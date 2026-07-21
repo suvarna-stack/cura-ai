@@ -77,5 +77,5 @@ vs GKE — not decided yet). What already fits that plan:
 - `/api/healthz` runs a real `SELECT COUNT(*)` — usable as the container
   health/liveness check.
 
-Migration plan + milestones: see the audit_chart session plan
-(`what-is-current-backend-refactored-gosling.md`).
+Migration plan + milestones: see `CLAUDE.md` (progress) and the full session
+plan at `~/.claude-work/plans/what-is-current-backend-refactored-gosling.md`.
