@@ -59,20 +59,23 @@ docker run -p 8002:8002 -e PORT=8002 \
   -e DATABASE_URL="postgresql://$USER@host.docker.internal:5432/medcode" medcode-api
 ```
 
-## Deploy (Render free tier, like the Flask POC)
+## Deploy (production direction: GCP, decided 2026-07-21)
 
-- New Web Service from this repo, runtime **Docker** (the Dockerfile builds and
-  runs the jar). Health check path: `/api/healthz` — keep the UptimeRobot ping
-  on it: the same request keeps the instance warm AND counts as Supabase DB
-  activity (free projects pause after 7 idle days).
-- Env vars: `DATABASE_URL` = the Supabase **session pooler** DSN
-  (`postgresql://...pooler.supabase.com:5432/postgres` — translated to JDBC
-  automatically), `ALLOWED_ORIGINS` = `*` or the Netlify origin. Render sets
-  `PORT` itself.
-- Single instance only: the in-process cases cache + write lock assume one
-  process (same as the Flask deploy's `gunicorn --workers 1`).
-- Before cutover check Supabase's Postgres major version (`select version();`)
-  — local dev runs 18; never restore a local pg_dump into an older server.
+Production will NOT use Supabase (cost). Target: **GCP with one container for
+this backend and one for Postgres** (exact service — VM+compose vs Cloud Run
+vs GKE — not decided yet). What already fits that plan:
+
+- The Dockerfile is the backend container; a stock `postgres:18` image is the
+  DB container (same major version as local dev — no dump-compat surprises).
+- Configuration is env-only: `DATABASE_URL` (or `JDBC_DATABASE_URL`),
+  `ALLOWED_ORIGINS` (the Netlify origin), `PORT`.
+- Seeding a fresh Postgres = the two `schema_postgres.sql` files +
+  `migrate_to_pg.py` (see `scripts/seed_local_pg.sh` for the exact sequence).
+- **Single backend instance only**: the in-process cases cache + write lock
+  assume one process (Flask ran `gunicorn --workers 1` for the same reason).
+  On Cloud Run that means `max-instances=1`.
+- `/api/healthz` runs a real `SELECT COUNT(*)` — usable as the container
+  health/liveness check.
 
 Migration plan + milestones: see the audit_chart session plan
 (`what-is-current-backend-refactored-gosling.md`).
