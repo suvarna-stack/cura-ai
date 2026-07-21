@@ -66,6 +66,15 @@ public class CasesWriteController {
         return approvals.reopen(caseId, coder);
     }
 
+    // app.py:379 demo_reset() — Settings demo tools bulk reset
+    @PostMapping("/api/demo/reset")
+    public Map<String, Object> demoReset(@RequestBody(required = false) byte[] body) {
+        Object parsed = parseSilent(body);
+        Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
+        String baselineCoder = Py.or_(b.get("baselineCoder") instanceof String s ? s : null, "demo.coder");
+        return approvals.demoReset(baselineCoder);
+    }
+
     // app.py:255 put_codes() — body is a bare StoredCode[] array
     @PutMapping("/api/cases/{caseId}/codes")
     public Map<String, Object> putCodes(@PathVariable String caseId,

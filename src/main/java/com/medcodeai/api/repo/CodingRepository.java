@@ -101,6 +101,11 @@ public class CodingRepository {
         return r.isEmpty() ? null : r.get(0);
     }
 
+    // app.py:415 demo_reset() — every currently-approved case
+    public List<String> approvedCaseIds() {
+        return jdbc.queryForList("SELECT case_id FROM cases WHERE case_status='approved'", String.class);
+    }
+
     // writeback.py:100 — the coder_assigned set the write-back exports
     public List<Map<String, Object>> coderCodes(String caseId) {
         return jdbc.query("""

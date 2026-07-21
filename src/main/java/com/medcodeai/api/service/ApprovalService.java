@@ -107,6 +107,80 @@ public class ApprovalService {
         return out;
     }
 
+    // app.py:379 demo_reset() — restore the run_demo baseline in one bulk call:
+    // reopen every non-baseline approval (actor "demo.reset", which views.py
+    // hides from coder lists and the Reopen tab), then re-finalize baseline
+    // cases a visitor reopened or approved-over — via the original run_demo
+    // path (re-confirm the principal), NOT the visitor's saved edits.
+    // Edits and drafts are kept, same as a single reopen.
+    public Map<String, Object> demoReset(String baselineCoder) {
+        Map<String, Object> result = writeGate.locked(() -> tx.execute(status -> {
+            String now = nowStr();
+            Map<String, Integer> stats = newStats();
+
+            // baseline = cases EVER finalized by the run_demo coder; last_by =
+            // most recent finalizer (same ordering as the finished tab's coder)
+            java.util.Set<String> baseline = new java.util.TreeSet<>();
+            Map<String, String> lastBy = new LinkedHashMap<>();
+            for (Map<String, Object> r : cases.approvalRows()) {
+                String by = detailBy((String) r.get("action_detail"));
+                if (Py.truthy(by)) {
+                    lastBy.put((String) r.get("case_id"), by);
+                    if (by.equals(baselineCoder)) {
+                        baseline.add((String) r.get("case_id"));
+                    }
+                }
+            }
+            java.util.Set<String> approvedNow = new java.util.TreeSet<>(coding.approvedCaseIds());
+
+            int reopened = 0;
+            int restored = 0;
+            for (String cid : approvedNow) {          // sorted(approved_now - baseline)
+                if (baseline.contains(cid)) {
+                    continue;
+                }
+                reopenCaseRows(cid, "demo.reset");
+                reopened++;
+            }
+            Integer uid = null;
+            for (String cid : baseline) {             // sorted(baseline)
+                if (approvedNow.contains(cid) && baselineCoder.equals(lastBy.get(cid))) {
+                    continue; // untouched baseline case
+                }
+                if (uid == null) {
+                    uid = ensureDemoCoder(baselineCoder);
+                }
+                if (approvedNow.contains(cid)) {      // re-approved by a visitor
+                    reopenCaseRows(cid, "demo.reset");
+                }
+                simulateCoderAssignment(cid, uid, baselineCoder, now, stats);
+                finalizeCase(cid, baselineCoder, now, stats);
+                restored++;
+            }
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("ok", true);
+            out.put("reopened", reopened);
+            out.put("restoredBaseline", restored);
+            return out;
+        }));
+        cache.invalidate();
+        return result;
+    }
+
+    // views.py:149 semantics — json.loads(detail or '{}').get('by'), errors -> null
+    private String detailBy(String actionDetail) {
+        if (!Py.truthy(actionDetail)) {
+            return null;
+        }
+        try {
+            Object v = json.readValue(actionDetail, LinkedHashMap.class).get("by");
+            return v == null ? null : v.toString();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     static Map<String, Integer> newStats() {
         Map<String, Integer> stats = new LinkedHashMap<>();
         stats.put("cases_finalized", 0);
