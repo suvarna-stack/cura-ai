@@ -2,16 +2,17 @@ package com.medcodeai.api.web;
 
 import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
+import com.medcodeai.api.service.ApprovalService;
+import com.medcodeai.api.service.Py;
 import com.medcodeai.api.service.WriteGate;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +29,41 @@ public class CasesWriteController {
     private final CasesRepository cases;
     private final WorkingStateRepository workingState;
     private final WriteGate writeGate;
+    private final ApprovalService approvals;
     private final JsonMapper json = new JsonMapper();
 
-    public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState, WriteGate writeGate) {
+    public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState,
+                                WriteGate writeGate, ApprovalService approvals) {
         this.cases = cases;
         this.workingState = workingState;
         this.writeGate = writeGate;
+        this.approvals = approvals;
+    }
+
+    // app.py:299 approve() — {ids, coder?} -> finalize + iMed write-back
+    @PostMapping("/api/cases/approve")
+    public Map<String, Object> approve(@RequestBody(required = false) byte[] body) {
+        Object parsed = parseSilent(body);
+        Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
+        Object ids = b.get("ids");
+        if (!(ids instanceof List<?> idList) || idList.isEmpty()
+                || !idList.stream().allMatch(i -> i instanceof String)) {
+            throw new ApiExceptionHandler.BadRequestException("expected {\"ids\": [\"<case_id>\", ...]}");
+        }
+        String coder = Py.or_(b.get("coder") instanceof String s ? s : null, "web.coder");
+        @SuppressWarnings("unchecked")
+        List<String> caseIds = (List<String>) idList;
+        return approvals.approve(caseIds, coder);
+    }
+
+    // app.py:360 reopen() — undo approve (both schemas)
+    @PostMapping("/api/cases/{caseId}/reopen")
+    public Map<String, Object> reopen(@PathVariable String caseId,
+                                      @RequestBody(required = false) byte[] body) {
+        Object parsed = parseSilent(body);
+        Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
+        String coder = Py.or_(b.get("coder") instanceof String s ? s : null, "web.coder");
+        return approvals.reopen(caseId, coder);
     }
 
     // app.py:255 put_codes() — body is a bare StoredCode[] array
@@ -86,7 +116,7 @@ public class CasesWriteController {
 
     // app.py:118 now_str()
     static String nowStr() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        return ApprovalService.nowStr();
     }
 
     static Map<String, Object> ok() {
