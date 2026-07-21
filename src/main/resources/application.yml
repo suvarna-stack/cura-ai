@@ -1,0 +1,8 @@
+server:
+  # Flask runs on 8000; default to 8001 so both servers can run side by side
+  # during the parity phase. Render sets PORT itself.
+  port: ${PORT:8001}
+
+spring:
+  application:
+    name: medcode-api
