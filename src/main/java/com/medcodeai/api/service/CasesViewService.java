@@ -2,6 +2,7 @@ package com.medcodeai.api.service;
 
 import com.medcodeai.api.repo.CasesRepository;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
@@ -151,7 +152,7 @@ public class CasesViewService {
                         }
                     }
                     String missing = String.join(", ", labels);
-                    Map<String, Object> oc = (Map<String, Object>) u.get("orders");
+                    Map<?, ?> oc = (Map<?, ?>) u.get("orders");
                     String g;
                     if (oc.containsKey("surgery")) {
                         g = "Surgery";
@@ -272,7 +273,7 @@ public class CasesViewService {
             return Map.of();
         }
         try {
-            return json.readValue(actionDetail, LinkedHashMap.class);
+            return json.readValue(actionDetail, new TypeReference<LinkedHashMap<String, Object>>() {});
         } catch (RuntimeException e) {
             return Map.of();
         }
