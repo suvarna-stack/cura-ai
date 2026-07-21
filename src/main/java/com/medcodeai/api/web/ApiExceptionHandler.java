@@ -17,9 +17,13 @@ import java.util.Map;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-    public static class NotFoundException extends RuntimeException {}
+    public static class NotFoundException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
 
     public static class BadRequestException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
         public BadRequestException(String message) {
             super(message);
         }
