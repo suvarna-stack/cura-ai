@@ -6,12 +6,13 @@ ORDER (the contract preserves it) and reports the first divergent paths.
 Run: .venv/bin/python scripts/parity_read.py [--details N|all]
 """
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 
-FLASK = 'http://localhost:8000/api'
-SPRING = 'http://localhost:8001/api'
+FLASK = os.environ.get('FLASK_BASE', 'http://localhost:8000/api')
+SPRING = os.environ.get('SPRING_BASE', 'http://localhost:8001/api')
 MAX_REPORT = 20
 
 diffs = []
