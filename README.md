@@ -16,18 +16,31 @@ against [docs/api-contract.md](docs/api-contract.md) /
   never touches it directly, it only calls the iMed API (approval results on
   approve/reopen).
 
-## Local dev
+## Local dev — first-time setup included
+
+**Just cloned this (or got it from a teammate)?** The databases are NOT
+shipped pre-built — you create them yourself from the seed file committed in
+each repo (`db/seed.sql.gz`). Keep the two repos as **sibling folders**
+(`medcode-api`, `imed-mock-api`), then:
 
 ```bash
-brew services start postgresql@18
-scripts/seed_local_pg.sh          # creates + seeds db "medcode" from db/seed.sql.gz
-cd ../imed-mock-api && scripts/seed_local_imed_pg.sh && ./mvnw spring-boot:run   # :8003
-./mvnw spring-boot:run            # :8001 (back in this repo)
+brew install postgresql@18 && brew services start postgresql@18   # once per machine
+scripts/seed_local_pg.sh                               # builds db "medcode" (this repo)
+cd ../imed-mock-api && scripts/seed_local_imed_pg.sh   # builds db "imed" (sibling repo)
+./mvnw spring-boot:run                                 # :8003 fake hospital — keep it running
+cd ../medcode-api && ./mvnw spring-boot:run            # :8001 this backend
 ```
 
-`db/seed.sql.gz` is the frozen demo baseline (real sample data, dumped once
-from the original POC pipeline). Restoring is plain `psql` — no Python, no
-venv, no dependency on the audit_chart folder.
+Good to know:
+
+- `db/seed.sql.gz` is the frozen demo baseline (real sample data, dumped once
+  from the original POC pipeline). Restoring is plain `psql` — no Python, no
+  venv, no other repos or downloads needed.
+- **Re-running a seed script wipes that database back to the baseline** —
+  handy reset, but it discards local approvals/edits.
+- Java 21 required; `./mvnw` fetches Maven itself.
+- Postgres not from Homebrew? Point `PGBIN` at your Postgres `bin` directory
+  when running the seed scripts.
 
 ## Environment variables
 
