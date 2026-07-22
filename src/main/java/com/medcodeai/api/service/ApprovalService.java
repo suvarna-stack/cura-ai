@@ -1,8 +1,8 @@
 package com.medcodeai.api.service;
 
+import com.medcodeai.api.client.ImedApiClient;
 import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.CodingRepository;
-import com.medcodeai.api.repo.ImedWritebackRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
 import com.medcodeai.api.web.ApiExceptionHandler;
 import org.springframework.stereotype.Service;
@@ -19,14 +19,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The approval workflow: approve (materialize edits + finalize + iMed
- * write-back) and reopen. Ported from server/app.py + sync/writeback.py.
+ * The approval workflow: approve (materialize edits + finalize + send results
+ * to the hospital) and reopen. Ported from server/app.py + sync/writeback.py.
  *
- * Structure per write request: WriteGate lock -> ONE DB transaction -> unlock
- * -> cache invalidate. Both schemas live in one Postgres DB, so unlike
- * Flask's two commits the whole write is atomic — the one allowed
- * improvement; every row written is identical. finalize stays idempotent
- * (Flask's crash-healing property).
+ * Structure per write request: WriteGate lock -> ONE DB transaction (our
+ * database only) -> hospital HTTP calls (ImedApiClient) -> unlock -> cache
+ * invalidate. The hospital ops are QUEUED while the transaction runs and sent
+ * only after it commits — the same order as the Flask reference's
+ * mc.commit()-then-imed.commit(). If a hospital call fails the request 500s
+ * with our side already committed; finalize and reopen are idempotent on both
+ * sides, so re-approving / re-reopening heals (Flask's crash-healing
+ * property, now across the HTTP boundary).
  */
 @Service
 public class ApprovalService {
@@ -40,14 +43,18 @@ public class ApprovalService {
 
     private final CasesRepository cases;
     private final CodingRepository coding;
-    private final ImedWritebackRepository imed;
+    private final ImedApiClient imed;
     private final WorkingStateRepository workingState;
     private final WriteGate writeGate;
     private final CasesCache cache;
     private final TransactionTemplate tx;
     private final JsonMapper json = new JsonMapper();
 
-    public ApprovalService(CasesRepository cases, CodingRepository coding, ImedWritebackRepository imed,
+    /** One queued hospital call; a null putBody means DELETE (reopen). */
+    private record ImedOp(String tn, Map<String, Object> putBody) {
+    }
+
+    public ApprovalService(CasesRepository cases, CodingRepository coding, ImedApiClient imed,
                            WorkingStateRepository workingState, WriteGate writeGate, CasesCache cache,
                            PlatformTransactionManager txManager) {
         this.cases = cases;
@@ -66,41 +73,51 @@ public class ApprovalService {
 
     // app.py:299 approve() — response {ok, approved, notFound, stats}
     public Map<String, Object> approve(List<String> ids, String coder) {
-        Map<String, Object> result = writeGate.locked(() -> tx.execute(status -> {
-            String now = nowStr();
-            Map<String, Integer> stats = newStats();
-            Integer uid = ensureDemoCoder(coder);
-            List<String> approved = new ArrayList<>();
-            List<String> notFound = new ArrayList<>();
-            for (String tn : ids) {
-                if (!cases.caseExists(tn)) {
-                    notFound.add(tn);
-                    continue;
+        Map<String, Object> result = writeGate.locked(() -> {
+            List<ImedOp> ops = new ArrayList<>();
+            Map<String, Object> out = tx.execute(status -> {
+                String now = nowStr();
+                Map<String, Integer> stats = newStats();
+                Integer uid = ensureDemoCoder(coder);
+                List<String> approved = new ArrayList<>();
+                List<String> notFound = new ArrayList<>();
+                for (String tn : ids) {
+                    if (!cases.caseExists(tn)) {
+                        notFound.add(tn);
+                        continue;
+                    }
+                    materializeCodeEdits(tn, uid, coder, now, stats);
+                    finalizeCase(tn, coder, now, stats, ops);
+                    approved.add(tn);
                 }
-                materializeCodeEdits(tn, uid, coder, now, stats);
-                finalizeCase(tn, coder, now, stats);
-                approved.add(tn);
-            }
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("ok", true);
-            out.put("approved", approved);
-            out.put("notFound", notFound);
-            out.put("stats", stats);
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("ok", true);
+                o.put("approved", approved);
+                o.put("notFound", notFound);
+                o.put("stats", stats);
+                return o;
+            });
+            runImedOps(ops); // after our commit — Flask's two-commit order
             return out;
-        }));
+        });
         cache.invalidate();
         return result;
     }
 
     // app.py:360 reopen()
     public Map<String, Object> reopen(String caseId, String coder) {
-        writeGate.locked(() -> tx.execute(status -> {
-            if (!cases.caseExists(caseId)) {
-                throw new ApiExceptionHandler.NotFoundException();
-            }
-            reopenCaseRows(caseId, coder);
+        writeGate.locked(() -> {
+            List<ImedOp> ops = new ArrayList<>();
+            tx.execute(status -> {
+                if (!cases.caseExists(caseId)) {
+                    throw new ApiExceptionHandler.NotFoundException();
+                }
+                reopenCaseRows(caseId, coder, ops);
+                return null;
+            });
+            runImedOps(ops);
             return null;
-        }));
+        });
         cache.invalidate();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);
@@ -114,56 +131,61 @@ public class ApprovalService {
     // path (re-confirm the principal), NOT the visitor's saved edits.
     // Edits and drafts are kept, same as a single reopen.
     public Map<String, Object> demoReset(String baselineCoder) {
-        Map<String, Object> result = writeGate.locked(() -> tx.execute(status -> {
-            String now = nowStr();
-            Map<String, Integer> stats = newStats();
+        Map<String, Object> result = writeGate.locked(() -> {
+            List<ImedOp> ops = new ArrayList<>();
+            Map<String, Object> out = tx.execute(status -> {
+                String now = nowStr();
+                Map<String, Integer> stats = newStats();
 
-            // baseline = cases EVER finalized by the run_demo coder; last_by =
-            // most recent finalizer (same ordering as the finished tab's coder)
-            java.util.Set<String> baseline = new java.util.TreeSet<>();
-            Map<String, String> lastBy = new LinkedHashMap<>();
-            for (Map<String, Object> r : cases.approvalRows()) {
-                String by = detailBy((String) r.get("action_detail"));
-                if (Py.truthy(by)) {
-                    lastBy.put((String) r.get("case_id"), by);
-                    if (by.equals(baselineCoder)) {
-                        baseline.add((String) r.get("case_id"));
+                // baseline = cases EVER finalized by the run_demo coder; last_by =
+                // most recent finalizer (same ordering as the finished tab's coder)
+                java.util.Set<String> baseline = new java.util.TreeSet<>();
+                Map<String, String> lastBy = new LinkedHashMap<>();
+                for (Map<String, Object> r : cases.approvalRows()) {
+                    String by = detailBy((String) r.get("action_detail"));
+                    if (Py.truthy(by)) {
+                        lastBy.put((String) r.get("case_id"), by);
+                        if (by.equals(baselineCoder)) {
+                            baseline.add((String) r.get("case_id"));
+                        }
                     }
                 }
-            }
-            java.util.Set<String> approvedNow = new java.util.TreeSet<>(coding.approvedCaseIds());
+                java.util.Set<String> approvedNow = new java.util.TreeSet<>(coding.approvedCaseIds());
 
-            int reopened = 0;
-            int restored = 0;
-            for (String cid : approvedNow) {          // sorted(approved_now - baseline)
-                if (baseline.contains(cid)) {
-                    continue;
+                int reopened = 0;
+                int restored = 0;
+                for (String cid : approvedNow) {          // sorted(approved_now - baseline)
+                    if (baseline.contains(cid)) {
+                        continue;
+                    }
+                    reopenCaseRows(cid, "demo.reset", ops);
+                    reopened++;
                 }
-                reopenCaseRows(cid, "demo.reset");
-                reopened++;
-            }
-            Integer uid = null;
-            for (String cid : baseline) {             // sorted(baseline)
-                if (approvedNow.contains(cid) && baselineCoder.equals(lastBy.get(cid))) {
-                    continue; // untouched baseline case
+                Integer uid = null;
+                for (String cid : baseline) {             // sorted(baseline)
+                    if (approvedNow.contains(cid) && baselineCoder.equals(lastBy.get(cid))) {
+                        continue; // untouched baseline case
+                    }
+                    if (uid == null) {
+                        uid = ensureDemoCoder(baselineCoder);
+                    }
+                    if (approvedNow.contains(cid)) {      // re-approved by a visitor
+                        reopenCaseRows(cid, "demo.reset", ops);
+                    }
+                    simulateCoderAssignment(cid, uid, baselineCoder, now, stats);
+                    finalizeCase(cid, baselineCoder, now, stats, ops);
+                    restored++;
                 }
-                if (uid == null) {
-                    uid = ensureDemoCoder(baselineCoder);
-                }
-                if (approvedNow.contains(cid)) {      // re-approved by a visitor
-                    reopenCaseRows(cid, "demo.reset");
-                }
-                simulateCoderAssignment(cid, uid, baselineCoder, now, stats);
-                finalizeCase(cid, baselineCoder, now, stats);
-                restored++;
-            }
 
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("ok", true);
-            out.put("reopened", reopened);
-            out.put("restoredBaseline", restored);
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("ok", true);
+                o.put("reopened", reopened);
+                o.put("restoredBaseline", restored);
+                return o;
+            });
+            runImedOps(ops);
             return out;
-        }));
+        });
         cache.invalidate();
         return result;
     }
@@ -283,9 +305,10 @@ public class ApprovalService {
         bump(stats, "coder_codes_created");
     }
 
-    // writeback.py:73 finalize_case() — status + audit trail, then the limited
-    // iMed write-back (A11 status row + MCAI-prefixed code rows)
-    void finalizeCase(String tn, String coder, String now, Map<String, Integer> stats) {
+    // writeback.py:73 finalize_case() — status + audit trail, then QUEUE the
+    // limited hospital write-back (one PUT: A11 status + MCAI-prefixed codes);
+    // the queued call is sent after our transaction commits
+    void finalizeCase(String tn, String coder, String now, Map<String, Integer> stats, List<ImedOp> ops) {
         Map<String, Object> caseRow = coding.caseRowForFinalize(tn);
         if (caseRow == null) {
             return; // approve() already screens with case_exists, like Flask
@@ -299,26 +322,33 @@ public class ApprovalService {
         approvedDetail.put("at", now);
         coding.insertHistory(tn, null, "approved_single", json.writeValueAsString(approvedDetail));
 
-        // Write-back 1: case coding/audit status -> A11 (upsert)
-        imed.deleteCodingStatus(tn);
-        imed.insertCodingStatus(tn, "approved", now, coder);
-        bump(stats, "status_rows");
-
-        // Write-back 2: finalized ICD codes (coder_assigned only, marked MCAI-)
-        imed.deleteMcaiCodeRows(tn);
+        // Hospital side (queued PUT): the coder_assigned set, translated into
+        // iMed vocabulary here — the hospital stores what it receives verbatim
         List<Map<String, Object>> coderCodes = coding.coderCodes(tn);
+        List<Map<String, Object>> codes = new ArrayList<>();
         for (Map<String, Object> cc : coderCodes) {
-            String ref = "MCAI-" + cc.get("case_code_id");
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("id", "MCAI-" + cc.get("case_code_id"));
+            c.put("icd", cc.get("code"));
+            c.put("name", cc.get("description"));
             if ("ICD-9".equals(cc.get("code_system")) || "procedure".equals(cc.get("code_role"))) {
-                imed.insertProcedureRow(tn, encountertype, ref,
-                        (String) cc.get("description"), (String) cc.get("code"));
+                c.put("type", "procedure");
             } else {
-                imed.insertDiagnosisRow(tn, encountertype, ref,
-                        (String) cc.get("description"), (String) cc.get("code"),
-                        ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS"));
+                c.put("type", "diagnosis");
+                // reverse Q3 role mapping, ours -> theirs
+                c.put("diagnosisType", ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS"));
             }
+            codes.add(c);
             bump(stats, "mcai_code_rows");
         }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "approved");
+        body.put("finalizedAt", now);
+        body.put("updatedBy", coder);
+        body.put("encounterType", encountertype);
+        body.put("codes", codes);
+        ops.add(new ImedOp(tn, body));
+        bump(stats, "status_rows");
 
         Map<String, Object> exportedDetail = new LinkedHashMap<>();
         exportedDetail.put("to", "iMed");
@@ -329,17 +359,30 @@ public class ApprovalService {
         bump(stats, "cases_finalized");
     }
 
-    // app.py:337 reopen_case_rows() — reverse an approve in both schemas;
-    // case_code_edits / case_report_drafts are KEPT (coder's work survives)
-    void reopenCaseRows(String caseId, String coder) {
+    // app.py:337 reopen_case_rows() — reverse an approve on our side and QUEUE
+    // the hospital-side clear; case_code_edits / case_report_drafts are KEPT
+    // (coder's work survives)
+    void reopenCaseRows(String caseId, String coder, List<ImedOp> ops) {
         coding.updateCaseStatus(caseId, "open");
         coding.deleteCoderAssigned(caseId);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);
         detail.put("at", nowStr());
         coding.insertHistory(caseId, null, "reopened", json.writeValueAsString(detail));
-        imed.deleteCodingStatus(caseId);
-        imed.deleteMcaiCodeRows(caseId);
+        ops.add(new ImedOp(caseId, null));
+    }
+
+    /** Send the queued hospital calls, in order, after our commit (still
+     *  inside the WriteGate lock). A failure here 500s the request with our
+     *  side committed — re-approve / re-reopen heals (both are idempotent). */
+    private void runImedOps(List<ImedOp> ops) {
+        for (ImedOp op : ops) {
+            if (op.putBody() == null) {
+                imed.deleteCodingResult(op.tn());
+            } else {
+                imed.putCodingResult(op.tn(), op.putBody());
+            }
+        }
     }
 
     // Python truthiness for JSON values (e.get("missing") checks)

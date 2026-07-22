@@ -2,48 +2,51 @@
 
 ## What this is
 
-Spring Boot 4.1 / Java 21 clone of the Flask POC backend at
-`../audit_chart/audit-chart_doc/integration-poc/server/` (which stays untouched
-as the frozen reference implementation). Serves the exact JSON contract in
-`../audit_chart/src/api/types.ts`; the React frontend switches over by changing
-`VITE_API_BASE` only. Build/run/test commands: see `README.md`.
+Spring Boot 4.1 / Java 21 backend for MedCode AI (medical-coding audit
+dashboard). Originally a query-for-query clone of the Flask POC at
+`../audit_chart/audit-chart_doc/integration-poc/server/` — that POC (and the
+whole audit_chart repo) is now **historical reference only**, never edited,
+never needed at runtime or setup time. Owns the `medcode` Postgres database;
+sends approval results to the hospital's iMed API — locally the sibling repo
+`../imed-mock-api`, a fake hospital server owning the separate `imed`
+database. Build/run/test commands: see `README.md`.
 
-## The golden rule
+## The golden rule (rewritten 2026-07-22 — the Flask-clone era is over)
 
-We are **cloning** the Flask API, not improving it — key order, absent-vs-null
-fields, and error message text are all part of the contract. If a Flask
-behavior looks like a bug, clone it anyway.
+**This backend owns the API contract.** The old React frontend is being
+retired; the next one will be built against `docs/api-contract.md` +
+`docs/types.ts`. Consequences:
 
-**Exception (decided 2026-07-22):** the sha1-based fake-data layer
-(`DeterministicFakes`, formerly guarded by a Python-generated golden file) has
-been permanently removed. Six fields — `confidence`, `patient`, `hn`,
-`created_at`/`updated_at`, `revenue_impact`, and `coder`/`coders`/`reopenedBy`
-— now return real DB values (null where no real value exists) instead of
-Flask's synthesized placeholders. This is a deliberate, permanent divergence
-from the Flask reference for those fields specifically; everything else
-stays a faithful clone. Frontend contract reconciliation
-(`../audit_chart/src/api/types.ts`, which currently types several of these
-fields as required/non-nullable) is explicitly out of scope for this repo.
-
-The correctness gate is now the Java integration test suite
-(`CasesApiIntegrationTest`, `./mvnw test` — usage in README), not code review
-and not a live-Flask diff.
+- Key order, absent-vs-null choices, and error text are OUR decisions now —
+  deliberate and documented, not cloned. When changing any response shape,
+  update `docs/api-contract.md` + `docs/types.ts` + `CasesApiIntegrationTest`
+  in the same commit.
+- Every field serves a REAL DB value; where no real source exists the field
+  is null (`confidence`, `patient`, `revenue_impact`) or a documented static
+  placeholder (`drg: "—"`). Never reintroduce synthesized per-case fake data.
+- The correctness gate is `./mvnw test` (requires imed-mock-api on :8003).
 
 ## Layout conventions
 
-- Layers: `web/` (controllers) → `service/` (logic) → `repo/` (ALL SQL).
-- Every repo method carries a comment naming its Python source line
-  (`// views.py:117`); services read step-by-step like their Python originals.
-- Responses are `LinkedHashMap<String,Object>` — never records, never JPA —
-  so key order and absent-vs-null stay one-line decisions per field.
-- `service/Py.java` replicates Python semantics (or-falsiness, `[:n]` slices).
-- Single-instance concurrency model: one write `ReentrantLock` + an in-process
-  `cases.json` cache (`CasesCache`), invalidated after approve/reopen/reset —
-  NOT after codes/draft saves. Never scale past one instance.
+- Layers: `web/` (controllers) → `service/` (logic) → `repo/` (ALL SQL), plus
+  `client/` (outbound HTTP to the hospital iMed API — `ImedApiClient`).
+- Many repo/service methods still carry comments naming their Python source
+  line (`// views.py:117`) — provenance for archaeology, not a constraint.
+- Responses are `LinkedHashMap<String,Object>` — stable key order and
+  absent-vs-null stay one-line decisions per field. `service/Py.java` keeps
+  the ported or-falsiness/slice helpers.
+- Single-instance concurrency: one write `ReentrantLock` (`WriteGate`) + an
+  in-process cases cache (`CasesCache`), invalidated after approve/reopen/
+  reset — NOT after codes/draft saves. Never scale past one instance.
+- **Writes are two-phase**: our DB transaction commits first, then the queued
+  hospital calls run (`ApprovalService` → `ImedApiClient`), still inside the
+  write lock — the Flask reference's two-commit order. A hospital-call
+  failure 500s with our side committed; approve/reopen are idempotent on both
+  sides, so re-doing the action heals.
 
 ## Progress
 
-Milestones from the migration plan (git log --oneline reads as this sequence):
+Milestones (git log --oneline reads as this sequence):
 
 - ✅ **M0** skeleton, health endpoints, local PG seeding
 - ✅ **M1** DeterministicFakes port + golden parity test
@@ -52,47 +55,56 @@ Milestones from the migration plan (git log --oneline reads as this sequence):
 - ✅ **M4** approve + reopen, full write parity
 - ✅ **M5** demo reset
 - ✅ **M6** CORS, Dockerfile, deploy docs — all parity gates green
-- ✅ **Fake-data removal (2026-07-22):** dropped `DeterministicFakes` entirely;
+- ✅ **Fake-data removal (2026-07-22):** dropped `DeterministicFakes`;
   `confidence`/`patient`/`hn`/`created_at`/`updated_at`/`revenue_impact`/
-  `coder` now serve real DB values (null where none exists). Python parity
-  scripts (`parity_read.py`, `parity_write.py`, `gen_fakes_golden.py`) deleted
-  along with the golden fixture; replaced by `CasesApiIntegrationTest`
-  (MockMvc against the local seeded DB). Frontend contract reconciliation
-  deferred — see "The golden rule."
-- ⬜ **M7 — cutover (NOT done):** point Spring at the prod DB, rerun the
-  integration test suite there, flip `VITE_API_BASE` in the frontend, drive
-  the real UI; Flask stays deployed as instant rollback.
+  `coder` serve real DB values (null where none exists). Python parity
+  scripts deleted; `CasesApiIntegrationTest` is the gate.
+- ✅ **iMed split + contract ownership + Python removal (2026-07-22):**
+  hospital side extracted to sibling repo `../imed-mock-api` (own `imed`
+  database; the medcode DB has no imed schema anymore). Approval results go
+  over HTTP (`client/ImedApiClient`, `IMED_API_BASE`). Seeding is committed
+  `db/seed.sql.gz` dumps restored with plain psql — Python and `.venv` fully
+  gone from both repos. URLs cleaned (`GET /api/cases`, `GET
+  /api/cases/{id}` — no `.json` suffix). Backend now owns the API contract:
+  `docs/api-contract.md` + `docs/types.ts`.
+- ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
+  containers), rerun both repos' test suites there, and build the NEW
+  frontend against `docs/types.ts`. The old frontend/Flask pair just keeps
+  running untouched until then.
 
-Deploy direction (decided 2026-07-21): **GCP, two containers** — this backend's
-Dockerfile + a stock `postgres:18` — NOT Supabase/Render (cost). Exact GCP
-service (VM+compose vs Cloud Run vs GKE) not chosen yet. Must run a single
-backend instance (`max-instances=1` on Cloud Run).
+Deploy direction (decided 2026-07-21, updated 2026-07-22): **GCP, three
+containers** — medcode-api, imed-mock-api (until the hospital provides the
+real iMed API; swapping is an `IMED_API_BASE` change), and one stock
+`postgres:18` hosting both databases. Exact GCP service not chosen yet. Must
+run a single medcode-api instance (`max-instances=1` on Cloud Run).
 
 **Update this section when a milestone or significant decision lands.**
 
 ## Gotchas still live
 
+- `./mvnw test` needs BOTH seeded databases AND imed-mock-api running on
+  :8003 (`IMED_API_BASE`) — approve/reopen make real hospital calls.
 - Timestamps/JSONB always come back as raw strings: `::text` casts +
   `getString`; never let JDBC parse them into objects.
-- Never `ORDER BY` a PG ENUM column bare — the verbatim `CASE` expressions
-  copied from views.py ARE the contract.
+- Never `ORDER BY` a PG ENUM column bare — the `CASE` expressions in the
+  repo SQL define the intended order.
 - JDBC URL needs `stringtype=unspecified` (writes into ENUM/JSONB columns)
   and `binaryTransfer=false`.
-- Absent-vs-null field mistakes are only caught by a full-payload diff —
-  run `./mvnw test` (`CasesApiIntegrationTest`) after any response-shape
-  change.
+- Response-shape changes must update `docs/api-contract.md` + `docs/types.ts`
+  and pass `CasesApiIntegrationTest`.
+- The seed dumps are the frozen demo baseline — regenerating them requires
+  the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
+  build output.
 
 ## Open tasks
 
-- **Split iMed integration into its own app.** `ImedWritebackRepository.java`
-  is currently the only class touching the `imed` schema (called from
-  `ApprovalService`) — today it's raw JDBC against the local Postgres mock.
-  Decided (2026-07-22): this will eventually move to its own separate
-  folder/repo/Spring Boot application, not an in-repo interface/gateway.
-  Not started; no timeline yet.
+- **Frontend rewrite** against `docs/types.ts` — separate project, not
+  started, out of scope for this repo.
+- **M7 cutover** (above).
 
 ## Full history
 
 - Complete migration plan (context, file mapping, gotchas):
   `~/.claude-work/plans/what-is-current-backend-refactored-gosling.md`
-- Ground-truth Python sources to port from are listed at the end of that plan.
+- iMed split + contract-ownership plan:
+  `~/.claude/plans/lets-split-repo-first-shimmying-ripple.md`

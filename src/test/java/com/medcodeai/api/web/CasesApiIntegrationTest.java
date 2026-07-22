@@ -22,12 +22,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Drives the real read/write/approve/reopen endpoints against the local
- * seeded "medcode" Postgres (no test containers, no mocks) — this is the
- * project's correctness gate now, replacing the old parity_read.py /
- * parity_write.py scripts. It validates the Java app's own real-DB-backed
- * behavior, not byte-for-byte Flask parity: confidence/patient/hn/dates/
- * revenue_impact/coder deliberately no longer come from synthesized
- * placeholder data (see CLAUDE.md, 2026-07-22).
+ * seeded "medcode" Postgres (no test containers, no mocks) — the project's
+ * correctness gate. PREREQUISITE: imed-mock-api must be running on :8003
+ * (or IMED_API_BASE) — approve/reopen send the hospital calls for real
+ * (cd ../imed-mock-api && ./mvnw spring-boot:run).
+ *
+ * Validates this backend's own contract (docs/api-contract.md), not Flask
+ * parity: confidence/patient/hn/dates/revenue_impact/coder come from real DB
+ * values, null where no real source exists (see CLAUDE.md, 2026-07-22).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,7 +54,7 @@ class CasesApiIntegrationTest {
 
     @Test
     void casesJsonHasExpectedShape() throws Exception {
-        JsonNode root = getJson("/api/cases.json");
+        JsonNode root = getJson("/api/cases");
         assertTrue(root.has("stats"));
         assertTrue(root.get("complete").isArray());
         assertTrue(root.get("incompleteGroups").isArray());
@@ -61,7 +63,7 @@ class CasesApiIntegrationTest {
 
     @Test
     void listedCasesHaveRealValuesNotPlaceholders() throws Exception {
-        JsonNode root = getJson("/api/cases.json");
+        JsonNode root = getJson("/api/cases");
         JsonNode sample = firstListedCase(root);
         assertNotNull(sample, "expected at least one case in the dashboard payload");
         assertTrue(sample.get("patient").isNull(), "no real patient-name source exists yet");
@@ -71,7 +73,7 @@ class CasesApiIntegrationTest {
 
     @Test
     void finishedCasesShowRealCoderIdNotRotatedFakeName() throws Exception {
-        JsonNode finished = getJson("/api/cases.json").get("finished");
+        JsonNode finished = getJson("/api/cases").get("finished");
         assertTrue(finished.size() > 0, "expected at least one already-approved case in the seed data");
         String coder = finished.get(0).get("coder").asString();
         assertTrue(coder.equals("demo.coder") || coder.equals("web.coder"),
@@ -80,16 +82,15 @@ class CasesApiIntegrationTest {
 
     @Test
     void caseDetailUnknownIdReturns404() throws Exception {
-        mvc.perform(get("/api/cases/does-not-exist.json")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/cases/does-not-exist")).andExpect(status().isNotFound());
     }
 
     @Test
-    void caseDetailKnownIdReturnsLiveMarkers() throws Exception {
-        // codeEdits/reportDraft are always present but may be JSON null when
-        // unset — that null-vs-absent distinction is what marks "served live
-        // by this server" vs a static export, so check key presence directly
-        // rather than via jsonPath().exists() (which treats a null leaf as absent).
-        JsonNode detail = getJson("/api/cases/" + KNOWN_CASE_ID + ".json");
+    void caseDetailKnownIdIncludesWorkingState() throws Exception {
+        // codeEdits/reportDraft are always present, JSON null when unset —
+        // check key presence directly rather than via jsonPath().exists()
+        // (which treats a null leaf as absent).
+        JsonNode detail = getJson("/api/cases/" + KNOWN_CASE_ID);
         assertTrue(KNOWN_CASE_ID.equals(detail.get("case").get("case_id").asString()));
         assertTrue(detail.has("codeEdits"));
         assertTrue(detail.has("reportDraft"));
@@ -103,7 +104,7 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(true));
 
-        mvc.perform(get("/api/cases/{id}.json", KNOWN_CASE_ID))
+        mvc.perform(get("/api/cases/{id}", KNOWN_CASE_ID))
                 .andExpect(jsonPath("$.reportDraft").value("integration test draft"));
     }
 
@@ -115,7 +116,7 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approved[0]").value(APPROVABLE_CASE_ID));
 
-        JsonNode afterApprove = getJson("/api/cases.json");
+        JsonNode afterApprove = getJson("/api/cases");
         assertTrue(containsCaseId(afterApprove.get("finished"), APPROVABLE_CASE_ID),
                 "approved case should move into the finished queue (cache must invalidate)");
 
@@ -125,7 +126,7 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(true));
 
-        JsonNode afterReopen = getJson("/api/cases.json");
+        JsonNode afterReopen = getJson("/api/cases");
         assertFalse(containsCaseId(afterReopen.get("finished"), APPROVABLE_CASE_ID),
                 "reopened case should leave the finished queue");
     }

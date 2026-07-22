@@ -10,9 +10,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * The two read endpoints. Paths keep the literal ".json" suffix — the static
- * export convention baked into src/api/client.ts — so the frontend switches
- * between static files and this server via VITE_API_BASE alone.
+ * The two read endpoints. Clean REST paths — the legacy ".json" suffix (a
+ * static-file convention the old frontend depended on) is gone: this backend
+ * owns the contract now and the next frontend is built against it
+ * (docs/api-contract.md).
  */
 @RestController
 public class CasesReadController {
@@ -28,15 +29,14 @@ public class CasesReadController {
     }
 
     // app.py:229 — cached until the next approve/reopen/reset
-    @GetMapping("/api/cases.json")
+    @GetMapping("/api/cases")
     public Map<String, Object> cases() {
         return cache.get(views::buildCasesPayload);
     }
 
-    // app.py:241 — detail + codeEdits/reportDraft, which are ALWAYS present
-    // (null when unset): their presence is the frontend's "live server, not
-    // static files" marker (client.ts isLiveDetail)
-    @GetMapping("/api/cases/{caseId}.json")
+    // app.py:241 — detail + codeEdits/reportDraft, ALWAYS present (null when
+    // unset): the working state belongs to the detail payload even when empty
+    @GetMapping("/api/cases/{caseId}")
     public Map<String, Object> caseDetail(@PathVariable String caseId) {
         Map<String, Object> detail = views.buildCaseDetail(caseId);
         if (detail == null) {
