@@ -1,0 +1,7 @@
+server:
+  # 8000 Flask (retired reference), 8001 medcode-api — this app defaults to 8003
+  port: ${PORT:8003}
+
+spring:
+  application:
+    name: imed-mock-api
