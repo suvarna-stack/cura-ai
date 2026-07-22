@@ -83,17 +83,28 @@ liveness check).
 **Auth: none in this mock.** The production API the hospital provides will
 need authentication — scheme TBD with the hospital.
 
-## Local dev
+## Local dev — first-time setup included
+
+**Just cloned this (or got it from a teammate)?** The `imed` database is NOT
+shipped pre-built — you create it from the committed seed file:
 
 ```bash
-brew services start postgresql@18
+brew install postgresql@18 && brew services start postgresql@18   # once per machine
 scripts/seed_local_imed_pg.sh     # creates + seeds db "imed" from db/seed.sql.gz
 ./mvnw spring-boot:run            # :8003
 ```
 
-`db/seed.sql.gz` is the frozen demo baseline — real hospital sample extracts
-(73k rows across 11 tables), dumped once from the original POC pipeline.
-Restoring is plain `psql`; no Python anywhere.
+Good to know:
+
+- `db/seed.sql.gz` is the frozen demo baseline — real hospital sample
+  extracts (73k rows across 11 tables), dumped once from the original POC
+  pipeline. Restoring is plain `psql`; no Python anywhere.
+- **Re-running the seed script wipes the database back to the baseline**
+  (any coding results written by medcode-api are discarded).
+- The full stack needs the sibling repo `../medcode-api` too — see its README
+  for the two-repo setup.
+- Java 21 required; `./mvnw` fetches Maven itself. Postgres not from
+  Homebrew? Point `PGBIN` at your Postgres `bin` directory.
 
 ## Environment variables
 
