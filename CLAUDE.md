@@ -25,6 +25,12 @@ retired; the next one will be built against `docs/api-contract.md` +
   is null (`confidence`, `patient`, `revenue_impact`) or a documented static
   placeholder (`drg: "—"`). Never reintroduce synthesized per-case fake data.
 - The correctness gate is `./mvnw test` (requires imed-mock-api on :8003).
+- **Swagger is NOT a fourth mirror.** The `@Operation`/`@ExampleObject`
+  annotations on the controllers feed a local-dev try-it-out console; they are
+  descriptive, hand-trimmed, and nothing asserts them. The same-commit sync
+  obligation stays `docs/api-contract.md` + `docs/types.ts` +
+  `CasesApiIntegrationTest`. Only **adding or removing an endpoint** obliges
+  you to touch the annotations — `OpenApiDocsTest` enforces that much.
 
 ## Layout conventions
 
@@ -67,6 +73,13 @@ Milestones (git log --oneline reads as this sequence):
   gone from both repos. URLs cleaned (`GET /api/cases`, `GET
   /api/cases/{id}` — no `.json` suffix). Backend now owns the API contract:
   `docs/api-contract.md` + `docs/types.ts`.
+- ✅ **Swagger UI (2026-07-22):** springdoc 3.0.3 (the Boot 4 line; Boot's BOM
+  doesn't manage it, so the version is pinned in `pom.xml`). Scope was chosen
+  deliberately: a **try-it-out console for manual poking, local dev only** —
+  not a codegen-grade spec. `SWAGGER_ENABLED` defaults true in
+  `application.yml` and is forced `false` by `ENV` in the `Dockerfile`, so
+  containers are off by construction (the API has no auth and
+  `POST /api/demo/reset` is a bulk write). Metadata in `config/OpenApiConfig`.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers), rerun both repos' test suites there, and build the NEW
   frontend against `docs/types.ts`. The old frontend/Flask pair just keeps

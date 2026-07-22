@@ -6,3 +6,14 @@ server:
 spring:
   application:
     name: medcode-api
+
+# Swagger UI is a local-dev convenience: default ON here so `mvnw
+# spring-boot:run` just works, forced OFF in the Dockerfile so every
+# containerized run (incl. GCP) is off by construction. The API has no auth —
+# a public try-it-out console would advertise POST /api/demo/reset.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html

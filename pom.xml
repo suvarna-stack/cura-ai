@@ -39,6 +39,15 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- Swagger UI / OpenAPI. The 3.0.x line is the Spring Boot 4 one (2.8.x
+		     is Boot 3); Boot's BOM doesn't manage springdoc, hence the version.
+		     Disabled unless SWAGGER_ENABLED=true — see application.yml. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>

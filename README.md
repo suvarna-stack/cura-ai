@@ -51,6 +51,7 @@ Good to know:
 | `IMED_API_BASE` | Base URL of the hospital iMed API — `../imed-mock-api` locally, the hospital's real API in production. Default `http://localhost:8003`. |
 | `ALLOWED_ORIGINS` | CORS origins, `*` (default) or comma list. |
 | `PORT` | HTTP port (default 8001). |
+| `SWAGGER_ENABLED` | Swagger UI + `/v3/api-docs`. Default `true` when running locally, forced `false` in the Docker image (so every container, incl. GCP, ships without it). |
 
 ## The API
 
@@ -59,6 +60,14 @@ request/response shapes and per-field nullability (each field maps to a real
 DB column or a documented deliberate null).
 [docs/types.ts](docs/types.ts) — the same contract as TypeScript types; the
 next frontend imports/copies this file.
+
+**Swagger UI: <http://localhost:8001/swagger-ui.html>** — an interactive
+console for poking the endpoints by hand (handy for the write ones, whose
+bodies are easy to get wrong). It is a dev tool, **not** the contract: the
+controllers return `Map`, so the generated schemas are bare `object` and the
+real shapes come from hand-written examples on each method. `api-contract.md`
+above stays the source of truth. Off in containers — set
+`SWAGGER_ENABLED=true` to override.
 
 ## Testing
 

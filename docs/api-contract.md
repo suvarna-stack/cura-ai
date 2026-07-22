@@ -8,6 +8,10 @@ Any change to a response shape must update this file, `types.ts`, and
 Base URL: the backend origin (local dev `http://localhost:8001`). All bodies
 are JSON. CORS: `ALLOWED_ORIGINS` env (`*` by default).
 
+Running locally, `/swagger-ui.html` serves an interactive console for trying
+these endpoints out. Its examples are trimmed copies of what's below, kept for
+convenience — when the two disagree, **this document wins**.
+
 ## Conventions
 
 - **Key order is stable** and matches the shapes below (objects are built in
