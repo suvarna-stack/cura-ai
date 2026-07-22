@@ -12,5 +12,9 @@ RUN ./mvnw -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/imed-mock-api-*.jar app.jar
+# Actuator's readiness group includes the DB check, so an unreachable Postgres
+# marks the container unhealthy instead of merely failing every request.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD curl -fsS "http://localhost:${PORT:-8003}/actuator/health/readiness" || exit 1
 # application.yml reads PORT (default 8003)
 CMD ["java", "-jar", "app.jar"]

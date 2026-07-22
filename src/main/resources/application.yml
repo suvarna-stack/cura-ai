@@ -5,3 +5,27 @@ server:
 spring:
   application:
     name: imed-mock-api
+
+# Swagger UI / OpenAPI — this app IS the integration spec, so the doc is
+# generated from the running code (README tables drift, /v3/api-docs cannot).
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+# Container probes. The readiness group gets the DB check added to it, so
+# /actuator/health/readiness is false while Postgres is unreachable.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db

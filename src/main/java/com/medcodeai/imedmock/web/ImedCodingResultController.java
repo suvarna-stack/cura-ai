@@ -2,6 +2,10 @@ package com.medcodeai.imedmock.web;
 
 import com.medcodeai.imedmock.repo.ImedReadRepository;
 import com.medcodeai.imedmock.repo.ImedWritebackRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,6 +28,8 @@ import java.util.Map;
  * DELETE clears it (reopen). Both run in one local transaction.
  */
 @RestController
+@Tag(name = "Write — receive our approval results",
+        description = "The limited write-back MedCode AI performs on case finalization")
 public class ImedCodingResultController {
 
     private final ImedReadRepository read;
@@ -37,34 +42,32 @@ public class ImedCodingResultController {
 
     @PutMapping("/api/cases/{tn}/coding-result")
     @Transactional
-    public Map<String, Object> putCodingResult(@PathVariable String tn, @RequestBody Map<String, Object> body) {
+    @Operation(summary = "Submit the approval result for a case",
+            description = "Writes the A11 coding-status row and the finalized ICD codes as NEW rows "
+                    + "carrying the MCAI- prefix. Replaces any previously submitted result — idempotent, "
+                    + "safe to retry. Clinical notes and hospital-entered codes are never modified.")
+    @ApiResponse(responseCode = "200", description = "Written")
+    @ApiResponse(responseCode = "400", description = "A code id is missing the MCAI- prefix, "
+            + "status is blank, or the body is malformed")
+    @ApiResponse(responseCode = "404", description = "Unknown transaction number")
+    public Map<String, Object> putCodingResult(@PathVariable String tn,
+            @Valid @RequestBody CodingResultRequest req) {
+        // body constraints (MCAI- prefix, status) are enforced during binding
         requireCase(tn);
-        String encounterType = str(body.get("encounterType"));
-        List<?> codes = body.get("codes") instanceof List<?> l ? l : List.of();
-
-        // validate before writing anything: every code row needs the MCAI- id
-        for (Object o : codes) {
-            if (!(o instanceof Map<?, ?> c) || !(c.get("id") instanceof String id) || !id.startsWith("MCAI-")) {
-                throw new ApiExceptionHandler.BadRequestException("every code needs an id prefixed 'MCAI-'");
-            }
-        }
 
         // A11 status row, upsert-by-delete
         write.deleteCodingStatus(tn);
-        write.insertCodingStatus(tn, str(body.get("status")), str(body.get("finalizedAt")),
-                str(body.get("updatedBy")));
+        write.insertCodingStatus(tn, req.status(), req.finalizedAt(), req.updatedBy());
 
         // replace all previously submitted MCAI- rows with this submission
         write.deleteMcaiCodeRows(tn);
         int written = 0;
-        for (Object o : codes) {
-            Map<?, ?> c = (Map<?, ?>) o;
-            if ("procedure".equals(c.get("type"))) {
-                write.insertProcedureRow(tn, encounterType, str(c.get("id")), str(c.get("name")),
-                        str(c.get("icd")));
+        for (CodingResultRequest.Code c : req.codes()) {
+            if (c.isProcedure()) {
+                write.insertProcedureRow(tn, req.encounterType(), c.id(), c.name(), c.icd());
             } else {
-                write.insertDiagnosisRow(tn, encounterType, str(c.get("id")), str(c.get("name")),
-                        str(c.get("icd")), str(c.get("diagnosisType")));
+                write.insertDiagnosisRow(tn, req.encounterType(), c.id(), c.name(), c.icd(),
+                        c.diagnosisType());
             }
             written++;
         }
@@ -78,6 +81,10 @@ public class ImedCodingResultController {
 
     @DeleteMapping("/api/cases/{tn}/coding-result")
     @Transactional
+    @Operation(summary = "Clear the approval result for a case (reopen)",
+            description = "Removes the coding-status row and every MCAI- code row. Idempotent.")
+    @ApiResponse(responseCode = "200", description = "Cleared")
+    @ApiResponse(responseCode = "404", description = "Unknown transaction number")
     public Map<String, Object> deleteCodingResult(@PathVariable String tn) {
         requireCase(tn);
         write.deleteCodingStatus(tn);
@@ -91,9 +98,5 @@ public class ImedCodingResultController {
         if (!read.caseExists(tn)) {
             throw new ApiExceptionHandler.NotFoundException();
         }
-    }
-
-    private static String str(Object o) {
-        return o == null ? null : o.toString();
     }
 }

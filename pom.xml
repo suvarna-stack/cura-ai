@@ -25,6 +25,25 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<!-- Bean Validation: the coding-result contract is declared on the DTO
+		     records, so the rules are enforced AND published in the OpenAPI doc -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<!-- /actuator/health/{liveness,readiness} — container probes incl. the DB -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<!-- Swagger UI + OpenAPI 3.1 at /swagger-ui.html and /v3/api-docs[.yaml].
+		     MUST be the 3.x line: 2.8.x targets Boot 3 / Jackson 2 and will not
+		     start here. Not managed by the Boot BOM, hence the explicit version. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.3</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.postgresql</groupId>
@@ -48,6 +67,26 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<!-- Formatting, so it does not depend on who has format-on-save enabled.
+			     Runs the Eclipse JDT formatter — the same engine VSCode's Java
+			     extension uses — against config/eclipse-formatter.xml.
+			       ./mvnw spotless:apply    reformat everything
+			       ./mvnw spotless:check    fail if anything is unformatted -->
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>3.8.0</version>
+				<configuration>
+					<java>
+						<eclipse>
+							<file>${project.basedir}/config/eclipse-formatter.xml</file>
+						</eclipse>
+						<removeUnusedImports/>
+						<trimTrailingWhitespace/>
+						<endWithNewline/>
+					</java>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

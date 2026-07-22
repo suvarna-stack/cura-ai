@@ -51,15 +51,41 @@ public class ImedReadRepository {
         return jdbc.query("SELECT * FROM imed." + table + " WHERE transactionnumber = ?", ROW, tn);
     }
 
-    public List<Map<String, Object>> medicalRecords(String tn)       { return byTn("medhack_medicalrecord", tn); }
-    public List<Map<String, Object>> medicalRecordResults(String tn) { return byTn("medhack_medicalrecord_result", tn); }
-    public List<Map<String, Object>> diagnoses(String tn)            { return byTn("medhack_diagnosis_icd10", tn); }
-    public List<Map<String, Object>> procedures(String tn)           { return byTn("medhack_procedure_icd9", tn); }
-    public List<Map<String, Object>> orderDrugs(String tn)           { return byTn("medhack_orderdrug", tn); }
-    public List<Map<String, Object>> orderLabs(String tn)            { return byTn("medhack_orderlab", tn); }
-    public List<Map<String, Object>> vitalSigns(String tn)           { return byTn("medhack_vitalsign", tn); }
-    public List<Map<String, Object>> bedManagement(String tn)        { return byTn("medhack_bedmanagement", tn); }
-    public List<Map<String, Object>> billingItems(String tn)         { return byTn("medhack_billingitem", tn); }
+    public List<Map<String, Object>> medicalRecords(String tn) {
+        return byTn("medhack_medicalrecord", tn);
+    }
+
+    public List<Map<String, Object>> medicalRecordResults(String tn) {
+        return byTn("medhack_medicalrecord_result", tn);
+    }
+
+    public List<Map<String, Object>> diagnoses(String tn) {
+        return byTn("medhack_diagnosis_icd10", tn);
+    }
+
+    public List<Map<String, Object>> procedures(String tn) {
+        return byTn("medhack_procedure_icd9", tn);
+    }
+
+    public List<Map<String, Object>> orderDrugs(String tn) {
+        return byTn("medhack_orderdrug", tn);
+    }
+
+    public List<Map<String, Object>> orderLabs(String tn) {
+        return byTn("medhack_orderlab", tn);
+    }
+
+    public List<Map<String, Object>> vitalSigns(String tn) {
+        return byTn("medhack_vitalsign", tn);
+    }
+
+    public List<Map<String, Object>> bedManagement(String tn) {
+        return byTn("medhack_bedmanagement", tn);
+    }
+
+    public List<Map<String, Object>> billingItems(String tn) {
+        return byTn("medhack_billingitem", tn);
+    }
 
     /** The A11 row MedCode AI wrote back, or null when the case is uncoded. */
     public Map<String, Object> codingStatus(String tn) {

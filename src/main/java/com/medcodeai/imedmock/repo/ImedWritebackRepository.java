@@ -55,7 +55,7 @@ public class ImedWritebackRepository {
     // ICD-10 diagnosis rows; diagnosistype arrives already in iMed vocabulary
     // (PRIMARY_DIAGNOSIS / COMORBIDITY / OTHERS / EXTERNAL_CAUSE_OF_INJURY)
     public void insertDiagnosisRow(String tn, String encountertype, String ref, String name,
-                                   String icd, String diagnosistype) {
+            String icd, String diagnosistype) {
         jdbc.update("""
                 INSERT INTO imed.medhack_diagnosis_icd10
                 (transactionnumber, encountertype, id, name, icd, diagnosistype)

@@ -14,6 +14,23 @@ sample extract data. Two audiences:
 Spring Boot 4.1 / Java 21, Maven (`./mvnw`), plain SQL — no JPA, no Python.
 Owns the `imed` PostgreSQL database exclusively; no other app touches it.
 
+## The spec, generated
+
+Because this app IS the integration spec, the spec is generated from the
+running code rather than maintained by hand — the tables below can drift, the
+generated document cannot.
+
+| URL | What |
+|---|---|
+| `/swagger-ui.html` | Browsable API, try-it-out against the seeded data |
+| `/v3/api-docs` | OpenAPI 3.1 JSON |
+| `/v3/api-docs.yaml` | OpenAPI 3.1 YAML — **the file to hand the hospital's integrators** |
+
+The write-back rules (MCAI- prefix, required `status`, the `diagnosisType`
+vocabulary) are declared once as Bean Validation constraints on
+`CodingResultRequest`, so what the server enforces and what the document
+publishes cannot disagree.
+
 ## The API
 
 ### READ — "give us your case data"
@@ -68,6 +85,10 @@ PUT /api/cases/{tn}/coding-result
   retry). `type` routes the row: `"procedure"` → MedHack_Procedure(ICD9),
   anything else → MedHack_Diagnosis(ICD10) with `diagnosisType` stored verbatim
   (`PRIMARY_DIAGNOSIS` / `COMORBIDITY` / `OTHERS` / `EXTERNAL_CAUSE_OF_INJURY`).
+- Rejected with 400 `{"error": "..."}`: any code id missing the `MCAI-` prefix,
+  a blank `status`, or a malformed body. Several problems at once come back as
+  one message joined with `; `. `finalizedAt` / `updatedBy` / `encounterType`
+  are optional — absent means a null column, not an error.
 
 ```
 DELETE /api/cases/{tn}/coding-result   → {"ok": true}
@@ -77,8 +98,14 @@ DELETE /api/cases/{tn}/coding-result   → {"ok": true}
 
 ### Health
 
-`GET /api/health` (no DB) · `GET /api/healthz` (real `COUNT(*)` — container
-liveness check).
+`GET /api/health` (no DB) · `GET /api/healthz` (real `COUNT(*)`). Both stay in
+the published contract for existing callers.
+
+For container probes prefer Actuator, which checks the connection pool itself:
+`GET /actuator/health/liveness` · `GET /actuator/health/readiness` (the
+readiness group includes the `db` check, so an unreachable Postgres reports
+DOWN rather than merely failing every request). The Dockerfile HEALTHCHECK
+uses readiness.
 
 **Auth: none in this mock.** The production API the hospital provides will
 need authentication — scheme TBD with the hospital.
@@ -91,7 +118,7 @@ shipped pre-built — you create it from the committed seed file:
 ```bash
 brew install postgresql@18 && brew services start postgresql@18   # once per machine
 scripts/seed_local_imed_pg.sh     # creates + seeds db "imed" from db/seed.sql.gz
-./mvnw spring-boot:run            # :8003
+./mvnw spring-boot:run            # :8003 — browse http://localhost:8003/swagger-ui.html
 ```
 
 Good to know:
@@ -122,8 +149,27 @@ Good to know:
 
 `ImedMockApiIntegrationTest` runs against the local seeded `imed` Postgres
 (`@SpringBootTest` + MockMvc, no test containers, no mocks): read endpoints,
-the MCAI- prefix rule, and the full coding-result round trip
-(submit → visible → replace → clear).
+the MCAI- prefix rule and the other body constraints, the full coding-result
+round trip (submit → visible → replace → clear), and the published contract
+itself — that `/v3/api-docs` covers every endpoint and carries the MCAI- rule,
+so the spec cannot silently drift from the code.
+
+## Formatting
+
+```bash
+./mvnw spotless:apply     # reformat every Java file
+./mvnw spotless:check     # fail if anything is unformatted
+```
+
+Spotless runs the Eclipse JDT formatter — the same engine VSCode's Java
+extension uses on format-on-save — against `config/eclipse-formatter.xml`, so
+saving in the editor and running the command produce identical output and
+nobody's editor settings can start a whitespace war.
+
+Two deliberate deviations from the Eclipse defaults: comment re-flow is off
+(the prose here is hand-wrapped), and annotation arguments wrap at 120 instead
+of never (the default drags long `@Operation`/`@Schema` descriptions onto
+200-character lines).
 
 ## Docker
 
