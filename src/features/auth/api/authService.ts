@@ -1,13 +1,17 @@
-import { apiClient } from '../../../lib/axios'
 import type { AuthResponse, LoginCredentials } from '../types/auth.types'
 
+/**
+ * Placeholder auth API — wire to shared apiClient when the backend is ready.
+ * Do not add mock credential checks here.
+ */
 export async function loginUser(
   credentials: LoginCredentials,
 ): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/login', credentials)
-  return data
+  void credentials
+  // TODO: const { data } = await apiClient.post<AuthResponse>('/auth/login', credentials)
+  return { token: '' }
 }
 
 export async function logoutUser(): Promise<void> {
-  await apiClient.post('/auth/logout')
+  // TODO: await apiClient.post('/auth/logout')
 }
