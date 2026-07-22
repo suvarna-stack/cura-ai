@@ -20,9 +20,28 @@ import java.util.Set;
  * JacksonConfig). "field absent" vs "field null" follows the Python exactly:
  * e.g. `missing` exists only on incomplete rows, `reopened*` only when set,
  * finished rows drop confidence/ccpi/cc/pi.
+ *
+ * Deliberate divergence from the Flask original (2026-07-22): confidence,
+ * patient, hn, created_at/updated_at, revenue_impact and coder/coders/
+ * reopenedBy no longer come from synthesized placeholder data — they're the
+ * real DB values (null where no real value exists yet).
  */
 @Service
 public class CasesViewService {
+
+    // views.py:89 MISSING_LABEL — missing-field key -> human label
+    private static final Map<String, String> MISSING_LABEL = missingLabels();
+
+    private static Map<String, String> missingLabels() {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("chief", "Chief complaint / subjective note");
+        m.put("exam", "Physical examination / objective note");
+        m.put("assessment", "Assessment / progression note");
+        m.put("primary_diagnosis", "Principal diagnosis (ICD-10)");
+        m.put("admission_note", "Admission note");
+        m.put("discharge_summary", "Discharge / clinical summary");
+        return m;
+    }
 
     private final CasesRepository repo;
     private final JsonMapper json = new JsonMapper();
@@ -74,10 +93,9 @@ public class CasesViewService {
             if (!Py.truthy(by) || "demo.reset".equals(by)) {
                 continue;
             }
-            String name = DeterministicFakes.displayCoder(caseId, by);
             List<String> lst = caseCoders.computeIfAbsent(caseId, k -> new ArrayList<>());
-            if (!lst.contains(name)) {
-                lst.add(name);
+            if (!lst.contains(by)) {
+                lst.add(by);
             }
         }
 
@@ -124,7 +142,7 @@ public class CasesViewService {
                 }
                 fin.put("codedDate",
                         Py.or_(approvedAt.get(id), Py.slice(Py.or_((String) r.get("fetched_at"), ""), 10)));
-                fin.put("coder", DeterministicFakes.displayCoder(id, by));
+                fin.put("coder", by);
                 fin.put("coderId", Py.or_(by, "—"));
                 fin.put("drg", "—");
                 fin.put("reopenable", true); // DEPRECATED: any coder may reopen any case
@@ -138,7 +156,7 @@ public class CasesViewService {
                         u.put("reopenedAt", lf[2]);
                     }
                     if (Py.truthy(lf[1])) {
-                        u.put("reopenedBy", DeterministicFakes.displayCoder(id, lf[1]));
+                        u.put("reopenedBy", lf[1]);
                     }
                 }
                 if ("complete".equals(r.get("completeness_status"))) {
@@ -148,7 +166,7 @@ public class CasesViewService {
                     List<String> labels = new ArrayList<>();
                     for (String m : Py.or_((String) r.get("missing_detail"), "").split(",", -1)) {
                         if (!m.isEmpty()) {
-                            labels.add(DeterministicFakes.MISSING_LABEL.getOrDefault(m, m));
+                            labels.add(MISSING_LABEL.getOrDefault(m, m));
                         }
                     }
                     String missing = String.join(", ", labels);
@@ -212,17 +230,16 @@ public class CasesViewService {
                                        Map<String, List<String>> caseCoders) {
         String cid = (String) r.get("case_id");
         Map<String, String> cc = ccpi.getOrDefault(cid, Map.of());
-        String[] dates = DeterministicFakes.fakeDates(cid);
         Map<String, Object> cv = coverage.get(r.get("coverage_type"));
 
         Map<String, Object> u = new LinkedHashMap<>();
         u.put("id", cid); // the real VN (iMed transactionnumber)
-        u.put("patient", DeterministicFakes.fakeName(cid, (String) r.get("sex")));
-        u.put("hn", DeterministicFakes.fakeHn(cid));
+        u.put("patient", null); // no real patient-name source exists (Data Mapping Q1)
+        u.put("hn", r.get("patient_ref")); // real column; null where the extract lacks it
         u.put("dept", Py.or_((String) r.get("department"), (String) r.get("ward"), "—"));
         u.put("ward", r.get("ward"));
         u.put("group", Py.or_((String) r.get("disease_group"), "Ungrouped"));
-        u.put("confidence", DeterministicFakes.conf(cid, (String) r.get("severity_level")));
+        u.put("confidence", null); // no real AI-confidence source exists
         u.put("severity", r.get("severity_level"));
         u.put("coverage", r.get("coverage_type"));
         u.put("coverageLabel", cv == null ? null
@@ -236,9 +253,9 @@ public class CasesViewService {
         List<Map<String, Object>> cs = codes.getOrDefault(cid, List.of());
         u.put("codes", cs.size() > 6 ? cs.subList(0, 6) : cs);
         u.put("orders", ordcat.getOrDefault(cid, Map.of()));
-        u.put("created_at", dates[0]);
-        u.put("updated_at", dates[1]);
-        u.put("revenue_impact", DeterministicFakes.revenueImpact(cid, (String) r.get("severity_level")));
+        u.put("created_at", r.get("admissiondatetime")); // real column; null where the extract lacks it
+        u.put("updated_at", r.get("dischargedatetime")); // real column; null where the extract lacks it
+        u.put("revenue_impact", null); // no real DRG/revenue source exists
         return u;
     }
 

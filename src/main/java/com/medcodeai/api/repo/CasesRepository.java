@@ -102,12 +102,17 @@ public class CasesRepository {
     }
 
     // views.py:219 — dashboard cases = OPD visits only, the columns ui_case reads
+    // patient_ref/admissiondatetime/dischargedatetime are real values (may be
+    // null for OPD rows the hospital extract doesn't carry them for) used
+    // directly by ui_case() instead of synthesized placeholder data.
     public List<Map<String, Object>> opdCases() {
         return jdbc.query("""
                 SELECT case_id, sex, department, ward, disease_group, severity_level,
                        coverage_type, encountertype, case_status::text AS case_status,
                        completeness_status::text AS completeness_status, missing_detail,
-                       fetched_at::text AS fetched_at
+                       fetched_at::text AS fetched_at, patient_ref,
+                       admissiondatetime::text AS admissiondatetime,
+                       dischargedatetime::text AS dischargedatetime
                 FROM cases WHERE encountertype='0' ORDER BY case_id""", ROW);
     }
 

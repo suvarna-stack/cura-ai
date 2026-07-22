@@ -10,11 +10,24 @@ as the frozen reference implementation). Serves the exact JSON contract in
 
 ## The golden rule
 
-We are **cloning** the Flask API, not improving it. Key order, absent-vs-null
-fields, error message text, and the sha1 fake-data math are all part of the
-contract. The correctness gate is the parity harness (`scripts/parity_read.py`,
-`scripts/parity_write.py`, `scripts/gen_fakes_golden.py` — usage in README),
-not code review. If a Flask behavior looks like a bug, clone it anyway.
+We are **cloning** the Flask API, not improving it — key order, absent-vs-null
+fields, and error message text are all part of the contract. If a Flask
+behavior looks like a bug, clone it anyway.
+
+**Exception (decided 2026-07-22):** the sha1-based fake-data layer
+(`DeterministicFakes`, formerly guarded by a Python-generated golden file) has
+been permanently removed. Six fields — `confidence`, `patient`, `hn`,
+`created_at`/`updated_at`, `revenue_impact`, and `coder`/`coders`/`reopenedBy`
+— now return real DB values (null where no real value exists) instead of
+Flask's synthesized placeholders. This is a deliberate, permanent divergence
+from the Flask reference for those fields specifically; everything else
+stays a faithful clone. Frontend contract reconciliation
+(`../audit_chart/src/api/types.ts`, which currently types several of these
+fields as required/non-nullable) is explicitly out of scope for this repo.
+
+The correctness gate is now the Java integration test suite
+(`CasesApiIntegrationTest`, `./mvnw test` — usage in README), not code review
+and not a live-Flask diff.
 
 ## Layout conventions
 
@@ -39,9 +52,16 @@ Milestones from the migration plan (git log --oneline reads as this sequence):
 - ✅ **M4** approve + reopen, full write parity
 - ✅ **M5** demo reset
 - ✅ **M6** CORS, Dockerfile, deploy docs — all parity gates green
-- ⬜ **M7 — cutover (NOT done):** point Spring at the prod DB, rerun
-  `parity_read.py` there, flip `VITE_API_BASE` in the frontend, drive the real
-  UI; Flask stays deployed as instant rollback.
+- ✅ **Fake-data removal (2026-07-22):** dropped `DeterministicFakes` entirely;
+  `confidence`/`patient`/`hn`/`created_at`/`updated_at`/`revenue_impact`/
+  `coder` now serve real DB values (null where none exists). Python parity
+  scripts (`parity_read.py`, `parity_write.py`, `gen_fakes_golden.py`) deleted
+  along with the golden fixture; replaced by `CasesApiIntegrationTest`
+  (MockMvc against the local seeded DB). Frontend contract reconciliation
+  deferred — see "The golden rule."
+- ⬜ **M7 — cutover (NOT done):** point Spring at the prod DB, rerun the
+  integration test suite there, flip `VITE_API_BASE` in the frontend, drive
+  the real UI; Flask stays deployed as instant rollback.
 
 Deploy direction (decided 2026-07-21): **GCP, two containers** — this backend's
 Dockerfile + a stock `postgres:18` — NOT Supabase/Render (cost). Exact GCP
@@ -52,15 +72,24 @@ backend instance (`max-instances=1` on Cloud Run).
 
 ## Gotchas still live
 
-- sha1 math must stay on `BigInteger` end-to-end — never truncate to `long`.
 - Timestamps/JSONB always come back as raw strings: `::text` casts +
   `getString`; never let JDBC parse them into objects.
 - Never `ORDER BY` a PG ENUM column bare — the verbatim `CASE` expressions
   copied from views.py ARE the contract.
 - JDBC URL needs `stringtype=unspecified` (writes into ENUM/JSONB columns)
   and `binaryTransfer=false`.
-- Absent-vs-null field mistakes are only caught by the full-payload parity
-  diff — run the harness after any response-shape change.
+- Absent-vs-null field mistakes are only caught by a full-payload diff —
+  run `./mvnw test` (`CasesApiIntegrationTest`) after any response-shape
+  change.
+
+## Open tasks
+
+- **Split iMed integration into its own app.** `ImedWritebackRepository.java`
+  is currently the only class touching the `imed` schema (called from
+  `ApprovalService`) — today it's raw JDBC against the local Postgres mock.
+  Decided (2026-07-22): this will eventually move to its own separate
+  folder/repo/Spring Boot application, not an in-repo interface/gateway.
+  Not started; no timeline yet.
 
 ## Full history
 

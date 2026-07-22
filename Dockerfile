@@ -5,7 +5,7 @@ COPY mvnw pom.xml ./
 COPY .mvn .mvn
 RUN ./mvnw -q dependency:go-offline
 COPY src src
-# tests need a seeded Postgres — the parity harness is the real gate
+# tests need a seeded local Postgres (see README "Testing"), skip in-build
 RUN ./mvnw -q -DskipTests package
 
 # Run stage
