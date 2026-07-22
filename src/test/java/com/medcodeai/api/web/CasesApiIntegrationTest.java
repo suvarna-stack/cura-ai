@@ -97,6 +97,18 @@ class CasesApiIntegrationTest {
     }
 
     @Test
+    void caseDetailServesRealHospitalValues() throws Exception {
+        // positive check on the contract's field <-> real-column mapping:
+        // KNOWN_CASE_ID is an IPD visit whose extract row carries these values
+        // verbatim (the frozen db/seed.sql.gz baseline)
+        mvc.perform(get("/api/cases/{id}", KNOWN_CASE_ID))
+                .andExpect(jsonPath("$.case.patient_ref").value("690003026"))
+                .andExpect(jsonPath("$.case.admissiondatetime").value("2026-04-01 06:45:00"))
+                .andExpect(jsonPath("$.case.dischargedatetime").value("2026-04-10 16:22:41"))
+                .andExpect(jsonPath("$.case.encountertype").value("1"));
+    }
+
+    @Test
     void putDraftThenReadBackReflectsIt() throws Exception {
         mvc.perform(put("/api/cases/{id}/draft", KNOWN_CASE_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,11 +122,17 @@ class CasesApiIntegrationTest {
 
     @Test
     void approveThenReopenRoundTripsAndInvalidatesCache() throws Exception {
+        // stats shape per docs/api-contract.md: one case, no saved edits ->
+        // the imported principal is re-confirmed (1 code) + 1 status row
         mvc.perform(post("/api/cases/approve")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ids\":[\"" + APPROVABLE_CASE_ID + "\"],\"coder\":\"web.coder\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.approved[0]").value(APPROVABLE_CASE_ID));
+                .andExpect(jsonPath("$.approved[0]").value(APPROVABLE_CASE_ID))
+                .andExpect(jsonPath("$.notFound").isEmpty())
+                .andExpect(jsonPath("$.stats.cases_finalized").value(1))
+                .andExpect(jsonPath("$.stats.status_rows").value(1))
+                .andExpect(jsonPath("$.stats.mcai_code_rows").value(1));
 
         JsonNode afterApprove = getJson("/api/cases");
         assertTrue(containsCaseId(afterApprove.get("finished"), APPROVABLE_CASE_ID),
