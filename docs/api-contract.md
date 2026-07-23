@@ -181,8 +181,49 @@ baseline: reopens every non-baseline approval and re-finalizes baseline cases
 a visitor touched. Response
 `{"ok": true, "reopened": <int>, "restoredBaseline": <int>}`.
 
+### POST /api/sync — pull case data from the hospital
+
+No request body. Fetches every case the hospital's iMed API exposes and loads
+it into medcode. **Non-destructive** (safe to re-run) — per case:
+
+- **new** (unknown to medcode) → full import;
+- **open** → hospital-sourced data refreshed (the `cases` clinical columns,
+  sections, orders, and `imported_from_imed` codes are replaced), while coder
+  work is KEPT — `coder_assigned` codes, saved `codeEdits`/`reportDraft`,
+  `case_status`, and existing history are never touched (a `case_synced`
+  history row is only appended);
+- **already finalized** (`case_status` not `open`) → **skipped**, left intact,
+  so a sync can never silently invalidate an approved coding.
+
+Reads the hospital only (no write-back). Runs under the single-writer lock, so
+it briefly blocks approve/reopen. Response:
+
+```jsonc
+{ "ok": true,
+  "imported": ["<case_id>", …],         // newly created
+  "refreshed": ["<case_id>", …],         // existing open cases re-pulled
+  "skippedApproved": ["<case_id>", …],   // finalized, left untouched
+  "failed": [ { "caseId": "<case_id>", "error": "<message>" }, … ],
+  "stats": { "cases": 0, "sections": 0, "codes": 0, "orders": 0,
+             "chunks": 0, "coverageTypes": 0 } }
+```
+
+Note: the hospital's list endpoint has no "changed since" filter, so the fetch
+pulls the full list; only the writes are selective. `document_chunks` is
+populated for future retrieval but has no reader today.
+
+### POST /api/cases/{caseId}/sync — sync one case from the hospital
+
+No request body. Same non-destructive rules as `POST /api/sync`, scoped to one
+transaction number; same response shape (arrays hold at most that one id).
+`404` when the hospital doesn't expose that case.
+
 ## Downstream: the hospital iMed API
 
 On approve/reopen this backend calls the hospital's iMed API
 (`IMED_API_BASE`; locally the sibling repo `../imed-mock-api`, which also
 documents that contract). Frontends never call it directly.
+
+Sync (`POST /api/sync`, `POST /api/cases/{caseId}/sync`) is the **inbound**
+direction of the same iMed API: it reads the hospital's case tables (`GET
+/api/cases` and the per-visit endpoints) and loads them into medcode.

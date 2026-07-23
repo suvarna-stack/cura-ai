@@ -149,6 +149,62 @@ class CasesApiIntegrationTest {
                 "reopened case should leave the finished queue");
     }
 
+    // ---- sync (pull from the hospital) ----
+    // Exercised through the per-case route: it drives the SAME SyncService engine
+    // as bulk POST /api/sync but touches one case, so the suite stays fast and
+    // doesn't rewrite the whole shared seed. Assertions stay on outcome/status
+    // (not refreshed field values) per the contract's isolation note.
+
+    @Test
+    void syncRefreshesAnOpenCaseWithoutChangingItsStatus() throws Exception {
+        // a "complete" dashboard case is complete-but-not-approved = open
+        String openId = getJson("/api/cases").get("complete").get(0).get("id").asString();
+
+        JsonNode r = postJson("/api/cases/" + openId + "/sync");
+        assertTrue(r.get("ok").asBoolean());
+        assertTrue(containsString(r.get("refreshed"), openId), "an open case should refresh");
+        assertTrue(r.get("imported").isEmpty(), "already-present case is not a new import");
+        assertTrue(r.get("skippedApproved").isEmpty());
+        assertTrue(r.get("failed").isEmpty(), "no case should fail against the seeded hospital");
+
+        // idempotent + non-destructive: re-pull keeps it open
+        postJson("/api/cases/" + openId + "/sync");
+        assertTrue("open".equals(getJson("/api/cases/" + openId).get("case").get("case_status").asString()),
+                "sync must never change a case's workflow status");
+    }
+
+    @Test
+    void syncSkipsAnApprovedCase() throws Exception {
+        String approvedId = getJson("/api/cases").get("finished").get(0).get("id").asString();
+
+        JsonNode r = postJson("/api/cases/" + approvedId + "/sync");
+        assertTrue(containsString(r.get("skippedApproved"), approvedId),
+                "an approved case must be protected from sync, not rebuilt");
+        assertTrue(r.get("refreshed").isEmpty());
+        assertTrue(r.get("imported").isEmpty());
+    }
+
+    @Test
+    void syncUnknownCaseReturns404() throws Exception {
+        mvc.perform(post("/api/cases/does-not-exist/sync")).andExpect(status().isNotFound());
+    }
+
+    private JsonNode postJson(String url) throws Exception {
+        String body = mvc.perform(post(url))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body);
+    }
+
+    private boolean containsString(JsonNode arr, String value) {
+        for (JsonNode n : arr) {
+            if (value.equals(n.asString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private JsonNode getJson(String url) throws Exception {
         String body = mvc.perform(get(url))
                 .andExpect(status().isOk())

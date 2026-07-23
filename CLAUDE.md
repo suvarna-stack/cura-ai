@@ -35,7 +35,8 @@ retired; the next one will be built against `docs/api-contract.md` +
 ## Layout conventions
 
 - Layers: `web/` (controllers) → `service/` (logic) → `repo/` (ALL SQL), plus
-  `client/` (outbound HTTP to the hospital iMed API — `ImedApiClient`).
+  `client/` (HTTP to the hospital iMed API — `ImedApiClient`: write-back on
+  approve/reopen, and the read/sync GETs the `SyncService` pulls case data with).
 - Many repo/service methods still carry comments naming their Python source
   line (`// views.py:117`) — provenance for archaeology, not a constraint.
 - Responses are `LinkedHashMap<String,Object>` — stable key order and
@@ -80,6 +81,19 @@ Milestones (git log --oneline reads as this sequence):
   `application.yml` and is forced `false` by `ENV` in the `Dockerfile`, so
   containers are off by construction (the API has no auth and
   `POST /api/demo/reset` is a bulk write). Metadata in `config/OpenApiConfig`.
+- ✅ **Sync — inbound hospital pull (2026-07-23):** the read direction of the
+  iMed integration. `POST /api/sync` (bulk) + `POST /api/cases/{id}/sync`
+  (one) fetch case data from the hospital and load it into medcode. Ported
+  from the retired `sync/sync.py`, but reshaped **non-destructive**: new case →
+  import, existing OPEN case → refresh hospital-sourced rows only, finalized
+  case → **skipped** (coder work — `coder_assigned` codes, edits/drafts,
+  `case_status`, history — is never clobbered; a `case_synced` row is only
+  appended). Idempotent, so re-running is safe. New code: `client/ImedApiClient`
+  GET methods, `service/SyncService` + `service/SyncRules` (pure [POC] derive
+  rules), `repo/SyncRepository`, `web/SyncController`. Reads the hospital only
+  (no write-back). Runs under the `WriteGate` lock; invalidates `CasesCache`.
+  Limitation: the hospital list has no "changed since" filter, so the fetch
+  pulls the full list (writes are selective) — a future hospital-side add.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers), rerun both repos' test suites there, and build the NEW
   frontend against `docs/types.ts`. The old frontend/Flask pair just keeps

@@ -215,6 +215,33 @@ export interface DemoResetResponse {
   restoredBaseline: number;
 }
 
+/**
+ * POST /api/sync (all cases) and POST /api/cases/{caseId}/sync (one case) — no
+ * request body. Non-destructive pull from the hospital: new cases imported,
+ * open cases refreshed (coder work kept), finalized cases skipped. For the
+ * per-case route the arrays hold at most that one id; 404 if the hospital has
+ * no such case.
+ */
+export interface SyncResponse {
+  ok: true;
+  /** newly created cases */
+  imported: string[];
+  /** existing open cases whose hospital data was re-pulled */
+  refreshed: string[];
+  /** finalized cases left untouched */
+  skippedApproved: string[];
+  /** cases that errored mid-sync (batch continues) */
+  failed: { caseId: string; error: string }[];
+  stats: {
+    cases: number;
+    sections: number;
+    codes: number;
+    orders: number;
+    chunks: number;
+    coverageTypes: number;
+  };
+}
+
 /** 400 / 404 body. 500s return Spring's default error body — the triggering
  *  action (approve/reopen) is idempotent: retry it. */
 export interface ApiError {
