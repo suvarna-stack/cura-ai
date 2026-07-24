@@ -20,7 +20,10 @@ public class CorsConfig implements WebMvcConfigurer {
                 : java.util.Arrays.stream(allowed.split(",")).map(String::strip).toArray(String[]::new);
         registry.addMapping("/api/**")
                 .allowedOrigins(origins)
-                .allowedMethods("GET", "PUT", "POST", "OPTIONS")
+                // DELETE added for admin account removal; allowedHeaders("*")
+                // already permits the Authorization header (Bearer token auth,
+                // no cookies → no allowCredentials needed).
+                .allowedMethods("GET", "PUT", "POST", "DELETE", "OPTIONS")
                 .allowedHeaders("*");
     }
 }

@@ -29,6 +29,34 @@ public class ApiExceptionHandler {
         }
     }
 
+    /** 401 — no/invalid/expired Bearer token (thrown by AuthInterceptor and login). */
+    public static class UnauthorizedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public UnauthorizedException(String message) {
+            super(message);
+        }
+    }
+
+    /** 403 — authenticated but not permitted (a non-admin hitting /api/admin/**). */
+    public static class ForbiddenException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public ForbiddenException(String message) {
+            super(message);
+        }
+    }
+
+    /** 409 — the request conflicts with existing state (duplicate email, or a
+     *  delete blocked because the account has coding history). */
+    public static class ConflictException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public ConflictException(String message) {
+            super(message);
+        }
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound() {
         return body(HttpStatus.NOT_FOUND, "not found");
@@ -37,6 +65,21 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, Object>> badRequest(BadRequestException e) {
         return body(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> unauthorized(UnauthorizedException e) {
+        return body(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> forbidden(ForbiddenException e) {
+        return body(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> conflict(ConflictException e) {
+        return body(HttpStatus.CONFLICT, e.getMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error) {

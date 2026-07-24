@@ -173,4 +173,10 @@ public class CasesRepository {
     public boolean caseExists(String caseId) {
         return !jdbc.queryForList("SELECT 1 FROM cases WHERE case_id=?", caseId).isEmpty();
     }
+
+    /** Total cases in the system — the admin dashboard's "Total Cases" card. */
+    public long countCases() {
+        Long n = jdbc.queryForObject("SELECT COUNT(*) FROM cases", Long.class);
+        return n == null ? 0 : n;
+    }
 }

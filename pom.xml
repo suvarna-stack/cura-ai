@@ -39,6 +39,17 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- BCrypt only. Deliberately NOT spring-boot-starter-security: that
+		     starter auto-locks every endpoint (401) and would break the public
+		     case/approve/sync endpoints + their tests. spring-security-crypto
+		     ships no autoconfiguration and no servlet filter — just the password
+		     encoder. Auth enforcement is our own HandlerInterceptor scoped to the
+		     admin routes. Version managed by Spring Boot's BOM. -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+
 		<!-- Swagger UI / OpenAPI. The 3.0.x line is the Spring Boot 4 one (2.8.x
 		     is Boot 3); Boot's BOM doesn't manage springdoc, hence the version.
 		     Disabled unless SWAGGER_ENABLED=true — see application.yml. -->

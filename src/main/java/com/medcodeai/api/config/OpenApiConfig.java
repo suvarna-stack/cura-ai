@@ -1,7 +1,9 @@
 package com.medcodeai.api.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,6 +14,12 @@ import org.springframework.context.annotation.Configuration;
  * "object" and the real shapes live in the hand-written @ExampleObject bodies
  * on each controller method. docs/api-contract.md stays the source of truth.
  *
+ * The "bearerAuth" security scheme below powers the UI's Authorize button:
+ * log in via POST /api/auth/login, paste the returned token once, and it rides
+ * on the guarded endpoints (the ones tagged with @SecurityRequirement —
+ * /api/auth/{me,logout} and all of /api/admin/**). The public endpoints carry
+ * no requirement, so they show no lock.
+ *
  * Only registered when SWAGGER_ENABLED is unset or true (application.yml).
  */
 @Configuration
@@ -19,7 +27,14 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI medcodeOpenAPI() {
-        return new OpenAPI().info(new Info()
+        return new OpenAPI()
+                .components(new Components().addSecuritySchemes("bearerAuth",
+                        new SecurityScheme()
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .description("Paste the `token` from POST /api/auth/login "
+                                        + "(no \"Bearer \" prefix — Swagger adds it).")))
+                .info(new Info()
                 .title("medcode-api")
                 .version("0.0.1-SNAPSHOT")
                 .description("""

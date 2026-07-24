@@ -94,6 +94,32 @@ Milestones (git log --oneline reads as this sequence):
   (no write-back). Runs under the `WriteGate` lock; invalidates `CasesCache`.
   Limitation: the hospital list has no "changed since" filter, so the fetch
   pulls the full list (writes are selective) — a future hospital-side add.
+- ✅ **Admin auth + account management (2026-07-24):** login wall around the
+  **admin surface only** — the case/approve/sync endpoints stay public
+  (unchanged, tests untouched). Per-account BCrypt passwords (new `password_hash`
+  column), roles just `coder`/`admin` (the frontend's "Senior Coder" was a
+  mistake; "SuperAdmin" = the `admin` role), opaque **Bearer tokens** stored
+  server-side in the existing `auth_sessions` table (`session_id` = sha256 of the
+  token; `SESSION_TTL_DAYS` default 7). New endpoints: `POST /api/auth/login`,
+  `POST /api/auth/logout`, `GET /api/auth/me`, and admin-guarded
+  `GET/POST /api/admin/accounts`, `PUT /api/admin/accounts/{id}`,
+  `PUT …/{id}/status`, `DELETE …/{id}`, `GET /api/admin/dashboard`. Key
+  choices: **`spring-security-crypto` only** (BCrypt), NOT
+  `spring-boot-starter-security` — the starter would auto-lock every endpoint;
+  enforcement is a hand-written `AuthInterceptor` scoped to `/api/admin/**` +
+  `/api/auth/{me,logout}`. No migration tool exists, so a startup
+  `ApplicationRunner` (`config/SchemaBootstrap`) idempotently adds `password_hash`
+  and seeds a bootstrap admin from `ADMIN_BOOTSTRAP_EMAIL`/`_PASSWORD` (default
+  `admin@medcodeai.demo` / `admin1234` — WARNs on the default). Delete is
+  audit-safe: an account referenced by coding history → `409` (deactivate
+  instead). New code: `web/{AuthController,AdminController,AuthInterceptor}`,
+  `service/{AuthService,AccountService}`, `repo/{UsersRepository,
+  AuthSessionRepository}`, `config/{AuthConfig,WebConfig,SchemaBootstrap}`. Test:
+  `web/AdminApiIntegrationTest`. This **supersedes** the old
+  shared-coder-password idea (per-account passwords won). Deferred still:
+  coder-facing login + stamping the authenticated coder into approvals (wait for
+  the coder frontend).
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers), rerun both repos' test suites there, and build the NEW
   frontend against `docs/types.ts`. The old frontend/Flask pair just keeps
@@ -122,6 +148,15 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 - The seed dumps are the frozen demo baseline — regenerating them requires
   the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
   build output.
+- Auth schema lives OUTSIDE the seed dump: `config/SchemaBootstrap` adds the
+  `users.password_hash` column + the bootstrap admin at every startup
+  (idempotent). So a fresh re-seed drops them and the next boot restores them —
+  don't "fix" a missing `password_hash` by editing the dump. `@SpringBootTest`
+  runs the runner too, so the test DB self-heals.
+- Auth is admin-only and additive: never add the interceptor to the
+  case/approve/sync routes (that was the deliberate scope). Adding
+  `spring-boot-starter-security` is still the trap the memory warns about — we
+  use `spring-security-crypto` (BCrypt) + a `HandlerInterceptor` instead.
 
 ## Open tasks
 

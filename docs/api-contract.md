@@ -26,9 +26,12 @@ convenience — when the two disagree, **this document wins**.
   can be malformed — treat as opaque display text). Fields written by this
   backend (`codedDate`, `fetched_at`, working-state timestamps) use
   `YYYY-MM-DD HH:MM:SS` (or `YYYY-MM-DD` where sliced).
-- **Errors**: `400` / `404` return `{"error": "<message>"}`. `500` (e.g. the
-  hospital iMed call failed after our commit) returns Spring's default error
-  body; the triggering action is idempotent — retry it.
+- **Errors**: `400` / `404` / `401` / `403` / `409` return
+  `{"error": "<message>"}`. `500` (e.g. the hospital iMed call failed after our
+  commit) returns Spring's default error body; the triggering action is
+  idempotent — retry it.
+- **Auth** applies to the admin surface only (see the Authentication section).
+  The case/approve/sync endpoints above are unauthenticated.
 
 ## Endpoints
 
@@ -217,6 +220,103 @@ populated for future retrieval but has no reader today.
 No request body. Same non-destructive rules as `POST /api/sync`, scoped to one
 transaction number; same response shape (arrays hold at most that one id).
 `404` when the hospital doesn't expose that case.
+
+## Authentication & admin
+
+Auth guards the **admin dashboard only** — login, account management, and the
+dashboard cards. The case/approve/sync endpoints above stay public.
+
+**Model.** Email + per-account password (BCrypt-hashed, column `password_hash`).
+Roles are `coder` | `admin`; the dashboard's "SuperAdmin" persona is the
+`admin` role. `POST /api/auth/login` returns an opaque Bearer **token**; send it
+as `Authorization: Bearer <token>` on guarded requests. Sessions are stored
+server-side (`auth_sessions`) and expire after `SESSION_TTL_DAYS` (default 7);
+logout revokes immediately. A bootstrap admin is created at first startup from
+`ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`.
+
+**Guarding.** `/api/admin/**` requires a valid token **and** the `admin` role
+(`401` without a token, `403` for a coder token). `/api/auth/me` and
+`/api/auth/logout` require a valid token (any active account). Login itself is
+public. `login` also works for a `coder` account (forward-compatible for the
+coming coder frontend); only the admin routes enforce the role.
+
+### POST /api/auth/login
+
+Request `{"email": "…", "password": "…"}`. Response:
+
+```jsonc
+{ "token": "<opaque bearer token>",
+  "user": { "id": 2, "email": "admin@medcodeai.demo",
+            "fullName": "Super Admin", "role": "admin" } }
+```
+
+`400` when email/password missing. `401` `{"error": "invalid email or
+password"}` on unknown email, wrong password, or an inactive account (the
+message never says which).
+
+### POST /api/auth/logout
+
+Requires a token. Revokes the current session → `{"ok": true}`. Idempotent.
+`401` without a valid token.
+
+### GET /api/auth/me
+
+Requires a token. The current account:
+
+```jsonc
+{ "id": 2, "email": "admin@medcodeai.demo", "fullName": "Super Admin",
+  "role": "admin", "status": "active" }
+```
+
+### GET /api/admin/accounts — list accounts (admin)
+
+A JSON **array** of every account (coders and admins), `full_name` order. Each:
+
+```jsonc
+{ "id": 3, "fullName": "Naret Pichitporn", "email": "naret.p@hospital.th",
+  "role": "coder",              // "coder" | "admin"
+  "status": "active",           // "active" | "inactive" | "suspended"
+  "createdAt": "2026-07-24 09:12:03",   // backend text, may be null
+  "lastLoginAt": null }         // null until first login
+```
+
+The "Total Coder Accounts" card counts `role == "coder"`.
+
+### POST /api/admin/accounts — create (admin)
+
+Request `{"fullName", "email", "password", "role"?}` — `role` defaults to
+`coder` (must be `coder`/`admin`); `password` ≥ 8 chars, stored BCrypt-hashed.
+Response: the created account object (as above, no password). `400` on a
+missing/invalid field; `409` `{"error": "an account with this email already
+exists"}`.
+
+### PUT /api/admin/accounts/{id} — edit (admin)
+
+Request any of `{"fullName"?, "email"?, "role"?, "password"?}` — a non-blank
+`password` re-hashes. Response: the updated account object. `404` unknown id;
+`409` if the new email is taken.
+
+### PUT /api/admin/accounts/{id}/status — activate/deactivate (admin)
+
+Request `{"status": "active" | "inactive"}` — the list's toggle. Deactivating
+also revokes that account's live sessions. Response: the updated account
+object. `400` on a bad status; `404` unknown id.
+
+### DELETE /api/admin/accounts/{id} — delete (admin)
+
+Hard-deletes an account **only if it never did coding work**. An account
+referenced by the audit trail is protected: `409` `{"error": "this account has
+coding history and cannot be deleted — deactivate it instead"}`. Response on
+success `{"ok": true}`. `404` unknown id.
+
+### GET /api/admin/dashboard — dashboard cards (admin)
+
+```jsonc
+{ "totalCoderAccounts": 6,     // COUNT(role='coder')
+  "activeToday": 3,             // accounts whose last_login_at is today
+  "totalCases": 1101,           // COUNT(*) FROM cases
+  "systemStatus": "operational" }
+```
 
 ## Downstream: the hospital iMed API
 

@@ -36,7 +36,14 @@ class OpenApiDocsTest {
             "/api/cases/{caseId}/reopen",
             "/api/demo/reset",
             "/api/sync",
-            "/api/cases/{caseId}/sync");
+            "/api/cases/{caseId}/sync",
+            "/api/auth/login",
+            "/api/auth/logout",
+            "/api/auth/me",
+            "/api/admin/accounts",
+            "/api/admin/accounts/{id}",
+            "/api/admin/accounts/{id}/status",
+            "/api/admin/dashboard");
 
     @Autowired
     private MockMvc mvc;

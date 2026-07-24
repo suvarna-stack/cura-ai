@@ -255,3 +255,88 @@ export interface Healthz {
   cases: number;
   db: "pg";
 }
+
+// ---------- authentication & admin (admin surface only) ----------
+//
+// Auth guards the admin dashboard only; the case/approve/sync endpoints are
+// public. Login returns an opaque Bearer token; send it as
+// `Authorization: Bearer <token>`. /api/admin/** requires the "admin" role
+// (401 without a token, 403 for a coder token).
+
+export type UserRole = "coder" | "admin";
+export type UserStatus = "active" | "inactive" | "suspended";
+
+/** POST /api/auth/login — request body. */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** POST /api/auth/login — response (401 {error} on bad credentials). */
+export interface LoginResponse {
+  /** opaque Bearer token; store and send as Authorization: Bearer <token> */
+  token: string;
+  user: {
+    id: number;
+    email: string;
+    fullName: string | null;
+    role: UserRole;
+  };
+}
+
+/** GET /api/auth/me — the account behind the token. */
+export interface AuthMe {
+  id: number;
+  email: string;
+  fullName: string | null;
+  role: UserRole;
+  /** always "active" — the token wouldn't resolve otherwise */
+  status: "active";
+}
+
+/** An account row — GET /api/admin/accounts returns Account[]; create/update/
+ *  status all return a single Account. Never carries the password. */
+export interface Account {
+  id: number;
+  fullName: string | null;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  /** backend text "YYYY-MM-DD HH:MM:SS"; may be null */
+  createdAt: string | null;
+  /** null until the account's first login */
+  lastLoginAt: string | null;
+}
+
+/** POST /api/admin/accounts — request (409 on duplicate email). role default "coder". */
+export interface CreateAccountRequest {
+  fullName: string;
+  email: string;
+  /** ≥ 8 chars */
+  password: string;
+  role?: UserRole;
+}
+
+/** PUT /api/admin/accounts/{id} — request (all optional; non-blank password re-hashes). */
+export interface UpdateAccountRequest {
+  fullName?: string;
+  email?: string;
+  role?: UserRole;
+  password?: string;
+}
+
+/** PUT /api/admin/accounts/{id}/status — request. */
+export interface UpdateStatusRequest {
+  status: "active" | "inactive";
+}
+
+/** GET /api/admin/dashboard — the four summary cards. */
+export interface DashboardStats {
+  /** COUNT(role='coder') */
+  totalCoderAccounts: number;
+  /** accounts whose last_login_at is today */
+  activeToday: number;
+  /** COUNT(*) FROM cases */
+  totalCases: number;
+  systemStatus: "operational";
+}

@@ -52,6 +52,28 @@ Good to know:
 | `ALLOWED_ORIGINS` | CORS origins, `*` (default) or comma list. |
 | `PORT` | HTTP port (default 8001). |
 | `SWAGGER_ENABLED` | Swagger UI + `/v3/api-docs`. Default `true` when running locally, forced `false` in the Docker image (so every container, incl. GCP, ships without it). |
+| `ADMIN_BOOTSTRAP_EMAIL` | Email of the admin created at first startup when no admin exists. Default `admin@medcodeai.demo`. |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Password for that bootstrap admin. Default `admin1234` — **override and change it before any real deployment** (a WARN logs when the default is used). |
+| `SESSION_TTL_DAYS` | Login-session lifetime in days (default `7`). |
+
+## Admin authentication
+
+Auth guards the **admin dashboard only** (login, account management, dashboard
+cards); the case/approve/sync endpoints stay public. Email + per-account BCrypt
+password, roles `coder`/`admin`, opaque Bearer tokens stored server-side in
+`auth_sessions`. Full endpoint shapes: [docs/api-contract.md](docs/api-contract.md)
+(Authentication section) / [docs/types.ts](docs/types.ts).
+
+- The `password_hash` column and a bootstrap admin are created **at startup**,
+  idempotently (`config/SchemaBootstrap`) — the frozen seed dump predates auth
+  and there is no migration tool. The same DDL is in
+  `db/migrations/0001_add_password_hash.sql` for manual/prod application. A
+  re-seed drops the column; the next boot re-adds it (and re-creates the admin).
+- Log in against `admin@medcodeai.demo` / `admin1234` locally (or your
+  `ADMIN_BOOTSTRAP_*` overrides), then send `Authorization: Bearer <token>`.
+- Implemented with `spring-security-crypto` (BCrypt only) plus a small
+  `HandlerInterceptor` — deliberately **not** `spring-boot-starter-security`,
+  which would auto-lock the public endpoints.
 
 ## The API
 
