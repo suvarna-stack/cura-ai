@@ -1,0 +1,151 @@
+// ============================================================
+// Frontend <-> Backend API contract types.
+// The static JSON in /public/api implements this contract today;
+// the future backend (NestJS / Spring Boot over PostgreSQL) must
+// serve the exact same shapes from GET /api/cases and
+// GET /api/cases/{id}.
+// ============================================================
+
+/** A code preview shown on case rows (feedback item 3). */
+export interface ApiCodePreview {
+  code: string;            // READ: MedHack_Diagnosis(ICD10).icd / Procedure(ICD9).icd
+  system: "ICD-10" | "ICD-9";
+  role: string;            // principal_diagnosis / secondary_diagnosis / procedure / ...
+  desc?: string | null;    // READ: icd_codes.description (meeting item 7 — code + meaning on the card)
+}
+
+/** One case row as shown in the Dashboard lists (READ from iMed + CREATE fields). */
+export interface ApiCase {
+  id: string;              // READ: iMed transactionnumber (visit number)
+  patient: string;         // [POC] generated display name — NOT shown in the UI (cards show vn/hn)
+  vn: string;              // READ: iMed transactionnumber — the visit number shown on every card
+  /** READ: MedHack_Patient.admissionnumber. iMed only fills this for IPD
+   *  admissions, so it is null on every OPD case the dashboard shows. */
+  hn: string | null;
+  dept: string;            // READ: MedHack_BedManagement.department / ward
+  ward: string | null;     // READ: MedHack_BedManagement.ward
+  group: string;           // CREATE: disease_group (F04)
+  confidence: number;      // CREATE: [POC] placeholder until the real AI model
+  severity: string | null; // CREATE: severity_level (F06)
+  coverage: string | null; // READ: MedHack_Patient.healthcoverage (raw code, e.g. OFC_O4)
+  coverageLabel?: string | null; // REF: coverage_types label (falls back to scheme family until hospital list arrives)
+  /** REF: coverage_types.scheme_family — OFC_O1/OFC_O4/OFC_E2 all collapse to
+   *  "OFC". The hospital reads coverage per scheme, so this (not `coverage`)
+   *  is what the UI displays and filters on. */
+  coverageFamily?: string | null;
+  encountertype: string | null;
+  ccpi: string | null;     // READ: Chief Complaint / Present Illness snippet (item 3)
+  cc: string;              // READ: Chief Complaint (MedHack_MedicalRecord CC section)
+  pi: string;              // READ: Present Illness (MedHack_MedicalRecord PI section)
+  codes: ApiCodePreview[]; // READ: existing iMed codes (item 3)
+  orders: Record<string, number>; // READ: order-category counts (items 3, 5)
+  /** READ: a few real order names per category (meeting item 7 — the treatment
+   *  side of the card). Capped server-side; `orders` still holds the totals. */
+  orderNames?: Record<string, string[]>;
+  missing?: string;        // CREATE: only on incomplete cases (F03)
+  created_at: string;      // READ: ISO string (iMed visit datetime) — display via formatDate/formatDateTime
+  updated_at: string;      // READ: ISO string — last modification in iMed
+  revenue_impact: "high" | "medium" | "low"; // CREATE: [POC] mock band until real DRG revenue exists
+  /** CREATE: every coder who worked this case, from coding_history — a case is
+   *  not limited to one responsible coder. Most recent toucher LAST, so
+   *  `coders.at(-1)` is the responsible coder. Empty on untouched cases. */
+  coders?: string[];
+  /** CREATE: the case's last approve/reopen action in coding_history is
+   *  'reopened' — it belongs in the Dashboard's Reopen tab, not the queues.
+   *  Live server only; absent in the static baseline export (= false). */
+  reopened?: boolean;
+}
+
+export interface ApiIncompleteGroup {
+  id: string;
+  label: string;
+  total: number;
+  cases: ApiCase[];
+}
+
+export interface ApiFinishedCase {
+  id: string;
+  patient: string;         // [POC] generated display name — NOT shown in the UI
+  vn: string;
+  hn: string | null;
+  codedDate: string;
+  /** Responsible coder = the LATEST person to touch the case (= coders.at(-1)),
+   *  which is not necessarily whoever approved it first. */
+  coder: string;           // display name (e.g. "Sarah K.")
+  coders?: string[];       // everyone who worked it, most recent last
+  /** Raw workflow id behind `coder` ("demo.coder" = run_demo baseline,
+   *  "web.coder" = approved through this UI). The Settings demo tools use it
+   *  to tell baseline approvals from web ones. Absent on older payloads,
+   *  where `coder` still holds the raw id. */
+  coderId?: string;
+  drg: string;
+  reopenable: boolean;     // DEPRECATED: always true — any coder may reopen any case; kept so old payloads/frontends still parse, the UI no longer reads it
+  created_at: string;      // READ: ISO string — display via formatDate/formatDateTime
+  updated_at: string;      // READ: ISO string
+  // facet fields (same sources as ApiCase) so the sidebar filters work on Finished too
+  dept: string;
+  ward: string | null;
+  group: string;
+  severity: string | null;
+  coverage: string | null;
+  coverageLabel?: string | null;
+  coverageFamily?: string | null;
+  encountertype: string | null;
+  orders: Record<string, number>;
+  codes: ApiCodePreview[];
+  revenue_impact: "high" | "medium" | "low";
+}
+
+/** One row of the server-side audit trail (medcodeai `coding_history`).
+ *  Shows what OTHER coders did — the frontend's own activity log is local
+ *  to a single browser. */
+export interface ApiCaseHistoryEntry {
+  action: string;          // approved_single / approved_group / approved_all / reopened / code_assigned
+  coder: string;           // display name
+  at: string;              // "YYYY-MM-DD HH:MM:SS"
+  detail?: Record<string, unknown>;
+}
+
+export interface ApiCasesResponse {
+  stats: { total: number; complete: number; incomplete: number; finished: number };
+  complete: ApiCase[];
+  incompleteGroups: ApiIncompleteGroup[];
+  finished: ApiFinishedCase[];
+}
+
+/** One editable code row as the UI stores it (same shape as caseLocal's
+ *  StoredCode). PUT /api/cases/{id}/codes sends an array of these; the live
+ *  server echoes them back inside the detail as `codeEdits`. */
+export interface ApiStoredCode {
+  code: string;
+  type: string;
+  desc: string;
+  confidence: number;
+  missing?: boolean;     // unresolved "???" placeholder row
+  missingMsg?: string;
+}
+
+/** GET /api/cases/{id} — full case detail. */
+export interface ApiCaseDetail {
+  case: Record<string, string | null>;
+  coverage: Record<string, string | null> | null; // REF: full coverage_types row (doc B4)
+  sections: { documenttype: string; fieldname: string; value: string | null; recorddatetime: string | null }[];
+  codes: { code: string; code_system: string; description: string | null; code_role: string; source: string }[];
+  orders: {
+    order_category: string;
+    imed_source: string;
+    order_name: string | null;
+    ordered_at: string | null;
+    /** the exact iMed source row — dosage, quantity, result value, unit,
+     *  procedure times… Keys differ per imed_source, so the UI renders
+     *  whatever is present. Capped at 150 orders; see orderCounts. */
+    detail?: Record<string, string | null>;
+  }[];
+  /** true per-category order totals, even when `orders` is truncated */
+  orderCounts?: Record<string, number>;
+  history?: ApiCaseHistoryEntry[];
+  // Present only when served by the live server (server/app.py), which echoes
+  // the coder's saved working state; absent in the static JSON export.
+  codeEdits?: ApiStoredCode[] | null;
+  reportDraft?: string | null;
+}

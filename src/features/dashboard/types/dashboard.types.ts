@@ -10,6 +10,5 @@ export interface DashboardOverview {
 export interface DashboardAccountRow {
   id: string
   name: string
-  role: Account['role']
   status: Account['status']
 }

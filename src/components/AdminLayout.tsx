@@ -8,6 +8,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/hooks/useAuth'
 import { logoutUser } from '../features/auth/api/authService'
@@ -16,6 +17,7 @@ const NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/accounts', label: 'Accounts', icon: Users, end: false },
   { to: '/admin/training', label: 'AI Training', icon: BrainCircuit, end: false },
+  { to: '/cases', label: 'Cases', icon: ClipboardList, end: false },
 ]
 
 export function AdminLayout() {

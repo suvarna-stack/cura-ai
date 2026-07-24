@@ -56,7 +56,7 @@ export function AccountsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
-                {['Name', 'Email', 'Role', 'Status', 'Actions'].map((h) => (
+                {['Name', 'Email', 'Status', 'Actions'].map((h) => (
                   <th
                     key={h}
                     className="px-5 py-3 font-semibold whitespace-nowrap"
@@ -77,9 +77,6 @@ export function AccountsPage() {
                   </td>
                   <td className="px-5 py-3 text-[13px] whitespace-nowrap text-muted">
                     {a.email}
-                  </td>
-                  <td className="px-5 py-3 text-[13px] whitespace-nowrap text-muted">
-                    {a.role}
                   </td>
                   <td className="px-5 py-3">
                     <Badge
@@ -202,7 +199,6 @@ export function AccountsPage() {
               id: `a${Date.now()}`,
               name: input.name,
               email: input.email,
-              role: input.role,
               status: 'Active',
             }
             setAccounts((prev) => [...prev, created])

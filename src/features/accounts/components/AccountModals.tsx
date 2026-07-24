@@ -3,7 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
-import type { Account, Role } from '../types/account.types'
+import type { Account } from '../types/account.types'
 
 const selectClassName =
   'w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-[13px] text-text outline-none transition-colors focus:border-primary'
@@ -36,21 +36,6 @@ export function EditAccountModal({
           value={form.email}
           onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
         />
-        <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-muted">
-            Role
-          </label>
-          <select
-            className={selectClassName}
-            value={form.role}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, role: e.target.value as Role }))
-            }
-          >
-            <option>Coder</option>
-            <option>Senior Coder</option>
-          </select>
-        </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onClose}>
             Cancel
@@ -68,7 +53,6 @@ interface NewAccountModalProps {
   onCreate: (input: {
     name: string
     email: string
-    role: Role
     password: string
   }) => void
   onClose: () => void
@@ -79,7 +63,6 @@ export function NewAccountModal({ onCreate, onClose }: NewAccountModalProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
-  const [role, setRole] = useState<Role>('Coder')
   const valid =
     name.trim() !== '' && email.trim() !== '' && password.trim() !== ''
 
@@ -118,19 +101,6 @@ export function NewAccountModal({ onCreate, onClose }: NewAccountModalProps) {
             </button>
           </div>
         </div>
-        <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-muted">
-            Role
-          </label>
-          <select
-            className={selectClassName}
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-          >
-            <option>Coder</option>
-            <option>Senior Coder</option>
-          </select>
-        </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onClose}>
             Cancel
@@ -142,7 +112,6 @@ export function NewAccountModal({ onCreate, onClose }: NewAccountModalProps) {
               onCreate({
                 name: name.trim(),
                 email: email.trim(),
-                role,
                 password: password.trim(),
               })
             }

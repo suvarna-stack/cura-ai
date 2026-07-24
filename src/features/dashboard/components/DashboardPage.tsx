@@ -23,7 +23,7 @@ const FALLBACK_OVERVIEW: DashboardOverview = {
 }
 
 const FALLBACK_ACCOUNTS: DashboardAccountRow[] = SEED_ACCOUNTS.map(
-  ({ id, name, role, status }) => ({ id, name, role, status }),
+  ({ id, name, status }) => ({ id, name, status }),
 )
 
 export function DashboardPage() {
@@ -100,7 +100,6 @@ export function DashboardPage() {
             <thead>
               <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
                 <th className="px-5 py-3 font-semibold">Name</th>
-                <th className="px-5 py-3 font-semibold">Role</th>
                 <th className="px-5 py-3 font-semibold">Status</th>
               </tr>
             </thead>
@@ -113,7 +112,6 @@ export function DashboardPage() {
                   <td className="px-5 py-3 text-[13px] font-semibold text-text">
                     {a.name}
                   </td>
-                  <td className="px-5 py-3 text-[13px] text-muted">{a.role}</td>
                   <td className="px-5 py-3">
                     <Badge
                       variant={a.status === 'Active' ? 'success' : 'neutral'}
