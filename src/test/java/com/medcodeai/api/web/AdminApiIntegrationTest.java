@@ -69,6 +69,22 @@ class AdminApiIntegrationTest {
     }
 
     @Test
+    void loginRateLimitTripsAfterRepeatedFailures() throws Exception {
+        // unique unknown email so this can't lock out any account other tests use.
+        // Default LOGIN_MAX_ATTEMPTS = 5: five 401s, then the sixth is locked out.
+        String email = "ratelimit-" + System.nanoTime() + "@example.com";
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"" + email + "\",\"password\":\"nope" + i + "\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"nope\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("too many failed login attempts — try again later"));
+    }
+
+    @Test
     void dashboardReturnsTheFourCards() throws Exception {
         String token = login(ADMIN_EMAIL, ADMIN_PW);
         mvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer " + token))

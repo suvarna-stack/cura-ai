@@ -26,7 +26,7 @@ convenience — when the two disagree, **this document wins**.
   can be malformed — treat as opaque display text). Fields written by this
   backend (`codedDate`, `fetched_at`, working-state timestamps) use
   `YYYY-MM-DD HH:MM:SS` (or `YYYY-MM-DD` where sliced).
-- **Errors**: `400` / `404` / `401` / `403` / `409` return
+- **Errors**: `400` / `404` / `401` / `403` / `409` / `429` return
   `{"error": "<message>"}`. `500` (e.g. the hospital iMed call failed after our
   commit) returns Spring's default error body; the triggering action is
   idempotent — retry it.
@@ -184,6 +184,10 @@ baseline: reopens every non-baseline approval and re-finalizes baseline cases
 a visitor touched. Response
 `{"ok": true, "reopened": <int>, "restoredBaseline": <int>}`.
 
+Gated by `DEMO_TOOLS_ENABLED` (default `true` locally, forced `false` in
+containers): when disabled this endpoint returns `404 {"error": "not found"}`,
+as if it didn't exist. It's a public bulk write, so production ships with it off.
+
 ### POST /api/sync — pull case data from the hospital
 
 No request body. Fetches every case the hospital's iMed API exposes and loads
@@ -252,7 +256,9 @@ Request `{"email": "…", "password": "…"}`. Response:
 
 `400` when email/password missing. `401` `{"error": "invalid email or
 password"}` on unknown email, wrong password, or an inactive account (the
-message never says which).
+message never says which). `429` `{"error": "too many failed login attempts —
+try again later"}` after `LOGIN_MAX_ATTEMPTS` (default 5) failures for the same
+email; a successful login clears the count.
 
 ### POST /api/auth/logout
 

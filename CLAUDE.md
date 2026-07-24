@@ -116,9 +116,15 @@ Milestones (git log --oneline reads as this sequence):
   `service/{AuthService,AccountService}`, `repo/{UsersRepository,
   AuthSessionRepository}`, `config/{AuthConfig,WebConfig,SchemaBootstrap}`. Test:
   `web/AdminApiIntegrationTest`. This **supersedes** the old
-  shared-coder-password idea (per-account passwords won). Deferred still:
-  coder-facing login + stamping the authenticated coder into approvals (wait for
-  the coder frontend).
+  shared-coder-password idea (per-account passwords won).
+  **Prod-hardening added same day:** `POST /api/demo/reset` is now gated by
+  `DEMO_TOOLS_ENABLED` (default true locally, forced `false` in the Dockerfile
+  like `SWAGGER_ENABLED` — returns `404` when off); and login has an in-memory
+  brute-force lockout (`service/LoginRateLimiter`, `LOGIN_MAX_ATTEMPTS`/
+  `LOGIN_LOCKOUT_SECONDS`, keyed by email, single-instance) that 429s past the
+  limit. Deferred still: coder-facing login + stamping the authenticated coder
+  into approvals (wait for the coder frontend); the broader prod checklist
+  (gate case reads, HTTPS/SSO/private network) is discussed but not built.
 
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers), rerun both repos' test suites there, and build the NEW

@@ -45,6 +45,12 @@ public class CasesWriteController {
     private final ApprovalService approvals;
     private final JsonMapper json = new JsonMapper();
 
+    // POST /api/demo/reset is a public bulk write; DEMO_TOOLS_ENABLED gates it
+    // (default on locally, forced off in the Docker image — same posture as
+    // SWAGGER_ENABLED). When off, the endpoint behaves as if it doesn't exist.
+    private final boolean demoToolsEnabled =
+            !"false".equalsIgnoreCase(System.getenv().getOrDefault("DEMO_TOOLS_ENABLED", "true").strip());
+
     public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState,
                                 WriteGate writeGate, ApprovalService approvals) {
         this.cases = cases;
@@ -132,12 +138,18 @@ public class CasesWriteController {
                     + "**Bulk write — it discards visitors' approvals.**")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = "{\"ok\": true, \"reopened\": 3, \"restoredBaseline\": 2}")))
+    @ApiResponse(responseCode = "404", description = "Disabled (DEMO_TOOLS_ENABLED=false)",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
     public Map<String, Object> demoReset(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(type = "object"),
                             examples = @ExampleObject(value = "{\"baselineCoder\": \"demo.coder\"}")))
             @RequestBody(required = false) byte[] body) {
+        if (!demoToolsEnabled) {
+            throw new ApiExceptionHandler.NotFoundException(); // disabled in this environment
+        }
         Object parsed = parseSilent(body);
         Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
         String baselineCoder = Py.or_(b.get("baselineCoder") instanceof String s ? s : null, "demo.coder");

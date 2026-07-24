@@ -15,4 +15,6 @@ COPY --from=build /app/target/medcode-api-*.jar app.jar
 # Render injects PORT; application.yml reads it (default 8001)
 # Swagger UI is dev-only: off in every container unless explicitly re-enabled
 ENV SWAGGER_ENABLED=false
+# POST /api/demo/reset is a public bulk write — off in every container too
+ENV DEMO_TOOLS_ENABLED=false
 CMD ["java", "-jar", "app.jar"]

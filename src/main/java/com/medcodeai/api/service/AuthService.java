@@ -39,6 +39,7 @@ public class AuthService {
     private final UsersRepository users;
     private final AuthSessionRepository sessions;
     private final PasswordEncoder encoder;
+    private final LoginRateLimiter rateLimiter;
     private final SecureRandom rng = new SecureRandom();
     private final int ttlDays;
 
@@ -46,29 +47,32 @@ public class AuthService {
     public record Principal(int userId, String email, String fullName, String role, String sessionId) {
     }
 
-    public AuthService(UsersRepository users, AuthSessionRepository sessions, PasswordEncoder encoder) {
+    public AuthService(UsersRepository users, AuthSessionRepository sessions, PasswordEncoder encoder,
+                       LoginRateLimiter rateLimiter) {
         this.users = users;
         this.sessions = sessions;
         this.encoder = encoder;
+        this.rateLimiter = rateLimiter;
         String ttl = System.getenv("SESSION_TTL_DAYS");
         this.ttlDays = ttl == null || ttl.isBlank() ? 7 : Integer.parseInt(ttl.strip());
     }
 
-    /** Verify credentials, open a session, return {token, user{...}}. 401 on any failure. */
+    /** Verify credentials, open a session, return {token, user{...}}. 401 on any
+     *  failure; 429 once the rate limiter trips for this email. */
     public Map<String, Object> login(String email, String password) {
+        rateLimiter.checkAllowed(email); // 429 if locked out (before we touch the DB)
+
         Map<String, Object> u = users.findForLogin(email);
+        String hash = u == null ? null : (String) u.get("password_hash");
         // Uniform failure for unknown email / no-password / wrong password /
         // inactive — never leak which one it was.
-        if (u == null) {
+        boolean ok = hash != null && !hash.isBlank() && encoder.matches(password, hash)
+                && "active".equals(u.get("status"));
+        if (!ok) {
+            rateLimiter.recordFailure(email);
             throw new ApiExceptionHandler.UnauthorizedException(BAD_CREDS);
         }
-        String hash = (String) u.get("password_hash");
-        if (hash == null || hash.isBlank() || !encoder.matches(password, hash)) {
-            throw new ApiExceptionHandler.UnauthorizedException(BAD_CREDS);
-        }
-        if (!"active".equals(u.get("status"))) {
-            throw new ApiExceptionHandler.UnauthorizedException(BAD_CREDS);
-        }
+        rateLimiter.reset(email); // clean slate on success
 
         int userId = ((Number) u.get("user_id")).intValue();
         String token = newToken();

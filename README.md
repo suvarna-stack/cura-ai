@@ -31,6 +31,19 @@ cd ../imed-mock-api && scripts/seed_local_imed_pg.sh   # builds db "imed" (sibli
 cd ../medcode-api && ./mvnw spring-boot:run            # :8001 this backend
 ```
 
+**Shortcut — one line to bring it all up:**
+
+```bash
+scripts/dev.sh          # seeds anything missing, starts the fake hospital (:8003),
+                        # then runs this backend (:8001). Ctrl-C stops both.
+scripts/dev.sh --seed   # force a fresh re-seed of BOTH databases first (wipes local data)
+```
+
+It prints the Swagger URL and the admin login (`admin@medcodeai.demo` /
+`admin1234`) once ready. Postgres must be installed; it will `brew services
+start` it if it's not already running. Keep the two repos as sibling folders (or
+set `IMED_DIR`).
+
 Good to know:
 
 - `db/seed.sql.gz` is the frozen demo baseline (real sample data, dumped once
@@ -55,6 +68,9 @@ Good to know:
 | `ADMIN_BOOTSTRAP_EMAIL` | Email of the admin created at first startup when no admin exists. Default `admin@medcodeai.demo`. |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Password for that bootstrap admin. Default `admin1234` — **override and change it before any real deployment** (a WARN logs when the default is used). |
 | `SESSION_TTL_DAYS` | Login-session lifetime in days (default `7`). |
+| `DEMO_TOOLS_ENABLED` | Enables `POST /api/demo/reset` (a public bulk write). Default `true` locally; forced `false` in the Docker image, where the endpoint returns `404`. |
+| `LOGIN_MAX_ATTEMPTS` | Failed logins allowed per email before lockout (default `5`). |
+| `LOGIN_LOCKOUT_SECONDS` | Lockout window in seconds once `LOGIN_MAX_ATTEMPTS` is hit (default `900`); a successful login clears the count. |
 
 ## Admin authentication
 

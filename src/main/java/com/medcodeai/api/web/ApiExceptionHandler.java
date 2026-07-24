@@ -57,6 +57,15 @@ public class ApiExceptionHandler {
         }
     }
 
+    /** 429 — too many requests (login rate limiter tripped). */
+    public static class TooManyRequestsException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public TooManyRequestsException(String message) {
+            super(message);
+        }
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound() {
         return body(HttpStatus.NOT_FOUND, "not found");
@@ -80,6 +89,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> conflict(ConflictException e) {
         return body(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<Map<String, Object>> tooManyRequests(TooManyRequestsException e) {
+        return body(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error) {
