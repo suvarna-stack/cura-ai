@@ -290,12 +290,36 @@ public class CasesViewService {
                 .comparing((Map<String, Object> s) -> s.get("recorddatetime") != null)
                 .thenComparing(s -> Py.or_((String) s.get("recorddatetime"), "")));
 
+        // per-case audit trail (meeting item 17): what every coder did to this
+        // case, for the detail's `history` array. action = raw action_type,
+        // coder = the acting account ("" when unrecorded), at = created_at
+        // sliced to "YYYY-MM-DD HH:MM:SS", detail = the parsed action_detail
+        // (omitted when empty). demo.reset churn is excluded, like the
+        // dashboard's coders list.
+        List<Map<String, Object>> history = new ArrayList<>();
+        for (Map<String, Object> r : repo.caseHistoryRows(caseId)) {
+            Map<String, Object> d = detailJson((String) r.get("action_detail"));
+            String by = str(d.get("by"));
+            if ("demo.reset".equals(by)) {
+                continue;
+            }
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("action", r.get("action_type"));
+            e.put("coder", Py.or_(by, ""));
+            e.put("at", Py.slice(Py.or_((String) r.get("created_at"), ""), 19));
+            if (!d.isEmpty()) {
+                e.put("detail", d);
+            }
+            history.add(e);
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("case", caseRow);
         out.put("coverage", cov);
         out.put("sections", sections);
         out.put("codes", repo.detailCodeRows(caseId));
         out.put("orders", repo.detailOrderRows(caseId));
+        out.put("history", history);
         return out;
     }
 

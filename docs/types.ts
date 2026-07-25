@@ -124,10 +124,27 @@ export interface CaseDetail {
   codes: DetailCodeRow[];
   /** max 150, grouped by category */
   orders: DetailOrderRow[];
+  /** this case's coder audit trail, oldest first (empty array when none) */
+  history: CaseHistoryEntry[];
   /** last PUT …/codes payload, echoed verbatim; null when never saved */
   codeEdits: CodeEdit[] | null;
   /** last PUT …/draft text (feature deprecated); null when never saved */
   reportDraft: string | null;
+}
+
+/** One row of this case's coder audit trail (medcodeai `coding_history`) — what
+ *  coders did to THIS case. `demo.reset` churn is excluded. The frontend also
+ *  keeps a separate browser-local activity log; this is the server side. */
+export interface CaseHistoryEntry {
+  /** the raw action: "approved_single" | "approved_group" | "approved_all" |
+   *  "reopened" | "code_assigned" */
+  action: string;
+  /** acting account id/email (e.g. "demo.coder", an email); "" when unrecorded */
+  coder: string;
+  /** "YYYY-MM-DD HH:MM:SS" */
+  at: string;
+  /** the raw action_detail object (e.g. {by, at, codes}); absent when empty */
+  detail?: Record<string, unknown>;
 }
 
 export interface CaseRow {

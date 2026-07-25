@@ -134,6 +134,10 @@ class CasesApiIntegrationTest {
         assertTrue(KNOWN_CASE_ID.equals(detail.get("case").get("case_id").asString()));
         assertTrue(detail.has("codeEdits"));
         assertTrue(detail.has("reportDraft"));
+        // history is always present — an array, empty when the case has no
+        // coder actions yet (the frontend's ViewHistoryPage reads it)
+        assertTrue(detail.has("history"));
+        assertTrue(detail.get("history").isArray());
     }
 
     @Test
@@ -146,6 +150,24 @@ class CasesApiIntegrationTest {
                 .andExpect(jsonPath("$.case.admissiondatetime").value("2026-04-01 06:45:00"))
                 .andExpect(jsonPath("$.case.dischargedatetime").value("2026-04-10 16:22:41"))
                 .andExpect(jsonPath("$.case.encountertype").value("1"));
+    }
+
+    @Test
+    void caseDetailIncludesServerHistoryForApprovedCase() throws Exception {
+        // finished cases were approved in the frozen seed, so their detail
+        // carries a populated `history` array (the coder audit trail); each
+        // entry is {action, coder, at} with a known coder action. Pure read —
+        // no imed-mock needed, unlike the approve round-trip.
+        String approvedId = getJson("/api/cases").get("finished").get(0).get("id").asString();
+        JsonNode history = getJson("/api/cases/" + approvedId).get("history");
+        assertTrue(history.isArray() && history.size() > 0,
+                "an approved case's detail should carry a non-empty history");
+        JsonNode h0 = history.get(0);
+        assertTrue(h0.has("action") && h0.has("coder") && h0.has("at"),
+                "each history entry has action, coder, at");
+        assertTrue(List.of("approved_single", "approved_group", "approved_all", "reopened", "code_assigned")
+                        .contains(h0.get("action").asString()),
+                "history action should be a known coder action, got " + h0.get("action").asString());
     }
 
     @Test

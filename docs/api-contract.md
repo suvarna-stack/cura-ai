@@ -141,10 +141,23 @@ real values here when the extract has them).
                   "code_role": "…", "source": "imported_from_imed|coder_assigned" }, ... ],
   "orders":   [ { "order_category": "…", "imed_source": "…", "order_name": "…",
                   "ordered_at": "…" }, ... ],        // max 150, category-grouped
+  "history":  [ { "action": "approved_single", "coder": "demo.coder",
+                  "at": "2026-07-20 09:00:00",
+                  "detail": { "by": "demo.coder", "codes": 1 } }, ... ],  // coder audit trail, oldest first
   "codeEdits": <CodeEdit[] | null>,   // last PUT …/codes payload, echoed verbatim
   "reportDraft": <string | null>      // last PUT …/draft text (feature deprecated)
 }
 ```
+
+`history` is this case's slice of the coder audit trail (`coding_history`),
+**oldest first** — one entry per coder action (`approved_single` /
+`approved_group` / `approved_all` / `reopened` / `code_assigned`); `demo.reset`
+churn is excluded, as in `coders`. `coder` is the acting account id/email
+(`""` when unrecorded), `at` is `YYYY-MM-DD HH:MM:SS`, and `detail` (present
+only when non-empty) is the raw `action_detail` object (e.g. `{by, at, codes}`).
+The array is empty when the case has no coder actions yet. The next frontend's
+per-case "View History" merges these server rows (read-only — another coder's
+action isn't this coder's to undo) with its own browser-local activity log.
 
 ### PUT /api/cases/{caseId}/codes — save the coder's working code list
 

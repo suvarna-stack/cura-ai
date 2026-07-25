@@ -169,6 +169,18 @@ public class CasesRepository {
                          ELSE 7 END, order_id LIMIT 150""", ROW, caseId);
     }
 
+    // this case's coder audit trail for the detail `history` array — the same
+    // five coder actions coderHistoryRows() counts, scoped to one case, in
+    // history_id (insertion) order; action_detail carries {by, at, …} as text.
+    public List<Map<String, Object>> caseHistoryRows(String caseId) {
+        return jdbc.query("""
+                SELECT action_type::text AS action_type, action_detail::text AS action_detail,
+                       created_at::text AS created_at FROM coding_history
+                WHERE case_id=? AND action_type IN ('approved_single','approved_group',
+                      'approved_all','reopened','code_assigned')
+                ORDER BY history_id""", ROW, caseId);
+    }
+
     // app.py:126 case_exists()
     public boolean caseExists(String caseId) {
         return !jdbc.queryForList("SELECT 1 FROM cases WHERE case_id=?", caseId).isEmpty();
