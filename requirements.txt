@@ -1,0 +1,18 @@
+# --- Web framework ---
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+python-multipart>=0.0.12
+
+# --- Retrieval / embeddings ---
+sentence-transformers>=3.3          # provides BAAI/bge-m3
+chromadb>=0.5.20                    # persistent vector store
+
+# --- Generation (tiny local LLM) ---
+transformers>=4.46
+torch>=2.5                          # CPU build is fine
+accelerate>=1.1
+
+# --- Document loading ---
+pypdf>=5.1
