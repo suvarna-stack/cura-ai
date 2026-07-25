@@ -14,18 +14,20 @@ export interface ApiCodePreview {
   desc?: string | null;    // READ: icd_codes.description (meeting item 7 — code + meaning on the card)
 }
 
-/** One case row as shown in the Dashboard lists (READ from iMed + CREATE fields). */
+/** One case row as shown in the Dashboard lists (READ from iMed + CREATE fields).
+ *  Nullability follows medcode-api's contract (docs/types.ts CaseCard): fields
+ *  with no real data source are null — useCases.rich() normalizes for display. */
 export interface ApiCase {
   id: string;              // READ: iMed transactionnumber (visit number)
-  patient: string;         // [POC] generated display name — NOT shown in the UI (cards show vn/hn)
-  vn: string;              // READ: iMed transactionnumber — the visit number shown on every card
+  patient: string | null;  // always null from the live server (no real name source)
+  vn?: string;             // not sent by the live server — falls back to id
   /** READ: MedHack_Patient.admissionnumber. iMed only fills this for IPD
    *  admissions, so it is null on every OPD case the dashboard shows. */
   hn: string | null;
   dept: string;            // READ: MedHack_BedManagement.department / ward
   ward: string | null;     // READ: MedHack_BedManagement.ward
   group: string;           // CREATE: disease_group (F04)
-  confidence: number;      // CREATE: [POC] placeholder until the real AI model
+  confidence: number | null; // always null from the live server (no real AI confidence yet)
   severity: string | null; // CREATE: severity_level (F06)
   coverage: string | null; // READ: MedHack_Patient.healthcoverage (raw code, e.g. OFC_O4)
   coverageLabel?: string | null; // REF: coverage_types label (falls back to scheme family until hospital list arrives)
@@ -43,9 +45,9 @@ export interface ApiCase {
    *  side of the card). Capped server-side; `orders` still holds the totals. */
   orderNames?: Record<string, string[]>;
   missing?: string;        // CREATE: only on incomplete cases (F03)
-  created_at: string;      // READ: ISO string (iMed visit datetime) — display via formatDate/formatDateTime
-  updated_at: string;      // READ: ISO string — last modification in iMed
-  revenue_impact: "high" | "medium" | "low"; // CREATE: [POC] mock band until real DRG revenue exists
+  created_at: string | null; // READ: raw hospital datetime text; null on OPD rows today
+  updated_at: string | null; // READ: same caveat
+  revenue_impact: "high" | "medium" | "low" | null; // always null from the live server (no real DRG revenue)
   /** CREATE: every coder who worked this case, from coding_history — a case is
    *  not limited to one responsible coder. Most recent toucher LAST, so
    *  `coders.at(-1)` is the responsible coder. Empty on untouched cases. */
@@ -65,8 +67,8 @@ export interface ApiIncompleteGroup {
 
 export interface ApiFinishedCase {
   id: string;
-  patient: string;         // [POC] generated display name — NOT shown in the UI
-  vn: string;
+  patient: string | null;  // always null from the live server
+  vn?: string;             // not sent by the live server — falls back to id
   hn: string | null;
   codedDate: string;
   /** Responsible coder = the LATEST person to touch the case (= coders.at(-1)),
@@ -80,8 +82,8 @@ export interface ApiFinishedCase {
   coderId?: string;
   drg: string;
   reopenable: boolean;     // DEPRECATED: always true — any coder may reopen any case; kept so old payloads/frontends still parse, the UI no longer reads it
-  created_at: string;      // READ: ISO string — display via formatDate/formatDateTime
-  updated_at: string;      // READ: ISO string
+  created_at: string | null; // READ: raw hospital datetime text; null on OPD rows today
+  updated_at: string | null; // READ: same caveat
   // facet fields (same sources as ApiCase) so the sidebar filters work on Finished too
   dept: string;
   ward: string | null;
@@ -93,7 +95,7 @@ export interface ApiFinishedCase {
   encountertype: string | null;
   orders: Record<string, number>;
   codes: ApiCodePreview[];
-  revenue_impact: "high" | "medium" | "low";
+  revenue_impact: "high" | "medium" | "low" | null; // always null from the live server
 }
 
 /** One row of the server-side audit trail (medcodeai `coding_history`).
@@ -107,9 +109,15 @@ export interface ApiCaseHistoryEntry {
 }
 
 export interface ApiCasesResponse {
-  stats: { total: number; complete: number; incomplete: number; finished: number };
+  stats: { total: number; complete: number; incomplete: number; reopened?: number; finished: number };
   complete: ApiCase[];
   incompleteGroups: ApiIncompleteGroup[];
+  /** since 2026-07-24 the server sends reopened-awaiting-re-approval cases as
+   *  their own exclusive list (they no longer ride inside complete/incomplete
+   *  with just a flag). Optional so the mock seed payload stays valid. Each
+   *  row carries reopened: true (+ reopenedAt/By); incomplete-origin rows
+   *  keep `missing`. */
+  reopened?: ApiCase[];
   finished: ApiFinishedCase[];
 }
 

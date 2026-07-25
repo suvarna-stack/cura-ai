@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Users, Activity, Database, CheckCircle2 } from 'lucide-react'
 import { Badge } from '../../../components/ui/Badge'
 import { Card } from '../../../components/ui/Card'
-import { SEED_ACCOUNTS } from '../../accounts/types/account.types'
 import {
   fetchDashboardAccounts,
   fetchDashboardOverview,
@@ -12,24 +11,18 @@ import type {
   DashboardOverview,
 } from '../types/dashboard.types'
 
-const FALLBACK_OVERVIEW: DashboardOverview = {
-  totalAccounts: SEED_ACCOUNTS.length,
-  activeToday: Math.min(
-    3,
-    SEED_ACCOUNTS.filter((a) => a.status === 'Active').length,
-  ),
-  totalCases: 127,
-  systemStatus: 'Operational ✅',
+// Zeroed skeleton shown only while the live fetch is in flight (Phase 4:
+// the seed-account fallbacks are gone — real data or nothing).
+const EMPTY_OVERVIEW: DashboardOverview = {
+  totalAccounts: 0,
+  activeToday: 0,
+  totalCases: 0,
+  systemStatus: '…',
 }
 
-const FALLBACK_ACCOUNTS: DashboardAccountRow[] = SEED_ACCOUNTS.map(
-  ({ id, name, status }) => ({ id, name, status }),
-)
-
 export function DashboardPage() {
-  const [overview, setOverview] = useState<DashboardOverview>(FALLBACK_OVERVIEW)
-  const [accounts, setAccounts] =
-    useState<DashboardAccountRow[]>(FALLBACK_ACCOUNTS)
+  const [overview, setOverview] = useState<DashboardOverview>(EMPTY_OVERVIEW)
+  const [accounts, setAccounts] = useState<DashboardAccountRow[]>([])
 
   useEffect(() => {
     void (async () => {
@@ -38,11 +31,10 @@ export function DashboardPage() {
           fetchDashboardOverview(),
           fetchDashboardAccounts(),
         ])
-        // Keep seed UI until real API returns data
-        if (nextOverview.totalAccounts > 0) setOverview(nextOverview)
-        if (nextAccounts.length > 0) setAccounts(nextAccounts)
+        setOverview(nextOverview)
+        setAccounts(nextAccounts)
       } catch {
-        // placeholders may throw later — seed UI stays
+        // 401/network — the axios interceptor handles dead tokens
       }
     })()
   }, [])

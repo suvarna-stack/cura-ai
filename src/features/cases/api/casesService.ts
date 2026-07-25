@@ -1,66 +1,64 @@
+import { apiClient } from '../../../lib/axios'
 import type {
   ApiCaseDetail,
   ApiCasesResponse,
   ApiStoredCode,
 } from '../types/api.types'
-import { SEED_CASE_DETAILS, SEED_CASES } from '../mock/seedCases'
 
 /**
- * Toggle mock responses until the real cases API is ready.
- * When false, wire the TODO apiClient calls below.
+ * Cases API — live against medcode-api since Phase 4 (the USE_MOCK seed layer
+ * is gone). All requests carry the login token via the shared apiClient; the
+ * server stamps approve/reopen with the logged-in coder, so no coder name is
+ * sent from here.
  */
-const USE_MOCK = true
 
-/** True when a live API base is configured (approvals persist server-side). */
-export const hasLiveServer = Boolean(import.meta.env.VITE_API_BASE)
+/** Live server is the only mode now (kept for callers that still branch). */
+export const hasLiveServer = true
 
-/**
- * Placeholder cases API — wire to shared apiClient when the backend is ready.
- */
+/** GET /api/cases — the four-group dashboard payload. */
 export async function fetchCases(): Promise<ApiCasesResponse> {
-  if (USE_MOCK) {
-    return structuredClone(SEED_CASES)
-  }
-  // TODO: const { data } = await apiClient.get<ApiCasesResponse>('/cases')
-  throw new Error('fetchCases is not implemented')
+  const { data } = await apiClient.get<ApiCasesResponse>('/cases')
+  return data
 }
 
+/** GET /api/cases/{id} — full detail incl. codeEdits/reportDraft. */
 export async function fetchCaseDetail(id: string): Promise<ApiCaseDetail> {
-  if (USE_MOCK) {
-    const detail = SEED_CASE_DETAILS[id]
-    if (!detail) throw new Error(`No mock detail for case ${id}`)
-    return structuredClone(detail)
-  }
-  // TODO: const { data } = await apiClient.get<ApiCaseDetail>(`/cases/${id}`)
-  void id
-  throw new Error('fetchCaseDetail is not implemented')
+  const { data } = await apiClient.get<ApiCaseDetail>(
+    `/cases/${encodeURIComponent(id)}`,
+  )
+  return data
 }
 
 /** True when the detail came from a live server (includes working-state keys). */
 export const isLiveDetail = (d: ApiCaseDetail) => 'codeEdits' in d
 
-async function sendPlaceholder(
-  _path: string,
-  _method: string,
-  _body: unknown,
+/** Fire a write; resolves true on success, false on failure (callers treat
+ *  writes as best-effort on top of their optimistic local state). */
+async function send(
+  url: string,
+  method: 'POST' | 'PUT',
+  body: unknown,
 ): Promise<boolean> {
-  if (USE_MOCK) return false
-  // TODO: await apiClient.request(...)
-  return false
+  try {
+    await apiClient.request({ url, method, data: body })
+    return true
+  } catch {
+    return false
+  }
 }
 
-/** POST /cases/approve — finalize cases (placeholder). */
-export const approveCases = (ids: string[], coder = 'web.coder') =>
-  sendPlaceholder('/cases/approve', 'POST', { ids, coder })
+/** POST /api/cases/approve — the server records the logged-in coder. */
+export const approveCases = (ids: string[]) =>
+  send('/cases/approve', 'POST', { ids })
 
-/** POST /cases/{id}/reopen — undo an approve (placeholder). */
-export const reopenCase = (id: string, coder = 'web.coder') =>
-  sendPlaceholder(`/cases/${id}/reopen`, 'POST', { coder })
+/** POST /api/cases/{id}/reopen — undo an approve (actor = logged-in coder). */
+export const reopenCase = (id: string) =>
+  send(`/cases/${encodeURIComponent(id)}/reopen`, 'POST', {})
 
-/** PUT /cases/{id}/codes — save working code edits (placeholder). */
+/** PUT /api/cases/{id}/codes — save working code edits (bare array). */
 export const saveCodesRemote = (id: string, codes: ApiStoredCode[]) =>
-  sendPlaceholder(`/cases/${id}/codes`, 'PUT', codes)
+  send(`/cases/${encodeURIComponent(id)}/codes`, 'PUT', codes)
 
-/** PUT /cases/{id}/draft — save report draft (placeholder). */
+/** PUT /api/cases/{id}/draft — save report draft (deprecated feature). */
 export const saveDraftRemote = (id: string, text: string) =>
-  sendPlaceholder(`/cases/${id}/draft`, 'PUT', { text })
+  send(`/cases/${encodeURIComponent(id)}/draft`, 'PUT', { text })

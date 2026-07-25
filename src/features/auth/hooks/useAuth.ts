@@ -1,32 +1,5 @@
-import { useState } from 'react'
-
-const TOKEN_KEY = 'token'
-
 /**
- * Local auth shell — token read/write only.
- * Real login/logout API + role handling will be wired later.
+ * Auth hook — context-backed since Phase 3 (real login/logout/me + roles).
+ * Kept at this path so existing imports keep working.
  */
-export function useAuth() {
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem(TOKEN_KEY),
-  )
-
-  const isAuthenticated = Boolean(token)
-
-  function setAuthToken(nextToken: string): void {
-    localStorage.setItem(TOKEN_KEY, nextToken)
-    setToken(nextToken)
-  }
-
-  function clearAuthToken(): void {
-    localStorage.removeItem(TOKEN_KEY)
-    setToken(null)
-  }
-
-  return {
-    token,
-    isAuthenticated,
-    setAuthToken,
-    clearAuthToken,
-  }
-}
+export { useAuthContext as useAuth, roleHome } from '../context/AuthProvider'

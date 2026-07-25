@@ -60,14 +60,17 @@ const GROUP_ICONS: [RegExp, IncompleteGroup['icon']][] = [
 const iconFor = (label: string) =>
   GROUP_ICONS.find(([re]) => re.test(label))?.[1] ?? ShieldQuestion
 
+// Normalization point for the live contract's honest nulls (patient /
+// confidence / revenue_impact have no real data source): the display layer
+// gets safe fallbacks HERE, in one place, so components don't null-check.
 const rich = (c: ApiCase): RichCase => ({
   id: c.id,
-  patient: c.patient,
+  patient: c.patient ?? '',
   vn: c.vn ?? c.id,
   hn: c.hn ?? null,
   dept: c.dept,
   group: c.group,
-  confidence: c.confidence,
+  confidence: c.confidence ?? 0,
   ward: c.ward,
   severity: c.severity,
   coverage: c.coverage,
@@ -82,9 +85,9 @@ const rich = (c: ApiCase): RichCase => ({
   orders: c.orders,
   orderNames: c.orderNames,
   missing: c.missing,
-  created_at: c.created_at,
-  updated_at: c.updated_at,
-  revenue_impact: c.revenue_impact,
+  created_at: c.created_at ?? undefined,
+  updated_at: c.updated_at ?? undefined,
+  revenue_impact: c.revenue_impact ?? undefined,
   reopened: c.reopened,
 })
 
@@ -123,7 +126,11 @@ export function useCases(refreshKey = 0): CasesData {
       .then((api) => {
         if (cancelled) return
         setData({
-          completeCases: api.complete.map(rich),
+          // the server now sends reopened cases as their own exclusive list
+          // (2026-07-24); fold them back into the complete pool — they carry
+          // reopened: true, so the existing Reopen-tab derivation in CasesPage
+          // picks them up unchanged (proper 4-tab consumption = the rewrite)
+          completeCases: [...api.complete, ...(api.reopened ?? [])].map(rich),
           incompleteGroups: api.incompleteGroups.map((g) => ({
             id: g.id,
             label: g.label,
@@ -136,14 +143,14 @@ export function useCases(refreshKey = 0): CasesData {
           })),
           finishedCases: api.finished.map((f) => ({
             id: f.id,
-            patient: f.patient,
+            patient: f.patient ?? '',
             vn: f.vn ?? f.id,
             hn: f.hn ?? null,
             codedDate: f.codedDate,
             coder: f.coder,
             coders: f.coders,
             drg: f.drg,
-            created_at: f.created_at,
+            created_at: f.created_at ?? undefined,
             dept: f.dept,
             group: f.group,
             severity: f.severity,
@@ -152,7 +159,7 @@ export function useCases(refreshKey = 0): CasesData {
             codes: f.codes,
             encountertype: f.encountertype,
             orders: f.orders,
-            revenue_impact: f.revenue_impact,
+            revenue_impact: f.revenue_impact ?? undefined,
           })),
           stats: api.stats,
           loading: false,

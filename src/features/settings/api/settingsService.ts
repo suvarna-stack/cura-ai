@@ -1,48 +1,41 @@
+import { apiClient } from '../../../lib/axios'
+import { fetchMe } from '../../auth/api/authService'
 import type { CoderProfile } from '../types/settings.types'
-import { MOCK_CODER_PROFILE } from '../types/settings.types'
 
 /**
- * Toggle mock responses until the real settings API is ready.
- */
-const USE_MOCK = true
-
-/**
- * Placeholder settings API — wire to shared apiClient when ready.
+ * Settings API — live since Phase 4. The profile card is fed from the
+ * logged-in account (/api/auth/me); `scope` and `imedUserId` have no real
+ * backend source yet (hospital master data still TBD — see
+ * medcode-api/docs/imed-integration.md open question 4), so they show
+ * honest placeholders.
  */
 export async function fetchCoderProfile(): Promise<CoderProfile> {
-  if (USE_MOCK) {
-    return { ...MOCK_CODER_PROFILE }
+  const me = await fetchMe()
+  return {
+    fullName: me.fullName ?? me.email,
+    role: me.role === 'admin' ? 'Administrator' : 'Medical Coder',
+    scope: 'All departments',
+    imedUserId: '—', // no iMed employee-id mapping yet (open question 4)
   }
-  // TODO: const { data } = await apiClient.get<CoderProfile>('/me')
-  throw new Error('fetchCoderProfile is not implemented')
 }
 
-/** Local + optional server approved case ids (demo reset tooling). */
+/** Locally-approved case ids (demo tooling reads the optimistic set). */
 export async function fetchApprovedCaseIds(): Promise<string[]> {
-  if (USE_MOCK) {
-    try {
-      return JSON.parse(
-        localStorage.getItem('approvedCases') ?? '[]',
-      ) as string[]
-    } catch {
-      return []
-    }
+  try {
+    return JSON.parse(localStorage.getItem('approvedCases') ?? '[]') as string[]
+  } catch {
+    return []
   }
-  // TODO: const { data } = await apiClient.get<string[]>('/cases/approved-ids')
-  throw new Error('fetchApprovedCaseIds is not implemented')
 }
 
 /**
- * Reset demo approvals — clears localStorage and reloads.
- * Real backend: POST /demo/reset (placeholder).
+ * Reset demo approvals — server-side POST /api/demo/reset (restores the demo
+ * baseline; 404 when DEMO_TOOLS_ENABLED is off), then clears the local
+ * optimistic sets and reloads so the UI refetches the reset payload.
  */
 export async function resetDemoApprovals(): Promise<void> {
-  if (USE_MOCK) {
-    localStorage.removeItem('approvedCases')
-    localStorage.removeItem('reopenedCases')
-    window.location.reload()
-    return
-  }
-  // TODO: await apiClient.post('/demo/reset')
-  throw new Error('resetDemoApprovals is not implemented')
+  await apiClient.post('/demo/reset', {})
+  localStorage.removeItem('approvedCases')
+  localStorage.removeItem('reopenedCases')
+  window.location.reload()
 }

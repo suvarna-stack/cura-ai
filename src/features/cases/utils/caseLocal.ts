@@ -1,10 +1,10 @@
 // ============================================================
 // caseLocal — POC persistence for per-case edits.
-// Dual-write: every save lands in localStorage (offline/static
-// fallback, always) AND fires PUT /cases/{id}/codes / .../draft
-// at the live server when one is configured (VITE_API_BASE).
-// Reads stay localStorage-only; the server's copy comes back
-// embedded in the case detail (codeEdits / reportDraft).
+// Dual-write: every save lands in localStorage (offline fallback)
+// AND fires PUT /cases/{id}/codes / .../draft at medcode-api
+// (live-only since Phase 4). Reads stay localStorage-only; the
+// server's copy comes back embedded in the case detail
+// (codeEdits / reportDraft).
 // ============================================================
 import { saveCodesRemote, saveDraftRemote } from "../api/casesService";
 import type { CodeEntry } from "../types/case.types";

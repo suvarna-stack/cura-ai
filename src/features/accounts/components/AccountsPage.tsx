@@ -17,11 +17,10 @@ import {
   updateAccount,
 } from '../api/accountService'
 import type { Account } from '../types/account.types'
-import { SEED_ACCOUNTS } from '../types/account.types'
 import { EditAccountModal, NewAccountModal } from './AccountModals'
 
 export function AccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>(SEED_ACCOUNTS)
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [editing, setEditing] = useState<Account | null>(null)
   const [toggling, setToggling] = useState<Account | null>(null)
   const [deleting, setDeleting] = useState<Account | null>(null)
@@ -30,10 +29,9 @@ export function AccountsPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const next = await fetchAccounts()
-        if (next.length > 0) setAccounts(next)
+        setAccounts(await fetchAccounts())
       } catch {
-        // keep seed UI
+        // 401/network — the axios interceptor handles dead tokens
       }
     })()
   }, [])

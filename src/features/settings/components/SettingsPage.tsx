@@ -19,7 +19,14 @@ import {
   resetDemoApprovals,
 } from '../api/settingsService'
 import type { CoderProfile } from '../types/settings.types'
-import { MOCK_CODER_PROFILE } from '../types/settings.types'
+
+// blank skeleton while /auth/me loads (Phase 4: mock profile is gone)
+const EMPTY_PROFILE: CoderProfile = {
+  fullName: '…',
+  role: '',
+  scope: '',
+  imedUserId: '—',
+}
 
 const themeOrder: ThemeId[] = [
   'light-rose',
@@ -37,7 +44,7 @@ export function SettingsPage() {
   const { gl, themeId, setThemeId } = useTheme()
   const { lang, setLang, t } = useLang()
 
-  const [profile, setProfile] = useState<CoderProfile>(MOCK_CODER_PROFILE)
+  const [profile, setProfile] = useState<CoderProfile>(EMPTY_PROFILE)
   const [approvedIds, setApprovedIds] = useState<string[]>([])
   const [resetProgress, setResetProgress] = useState<number | null>(null)
   const resetting = resetProgress !== null

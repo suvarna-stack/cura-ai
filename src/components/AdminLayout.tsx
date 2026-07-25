@@ -8,27 +8,24 @@ import {
   Menu,
   X,
   ShieldCheck,
-  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/hooks/useAuth'
-import { logoutUser } from '../features/auth/api/authService'
 
+// Strict role separation (Phase 3): no cross-link to the coder's /cases —
+// admins see admin pages only (the router would bounce it anyway).
 const NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/accounts', label: 'Accounts', icon: Users, end: false },
   { to: '/admin/training', label: 'AI Training', icon: BrainCircuit, end: false },
-  { to: '/cases', label: 'Cases', icon: ClipboardList, end: false },
 ]
 
 export function AdminLayout() {
   const navigate = useNavigate()
-  const { clearAuthToken } = useAuth()
+  const { logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleLogout = () => {
-    void logoutUser()
-    clearAuthToken()
-    navigate('/login', { replace: true })
+    void logout().finally(() => navigate('/login', { replace: true }))
   }
 
   const sidebar = (

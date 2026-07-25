@@ -1,14 +1,16 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   BarChart2,
   Bot,
   Settings,
   Cpu,
+  LogOut,
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
 import { CasesProviders } from '../context/CasesProviders'
+import { useAuth } from '../../auth/hooks/useAuth'
 
 const NAV = [
   { to: '/cases', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: false },
@@ -20,6 +22,12 @@ const NAV = [
 function CoderShell() {
   const { gl } = useTheme()
   const { t } = useLang()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    void logout().finally(() => navigate('/login', { replace: true }))
+  }
 
   return (
     <>
@@ -65,6 +73,28 @@ function CoderShell() {
             </NavLink>
           ))}
         </nav>
+
+        {/* logged-in coder + logout (coders never see the admin sidebar) */}
+        <div className="ml-auto flex items-center gap-2">
+          {user && (
+            <span
+              className="hidden text-[12px] font-semibold sm:inline"
+              style={{ color: gl.text, opacity: 0.7 }}
+              title={user.email}
+            >
+              {user.fullName ?? user.email}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold opacity-70 transition-opacity hover:opacity-100"
+            style={{ color: gl.text }}
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">

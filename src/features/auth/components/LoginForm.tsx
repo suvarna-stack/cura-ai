@@ -1,20 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ShieldCheck } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
-import { loginUser } from '../api/authService'
-import { useAuth } from '../hooks/useAuth'
+import { extractAuthError } from '../api/authService'
+import { roleHome, useAuth } from '../hooks/useAuth'
 import { DEMO_EMAIL, DEMO_PASSWORD } from '../types/auth.types'
 import { loginSchema, type LoginFormValues } from '../types/login.schema'
 
+/** Shared login for both roles — where you land depends on your account:
+ *  coder → /cases, admin → /admin/dashboard (strict role routing). */
 export function LoginForm() {
   const navigate = useNavigate()
-  const { setAuthToken } = useAuth()
-  const [submitError, setSubmitError] = useState(false)
+  const { user, ready, login } = useAuth()
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const {
     register,
@@ -29,23 +31,26 @@ export function LoginForm() {
     },
   })
 
-  const onSubmit = async (values: LoginFormValues) => {
-    setSubmitError(false)
+  // already logged in (e.g. back-button to /login) → straight to role home
+  if (ready && user) {
+    return <Navigate to={roleHome(user.role)} replace />
+  }
 
+  const onSubmit = async (values: LoginFormValues) => {
+    setSubmitError(null)
     try {
-      // Placeholder — role-based redirect comes when auth API is ready
-      const response = await loginUser(values)
-      setAuthToken(response.token || 'dev-token')
-      navigate('/admin/dashboard', { replace: true })
-    } catch {
-      setSubmitError(true)
+      const loggedIn = await login(values)
+      navigate(roleHome(loggedIn.role), { replace: true })
+    } catch (err) {
+      // 401 "invalid email or password" / 429 lockout — show the server's words
+      setSubmitError(extractAuthError(err))
     }
   }
 
   const fillDemoCredentials = () => {
     setValue('email', DEMO_EMAIL, { shouldValidate: true })
     setValue('password', DEMO_PASSWORD, { shouldValidate: true })
-    setSubmitError(false)
+    setSubmitError(null)
   }
 
   return (
@@ -56,7 +61,7 @@ export function LoginForm() {
           <ShieldCheck size={34} className="text-primary" />
           <h1 className="text-[20px] font-bold text-text">MedCode AI</h1>
           <p className="text-[12px] font-semibold text-primary">
-            SuperAdmin Portal
+            Coding Audit Platform
           </p>
         </div>
 
@@ -70,10 +75,10 @@ export function LoginForm() {
             type="email"
             label="Email"
             autoFocus
-            placeholder="admin@hospital.th"
+            placeholder="you@hospital.th"
             error={errors.email?.message}
             {...register('email', {
-              onChange: () => setSubmitError(false),
+              onChange: () => setSubmitError(null),
             })}
           />
 
@@ -84,29 +89,29 @@ export function LoginForm() {
             placeholder="••••••••••••"
             error={errors.password?.message}
             {...register('password', {
-              onChange: () => setSubmitError(false),
+              onChange: () => setSubmitError(null),
             })}
           />
 
           {submitError && (
             <p className="text-[12px] font-semibold text-error">
-              Invalid credentials
+              {submitError}
             </p>
           )}
 
           <Button type="submit" fullWidth disabled={isSubmitting}>
-            Sign in as SuperAdmin
+            Sign in
           </Button>
         </form>
 
-        {/* demo credentials — click to pre-fill */}
+        {/* demo credentials — click to pre-fill (local/demo only) */}
         <button
           type="button"
           onClick={fillDemoCredentials}
           className="mt-6 w-full rounded-lg border border-dashed border-border bg-bg p-3 text-left transition-colors hover:border-primary"
         >
           <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
-            Demo account — click to fill
+            Demo admin — click to fill
           </p>
           <p className="text-[12px] text-text">
             Email:{' '}

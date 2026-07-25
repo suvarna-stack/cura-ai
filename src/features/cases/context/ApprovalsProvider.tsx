@@ -1,19 +1,17 @@
 // ============================================================
 // ApprovalsProvider — component half of the approvals context.
 // Dual-write: the approved set lives in the browser
-// (localStorage["approvedCases"]) for optimistic UI + offline
-// mode, AND each action fires POST /cases/approve /
-// POST /cases/{id}/reopen at the live server when one is
-// configured (VITE_API_BASE). The server writes case_status,
-// a coding_history entry (F12) and the limited iMed write-back;
-// reopen per F14. Reopened-but-not-re-approved cases live in a
-// second persisted set (localStorage["reopenedCases"]) that feeds
-// the Dashboard's Reopen tab; a confirmed server reopen bumps
-// casesVersion so useCases refetches the moved case without a
-// remount.
+// (localStorage["approvedCases"]) for optimistic UI, AND each
+// action fires POST /cases/approve / POST /cases/{id}/reopen at
+// medcode-api (live-only since Phase 4; the server stamps the
+// logged-in coder and runs the hospital iMed write-back).
+// Reopened-but-not-re-approved cases live in a second persisted
+// set (localStorage["reopenedCases"]) that feeds the Dashboard's
+// Reopen tab; a confirmed server reopen bumps casesVersion so
+// useCases refetches the moved case without a remount.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
-import { approveCases, reopenCase } from "../api/casesService";
+import { approveCases, hasLiveServer, reopenCase } from "../api/casesService";
 import { ApprovalsCtx } from "./ApprovalsContext";
 
 export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
@@ -66,7 +64,7 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     });
   };
   const pruneReopened = useCallback((serverFinishedIds: string[]) => {
-    if (!import.meta.env.VITE_API_BASE) return; // static mode: local set is authoritative
+    if (!hasLiveServer) return; // static mode: local set is authoritative
     setReopenedIds(prev => {
       const stale = serverFinishedIds.filter(id => prev.has(id) && !inFlight.current.has(id));
       if (stale.length === 0) return prev;
