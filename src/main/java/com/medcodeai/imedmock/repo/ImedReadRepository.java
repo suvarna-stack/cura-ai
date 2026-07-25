@@ -59,12 +59,19 @@ public class ImedReadRepository {
         return byTn("medhack_medicalrecord_result", tn);
     }
 
+    // Cancelled rows stay in the tables (the /api/v1 DELETE is iMed's cancel
+    // flow — audit trail, no hard delete) but are invisible to reads: without
+    // this filter a sync would resurrect codes a coder deliberately removed.
     public List<Map<String, Object>> diagnoses(String tn) {
-        return byTn("medhack_diagnosis_icd10", tn);
+        return jdbc.query("""
+                SELECT * FROM imed.medhack_diagnosis_icd10
+                WHERE transactionnumber = ? AND is_cancelled IS DISTINCT FROM '1'""", ROW, tn);
     }
 
     public List<Map<String, Object>> procedures(String tn) {
-        return byTn("medhack_procedure_icd9", tn);
+        return jdbc.query("""
+                SELECT * FROM imed.medhack_procedure_icd9
+                WHERE transactionnumber = ? AND is_cancelled IS DISTINCT FROM '1'""", ROW, tn);
     }
 
     public List<Map<String, Object>> orderDrugs(String tn) {

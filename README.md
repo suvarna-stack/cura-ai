@@ -1,15 +1,18 @@
 # imed-mock-api
 
-A **mock of the iMed hospital API**: the HTTP endpoints the hospital must
-provide in production, implemented as a live, runnable example over the real
-sample extract data. Two audiences:
+A **mock of the iMed hospital API**: the HTTP surface between MedCode AI and
+the hospital, implemented as a live, runnable example over the real sample
+extract data. Two audiences:
 
-1. **Hospital clients** — this IS the integration spec. "Give us APIs like
-   this": the READ endpoints serve your case data; the two coding-result
-   endpoints receive our approval results.
-2. **medcode-api** — calls the coding-result endpoints on approve/reopen,
+1. **Hospital clients** — the READ endpoints are the integration spec for the
+   extract data ("give us APIs like this"); the WRITE endpoints under
+   `/api/v1` mock the hospital's OWN contract back at them — the "iMed
+   Diagnosis and Medical Discharge API" PDF (rev 1, 24 Jul 2026) — plus our
+   proposed coding-status extension.
+2. **medcode-api** — calls the `/api/v1` write endpoints on approve/reopen,
    exactly as it will call the hospital's real API later. Swapping this mock
-   for the real thing is a base-URL change (`IMED_API_BASE` in medcode-api).
+   for the real thing is a base-URL + token change (`IMED_API_BASE` /
+   `IMED_API_TOKEN` in medcode-api).
 
 Spring Boot 4.1 / Java 21, Maven (`./mvnw`), plain SQL — no JPA, no Python.
 Owns the `imed` PostgreSQL database exclusively; no other app touches it.
@@ -26,10 +29,9 @@ generated document cannot.
 | `/v3/api-docs` | OpenAPI 3.1 JSON |
 | `/v3/api-docs.yaml` | OpenAPI 3.1 YAML — **the file to hand the hospital's integrators** |
 
-The write-back rules (MCAI- prefix, required `status`, the `diagnosisType`
-vocabulary) are declared once as Bean Validation constraints on
-`CodingResultRequest`, so what the server enforces and what the document
-publishes cannot disagree.
+The `/api/v1` write bodies are typed records with the hospital PDF's exact
+snake_case field names (`DiagnosisRequest`), so the published schema mirrors
+their contract field-for-field.
 
 ## The API
 
@@ -55,46 +57,40 @@ non-uniform in the source; parsing is the consumer's job).
 
 `{tn}` is the transaction number (visit number). Unknown `{tn}` → `404
 {"error":"not found"}`; a known case with no rows in a table → `[]`.
+Cancelled diagnosis/procedure rows (see DELETE below) are excluded — they
+stay in the tables for the audit trail but are invisible to reads, so a sync
+can never resurrect a code a coder removed.
 
-### WRITE — "receive our approval results"
+### WRITE — `/api/v1`, the hospital's real contract (mocked)
 
-The LIMITED write-back on case finalization: exactly two things — the case
-coding status and the finalized ICD codes, stored as NEW rows whose `id` is
-prefixed **`MCAI-`** (the marker separating MedCode AI codes from hospital
-originals; enforced with a 400). Clinical notes and hospital-entered codes are
-never modified.
+Mirrors the "iMed Diagnosis and Medical Discharge API" PDF field-for-field:
+`Authorization: Bearer <token>` (mock: `IMED_API_TOKEN`, default
+`imed-mock-token`), snake_case bodies, `{request_id, status, result}`
+envelopes, and `request_id` dedup — replaying a request returns the stored
+response instead of re-executing.
 
-```
-PUT /api/cases/{tn}/coding-result
-{
-  "status": "approved",
-  "finalizedAt": "2026-07-22 12:00:00",
-  "updatedBy": "web.coder",
-  "encounterType": "0",
-  "codes": [
-    {"id": "MCAI-123", "icd": "E11.9", "name": "Type 2 diabetes",
-     "type": "diagnosis", "diagnosisType": "PRIMARY_DIAGNOSIS"},
-    {"id": "MCAI-124", "icd": "39.95", "name": "Hemodialysis",
-     "type": "procedure"}
-  ]
-}
-→ {"ok": true, "statusRows": 1, "codeRows": 2}
-```
+| Endpoint | What |
+|---|---|
+| `POST /api/v1/diagnosis` | Create ICD-10 dx + ICD-9 procedures + medical discharge in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
+| `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`; only provided fields change |
+| `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis — iMed's cancel flow: flagged `is_cancelled`, never hard-deleted, gone from reads. Idempotent |
+| `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |
+| `PUT /api/v1/coding-status/{visit_id}` | **Our proposed extension**: upsert the case's coding status (approve). Idempotent |
+| `DELETE /api/v1/coding-status/{visit_id}` | Clear it (reopen). Idempotent |
 
-- Replaces any previously submitted result for the case (idempotent — safe to
-  retry). `type` routes the row: `"procedure"` → MedHack_Procedure(ICD9),
-  anything else → MedHack_Diagnosis(ICD10) with `diagnosisType` stored verbatim
-  (`PRIMARY_DIAGNOSIS` / `COMORBIDITY` / `OTHERS` / `EXTERNAL_CAUSE_OF_INJURY`).
-- Rejected with 400 `{"error": "..."}`: any code id missing the `MCAI-` prefix,
-  a blank `status`, or a malformed body. Several problems at once come back as
-  one message joined with `; `. `finalizedAt` / `updatedBy` / `encounterType`
-  are optional — absent means a null column, not an error.
+Errors, verbatim from the PDF: `400 {"status":"STATUS_BUSINESS_ERROR",
+"message":"invalid_request","message_th":…}` (the mock adds a `detail` key as
+a debugging aid — the real API does not), `401 {"message":"unauthorized",…}`,
+`409 {"message":"DIAGNOSIS_CODE_ALREADY_EXIST",…}` on a duplicate live ICD-10
+code for the visit.
 
-```
-DELETE /api/cases/{tn}/coding-result   → {"ok": true}
-```
+Mock master data (real IDs arrive with the hospital's master-data list and
+slot into the same fields): `fix_visit_type_id` = `OPD` | `IPD`,
+`fix_diagnosis_type_id` = `PRIMARY_DIAGNOSIS` / `COMORBIDITY` / `OTHERS` /
+`EXTERNAL_CAUSE_OF_INJURY`, `fix_operation_type_id` = any non-blank string.
 
-- Reopen: removes the coding-status row and every `MCAI-` code row. Idempotent.
+The invented `PUT/DELETE /api/cases/{tn}/coding-result` contract from the
+first mock iteration is **gone** — superseded by the endpoints above.
 
 ### Health
 
@@ -107,8 +103,10 @@ readiness group includes the `db` check, so an unreachable Postgres reports
 DOWN rather than merely failing every request). The Dockerfile HEALTHCHECK
 uses readiness.
 
-**Auth: none in this mock.** The production API the hospital provides will
-need authentication — scheme TBD with the hospital.
+**Auth:** the `/api/v1` write surface requires `Authorization: Bearer
+<IMED_API_TOKEN>` (default `imed-mock-token`), mimicking the real contract;
+token issuance for production is the hospital's side. The extract READ
+endpoints are open in this mock — production read auth still TBD.
 
 ## Local dev — first-time setup included
 
@@ -140,6 +138,7 @@ Good to know:
 | `DATABASE_URL` | libpq-form DSN (`postgresql://user:pass@host:port/db`). Unset = `localhost:5432/imed`. |
 | `JDBC_DATABASE_URL` | Already-JDBC URL; wins over `DATABASE_URL`. |
 | `PORT` | HTTP port (default 8003). |
+| `IMED_API_TOKEN` | Bearer token the `/api/v1` write endpoints require (default `imed-mock-token`). |
 
 ## Testing
 
@@ -149,10 +148,12 @@ Good to know:
 
 `ImedMockApiIntegrationTest` runs against the local seeded `imed` Postgres
 (`@SpringBootTest` + MockMvc, no test containers, no mocks): read endpoints,
-the MCAI- prefix rule and the other body constraints, the full coding-result
-round trip (submit → visible → replace → clear), and the published contract
-itself — that `/v3/api-docs` covers every endpoint and carries the MCAI- rule,
-so the spec cannot silently drift from the code.
+Bearer auth (401s), the full `/api/v1/diagnosis` life cycle (POST → visible in
+reads → PUT edit → DELETE cancel → gone from reads, idempotent), the 409
+duplicate rule, `request_id` replay semantics, the coding-status round trip,
+and the published contract itself — that `/v3/api-docs` covers every endpoint
+with the PDF's exact field names, so the spec cannot silently drift from the
+code. The write tests self-reset via the cancel flow, so re-runs are stable.
 
 ## Formatting
 

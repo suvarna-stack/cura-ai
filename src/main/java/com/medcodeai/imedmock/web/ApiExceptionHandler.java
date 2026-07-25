@@ -15,10 +15,16 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * Error bodies: {"error": "..."} with 404/400 — same shape as medcode-api so
- * integrators see one error convention across both services. Bean Validation
- * failures on the request body are folded into that same shape here rather
- * than surfacing Spring's default ProblemDetail.
+ * Two error conventions live side by side, deliberately:
+ *
+ * - The extract READ endpoints keep {"error": "..."} with 404/400 — same
+ *   shape as medcode-api, one convention across both services.
+ * - The real-shaped /api/v1 write endpoints answer in the hospital's own
+ *   envelope from the "iMed Diagnosis and Medical Discharge API" PDF:
+ *   {"status": "STATUS_BUSINESS_ERROR", "message", "message_th"} for 400/409
+ *   (401 is emitted by ApiV1AuthInterceptor with its slightly different
+ *   no-status shape). The mock adds a "detail" key on 400s as a debugging
+ *   aid — documented as mock-only, the real API sends none.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -33,6 +39,39 @@ public class ApiExceptionHandler {
         public BadRequestException(String message) {
             super(message);
         }
+    }
+
+    /** 400 in the real API's envelope; `detail` is the mock-only diagnostic. */
+    public static class ImedBusinessException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public ImedBusinessException(String detail) {
+            super(detail);
+        }
+    }
+
+    /** 409 DIAGNOSIS_CODE_ALREADY_EXIST, verbatim from the PDF. */
+    public static class DuplicateDiagnosisException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    @ExceptionHandler(ImedBusinessException.class)
+    public ResponseEntity<Map<String, Object>> imedBusinessError(ImedBusinessException e) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("status", "STATUS_BUSINESS_ERROR");
+        m.put("message", "invalid_request");
+        m.put("message_th", "ข้อมูลไม่ครบหรือไม่ถูกต้อง");
+        m.put("detail", e.getMessage()); // mock-only aid; absent from the real API
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(m);
+    }
+
+    @ExceptionHandler(DuplicateDiagnosisException.class)
+    public ResponseEntity<Map<String, Object>> duplicateDiagnosis() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("status", "STATUS_BUSINESS_ERROR");
+        m.put("message", "DIAGNOSIS_CODE_ALREADY_EXIST");
+        m.put("message_th", "พบรหัส ICD-10 ซ้ำสำหรับ visit และแพทย์เดียวกัน");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(m);
     }
 
     @ExceptionHandler(NotFoundException.class)
