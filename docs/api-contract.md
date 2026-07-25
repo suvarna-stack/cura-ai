@@ -30,8 +30,10 @@ convenience — when the two disagree, **this document wins**.
   `{"error": "<message>"}`. `500` (e.g. the hospital iMed call failed after our
   commit) returns Spring's default error body; the triggering action is
   idempotent — retry it.
-- **Auth** applies to the admin surface only (see the Authentication section).
-  The case/approve/sync endpoints above are unauthenticated.
+- **Auth** guards the whole API except `POST /api/auth/login`, the health
+  probes, and Swagger — every case / approve / sync / demo endpoint needs a
+  Bearer token (any active account); `/api/admin/**` additionally requires the
+  `admin` role. See the Authentication section.
 
 ## Endpoints
 
@@ -217,7 +219,8 @@ a visitor touched. Response
 
 Gated by `DEMO_TOOLS_ENABLED` (default `true` locally, forced `false` in
 containers): when disabled this endpoint returns `404 {"error": "not found"}`,
-as if it didn't exist. It's a public bulk write, so production ships with it off.
+as if it didn't exist. It's a destructive bulk write (and, like the rest of the
+case surface, requires a token), so production ships with it off.
 
 ### POST /api/sync — pull case data from the hospital
 
