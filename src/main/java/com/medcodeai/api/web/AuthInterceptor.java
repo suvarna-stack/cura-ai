@@ -7,14 +7,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
- * The whole auth gate. Registered (in WebConfig) only on the guarded routes:
- * /api/admin/**, /api/auth/me, /api/auth/logout — everything else (the public
- * case/approve/sync endpoints, and /api/auth/login itself) is never touched.
+ * The whole auth gate. Registered (in WebConfig) on the guarded routes:
+ * /api/admin/**, /api/auth/{me,logout}, and — since Phase 3 (2026-07-25) —
+ * the whole case surface (/api/cases/**, /api/sync, /api/demo/reset). Only
+ * /api/auth/login, the health probes, and Swagger stay public.
  *
  * It validates the Bearer token, and for /api/admin/** additionally requires
  * the admin role. On success the resolved Principal is stashed as a request
- * attribute for the controllers. Failures throw the ApiExceptionHandler
- * exceptions, so the 401/403 bodies stay the contract's {"error": "..."}.
+ * attribute — approve/reopen stamp their audit trail from it (the
+ * body-supplied `coder` field is ignored now). Failures throw the
+ * ApiExceptionHandler exceptions, so the 401/403 bodies stay the contract's
+ * {"error": "..."}.
  */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {

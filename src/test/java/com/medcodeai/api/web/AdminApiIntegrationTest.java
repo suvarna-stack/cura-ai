@@ -195,20 +195,36 @@ class AdminApiIntegrationTest {
     void deletingAnAccountWithCodingHistoryIs409() throws Exception {
         String token = login(ADMIN_EMAIL, ADMIN_PW);
 
-        // give the coder "history-guard" real coding history via the public approve
-        // flow (it auto-creates the user), then reopen to leave the case as it was.
-        // The code_assigned history rows survive reopen, so the account stays
-        // referenced — and thus protected from deletion.
-        String openId = getJson("/api/cases").get("complete").get(0).get("id").asString();
-        mvc.perform(post("/api/cases/approve").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ids\":[\"" + openId + "\"],\"coder\":\"history-guard\"}"))
+        // Since Phase 3, approve stamps the LOGGED-IN account (body `coder` is
+        // ignored), so the history must come from a real coder login. A FIXED
+        // email keeps it to at most one permanently-undeletable account: create
+        // it if this is the first run (409 = already there from a prior run).
+        String guardEmail = "history-guard@medcodeai.demo";
+        mvc.perform(post("/api/admin/accounts").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountBody("History Guard", guardEmail, "historypass1", "coder")))
+                .andExpect(result -> {
+                    int s = result.getResponse().getStatus();
+                    if (s != 200 && s != 409) {
+                        throw new AssertionError("expected 200 or 409 creating the guard, got " + s);
+                    }
+                });
+        String coderToken = login(guardEmail, "historypass1");
+
+        // real coding history via approve, then reopen to leave the case as it
+        // was; the code_assigned history rows survive reopen, so the account
+        // stays referenced — and thus protected from deletion
+        String openId = getJson(token, "/api/cases").get("complete").get(0).get("id").asString();
+        mvc.perform(post("/api/cases/approve").header("Authorization", "Bearer " + coderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + openId + "\"]}"))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/cases/{id}/reopen", openId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"coder\":\"history-guard\"}"))
+        mvc.perform(post("/api/cases/{id}/reopen", openId).header("Authorization", "Bearer " + coderToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
-        Integer id = idByEmail(adminArray(token, "/api/admin/accounts"), "history-guard@medcodeai.demo");
-        assertNotNull(id, "approve should have created the history-guard user");
+        Integer id = idByEmail(adminArray(token, "/api/admin/accounts"), guardEmail);
+        assertNotNull(id, "the history-guard account should exist");
 
         mvc.perform(delete("/api/admin/accounts/{id}", id).header("Authorization", "Bearer " + token))
                 .andExpect(status().isConflict())
@@ -254,8 +270,8 @@ class AdminApiIntegrationTest {
         return json.readTree(body);
     }
 
-    private JsonNode getJson(String url) throws Exception {
-        String body = mvc.perform(get(url))
+    private JsonNode getJson(String token, String url) throws Exception {
+        String body = mvc.perform(get(url).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body);

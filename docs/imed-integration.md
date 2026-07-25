@@ -1,0 +1,105 @@
+# iMed write integration — design & open questions
+
+How medcode-api's approve/reopen flow maps onto the hospital's real write API
+("iMed Diagnosis and Medical Discharge API", rev 1, 24 Jul 2026), which
+supersedes the invented `coding-result` contract. The sibling repo
+`../imed-mock-api` mocks this contract field-for-field under `/api/v1` —
+production is an `IMED_API_BASE` + `IMED_API_TOKEN` swap.
+
+Decisions taken 2026-07-24 (with the team):
+
+1. **Diff strategy** — on approve, medcode diffs the coder's final code list
+   against the hospital's rows: new code → `POST /diagnosis`, changed code →
+   `PUT /diagnosis/{visit_id}`, removed code → `DELETE .../icd10|icd9/{id}`.
+   This is the API's intended use (POST returns generated `object_id`s; PUT
+   requires them; DELETE cancels one row).
+2. **Write timing** — the hospital is written ONLY at approve/reopen. Code
+   saves while the coder works stay in medcode's own DB.
+3. **Reopen** — reverts what approve did: PUT edited rows back to their
+   pre-approve values (requires snapshots, see below), DELETE-cancel rows we
+   created, clear the coding status.
+4. **Old contract** — `PUT/DELETE /api/cases/{tn}/coding-result` is deleted,
+   not kept in parallel.
+
+> **Status (2026-07-24): implemented.** Mock side: imed-mock-api `/api/v1`
+> (see its README). This side: `ImedWritebackService` (diff + revert),
+> `ImedWriteOpsRepository` + `imed_write_ops` journal, reworked
+> `ImedApiClient` (Bearer, /api/v1). Everything below remains the reference
+> for the field mapping and the still-open hospital questions.
+
+## What medcode-api must store (Phase 2)
+
+| New state | Why |
+|---|---|
+| `imed_object_id` per code row | PUT/DELETE address rows by the hospital's id. For rows imported from the extract, `medhack_diagnosis_icd10.id` is assumed to BE that id (open question 1). For rows we create, POST returns it. |
+| Pre-approve snapshot per edited row | Reopen must PUT the original values back — the API has no "undo", so we keep the before-image. |
+| `request_id` per outbound write | The API dedups by it; a retry after a 500 must replay the SAME id to heal without double-writing. Format: `MCAI-<caseId>-<action>-<n>`. |
+
+## Field mapping (our contract → theirs)
+
+### Visit level
+
+| medcode | iMed API | Notes |
+|---|---|---|
+| `case_id` (transaction number) | `object_id` / `{visit_id}` | Open question 1 confirms these are the same identifier |
+| `encountertype` `"0"`/`"1"` | `fix_visit_type_id` | Mock master data: `OPD` / `IPD`; real IDs TBD (open question 2) |
+| — | `doctor_discharge` | Always `"1"` per the PDF (open question 3!) |
+| — | `doctor_discharge_opd` / `_ipd` | Required per visit type; content source TBD (open question 3) |
+| generated | `request_id` | `MCAI-…`, stored for retry replay |
+
+### Per ICD-10 code
+
+| medcode (`CodeEdit` / detail row) | iMed API `diagnosis_icd10[]` |
+|---|---|
+| stored `imed_object_id` (PUT/DELETE only) | `object_id` |
+| `code` | `icd10_code` |
+| `desc` | `icd10_description` + `beginning_diagnosis` |
+| `diagnosisType` (`PRIMARY_DIAGNOSIS` / `COMORBIDITY` / `OTHERS` / `EXTERNAL_CAUSE_OF_INJURY`) | `fix_diagnosis_type_id` (mock accepts our vocabulary verbatim; real master-data IDs TBD) |
+| authenticated coder (Phase 3) | `coder_eid` (open question 4: our accounts ↔ iMed employee ids) |
+| constant | `fix_dx_source: "MED_DC"` |
+
+### Per ICD-9 procedure
+
+| medcode | iMed API `diagnosis_icd9[]` |
+|---|---|
+| stored `imed_object_id` | `object_id` |
+| `code` | `icd9_code` |
+| `desc` | `icd9_description` + `beginning_operation` |
+| — | `fix_operation_type_id` (master data TBD; mock accepts any non-blank) |
+| constant | `is_from: "MED_DC"` |
+
+### Coding status (our proposed extension — not in their PDF)
+
+`PUT /api/v1/coding-status/{visit_id}` `{request_id, coding_status,
+finalized_at, updated_by}` on approve; `DELETE` on reopen. Backed by the
+hospital-side coding-status table they agreed to add. The mock implements it;
+the shape is ours to negotiate.
+
+## Open questions for the hospital
+
+1. **Identifiers**: is the extract's `MedHack_Diagnosis(ICD10).id` the same
+   identifier as the API's `diagnosis_icd10[].object_id` (and the extract's
+   `transactionnumber` the same as `visit_id`)? Everything assumes yes.
+2. **Master data**: the ID lists for `fix_visit_type_id`,
+   `fix_diagnosis_type_id` (+ mapping to PRIMARY/COMORBIDITY/OTHERS/EXTERNAL
+   CAUSE), `fix_operation_type_id`, and the OPD/IPD discharge status/type ids.
+3. **Discharge coupling** (biggest one): the PDF requires
+   `doctor_discharge: "1"` and a discharge object on every POST — but our
+   writes happen at coding approval, typically AFTER the clinical discharge.
+   Does the visit already have discharge data by then, and does our POST
+   update it or fail on it? Can the discharge object echo their existing
+   values? Can `doctor_discharge` ever be `"0"`?
+4. **Coder identity**: do our coder accounts get iMed `EMP…` ids for
+   `coder_eid` / `doctor_eid`, or one system-level id?
+5. **Cancelled rows & reads**: does the extract/read layer already exclude
+   cancelled diagnoses? (The mock excludes them.)
+6. **Duplicate rule**: the 409 is "same visit and doctor" — with a
+   system-level `doctor_eid`, does re-adding a code another doctor already
+   entered 409?
+7. **Visit lock**: what does a locked visit return, and should we retry?
+8. **Read access**: the PDF covers writes only — what serves the 11 extract
+   read feeds (and the coding-status read) in production?
+9. **Errors**: is there a busy/e-tag style conflict besides 400/401/409/500?
+   What status does an unknown `visit_id` return (the mock uses 400
+   `invalid_request`)?
+10. **UAT**: URL, Bearer-token issuance, and test visits we may write to.

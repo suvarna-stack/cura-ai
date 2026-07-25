@@ -42,6 +42,21 @@ public class SchemaBootstrap implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         jdbc.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text");
 
+        // Revert journal for the diff-based hospital write-back (2026-07-24):
+        // what approve changed at the hospital, with before-images, so reopen
+        // can restore. Mirrored in db/migrations/0002_imed_write_ops.sql.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS imed_write_ops (
+                    op_id       serial PRIMARY KEY,
+                    case_id     varchar(50) NOT NULL,
+                    op          text NOT NULL,
+                    code_kind   text NOT NULL,
+                    object_id   varchar(100) NOT NULL,
+                    before_json text,
+                    created_at  text
+                )""");
+        jdbc.execute("CREATE INDEX IF NOT EXISTS imed_write_ops_case_idx ON imed_write_ops (case_id)");
+
         Long admins = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM users WHERE role = 'admin'", Long.class);
         if (admins != null && admins > 0) {

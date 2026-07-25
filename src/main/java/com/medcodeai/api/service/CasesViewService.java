@@ -18,8 +18,8 @@ import java.util.Set;
  * Responses are LinkedHashMaps so key insertion order = the Python dict order
  * (the contract preserves key order; Jackson must not re-sort — see
  * JacksonConfig). "field absent" vs "field null" follows the Python exactly:
- * e.g. `missing` exists only on incomplete rows, `reopened*` only when set,
- * finished rows drop confidence/ccpi/cc/pi.
+ * e.g. `missing` exists only on incomplete-origin rows, `reopened*` only on
+ * rows in the reopened queue, finished rows drop confidence/ccpi/cc/pi.
  *
  * Deliberate divergence from the Flask original (2026-07-22): confidence,
  * patient, hn, created_at/updated_at, revenue_impact and coder/coders/
@@ -122,8 +122,12 @@ public class CasesViewService {
                     Py.slice(Py.or_(str(d.get("at")), (String) r.get("created_at"), ""), 10)});
         }
 
-        // views.py:216 — route each OPD case into finished / complete / incomplete groups
+        // views.py:216 — route each OPD case into finished / reopened / complete
+        // / incomplete groups. `reopened` became a first-class exclusive queue on
+        // 2026-07-24 (MIGRATION_ISSUES.md issue 2): the old frontend derived the
+        // Reopen tab client-side from the per-case flag; the server owns it now.
         List<Map<String, Object>> complete = new ArrayList<>();
+        List<Map<String, Object>> reopened = new ArrayList<>();
         List<Map<String, Object>> finished = new ArrayList<>();
         Map<String, List<Map<String, Object>>> groups = new HashMap<>();
         Set<String> finishedOmits = Set.of("confidence", "ccpi", "cc", "pi");
@@ -148,9 +152,12 @@ public class CasesViewService {
                 fin.put("reopenable", true); // DEPRECATED: any coder may reopen any case
                 finished.add(fin);
             } else {
-                // views.py:237 — Reopen-tab flag; demo.reset reopens excluded
+                // views.py:237 — reopened queue; demo.reset reopens excluded.
+                // The flag fields stay on the row (the queue itself is the truth,
+                // the fields carry the who/when).
                 String[] lf = lastFlow.getOrDefault(id, new String[]{null, null, null});
-                if ("reopened".equals(lf[0]) && !"demo.reset".equals(lf[1])) {
+                boolean isReopened = "reopened".equals(lf[0]) && !"demo.reset".equals(lf[1]);
+                if (isReopened) {
                     u.put("reopened", true);
                     if (Py.truthy(lf[2])) {
                         u.put("reopenedAt", lf[2]);
@@ -160,7 +167,7 @@ public class CasesViewService {
                     }
                 }
                 if ("complete".equals(r.get("completeness_status"))) {
-                    complete.add(u);
+                    (isReopened ? reopened : complete).add(u);
                 } else {
                     // views.py:252 — missing labels + order-category bucketing
                     List<String> labels = new ArrayList<>();
@@ -183,7 +190,13 @@ public class CasesViewService {
                     }
                     Map<String, Object> row = new LinkedHashMap<>(u);
                     row.put("missing", Py.or_(missing, "—"));
-                    groups.computeIfAbsent(g, k -> new ArrayList<>()).add(row);
+                    if (isReopened) {
+                        // reopened is exclusive: the row keeps `missing` (its
+                        // incomplete origin) but leaves the incomplete groups
+                        reopened.add(row);
+                    } else {
+                        groups.computeIfAbsent(g, k -> new ArrayList<>()).add(row);
+                    }
                 }
             }
         }
@@ -208,15 +221,17 @@ public class CasesViewService {
         int incompleteCount = incompleteGroups.stream()
                 .mapToInt(g -> ((List<?>) g.get("cases")).size()).sum();
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("total", complete.size() + incompleteCount + finished.size());
+        stats.put("total", complete.size() + incompleteCount + reopened.size() + finished.size());
         stats.put("complete", complete.size());
         stats.put("incomplete", incompleteCount);
+        stats.put("reopened", reopened.size());
         stats.put("finished", finished.size());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("stats", stats);
         out.put("complete", complete);
         out.put("incompleteGroups", incompleteGroups);
+        out.put("reopened", reopened);
         out.put("finished", finished);
         return out;
     }

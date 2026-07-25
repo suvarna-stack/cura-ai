@@ -126,6 +126,43 @@ Milestones (git log --oneline reads as this sequence):
   into approvals (wait for the coder frontend); the broader prod checklist
   (gate case reads, HTTPS/SSO/private network) is discussed but not built.
 
+- ✅ **Real iMed write contract — diff-based write-back (2026-07-24):** the
+  hospital delivered its real API spec ("iMed Diagnosis and Medical Discharge
+  API" PDF: `POST /api/v1/diagnosis`, `PUT /api/v1/diagnosis/{visit_id}`,
+  `DELETE …/icd10|icd9/{object_id}`, Bearer auth, request_id dedup,
+  STATUS_SUCCESS/BUSINESS_ERROR envelopes, 409 duplicate rule). Supersedes
+  the invented coding-result contract — which was DELETED on both sides, not
+  kept in parallel (decision). imed-mock-api now mocks the real contract
+  field-for-field (+ our proposed `PUT/DELETE /api/v1/coding-status/{visit_id}`
+  extension, backed by the coding-status table the hospital agreed to add;
+  DELETE = cancel flow via `is_cancelled`, reads filter cancelled rows). This
+  side: `client/ImedApiClient` reworked (Bearer `IMED_API_TOKEN`, /api/v1
+  calls), new `service/ImedWritebackService` implements the decided **diff
+  strategy** — finalized codes vs live hospital rows → cancel removed / PUT
+  changed / POST new (order matters: cancel→update→create avoids the 409),
+  journaled with before-images in `imed_write_ops` (SchemaBootstrap +
+  `db/migrations/0002_imed_write_ops.sql`); reopen replays the journal in
+  reverse against live state (created→cancel, updated→restore,
+  cancelled→re-create with new ids — iMed has no un-cancel) and clears it.
+  Hospital writes still ONLY at approve/reopen (decision), still two-phase
+  after our commit; healing = re-diff against live state, not request replay.
+  `stats.mcai_code_rows` now counts diff writes (key kept for compat).
+  Placeholders pending hospital master data: `fix_operation_type_id`
+  GENERAL_OPERATION, discharge-object ids (open question 3 — the discharge
+  coupling — is the big unknown). Field mapping + 10 open hospital questions:
+  `docs/imed-integration.md`. Known gap: a crash between POST and journaling
+  its created ids leaves rows reopen can't attribute (approve re-diff heals).
+- ✅ **Case-surface auth + token actor stamping (2026-07-25, Phase 3):** the
+  AuthInterceptor now also guards /api/cases/**, /api/sync and
+  /api/demo/reset — any valid token (either role); 401 otherwise. Approve and
+  reopen take their acting coder from the authenticated principal's email
+  (`ApprovalService.approve(ids, userId, coder)`; body `coder` accepted but
+  IGNORED). Public remains: login, /api/health(z), Swagger. This supersedes
+  the earlier "auth is admin-only, never gate case routes" gotcha — reversed
+  deliberately now that the coder frontend logs in. Contract docs + both
+  integration tests updated (tests authenticate as the bootstrap admin; the
+  history-guard test now creates a real coder account since body-coder
+  auto-creation is gone).
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers), rerun both repos' test suites there, and build the NEW
   frontend against `docs/types.ts`. The old frontend/Flask pair just keeps
@@ -159,8 +196,11 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   (idempotent). So a fresh re-seed drops them and the next boot restores them —
   don't "fix" a missing `password_hash` by editing the dump. `@SpringBootTest`
   runs the runner too, so the test DB self-heals.
-- Auth is admin-only and additive: never add the interceptor to the
-  case/approve/sync routes (that was the deliberate scope). Adding
+- Auth covers the WHOLE case surface since 2026-07-25 (Phase 3 — the earlier
+  "admin-only, never gate case routes" scope is OVER): the interceptor guards
+  /api/cases/**, /api/sync and /api/demo/reset (any valid token), and
+  approve/reopen stamp the logged-in account (body `coder` ignored). Only
+  login, health, and Swagger stay public. Adding
   `spring-boot-starter-security` is still the trap the memory warns about — we
   use `spring-security-crypto` (BCrypt) + a `HandlerInterceptor` instead.
 

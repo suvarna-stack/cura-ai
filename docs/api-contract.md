@@ -46,9 +46,13 @@ convenience — when the two disagree, **this document wins**.
 Cached in-process; rebuilt after any approve / reopen / demo-reset. Lists
 **OPD visits only** (`encountertype = '0'`).
 
+The four case collections are **mutually exclusive** — every case appears in
+exactly one of `complete`, an `incompleteGroups` group, `reopened` or
+`finished`; `stats.total` is their sum.
+
 ```jsonc
 {
-  "stats": { "total": 1101, "complete": 780, "incomplete": 296, "finished": 25 },
+  "stats": { "total": 1101, "complete": 777, "incomplete": 296, "reopened": 3, "finished": 25 },
   "complete":  [ <CaseCard>, ... ],          // complete, not yet approved
   "incompleteGroups": [                       // sorted by size desc, then label
     { "id": "medicine",                       // "surgery" | "ct-x-ray" | "medicine" | "other"
@@ -57,7 +61,8 @@ Cached in-process; rebuilt after any approve / reopen / demo-reset. Lists
       "cases": [ <CaseCard + missing>, ... ] },
     ...
   ],
-  "finished": [ <FinishedCard>, ... ]         // approved queue (exclusive)
+  "reopened": [ <ReopenedCard>, ... ],        // reopened, awaiting re-approval
+  "finished": [ <FinishedCard>, ... ]         // approved queue
 }
 ```
 
@@ -86,10 +91,20 @@ Cached in-process; rebuilt after any approve / reopen / demo-reset. Lists
 | `created_at` | `string \| null` | `cases.admissiondatetime` (raw hospital text). OPD rows lack it → currently always `null` here |
 | `updated_at` | `string \| null` | `cases.dischargedatetime` — same caveat |
 | `revenue_impact` | `null` | no real DRG/revenue source exists |
-| `reopened?` | `true` | only on reopened, not-yet-reapproved cases (human reopen, not demo.reset) |
-| `reopenedAt?` | `string` | `YYYY-MM-DD`, only alongside `reopened` |
-| `reopenedBy?` | `string` | real actor id, only alongside `reopened` |
-| `missing?` | `string` | **incomplete rows only**: human-readable labels joined with `", "`, else `"—"` |
+| `missing?` | `string` | **incomplete-origin rows only** (incomplete groups + reopened rows that came from one): human-readable labels joined with `", "`, else `"—"` |
+
+**ReopenedCard** = CaseCard for a human-reopened, not-yet-reapproved case
+(`demo.reset` reopens don't count). These rows live ONLY in the top-level
+`reopened` list — they leave `complete`/`incompleteGroups` until re-approved
+(since 2026-07-24; before that the flag rode along inside those lists). Extra
+fields:
+
+| Field | Type | Source / meaning |
+|---|---|---|
+| `reopened` | `true` | always present on these rows (and only here) |
+| `reopenedAt?` | `string` | reopen `at` (`YYYY-MM-DD`) from the audit trail, when known |
+| `reopenedBy?` | `string` | real reopening actor id, when known |
+| `missing?` | `string` | kept when the case's origin was an incomplete group |
 
 **FinishedCard** = CaseCard **without** `confidence`/`ccpi`/`cc`/`pi`, plus:
 
@@ -153,11 +168,11 @@ Request `{"text": "…"}` → `{"ok": true}` · `400` / `404` as above.
 
 ### POST /api/cases/approve
 
-Request `{"ids": ["<case_id>", …], "coder": "web.coder"}` (`coder` optional,
-default `web.coder`). For each existing case: the saved `codeEdits` become
-real coder-assigned codes (no edits → the imported principal diagnosis is
-re-confirmed), the case is finalized, and the results are sent to the
-hospital's iMed API. Response:
+Request `{"ids": ["<case_id>", …]}`. The acting coder is the **logged-in
+account** (a body `coder` field is ignored — see Authentication). For each
+existing case: the saved `codeEdits` become real coder-assigned codes (no
+edits → the imported principal diagnosis is re-confirmed), the case is
+finalized, and the results are sent to the hospital's iMed API. Response:
 
 ```jsonc
 { "ok": true,
@@ -169,13 +184,16 @@ hospital's iMed API. Response:
 
 `400` when `ids` is missing/empty/non-strings. Our DB commits first, then the
 hospital calls run; if a hospital call fails the request 500s with our side
-committed — **approve again** to heal (idempotent).
+committed — **approve again** to heal (the hospital diff recomputes against
+live state). `stats.mcai_code_rows` = hospital code writes made by the diff
+(creates + edits + cancels; see "Downstream" below).
 
 ### POST /api/cases/{caseId}/reopen
 
-Request `{"coder": "web.coder"}` (optional). Reverses an approve on both
-sides; the coder's saved edits/draft are KEPT. Response `{"ok": true}` ·
-`404` unknown case. Same 500-then-retry semantics as approve.
+No meaningful request body (a `coder` field is ignored; the actor is the
+logged-in account). Reverses an approve on both sides; the coder's saved
+edits/draft are KEPT. Response `{"ok": true}` · `404` unknown case. Same
+500-then-retry semantics as approve.
 
 ### POST /api/demo/reset
 
@@ -225,10 +243,12 @@ No request body. Same non-destructive rules as `POST /api/sync`, scoped to one
 transaction number; same response shape (arrays hold at most that one id).
 `404` when the hospital doesn't expose that case.
 
-## Authentication & admin
+## Authentication
 
-Auth guards the **admin dashboard only** — login, account management, and the
-dashboard cards. The case/approve/sync endpoints above stay public.
+Since 2026-07-25 (Phase 3) auth guards the **whole API surface except**
+`POST /api/auth/login`, the health probes (`/api/health`, `/api/healthz`),
+and Swagger. That includes every case read/write, sync, and demo endpoint
+above — they all answer `401 {"error": "unauthorized"}` without a token.
 
 **Model.** Email + per-account password (BCrypt-hashed, column `password_hash`).
 Roles are `coder` | `admin`; the dashboard's "SuperAdmin" persona is the
@@ -238,11 +258,15 @@ server-side (`auth_sessions`) and expire after `SESSION_TTL_DAYS` (default 7);
 logout revokes immediately. A bootstrap admin is created at first startup from
 `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`.
 
-**Guarding.** `/api/admin/**` requires a valid token **and** the `admin` role
+**Guarding.** The case/sync/demo surface requires a valid token (any active
+account, either role). `/api/admin/**` additionally requires the `admin` role
 (`401` without a token, `403` for a coder token). `/api/auth/me` and
-`/api/auth/logout` require a valid token (any active account). Login itself is
-public. `login` also works for a `coder` account (forward-compatible for the
-coming coder frontend); only the admin routes enforce the role.
+`/api/auth/logout` require a valid token. Login itself is public.
+
+**Actor stamping.** `POST /api/cases/approve` and `POST
+/api/cases/{caseId}/reopen` record the **logged-in account** (its email) as
+the acting coder in the audit trail and the hospital write-back. A body
+`coder` field is still accepted for backward compatibility but **ignored**.
 
 ### POST /api/auth/login
 
@@ -326,10 +350,27 @@ success `{"ok": true}`. `404` unknown id.
 
 ## Downstream: the hospital iMed API
 
-On approve/reopen this backend calls the hospital's iMed API
-(`IMED_API_BASE`; locally the sibling repo `../imed-mock-api`, which also
-documents that contract). Frontends never call it directly.
+On approve/reopen this backend calls the hospital's REAL write contract —
+"iMed Diagnosis and Medical Discharge API" plus our proposed coding-status
+extension (`IMED_API_BASE` + `IMED_API_TOKEN`; locally the sibling repo
+`../imed-mock-api`, which mocks it field-for-field). Frontends never call it
+directly.
+
+Since 2026-07-24 the write-back is a **diff**: the finalized code set is
+compared against the hospital's live rows, then removed codes are cancelled
+(`DELETE`), changed codes edited in place (`PUT` by `object_id`), and new
+codes created (`POST`, one call carrying the required discharge object).
+Every touched hospital row is journaled in `imed_write_ops` with its
+before-image; reopen replays the journal in reverse (created→cancel,
+updated→restore, cancelled→re-create) and clears the coding status. Both
+directions recompute against live state, so retrying a failed action heals.
+Full field mapping and open hospital questions: `docs/imed-integration.md`.
+
+`stats.mcai_code_rows` in the approve response now counts hospital code
+writes performed by the diff (creates + edits + cancels) — the key name is
+kept for compatibility with the pre-diff contract.
 
 Sync (`POST /api/sync`, `POST /api/cases/{caseId}/sync`) is the **inbound**
-direction of the same iMed API: it reads the hospital's case tables (`GET
-/api/cases` and the per-visit endpoints) and loads them into medcode.
+direction: it reads the hospital's extract tables (`GET /api/cases` and the
+per-visit endpoints — cancelled rows already excluded) and loads them into
+medcode.

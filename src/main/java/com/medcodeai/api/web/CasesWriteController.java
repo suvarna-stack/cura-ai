@@ -3,6 +3,7 @@ package com.medcodeai.api.web;
 import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
 import com.medcodeai.api.service.ApprovalService;
+import com.medcodeai.api.service.AuthService;
 import com.medcodeai.api.service.Py;
 import com.medcodeai.api.service.WriteGate;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,7 +11,9 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -34,6 +37,7 @@ import java.util.Map;
  */
 @RestController
 @Tag(name = "cases (write)", description = "Working-state saves, approve/reopen, demo reset")
+@SecurityRequirement(name = "bearerAuth") // Phase 3: the whole case surface needs a login token
 public class CasesWriteController {
 
     private static final String OK_EXAMPLE = "{\"ok\": true}";
@@ -59,13 +63,16 @@ public class CasesWriteController {
         this.approvals = approvals;
     }
 
-    // app.py:299 approve() — {ids, coder?} -> finalize + iMed write-back
+    // app.py:299 approve() — {ids} -> finalize + iMed write-back. The coder
+    // identity comes from the login token (Phase 3); a body `coder` field is
+    // accepted for backward compatibility but IGNORED.
     @PostMapping("/api/cases/approve")
     @Operation(summary = "Approve cases",
             description = "For each existing case: the saved `codeEdits` become real "
                     + "coder-assigned codes (no edits → the imported principal diagnosis is "
                     + "re-confirmed), the case is finalized, and the results are sent to the "
-                    + "hospital's iMed API. `coder` defaults to `web.coder`.\n\n"
+                    + "hospital's iMed API. The approving coder is **the logged-in account** "
+                    + "(a body `coder` field is ignored).\n\n"
                     + "Our DB commits first, then the hospital calls run — a `500` means our "
                     + "side committed but the hospital call failed. Approve is idempotent: "
                     + "**re-run it to heal.**")
@@ -87,12 +94,12 @@ public class CasesWriteController {
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(
                             value = "{\"error\": \"expected {\\\"ids\\\": [\\\"<case_id>\\\", ...]}\"}")))
-    public Map<String, Object> approve(
+    public Map<String, Object> approve(HttpServletRequest request,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(type = "object"),
                             examples = @ExampleObject(
-                                    value = "{\"ids\": [\"690003026\"], \"coder\": \"web.coder\"}")))
+                                    value = "{\"ids\": [\"690003026\"]}")))
             @RequestBody(required = false) byte[] body) {
         Object parsed = parseSilent(body);
         Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
@@ -101,33 +108,32 @@ public class CasesWriteController {
                 || !idList.stream().allMatch(i -> i instanceof String)) {
             throw new ApiExceptionHandler.BadRequestException("expected {\"ids\": [\"<case_id>\", ...]}");
         }
-        String coder = Py.or_(b.get("coder") instanceof String s ? s : null, "web.coder");
+        AuthService.Principal p = principal(request);
         @SuppressWarnings("unchecked")
         List<String> caseIds = (List<String>) idList;
-        return approvals.approve(caseIds, coder);
+        return approvals.approve(caseIds, p.userId(), p.email());
     }
 
-    // app.py:360 reopen() — undo approve (both schemas)
+    // app.py:360 reopen() — undo approve (both schemas). Actor = the logged-in
+    // account; a body `coder` field is accepted but IGNORED (Phase 3).
     @PostMapping("/api/cases/{caseId}/reopen")
     @Operation(summary = "Reopen an approved case",
             description = "Reverses an approve on both sides (ours and the hospital's); the "
-                    + "coder's saved edits and draft are KEPT. `coder` defaults to `web.coder`. "
+                    + "coder's saved edits and draft are KEPT. The reopening actor is **the "
+                    + "logged-in account** (a body `coder` field is ignored). "
                     + "Same commit-then-call ordering as approve — idempotent, so retry a `500`.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = OK_EXAMPLE)))
     @ApiResponse(responseCode = "404", description = "Unknown case",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
-    public Map<String, Object> reopen(@PathVariable String caseId,
+    public Map<String, Object> reopen(HttpServletRequest request, @PathVariable String caseId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(type = "object"),
-                            examples = @ExampleObject(value = "{\"coder\": \"web.coder\"}")))
+                            examples = @ExampleObject(value = "{}")))
             @RequestBody(required = false) byte[] body) {
-        Object parsed = parseSilent(body);
-        Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
-        String coder = Py.or_(b.get("coder") instanceof String s ? s : null, "web.coder");
-        return approvals.reopen(caseId, coder);
+        return approvals.reopen(caseId, principal(request).email());
     }
 
     // app.py:379 demo_reset() — Settings demo tools bulk reset
@@ -229,6 +235,16 @@ public class CasesWriteController {
             return null;
         });
         return ok();
+    }
+
+    /** The authenticated caller, stashed by AuthInterceptor (guarded route). */
+    private static AuthService.Principal principal(HttpServletRequest request) {
+        Object p = request.getAttribute(AuthInterceptor.PRINCIPAL);
+        if (!(p instanceof AuthService.Principal principal)) {
+            // unreachable behind the interceptor; loud beats a silent fake actor
+            throw new ApiExceptionHandler.UnauthorizedException("unauthorized");
+        }
+        return principal;
     }
 
     private Object parseSilent(byte[] body) {

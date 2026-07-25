@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +23,7 @@ import java.util.Map;
  */
 @RestController
 @Tag(name = "cases (read)", description = "Dashboard payload and case detail")
+@SecurityRequirement(name = "bearerAuth") // Phase 3: the whole case surface needs a login token
 public class CasesReadController {
 
     private final CasesViewService views;
@@ -38,16 +40,18 @@ public class CasesReadController {
     @GetMapping("/api/cases")
     @Operation(summary = "The dashboard payload",
             description = "Lists **OPD visits only** (`encountertype = '0'`), split into "
-                    + "`complete`, `incompleteGroups` (sorted by size desc, then label) and "
-                    + "the exclusive `finished` approval queue. Served from an in-process "
-                    + "cache, rebuilt after any approve / reopen / demo-reset — code and "
-                    + "draft saves do not invalidate it.\n\n"
+                    + "`complete`, `incompleteGroups` (sorted by size desc, then label), "
+                    + "`reopened` (reopened, awaiting re-approval) and `finished` (approved). "
+                    + "The four collections are mutually exclusive — every case appears in "
+                    + "exactly one. Served from an in-process cache, rebuilt after any "
+                    + "approve / reopen / demo-reset — code and draft saves do not "
+                    + "invalidate it.\n\n"
                     + "Example below is trimmed to one card; see `docs/api-contract.md` for "
                     + "every field and its DB source.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = """
                     {
-                      "stats": {"total": 1101, "complete": 780, "incomplete": 296, "finished": 25},
+                      "stats": {"total": 1101, "complete": 777, "incomplete": 296, "reopened": 3, "finished": 25},
                       "complete": [
                         {
                           "id": "690003026",
@@ -79,6 +83,14 @@ public class CasesReadController {
                           "label": "Medicine Group",
                           "total": 123,
                           "cases": [{"id": "690003027", "missing": "Principal diagnosis, Discharge summary"}]
+                        }
+                      ],
+                      "reopened": [
+                        {
+                          "id": "690003042",
+                          "reopened": true,
+                          "reopenedAt": "2026-07-23",
+                          "reopenedBy": "web.coder"
                         }
                       ],
                       "finished": [

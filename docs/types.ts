@@ -15,13 +15,18 @@
 
 // ---------- GET /api/cases ----------
 
+/** The four case collections are mutually exclusive — every case appears in
+ *  exactly one of complete / an incompleteGroups group / reopened / finished;
+ *  stats.total is their sum. */
 export interface CasesPayload {
-  stats: { total: number; complete: number; incomplete: number; finished: number };
+  stats: { total: number; complete: number; incomplete: number; reopened: number; finished: number };
   /** complete, not yet approved */
   complete: CaseCard[];
   /** sorted by size desc, then label */
   incompleteGroups: IncompleteGroup[];
-  /** approved queue (exclusive — a case is here OR in the other buckets) */
+  /** reopened, awaiting re-approval (human reopen; demo.reset doesn't count) */
+  reopened: ReopenedCard[];
+  /** approved queue */
   finished: FinishedCard[];
 }
 
@@ -76,14 +81,20 @@ export interface CaseCard {
   updated_at: string | null;
   /** always null — no real DRG/revenue source exists */
   revenue_impact: null;
-  /** only on reopened, not-yet-reapproved cases (human reopen) */
-  reopened?: true;
-  /** "YYYY-MM-DD", only alongside reopened */
-  reopenedAt?: string;
-  /** real actor id, only alongside reopened */
-  reopenedBy?: string;
-  /** INCOMPLETE rows only: human-readable missing labels joined ", ", else "—" */
+  /** incomplete-origin rows only (incomplete groups + reopened rows that came
+   *  from one): human-readable missing labels joined ", ", else "—" */
   missing?: string;
+}
+
+/** A human-reopened, not-yet-reapproved case. Lives ONLY in the top-level
+ *  `reopened` list — it leaves complete/incompleteGroups until re-approved. */
+export interface ReopenedCard extends CaseCard {
+  /** always present on these rows (and only here) */
+  reopened: true;
+  /** reopen "YYYY-MM-DD" from the audit trail, when known */
+  reopenedAt?: string;
+  /** real reopening actor id, when known */
+  reopenedBy?: string;
 }
 
 /** CaseCard minus confidence/ccpi/cc/pi, plus finalization info. */
@@ -195,7 +206,8 @@ export interface OkResponse {
   ok: true;
 }
 
-/** POST /api/cases/approve — request {ids: string[], coder?: string} */
+/** POST /api/cases/approve — request {ids: string[]}. The acting coder is
+ *  the logged-in account; a body `coder` field is ignored (2026-07-25). */
 export interface ApproveResponse {
   ok: true;
   approved: string[];
@@ -204,6 +216,8 @@ export interface ApproveResponse {
     cases_finalized: number;
     status_rows: number;
     coder_codes_created: number;
+    /** hospital code writes made by the diff write-back (creates + edits +
+     *  cancels); key name kept from the pre-diff contract */
     mcai_code_rows: number;
   };
 }
@@ -256,12 +270,14 @@ export interface Healthz {
   db: "pg";
 }
 
-// ---------- authentication & admin (admin surface only) ----------
+// ---------- authentication ----------
 //
-// Auth guards the admin dashboard only; the case/approve/sync endpoints are
-// public. Login returns an opaque Bearer token; send it as
-// `Authorization: Bearer <token>`. /api/admin/** requires the "admin" role
-// (401 without a token, 403 for a coder token).
+// Since 2026-07-25 auth guards the WHOLE API except POST /api/auth/login,
+// the health probes, and Swagger — case/approve/sync included (401 without a
+// token). Login returns an opaque Bearer token; send it as
+// `Authorization: Bearer <token>`. /api/admin/** additionally requires the
+// "admin" role (403 for a coder token). Approve/reopen record the logged-in
+// account as the acting coder; body `coder` fields are ignored.
 
 export type UserRole = "coder" | "admin";
 export type UserStatus = "active" | "inactive" | "suspended";

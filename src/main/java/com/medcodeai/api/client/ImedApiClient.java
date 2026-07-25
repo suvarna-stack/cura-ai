@@ -14,20 +14,27 @@ import java.util.Map;
 
 /**
  * HTTP to the hospital's iMed API (imed-mock-api today, the real hospital API
- * in production — same contract, base-URL swap only). Two directions:
+ * in production — same contract, base-URL + token swap only). Two directions:
  *
- * WRITE-BACK (approve/reopen) — idempotent on the hospital side:
- *   PUT    /api/cases/{tn}/coding-result   — submit approval results
- *   DELETE /api/cases/{tn}/coding-result   — clear them (reopen)
+ * WRITE (approve/reopen) — the hospital's REAL contract ("iMed Diagnosis and
+ * Medical Discharge API" + our proposed coding-status extension), Bearer-
+ * authenticated (IMED_API_TOKEN), request_id-deduped on their side:
+ *   POST   /api/v1/diagnosis                          — create dx/px + discharge
+ *   PUT    /api/v1/diagnosis/{visit_id}               — edit rows by object_id
+ *   DELETE /api/v1/diagnosis/{visit_id}/icd10|icd9/{id} — cancel one row
+ *   PUT    /api/v1/coding-status/{visit_id}           — set coding status
+ *   DELETE /api/v1/coding-status/{visit_id}           — clear it (reopen)
  *
  * READ / sync (inbound) — pull the hospital's case data for SyncService, one
  * method per read endpoint of imed-mock-api's ImedCasesReadController. Rows
  * arrive verbatim (exact extract column names, values as stored — datetime
- * parsing is the caller's job, per Data Mapping Q5).
+ * parsing is the caller's job, per Data Mapping Q5). Cancelled rows are
+ * already excluded by the hospital side.
  *
- * Failures surface as exceptions → 500 to our caller. For write-back our own DB
- * transaction has already committed by then (see ApprovalService); re-approving
- * or re-reopening heals, so no retry logic here.
+ * Failures surface as exceptions → 500 to our caller. For writes our own DB
+ * transaction has already committed by then (see ApprovalService); the
+ * write-back diff recomputes against live hospital state, so re-approving or
+ * re-reopening heals — no retry logic here.
  */
 @Component
 public class ImedApiClient {
@@ -37,35 +44,74 @@ public class ImedApiClient {
             new ParameterizedTypeReference<>() {
             };
 
+    private static final ParameterizedTypeReference<Map<String, Object>> ENVELOPE =
+            new ParameterizedTypeReference<>() {
+            };
+
     private final String base;
     private final RestClient http;
 
     public ImedApiClient() {
         String env = System.getenv("IMED_API_BASE");
         this.base = (env == null || env.isEmpty()) ? "http://localhost:8003" : env;
+        String token = System.getenv("IMED_API_TOKEN");
+        if (token == null || token.isEmpty()) {
+            token = "imed-mock-token"; // imed-mock-api's default; real token comes from the hospital
+        }
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(10));
-        this.http = RestClient.builder().baseUrl(base).requestFactory(factory).build();
+        this.http = RestClient.builder().baseUrl(base).requestFactory(factory)
+                .defaultHeader("Authorization", "Bearer " + token).build();
     }
 
-    public void putCodingResult(String tn, Map<String, Object> body) {
+    // ---- write direction: the real /api/v1 contract -------------------------
+
+    /** POST /api/v1/diagnosis — returns the envelope with generated object_ids. */
+    public Map<String, Object> postDiagnosis(Map<String, Object> body) {
         try {
-            http.put().uri("/api/cases/{tn}/coding-result", tn)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .toBodilessEntity();
+            return http.post().uri("/api/v1/diagnosis")
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
+                    .retrieve().body(ENVELOPE);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }
     }
 
-    public void deleteCodingResult(String tn) {
+    public void putDiagnosis(String visitId, Map<String, Object> body) {
         try {
-            http.delete().uri("/api/cases/{tn}/coding-result", tn)
-                    .retrieve()
-                    .toBodilessEntity();
+            http.put().uri("/api/v1/diagnosis/{v}", visitId)
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
+                    .retrieve().toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** DELETE …/icd10|icd9/{objectId} — iMed's cancel flow, idempotent. */
+    public void cancelDiagnosis(String visitId, String kind, String objectId) {
+        try {
+            http.delete().uri("/api/v1/diagnosis/{v}/{kind}/{id}", visitId, kind, objectId)
+                    .retrieve().toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    public void putCodingStatus(String visitId, Map<String, Object> body) {
+        try {
+            http.put().uri("/api/v1/coding-status/{v}", visitId)
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
+                    .retrieve().toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    public void deleteCodingStatus(String visitId) {
+        try {
+            http.delete().uri("/api/v1/coding-status/{v}", visitId)
+                    .retrieve().toBodilessEntity();
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }

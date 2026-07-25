@@ -1,6 +1,5 @@
 package com.medcodeai.api.service;
 
-import com.medcodeai.api.client.ImedApiClient;
 import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.CodingRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
@@ -23,13 +22,17 @@ import java.util.Map;
  * to the hospital) and reopen. Ported from server/app.py + sync/writeback.py.
  *
  * Structure per write request: WriteGate lock -> ONE DB transaction (our
- * database only) -> hospital HTTP calls (ImedApiClient) -> unlock -> cache
- * invalidate. The hospital ops are QUEUED while the transaction runs and sent
- * only after it commits — the same order as the Flask reference's
+ * database only) -> hospital HTTP calls -> unlock -> cache invalidate. The
+ * hospital ops are QUEUED while the transaction runs and sent only after it
+ * commits — the same order as the Flask reference's
  * mc.commit()-then-imed.commit(). If a hospital call fails the request 500s
- * with our side already committed; finalize and reopen are idempotent on both
- * sides, so re-approving / re-reopening heals (Flask's crash-healing
- * property, now across the HTTP boundary).
+ * with our side already committed; re-approving / re-reopening heals.
+ *
+ * Since 2026-07-24 the hospital side speaks the REAL iMed contract: the
+ * queued ops are executed by ImedWritebackService, which diffs the finalized
+ * code set against the hospital's live rows (POST new / PUT changed / DELETE
+ * removed, by object_id) and journals every touched row so reopen can revert.
+ * Healing still holds — the diff recomputes against live state on retry.
  */
 @Service
 public class ApprovalService {
@@ -43,23 +46,24 @@ public class ApprovalService {
 
     private final CasesRepository cases;
     private final CodingRepository coding;
-    private final ImedApiClient imed;
+    private final ImedWritebackService writeback;
     private final WorkingStateRepository workingState;
     private final WriteGate writeGate;
     private final CasesCache cache;
     private final TransactionTemplate tx;
     private final JsonMapper json = new JsonMapper();
 
-    /** One queued hospital call; a null putBody means DELETE (reopen). */
-    private record ImedOp(String tn, Map<String, Object> putBody) {
+    /** One queued hospital action; null targets means reopen (revert). */
+    private record ImedOp(String tn, String encountertype,
+            List<ImedWritebackService.TargetCode> targets, String coder, String now) {
     }
 
-    public ApprovalService(CasesRepository cases, CodingRepository coding, ImedApiClient imed,
-                           WorkingStateRepository workingState, WriteGate writeGate, CasesCache cache,
-                           PlatformTransactionManager txManager) {
+    public ApprovalService(CasesRepository cases, CodingRepository coding,
+                           ImedWritebackService writeback, WorkingStateRepository workingState,
+                           WriteGate writeGate, CasesCache cache, PlatformTransactionManager txManager) {
         this.cases = cases;
         this.coding = coding;
-        this.imed = imed;
+        this.writeback = writeback;
         this.workingState = workingState;
         this.writeGate = writeGate;
         this.cache = cache;
@@ -71,14 +75,17 @@ public class ApprovalService {
         return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
-    // app.py:299 approve() — response {ok, approved, notFound, stats}
-    public Map<String, Object> approve(List<String> ids, String coder) {
+    // app.py:299 approve() — response {ok, approved, notFound, stats}.
+    // Since Phase 3 the coder identity comes from the authenticated principal
+    // (controller passes uid + email); ensureDemoCoder remains as fallback for
+    // the demo-reset path, which acts as the baseline coder, not the caller.
+    public Map<String, Object> approve(List<String> ids, Integer userId, String coder) {
         Map<String, Object> result = writeGate.locked(() -> {
             List<ImedOp> ops = new ArrayList<>();
             Map<String, Object> out = tx.execute(status -> {
                 String now = nowStr();
                 Map<String, Integer> stats = newStats();
-                Integer uid = ensureDemoCoder(coder);
+                Integer uid = userId != null ? userId : ensureDemoCoder(coder);
                 List<String> approved = new ArrayList<>();
                 List<String> notFound = new ArrayList<>();
                 for (String tn : ids) {
@@ -97,7 +104,12 @@ public class ApprovalService {
                 o.put("stats", stats);
                 return o;
             });
-            runImedOps(ops); // after our commit — Flask's two-commit order
+            // after our commit — Flask's two-commit order; the hospital write
+            // count is only known once the diff has run, so patch it in now
+            int writes = runImedOps(ops);
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> stats = (Map<String, Integer>) out.get("stats");
+            stats.put("mcai_code_rows", writes);
             return out;
         });
         cache.invalidate();
@@ -306,8 +318,7 @@ public class ApprovalService {
     }
 
     // writeback.py:73 finalize_case() — status + audit trail, then QUEUE the
-    // limited hospital write-back (one PUT: A11 status + MCAI-prefixed codes);
-    // the queued call is sent after our transaction commits
+    // hospital write-back; the queued diff runs after our transaction commits
     void finalizeCase(String tn, String coder, String now, Map<String, Integer> stats, List<ImedOp> ops) {
         Map<String, Object> caseRow = coding.caseRowForFinalize(tn);
         if (caseRow == null) {
@@ -322,32 +333,23 @@ public class ApprovalService {
         approvedDetail.put("at", now);
         coding.insertHistory(tn, null, "approved_single", json.writeValueAsString(approvedDetail));
 
-        // Hospital side (queued PUT): the coder_assigned set, translated into
-        // iMed vocabulary here — the hospital stores what it receives verbatim
+        // Hospital side (queued diff): the coder_assigned set, translated to
+        // the iMed API's vocabulary — ImedWritebackService diffs it against
+        // the hospital's live rows and edits them in place (2026-07-24)
         List<Map<String, Object>> coderCodes = coding.coderCodes(tn);
-        List<Map<String, Object>> codes = new ArrayList<>();
+        List<ImedWritebackService.TargetCode> targets = new ArrayList<>();
         for (Map<String, Object> cc : coderCodes) {
-            Map<String, Object> c = new LinkedHashMap<>();
-            c.put("id", "MCAI-" + cc.get("case_code_id"));
-            c.put("icd", cc.get("code"));
-            c.put("name", cc.get("description"));
-            if ("ICD-9".equals(cc.get("code_system")) || "procedure".equals(cc.get("code_role"))) {
-                c.put("type", "procedure");
-            } else {
-                c.put("type", "diagnosis");
-                // reverse Q3 role mapping, ours -> theirs
-                c.put("diagnosisType", ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS"));
-            }
-            codes.add(c);
-            bump(stats, "mcai_code_rows");
+            boolean procedure = "ICD-9".equals(cc.get("code_system"))
+                    || "procedure".equals(cc.get("code_role"));
+            targets.add(new ImedWritebackService.TargetCode(
+                    procedure ? "icd9" : "icd10",
+                    (String) cc.get("code"),
+                    (String) cc.get("description"),
+                    // reverse Q3 role mapping, ours -> theirs (diagnoses only)
+                    procedure ? null
+                            : ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS")));
         }
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", "approved");
-        body.put("finalizedAt", now);
-        body.put("updatedBy", coder);
-        body.put("encounterType", encountertype);
-        body.put("codes", codes);
-        ops.add(new ImedOp(tn, body));
+        ops.add(new ImedOp(tn, encountertype, targets, coder, now));
         bump(stats, "status_rows");
 
         Map<String, Object> exportedDetail = new LinkedHashMap<>();
@@ -360,29 +362,35 @@ public class ApprovalService {
     }
 
     // app.py:337 reopen_case_rows() — reverse an approve on our side and QUEUE
-    // the hospital-side clear; case_code_edits / case_report_drafts are KEPT
+    // the hospital-side revert; case_code_edits / case_report_drafts are KEPT
     // (coder's work survives)
     void reopenCaseRows(String caseId, String coder, List<ImedOp> ops) {
+        Map<String, Object> caseRow = coding.caseRowForFinalize(caseId);
+        String encountertype = caseRow == null ? "0" : (String) caseRow.get("encountertype");
         coding.updateCaseStatus(caseId, "open");
         coding.deleteCoderAssigned(caseId);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);
         detail.put("at", nowStr());
         coding.insertHistory(caseId, null, "reopened", json.writeValueAsString(detail));
-        ops.add(new ImedOp(caseId, null));
+        ops.add(new ImedOp(caseId, encountertype, null, coder, nowStr()));
     }
 
-    /** Send the queued hospital calls, in order, after our commit (still
+    /** Run the queued hospital actions, in order, after our commit (still
      *  inside the WriteGate lock). A failure here 500s the request with our
-     *  side committed — re-approve / re-reopen heals (both are idempotent). */
-    private void runImedOps(List<ImedOp> ops) {
+     *  side committed — re-approve / re-reopen heals (the diff recomputes
+     *  against live hospital state). Returns total hospital code writes. */
+    private int runImedOps(List<ImedOp> ops) {
+        int writes = 0;
         for (ImedOp op : ops) {
-            if (op.putBody() == null) {
-                imed.deleteCodingResult(op.tn());
+            if (op.targets() == null) {
+                writeback.reopenCase(op.tn(), op.encountertype(), op.now());
             } else {
-                imed.putCodingResult(op.tn(), op.putBody());
+                writes += writeback.approveCase(op.tn(), op.encountertype(), op.targets(),
+                        op.coder(), op.now());
             }
         }
+        return writes;
     }
 
     // Python truthiness for JSON values (e.get("missing") checks)
