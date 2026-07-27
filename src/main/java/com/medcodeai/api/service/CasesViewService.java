@@ -1,6 +1,7 @@
 package com.medcodeai.api.service;
 
 import com.medcodeai.api.repo.CasesRepository;
+import com.medcodeai.api.repo.WorkingStateRepository;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -24,7 +25,9 @@ import java.util.Set;
  * Deliberate divergence from the Flask original (2026-07-22): confidence,
  * patient, hn, created_at/updated_at, revenue_impact and coder/coders/
  * reopenedBy no longer come from synthesized placeholder data — they're the
- * real DB values (null where no real value exists yet).
+ * real DB values (null where no real value exists yet). Confidence is the
+ * average of saved code-edit confidences (RAG suggestions / coder scores)
+ * when present.
  */
 @Service
 public class CasesViewService {
@@ -44,10 +47,12 @@ public class CasesViewService {
     }
 
     private final CasesRepository repo;
+    private final WorkingStateRepository workingState;
     private final JsonMapper json = new JsonMapper();
 
-    public CasesViewService(CasesRepository repo) {
+    public CasesViewService(CasesRepository repo, WorkingStateRepository workingState) {
         this.repo = repo;
+        this.workingState = workingState;
     }
 
     // views.py:99 build_cases_payload()
@@ -115,6 +120,9 @@ public class CasesViewService {
             }
         }
 
+        // Average confidence from saved RAG/coder code edits (null when unset).
+        Map<String, Integer> aiConfidence = workingState.avgConfidenceByCase();
+
         // views.py:194 — finalization info from the audit trail
         Map<String, String> approvedAt = new HashMap<>();
         Map<String, String> approvedBy = new HashMap<>();
@@ -149,7 +157,7 @@ public class CasesViewService {
         Set<String> finishedOmits = Set.of("confidence", "ccpi", "cc", "pi");
 
         for (Map<String, Object> r : repo.opdCases()) {
-            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, ordnames, caseCoders);
+            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, ordnames, caseCoders, aiConfidence);
             String id = (String) u.get("id");
             if ("approved".equals(r.get("case_status"))) {
                 // views.py:221 — finished is an exclusive queue
@@ -259,7 +267,8 @@ public class CasesViewService {
                                        Map<String, List<Map<String, Object>>> codes,
                                        Map<String, Map<String, Object>> ordcat,
                                        Map<String, Map<String, List<String>>> ordnames,
-                                       Map<String, List<String>> caseCoders) {
+                                       Map<String, List<String>> caseCoders,
+                                       Map<String, Integer> aiConfidence) {
         String cid = (String) r.get("case_id");
         Map<String, String> cc = ccpi.getOrDefault(cid, Map.of());
         Map<String, Object> cv = coverage.get(r.get("coverage_type"));
@@ -271,7 +280,7 @@ public class CasesViewService {
         u.put("dept", Py.or_((String) r.get("department"), (String) r.get("ward"), "—"));
         u.put("ward", r.get("ward"));
         u.put("group", Py.or_((String) r.get("disease_group"), "Ungrouped"));
-        u.put("confidence", null); // no real AI-confidence source exists
+        u.put("confidence", aiConfidence.get(cid)); // avg of saved RAG/coder code confidences
         u.put("severity", r.get("severity_level"));
         u.put("coverage", r.get("coverage_type"));
         u.put("coverageLabel", cv == null ? null

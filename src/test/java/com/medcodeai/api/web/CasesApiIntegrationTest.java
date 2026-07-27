@@ -107,7 +107,8 @@ class CasesApiIntegrationTest {
         JsonNode sample = firstListedCase(root);
         assertNotNull(sample, "expected at least one case in the dashboard payload");
         assertTrue(sample.get("patient").isNull(), "no real patient-name source exists yet");
-        assertTrue(sample.get("confidence").isNull(), "no real AI-confidence source exists yet");
+        assertTrue(sample.get("confidence").isNull() || sample.get("confidence").isNumber(),
+                "confidence is null until RAG suggestions are saved, then an integer average");
         assertTrue(sample.get("revenue_impact").isNull(), "no real revenue source exists yet");
     }
 

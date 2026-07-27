@@ -1,6 +1,7 @@
 package com.medcodeai.api.web;
 
 import com.medcodeai.api.client.RagApiClient;
+import com.medcodeai.api.service.KnowledgeCodeSyncService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -41,10 +42,12 @@ import java.util.function.Supplier;
 public class KnowledgeController {
 
     private final RagApiClient rag;
+    private final KnowledgeCodeSyncService codeSync;
     private final JsonMapper json = new JsonMapper();
 
-    public KnowledgeController(RagApiClient rag) {
+    public KnowledgeController(RagApiClient rag, KnowledgeCodeSyncService codeSync) {
         this.rag = rag;
+        this.codeSync = codeSync;
     }
 
     @GetMapping("/api/admin/knowledge/docs")
@@ -98,6 +101,19 @@ public class KnowledgeController {
                     examples = @ExampleObject(value = "{\"status\": \"rebuilding\", \"documents\": 3}")))
     public Map<String, Object> train() {
         return forward(rag::rebuild);
+    }
+
+    @PostMapping("/api/admin/knowledge/sync-codes")
+    @Operation(summary = "Sync extracted ICD codes into icd_codes",
+            description = "Scans the uploaded reference documents for code + official-title pairs "
+                    + "and upserts them into this database's icd_codes table. Inserts new codes and "
+                    + "fills blank descriptions; existing descriptions are never overwritten.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            content = @Content(mediaType = "application/json", examples = @ExampleObject(value =
+                    "{\"documentsScanned\": 1, \"extracted\": 180, \"added\": 165, "
+                            + "\"descriptionsFilled\": 3, \"unchanged\": 12}")))
+    public Map<String, Object> syncCodes() {
+        return forward(codeSync::syncCodes);
     }
 
     @PostMapping("/api/admin/knowledge/retrieve")

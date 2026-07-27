@@ -2,8 +2,11 @@ package com.medcodeai.api.repo;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * UI working-state tables: case_code_edits (payload JSONB) and
@@ -16,6 +19,7 @@ import java.util.List;
 public class WorkingStateRepository {
 
     private final JdbcTemplate jdbc;
+    private final JsonMapper json = new JsonMapper();
 
     public WorkingStateRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -49,5 +53,47 @@ public class WorkingStateRepository {
                 INSERT INTO case_report_drafts (case_id, draft, updated_at) VALUES (?,?,?)
                 ON CONFLICT (case_id) DO UPDATE SET draft=excluded.draft, updated_at=excluded.updated_at""",
                 caseId, draft, now);
+    }
+
+    /** case_id → average of code `confidence` fields in the saved edits payload. */
+    public Map<String, Integer> avgConfidenceByCase() {
+        Map<String, Integer> out = new HashMap<>();
+        jdbc.query("SELECT case_id, payload::text AS payload FROM case_code_edits", rs -> {
+            Integer avg = averageConfidence(rs.getString("payload"));
+            if (avg != null) {
+                out.put(rs.getString("case_id"), avg);
+            }
+        });
+        return out;
+    }
+
+    private Integer averageConfidence(String payloadJson) {
+        if (payloadJson == null || payloadJson.isBlank()) {
+            return null;
+        }
+        try {
+            Object parsed = json.readValue(payloadJson, Object.class);
+            if (!(parsed instanceof List<?> list) || list.isEmpty()) {
+                return null;
+            }
+            int sum = 0;
+            int n = 0;
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) {
+                    continue;
+                }
+                if (Boolean.TRUE.equals(m.get("missing"))) {
+                    continue;
+                }
+                Object conf = m.get("confidence");
+                if (conf instanceof Number num) {
+                    sum += num.intValue();
+                    n++;
+                }
+            }
+            return n == 0 ? null : Math.round(sum / (float) n);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 }

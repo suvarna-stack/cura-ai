@@ -47,8 +47,12 @@ public class RagApiClient {
     public RagApiClient() {
         String env = System.getenv("RAG_API_BASE");
         this.base = (env == null || env.isEmpty()) ? "http://localhost:8000" : env;
+        // HTTP/1.1 only: the JDK client's default h2c upgrade breaks uvicorn
+        // ("Unsupported upgrade request" -> multipart bodies arrive mangled).
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+                HttpClient.newBuilder()
+                        .version(HttpClient.Version.HTTP_1_1)
+                        .connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(180));
         this.http = RestClient.builder().baseUrl(base).requestFactory(factory).build();
     }
@@ -100,6 +104,15 @@ public class RagApiClient {
         }
     }
 
+    /** GET /documents/codes — ICD code + title pairs extracted from the uploaded PDFs. */
+    public Map<String, Object> extractedCodes() {
+        try {
+            return http.get().uri("/documents/codes").retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
     /** POST /documents/rebuild — 202, wipes and re-ingests every saved PDF. */
     public Map<String, Object> rebuild() {
         try {
@@ -117,6 +130,11 @@ public class RagApiClient {
     /** POST /chat — full RAG answer from the local LLM (slow on CPU). */
     public Map<String, Object> chat(Map<String, Object> body) {
         return postJson("/chat", body);
+    }
+
+    /** POST /suggest — ICD-9/10 suggestions from clinical text + knowledge index. */
+    public Map<String, Object> suggest(Map<String, Object> body) {
+        return postJson("/suggest", body);
     }
 
     private Map<String, Object> postJson(String uri, Map<String, Object> body) {

@@ -4,6 +4,7 @@ import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
 import com.medcodeai.api.service.ApprovalService;
 import com.medcodeai.api.service.AuthService;
+import com.medcodeai.api.service.CaseSuggestService;
 import com.medcodeai.api.service.Py;
 import com.medcodeai.api.service.WriteGate;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,8 +48,8 @@ public class CasesWriteController {
     private final WorkingStateRepository workingState;
     private final WriteGate writeGate;
     private final ApprovalService approvals;
+    private final CaseSuggestService suggest;
     private final JsonMapper json = new JsonMapper();
-
     // POST /api/demo/reset is a public bulk write; DEMO_TOOLS_ENABLED gates it
     // (default on locally, forced off in the Docker image — same posture as
     // SWAGGER_ENABLED). When off, the endpoint behaves as if it doesn't exist.
@@ -56,11 +57,13 @@ public class CasesWriteController {
             !"false".equalsIgnoreCase(System.getenv().getOrDefault("DEMO_TOOLS_ENABLED", "true").strip());
 
     public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState,
-                                WriteGate writeGate, ApprovalService approvals) {
+                                WriteGate writeGate, ApprovalService approvals,
+                                CaseSuggestService suggest) {
         this.cases = cases;
         this.workingState = workingState;
         this.writeGate = writeGate;
         this.approvals = approvals;
+        this.suggest = suggest;
     }
 
     // app.py:299 approve() — {ids} -> finalize + iMed write-back. The coder
@@ -235,6 +238,27 @@ public class CasesWriteController {
             return null;
         });
         return ok();
+    }
+
+    @PostMapping("/api/cases/{caseId}/suggest-codes")
+    @Operation(summary = "Suggest ICD-9 / ICD-10 codes via RAG",
+            description = "Builds a clinical narrative from the case's report sections and asks "
+                    + "the RAG knowledge index for ICD-10 diagnosis and ICD-9 procedure "
+                    + "suggestions. Does not write anything — the coder accepts or edits "
+                    + "suggestions in the UI, then saves via PUT /codes.")
+    @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value =
+                    "{\"caseId\":\"870…\",\"codes\":[{\"code\":\"S82.6\",\"system\":\"ICD-10\","
+                            + "\"description\":\"Fracture of lateral malleolus\",\"confidence\":88,"
+                            + "\"source\":\"icd10_vol1\"}],\"mode\":\"plain\",\"hitsUsed\":8}")))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
+    public Map<String, Object> suggestCodes(@PathVariable String caseId) {
+        Map<String, Object> out = suggest.suggestForCase(caseId);
+        if (out == null) {
+            throw new ApiExceptionHandler.NotFoundException();
+        }
+        return out;
     }
 
     /** The authenticated caller, stashed by AuthInterceptor (guarded route). */
