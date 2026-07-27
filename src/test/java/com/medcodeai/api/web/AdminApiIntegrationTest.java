@@ -209,6 +209,16 @@ class AdminApiIntegrationTest {
                         throw new AssertionError("expected 200 or 409 creating the guard, got " + s);
                     }
                 });
+        // A guard from an OLD run may predate this test setting its own password
+        // (the pre-Phase-3 version let approve auto-create a passwordless actor),
+        // and such a row can never log in. Re-set the password every run so the
+        // 409 path above is genuinely self-healing, like the create path.
+        Integer guardId = idByEmail(adminArray(token, "/api/admin/accounts"), guardEmail);
+        assertNotNull(guardId, "the history-guard account should exist");
+        mvc.perform(put("/api/admin/accounts/{id}", guardId).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"historypass1\"}"))
+                .andExpect(status().isOk());
         String coderToken = login(guardEmail, "historypass1");
 
         // real coding history via approve, then reopen to leave the case as it
@@ -223,10 +233,7 @@ class AdminApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
-        Integer id = idByEmail(adminArray(token, "/api/admin/accounts"), guardEmail);
-        assertNotNull(id, "the history-guard account should exist");
-
-        mvc.perform(delete("/api/admin/accounts/{id}", id).header("Authorization", "Bearer " + token))
+        mvc.perform(delete("/api/admin/accounts/{id}", guardId).header("Authorization", "Bearer " + token))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error")
                         .value("this account has coding history and cannot be deleted — deactivate it instead"));
