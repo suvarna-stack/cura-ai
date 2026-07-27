@@ -1,44 +1,154 @@
+import { apiClient } from '../../../lib/axios'
 import type {
+  ChatAnswer,
   KbDoc,
+  KnowledgeStats,
   RetrievalHit,
-  TrainingRun,
 } from '../types/training.types'
-import { SEED_DOCS } from '../types/training.types'
 
 /**
- * Placeholder training / RAG API — wire to shared apiClient when ready.
+ * Training / RAG API — proxied by medcode-api (/api/admin/knowledge/**, admin
+ * token required) to the RAG FastAPI service. Uploads and training return
+ * immediately; real progress is polled via fetchKnowledgeDocs().
  */
+
+// --------------------------- wire formats (RAG service, snake_case) --------
+
+interface RagDocument {
+  source: string
+  filename: string
+  size_bytes: number
+  pages: number
+  chunks: number
+  status: KbDoc['status']
+  progress: number
+  error?: string | null
+  uploaded_at: string
+}
+
+interface RagStats {
+  documents_indexed: number
+  chunks_in_index: number
+  embed_model: string
+  llm_model: string
+  retrieval_mode: string
+}
+
+interface RagChunk {
+  text: string
+  source: string
+  score: number
+  via: string
+  metadata: Record<string, unknown>
+}
+
+interface RagRetrieveResponse {
+  question: string
+  mode: string
+  hits: RagChunk[]
+}
+
+interface RagChatResponse {
+  question: string
+  answer: string
+  mode: string
+  contexts: RagChunk[]
+}
+
+// --------------------------- mapping ---------------------------------------
+
+function toKbDoc(d: RagDocument): KbDoc {
+  return {
+    id: d.source,
+    name: d.filename || d.source,
+    sizeBytes: d.size_bytes,
+    pages: d.pages,
+    chunks: d.chunks,
+    status: d.status,
+    progress: d.progress,
+    uploadedAt: d.uploaded_at,
+    error: d.error ?? undefined,
+  }
+}
+
+function toHit(c: RagChunk): RetrievalHit {
+  const page = c.metadata?.page
+  return {
+    docName: c.source,
+    page: typeof page === 'number' ? page : null,
+    score: c.score,
+    snippet: c.text,
+    via: c.via,
+  }
+}
+
+// --------------------------- calls ------------------------------------------
+
 export async function fetchKnowledgeDocs(): Promise<KbDoc[]> {
-  // TODO: const { data } = await apiClient.get<KbDoc[]>('/admin/knowledge/docs')
-  return [...SEED_DOCS]
+  const { data } = await apiClient.get<RagDocument[]>('/admin/knowledge/docs')
+  return data.map(toKbDoc)
 }
 
-export async function fetchLastTrainingRun(): Promise<TrainingRun | null> {
-  // TODO: const { data } = await apiClient.get<TrainingRun | null>('/admin/knowledge/runs/latest')
-  return null
+export async function fetchKnowledgeStats(): Promise<KnowledgeStats> {
+  const { data } = await apiClient.get<RagStats>('/admin/knowledge/stats')
+  return {
+    documentsIndexed: data.documents_indexed,
+    chunksInIndex: data.chunks_in_index,
+    embedModel: data.embed_model,
+    llmModel: data.llm_model,
+    retrievalMode: data.retrieval_mode,
+  }
 }
 
-export async function uploadKnowledgeDocs(files: File[]): Promise<KbDoc[]> {
-  void files
-  // TODO: upload via apiClient multipart
-  throw new Error('uploadKnowledgeDocs is not implemented')
+/** Upload PDFs one by one; the RAG service ingests each in the background. */
+export async function uploadKnowledgeDocs(files: File[]): Promise<void> {
+  for (const file of files) {
+    const form = new FormData()
+    form.append('file', file)
+    await apiClient.post('/admin/knowledge/docs', form)
+  }
 }
 
 export async function removeKnowledgeDoc(id: string): Promise<void> {
-  void id
-  // TODO: await apiClient.delete(`/admin/knowledge/docs/${id}`)
-  throw new Error('removeKnowledgeDoc is not implemented')
+  await apiClient.delete(`/admin/knowledge/docs/${encodeURIComponent(id)}`)
 }
 
-export async function startTrainingRun(): Promise<TrainingRun> {
-  // TODO: const { data } = await apiClient.post<TrainingRun>('/admin/knowledge/train')
-  throw new Error('startTrainingRun is not implemented')
+/** Kick off a full index rebuild; poll fetchKnowledgeDocs() for progress. */
+export async function startTrainingRun(): Promise<{ documents: number }> {
+  const { data } = await apiClient.post<{ status: string; documents: number }>(
+    '/admin/knowledge/train',
+  )
+  return { documents: data.documents }
 }
 
-export async function testRetrieval(
-  query: string,
-): Promise<RetrievalHit[]> {
-  void query
-  // TODO: const { data } = await apiClient.post<RetrievalHit[]>('/admin/knowledge/retrieve', { query })
-  return []
+export async function testRetrieval(query: string): Promise<RetrievalHit[]> {
+  const { data } = await apiClient.post<RagRetrieveResponse>(
+    '/admin/knowledge/retrieve',
+    { question: query },
+  )
+  return data.hits.map(toHit)
+}
+
+/** Full RAG answer from the local LLM — can take a while on CPU. */
+export async function testChat(query: string): Promise<ChatAnswer> {
+  const { data } = await apiClient.post<RagChatResponse>(
+    '/admin/knowledge/chat',
+    { question: query, max_new_tokens: 300 },
+  )
+  return {
+    answer: data.answer,
+    mode: data.mode,
+    hits: data.contexts.map(toHit),
+  }
+}
+
+/** Human-readable message from an Axios error (the API's {"error": ...}). */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === 'object' && err !== null && 'response' in err) {
+    const data = (err as { response?: { data?: { error?: string } } }).response
+      ?.data
+    if (data?.error) return data.error
+  }
+  if (err instanceof Error && err.message) return err.message
+  return fallback
 }

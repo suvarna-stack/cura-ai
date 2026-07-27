@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BrainCircuit,
   CloudUpload,
@@ -19,39 +19,26 @@ import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
 import { ConfirmModal } from '../../../components/ui/Modal'
 import {
+  apiErrorMessage,
   fetchKnowledgeDocs,
-  fetchLastTrainingRun,
+  fetchKnowledgeStats,
   removeKnowledgeDoc,
   startTrainingRun,
+  testChat,
   testRetrieval,
   uploadKnowledgeDocs,
 } from '../api/trainingService'
 import type {
+  ChatAnswer,
   KbDoc,
+  KnowledgeStats,
   RetrievalHit,
   TrainingRun,
 } from '../types/training.types'
-import {
-  CHUNK_OVERLAP,
-  CHUNK_TOKENS,
-  EMBED_MODEL,
-  SEED_DOCS,
-  estimateChunks,
-  estimatePages,
-  estimateTokens,
-  formatSize,
-} from '../types/training.types'
+import { formatSize } from '../types/training.types'
 
-const STAGES = [
-  'Loading documents from knowledge base',
-  'Extracting text (PDF → plain text)',
-  `Chunking (${CHUNK_TOKENS} tokens, ${CHUNK_OVERLAP} overlap)`,
-  `Generating embeddings (${EMBED_MODEL})`,
-  'Building vector index',
-  'Validating retrieval on sample queries',
-]
-
-const TICK_MS = 90
+const POLL_MS = 2500
+const LAST_RUN_KEY = 'medcode:lastTrainingRun'
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', {
@@ -61,6 +48,15 @@ const fmtDate = (iso: string) =>
     hour: '2-digit',
     minute: '2-digit',
   })
+
+function loadLastRun(): TrainingRun | null {
+  try {
+    const raw = localStorage.getItem(LAST_RUN_KEY)
+    return raw ? (JSON.parse(raw) as TrainingRun) : null
+  } catch {
+    return null
+  }
+}
 
 function StatusPill({ doc }: { doc: KbDoc }) {
   if (doc.status === 'processing') {
@@ -85,7 +81,7 @@ function StatusPill({ doc }: { doc: KbDoc }) {
         title={doc.error}
         className="gap-1.5 whitespace-nowrap"
       >
-        <AlertTriangle size={11} /> Rejected
+        <AlertTriangle size={11} /> Failed
       </Badge>
     )
   }
@@ -96,188 +92,226 @@ function StatusPill({ doc }: { doc: KbDoc }) {
   )
 }
 
-/** Local deterministic retrieval stand-in until the API is wired. */
-function simulateRetrieve(query: string, docs: KbDoc[], k = 3): RetrievalHit[] {
-  const indexed = docs.filter((d) => d.status === 'indexed')
-  if (!indexed.length || !query.trim()) return []
-
-  let h = 0
-  const normalized = query.trim().toLowerCase()
-  for (let i = 0; i < normalized.length; i++) {
-    h = (h * 31 + normalized.charCodeAt(i)) | 0
-  }
-  h = Math.abs(h)
-
-  const snippets = [
-    `Assign the code that most specifically describes the documented condition. When the record supports only a symptom, code the symptom — do not infer the underlying diagnosis. (matched on "${query.trim()}")`,
-    `The principal diagnosis is the condition established after study to be chiefly responsible for the visit. It is listed first; sequencing is what the grouper reads. (matched on "${query.trim()}")`,
-    `Where a procedure is performed, the ICD-9-CM code is recorded in addition to — never instead of — the diagnosis code. (matched on "${query.trim()}")`,
-  ]
-
-  return Array.from({ length: Math.min(k, indexed.length) }, (_, i) => {
-    const doc = indexed[(h + i * 3) % indexed.length]
-    return {
-      docName: doc.name,
-      page: 1 + ((h >> (i + 1)) % doc.pages),
-      score: Number((0.93 - i * 0.07 - ((h >> i) % 4) / 100).toFixed(2)),
-      snippet: snippets[i % snippets.length],
-    }
-  })
-}
-
 export function TrainingPage() {
-  const [docs, setDocs] = useState<KbDoc[]>(SEED_DOCS)
-  const [lastRun, setLastRun] = useState<TrainingRun | null>(null)
+  const [docs, setDocs] = useState<KbDoc[]>([])
+  const [stats, setStats] = useState<KnowledgeStats | null>(null)
+  const [ragError, setRagError] = useState<string | null>(null)
+  const [lastRun, setLastRun] = useState<TrainingRun | null>(loadLastRun)
+
   const [dragging, setDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<KbDoc | null>(null)
 
   const [training, setTraining] = useState(false)
-  const [stage, setStage] = useState(0)
-  const [progress, setProgress] = useState(0)
   const [log, setLog] = useState<string[]>([])
 
   const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [hits, setHits] = useState<RetrievalHit[] | null>(null)
+  const [answering, setAnswering] = useState(false)
+  const [answer, setAnswer] = useState<ChatAnswer | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
-  const timers = useRef<number[]>([])
   const logEnd = useRef<HTMLDivElement>(null)
-
-  useEffect(() => () => {
-    timers.current.forEach(clearInterval)
-  }, [])
+  const prevStatus = useRef<Map<string, KbDoc['status']>>(new Map())
+  const trainStart = useRef(0)
+  const sawTrainingBusy = useRef(false)
 
   useEffect(() => {
     logEnd.current?.scrollIntoView({ block: 'nearest' })
   }, [log])
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [nextDocs, nextRun] = await Promise.all([
-          fetchKnowledgeDocs(),
-          fetchLastTrainingRun(),
-        ])
-        if (nextDocs.length > 0) setDocs(nextDocs)
-        setLastRun(nextRun)
-      } catch {
-        // keep seed UI
+  /** Pull live docs + stats from the API; logs per-document transitions. */
+  const refresh = useCallback(async () => {
+    const [nextDocs, nextStats] = await Promise.all([
+      fetchKnowledgeDocs(),
+      fetchKnowledgeStats(),
+    ])
+    setRagError(null)
+    setStats(nextStats)
+    setDocs(nextDocs)
+
+    for (const d of nextDocs) {
+      const prev = prevStatus.current.get(d.id)
+      if (prev && prev !== d.status) {
+        if (d.status === 'indexed') {
+          setLog((l) => [
+            ...l,
+            `✓ ${d.name} — ${d.chunks.toLocaleString()} chunks indexed`,
+          ])
+        } else if (d.status === 'failed') {
+          setLog((l) => [...l, `✗ ${d.name} — ${d.error ?? 'ingest failed'}`])
+        }
       }
-    })()
+      prevStatus.current.set(d.id, d.status)
+    }
+    return nextDocs
   }, [])
+
+  useEffect(() => {
+    void refresh().catch((err) => {
+      setRagError(
+        apiErrorMessage(err, 'Could not reach the AI training service.'),
+      )
+    })
+  }, [refresh])
 
   const indexed = docs.filter((d) => d.status === 'indexed')
   const totalChunks = indexed.reduce((s, d) => s + d.chunks, 0)
   const busy = docs.some(
     (d) => d.status === 'processing' || d.status === 'queued',
   )
-  const stale = lastRun ? lastRun.chunkCount !== totalChunks : indexed.length > 0
+  const hasIndex = (stats?.chunksInIndex ?? 0) > 0
 
-  const ingest = (doc: KbDoc) => {
-    setDocs((prev) =>
-      prev.map((d) => (d.id === doc.id ? { ...d, status: 'processing' } : d)),
-    )
+  // Poll while anything is ingesting (uploads index themselves) or training.
+  useEffect(() => {
+    if (!busy && !training && !uploading) return
     const id = window.setInterval(() => {
-      setDocs((prev) =>
-        prev.map((d) => {
-          if (d.id !== doc.id || d.status !== 'processing') return d
-          const nextProgress = Math.min(100, d.progress + 8)
-          if (nextProgress >= 100) {
-            clearInterval(id)
-            return { ...d, progress: 100, status: 'indexed' }
-          }
-          return { ...d, progress: nextProgress }
-        }),
-      )
-    }, 190)
-    timers.current.push(id)
-  }
+      void refresh().catch(() => {
+        /* transient — next tick retries */
+      })
+    }, POLL_MS)
+    return () => clearInterval(id)
+  }, [busy, training, uploading, refresh])
+
+  // Detect the end of a training run: the rebuild flips every doc to
+  // queued/processing first, so wait until we've seen it busy at least once
+  // (with a timeout escape in case the rebuild finished between two polls).
+  useEffect(() => {
+    if (!training) return
+    if (busy) {
+      sawTrainingBusy.current = true
+      return
+    }
+    const elapsed = Date.now() - trainStart.current
+    if (!sawTrainingBusy.current && elapsed < 15_000) return
+
+    const run: TrainingRun = {
+      finishedAt: new Date().toISOString(),
+      docCount: indexed.length,
+      chunkCount: totalChunks,
+      model: stats?.embedModel ?? 'unknown',
+      durationMs: elapsed,
+    }
+    setLastRun(run)
+    localStorage.setItem(LAST_RUN_KEY, JSON.stringify(run))
+    setTraining(false)
+    setLog((l) => [
+      ...l,
+      `✓ Index rebuilt — ${indexed.length} documents, ${totalChunks.toLocaleString()} chunks in ${(elapsed / 1000).toFixed(1)}s`,
+    ])
+  }, [training, busy, indexed.length, totalChunks, stats])
+
+  // Overall progress during a run = mean per-document ingest progress.
+  const trainProgress = training
+    ? docs.length
+      ? Math.round(
+          docs.reduce(
+            (s, d) => s + (d.status === 'indexed' ? 100 : d.progress),
+            0,
+          ) / docs.length,
+        )
+      : 0
+    : 100
 
   const addFiles = (files: FileList | null) => {
-    if (!files?.length) return
+    if (!files?.length || uploading) return
     const fileList = Array.from(files)
-    void uploadKnowledgeDocs(fileList).catch(() => {
-      /* placeholder — local UI ingest continues */
-    })
-
-    const incoming: KbDoc[] = fileList.map((f, i) => {
-      const isPdf =
-        f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-      return {
-        id: `k${Date.now()}${i}`,
-        name: f.name,
-        sizeBytes: f.size,
-        pages: isPdf ? estimatePages(f.size) : 0,
-        chunks: isPdf ? estimateChunks(f.size) : 0,
-        status: isPdf ? 'queued' : 'failed',
-        progress: 0,
-        uploadedAt: new Date().toISOString(),
-        error: isPdf
-          ? undefined
-          : 'Not a PDF — the ingester only accepts PDF files.',
+    const nonPdf = fileList.find(
+      (f) =>
+        f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf'),
+    )
+    if (nonPdf) {
+      setUploadError(`"${nonPdf.name}" is not a PDF — only PDFs are accepted.`)
+      return
+    }
+    setUploadError(null)
+    setUploading(true)
+    void (async () => {
+      try {
+        await uploadKnowledgeDocs(fileList)
+        await refresh()
+      } catch (err) {
+        setUploadError(apiErrorMessage(err, 'Upload failed.'))
+      } finally {
+        setUploading(false)
       }
-    })
-    setDocs((prev) => [...prev, ...incoming])
-    incoming.filter((d) => d.status === 'queued').forEach(ingest)
+    })()
   }
 
   const startTraining = () => {
-    if (training || !indexed.length) return
-    void startTrainingRun().catch(() => {
-      /* placeholder — local UI simulation continues */
-    })
-
+    if (training || busy || !docs.length) return
     setTraining(true)
-    setStage(0)
-    setProgress(0)
+    trainStart.current = Date.now()
+    sawTrainingBusy.current = false
     setLog([
-      `▸ Training run started — ${indexed.length} documents, ${totalChunks.toLocaleString()} chunks`,
+      `▸ Rebuild started — re-embedding ${docs.length} document${docs.length === 1 ? '' : 's'}`,
     ])
-    let tick = 0
-
-    const id = window.setInterval(() => {
-      tick += 1
-      const pct = Math.min(100, tick * 2)
-      setProgress(pct)
-      const next = Math.min(
-        STAGES.length - 1,
-        Math.floor((pct / 100) * STAGES.length),
-      )
-      setStage((cur) => {
-        if (next > cur) {
-          setLog((l) => [...l, `✓ ${STAGES[cur]}`, `▸ ${STAGES[next]}`])
-        }
-        return next
-      })
-      if (pct >= 100) {
-        clearInterval(id)
+    void (async () => {
+      try {
+        await startTrainingRun()
+        await refresh()
+      } catch (err) {
+        setTraining(false)
         setLog((l) => [
           ...l,
-          `✓ ${STAGES[STAGES.length - 1]}`,
-          `✓ Index rebuilt — ${totalChunks.toLocaleString()} vectors, ${estimateTokens(totalChunks).toLocaleString()} tokens embedded`,
+          `✗ ${apiErrorMessage(err, 'Could not start the training run.')}`,
         ])
-        const run: TrainingRun = {
-          finishedAt: new Date().toISOString(),
-          docCount: indexed.length,
-          chunkCount: totalChunks,
-          model: EMBED_MODEL,
-          durationMs: tick * TICK_MS,
-        }
-        setLastRun(run)
-        setTraining(false)
       }
-    }, TICK_MS)
-    timers.current.push(id)
+    })()
+  }
+
+  const runSearch = () => {
+    if (!query.trim() || searching) return
+    setSearching(true)
+    setSearchError(null)
+    setAnswer(null)
+    void (async () => {
+      try {
+        setHits(await testRetrieval(query))
+      } catch (err) {
+        setHits(null)
+        setSearchError(apiErrorMessage(err, 'Retrieval failed.'))
+      } finally {
+        setSearching(false)
+      }
+    })()
+  }
+
+  const runAnswer = () => {
+    if (!query.trim() || answering) return
+    setAnswering(true)
+    setSearchError(null)
+    void (async () => {
+      try {
+        setAnswer(await testChat(query))
+      } catch (err) {
+        setSearchError(apiErrorMessage(err, 'The AI answer failed.'))
+      } finally {
+        setAnswering(false)
+      }
+    })()
   }
 
   const tiles = [
-    { label: 'Documents indexed', value: String(indexed.length), icon: FileText },
+    {
+      label: 'Documents indexed',
+      value: String(stats?.documentsIndexed ?? indexed.length),
+      icon: FileText,
+    },
     {
       label: 'Chunks in index',
-      value: totalChunks.toLocaleString(),
+      value: (stats?.chunksInIndex ?? totalChunks).toLocaleString(),
       icon: ListTree,
     },
-    { label: 'Embedding model', value: EMBED_MODEL, icon: Sparkles, small: true },
+    {
+      label: 'Embedding model',
+      value: stats?.embedModel ?? '—',
+      icon: Sparkles,
+      small: true,
+    },
     {
       label: 'Last trained',
       value: lastRun ? fmtDate(lastRun.finishedAt) : 'Never',
@@ -290,10 +324,16 @@ export function TrainingPage() {
     <>
       <h1 className="mb-1 text-[19px] font-bold text-text">AI Training</h1>
       <p className="mb-6 text-[12px] text-muted">
-        Upload the coding references the AI retrieves from (RAG), then rebuild
-        the vector index. Everything on this page is a prototype — no model is
-        called yet.
+        Upload the coding references the AI retrieves from (RAG). Documents
+        index themselves on upload; retrain to rebuild the whole vector index.
       </p>
+
+      {ragError && (
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-[12px] font-semibold text-error">
+          <AlertTriangle size={14} className="mt-[1px] shrink-0" />
+          {ragError}
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((t) => (
@@ -334,9 +374,18 @@ export function TrainingPage() {
                 : 'border-border hover:border-primary/60 hover:bg-primary/5'
             }`}
           >
-            <CloudUpload size={26} className="mx-auto mb-2 text-primary" />
+            {uploading ? (
+              <RefreshCw
+                size={26}
+                className="mx-auto mb-2 animate-spin text-primary"
+              />
+            ) : (
+              <CloudUpload size={26} className="mx-auto mb-2 text-primary" />
+            )}
             <p className="text-[13px] font-semibold text-text">
-              Drop PDFs here, or click to browse
+              {uploading
+                ? 'Uploading…'
+                : 'Drop PDFs here, or click to browse'}
             </p>
             <p className="mt-1 text-[11px] text-muted">
               Coding guidelines, grouper handbooks, hospital SOPs — PDF only
@@ -353,6 +402,12 @@ export function TrainingPage() {
               }}
             />
           </div>
+          {uploadError && (
+            <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+              <AlertTriangle size={12} className="mt-[1px] shrink-0" />
+              {uploadError}
+            </p>
+          )}
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left">
@@ -400,7 +455,7 @@ export function TrainingPage() {
                             {d.name}
                           </p>
                           <p className="text-[11px] text-muted">
-                            {fmtDate(d.uploadedAt)}
+                            {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
                           </p>
                         </div>
                       </div>
@@ -439,25 +494,20 @@ export function TrainingPage() {
             <BrainCircuit size={15} className="text-primary" /> Train
           </h2>
           <p className="mb-4 text-[11px] text-muted">
-            Re-embeds every indexed document and rebuilds the vector index the
-            coding AI queries.
+            Re-embeds every document and rebuilds the vector index the coding
+            AI queries. Uploads already index themselves — retrain after
+            removing documents or changing models.
           </p>
-
-          {stale && !training && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] font-semibold text-warning">
-              Knowledge base changed since the last run — retrain to pick it up.
-            </div>
-          )}
 
           <Button
             onClick={startTraining}
-            disabled={training || busy || !indexed.length}
+            disabled={training || busy || uploading || !docs.length}
             fullWidth
           >
             {training ? (
               <>
                 <RefreshCw size={14} className="animate-spin" /> Training…{' '}
-                {progress}%
+                {trainProgress}%
               </>
             ) : (
               <>
@@ -475,43 +525,15 @@ export function TrainingPage() {
             <>
               <div className="mt-4 h-1.5 overflow-hidden rounded-full border border-border bg-bg">
                 <div
-                  className="h-full bg-primary transition-all duration-150"
-                  style={{ width: `${progress}%` }}
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${training ? trainProgress : 100}%` }}
                 />
               </div>
-              <ul className="mt-3 space-y-1.5">
-                {STAGES.map((s, i) => (
-                  <li
-                    key={s}
-                    className={`flex items-start gap-2 text-[11px] ${
-                      i < stage || (!training && progress >= 100)
-                        ? 'font-semibold text-text'
-                        : i === stage && training
-                          ? 'font-semibold text-primary'
-                          : 'text-muted'
-                    }`}
-                  >
-                    {i < stage || (!training && progress >= 100) ? (
-                      <CheckCircle2
-                        size={12}
-                        className="mt-[1px] shrink-0 text-success"
-                      />
-                    ) : i === stage && training ? (
-                      <RefreshCw
-                        size={12}
-                        className="mt-[1px] shrink-0 animate-spin"
-                      />
-                    ) : (
-                      <span className="mt-[1px] h-3 w-3 shrink-0 rounded-full border border-border" />
-                    )}
-                    {s}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 max-h-40 min-h-[7rem] flex-1 overflow-y-auto rounded-lg bg-text/95 px-3 py-2 font-mono text-[10.5px] leading-relaxed text-success">
+              <div className="mt-3 max-h-52 min-h-[7rem] flex-1 overflow-y-auto rounded-lg bg-text/95 px-3 py-2 font-mono text-[10.5px] leading-relaxed text-success">
                 {log.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
+                {training && <p className="animate-pulse">▸ working…</p>}
                 <div ref={logEnd} />
               </div>
             </>
@@ -532,17 +554,14 @@ export function TrainingPage() {
           <Search size={15} className="text-primary" /> Test retrieval
         </h2>
         <p className="mb-4 text-[11px] text-muted">
-          Ask what a coder would ask and see which chunks the index would hand
-          the AI. Simulated results.
+          Ask what a coder would ask and see which chunks the index hands the
+          AI. Optionally generate a full AI answer from those chunks.
         </p>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault()
-            void testRetrieval(query).catch(() => {
-              /* placeholder */
-            })
-            setHits(simulateRetrieve(query, docs))
+            runSearch()
           }}
         >
           <Input
@@ -552,61 +571,119 @@ export function TrainingPage() {
           />
           <Button
             type="submit"
-            disabled={!query.trim() || !lastRun}
+            disabled={!query.trim() || !hasIndex || searching}
             className="shrink-0 whitespace-nowrap"
           >
-            Search
+            {searching ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              'Search'
+            )}
           </Button>
         </form>
-        {!lastRun && (
+        {!hasIndex && (
           <p className="mt-2 text-[11px] text-muted">
-            Train the index once before testing retrieval.
+            Upload and index at least one document before testing retrieval.
+          </p>
+        )}
+        {searchError && (
+          <p className="mt-3 flex items-start gap-1.5 text-[12px] font-semibold text-error">
+            <AlertTriangle size={13} className="mt-[1px] shrink-0" />
+            {searchError}
           </p>
         )}
         {hits && hits.length === 0 && (
           <p className="mt-4 text-[12px] text-muted">
-            No chunks matched — the index is empty.
+            No chunks matched — try rephrasing the question.
           </p>
         )}
         {hits && hits.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {hits.map((h, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-border bg-bg px-4 py-3"
-              >
-                <div className="mb-1 flex items-center justify-between gap-3">
-                  <p className="truncate text-[12px] font-bold text-text">
-                    {h.docName}{' '}
-                    <span className="font-semibold text-muted">
-                      · p.{h.page}
+          <>
+            <div className="mt-4 space-y-2">
+              {hits.map((h, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-border bg-bg px-4 py-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <p className="truncate text-[12px] font-bold text-text">
+                      {h.docName}
+                      {h.page != null && (
+                        <span className="font-semibold text-muted">
+                          {' '}
+                          · p.{h.page}
+                        </span>
+                      )}
+                      <span className="ml-2 font-medium text-muted">
+                        {h.via}
+                      </span>
+                    </p>
+                    <span className="text-[11px] font-bold whitespace-nowrap text-primary">
+                      {h.score.toFixed(2)}
                     </span>
+                  </div>
+                  <p className="text-[12px] leading-relaxed whitespace-pre-line text-muted">
+                    {h.snippet}
                   </p>
-                  <span className="text-[11px] font-bold whitespace-nowrap text-primary">
-                    {h.score.toFixed(2)}
-                  </span>
                 </div>
-                <p className="text-[12px] leading-relaxed text-muted">
-                  {h.snippet}
+              ))}
+            </div>
+
+            <div className="mt-4">
+              <Button
+                variant="secondary"
+                onClick={runAnswer}
+                disabled={answering}
+              >
+                {answering ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />{' '}
+                    Generating… (the local model is slow)
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} /> Generate AI answer
+                  </>
+                )}
+              </Button>
+            </div>
+            {answer && (
+              <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                <p className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-primary">
+                  <Sparkles size={13} /> AI answer{' '}
+                  <span className="font-medium text-muted">
+                    ({answer.mode} retrieval)
+                  </span>
+                </p>
+                <p className="text-[13px] leading-relaxed whitespace-pre-line text-text">
+                  {answer.answer}
                 </p>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </Card>
 
       {deleting && (
         <ConfirmModal
           title="Remove document"
-          message={`Remove "${deleting.name}" from the knowledge base? Its chunks leave the index at the next training run.`}
+          message={`Remove "${deleting.name}" from the knowledge base? Its chunks are deleted from the index immediately.`}
           confirmLabel="Remove"
           variant="danger"
           onConfirm={() => {
-            setDocs((prev) => prev.filter((d) => d.id !== deleting.id))
-            void removeKnowledgeDoc(deleting.id).catch(() => {
-              /* placeholder */
-            })
+            const doc = deleting
             setDeleting(null)
+            void (async () => {
+              try {
+                await removeKnowledgeDoc(doc.id)
+                prevStatus.current.delete(doc.id)
+                await refresh()
+              } catch (err) {
+                setUploadError(
+                  apiErrorMessage(err, `Could not remove "${doc.name}".`),
+                )
+              }
+            })()
           }}
           onClose={() => setDeleting(null)}
         />
