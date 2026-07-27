@@ -85,6 +85,22 @@ public class CasesViewService {
                     .put((String) r.get("order_category"), r.get("n"));
         }
 
+        // case_id -> {category: [distinct order names A–Z]}, same pinned
+        // category order as `orders` — the items behind each count (the
+        // frontend's nested Study/Item filter reads this; added 2026-07-27)
+        Map<String, Map<String, List<String>>> ordnames = new HashMap<>();
+        for (Map<String, Object> r : repo.orderNameRows()) {
+            ordnames.computeIfAbsent((String) r.get("case_id"), k -> new LinkedHashMap<>())
+                    .computeIfAbsent((String) r.get("order_category"), k -> new ArrayList<>())
+                    .add((String) r.get("order_name"));
+        }
+        // names sorted HERE, not in SQL: order_name is raw hospital text (much
+        // of it Thai) and PG collation disagrees with Java's, so the payload
+        // would otherwise vary with the database's locale
+        for (Map<String, List<String>> byCat : ordnames.values()) {
+            byCat.values().forEach(names -> names.sort(Comparator.naturalOrder()));
+        }
+
         // views.py:144 — case_id -> [display names], first-touch order, demo.reset excluded
         Map<String, List<String>> caseCoders = new HashMap<>();
         for (Map<String, Object> r : repo.coderHistoryRows()) {
@@ -133,7 +149,7 @@ public class CasesViewService {
         Set<String> finishedOmits = Set.of("confidence", "ccpi", "cc", "pi");
 
         for (Map<String, Object> r : repo.opdCases()) {
-            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, caseCoders);
+            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, ordnames, caseCoders);
             String id = (String) u.get("id");
             if ("approved".equals(r.get("case_status"))) {
                 // views.py:221 — finished is an exclusive queue
@@ -242,6 +258,7 @@ public class CasesViewService {
                                        Map<String, Map<String, String>> ccpi,
                                        Map<String, List<Map<String, Object>>> codes,
                                        Map<String, Map<String, Object>> ordcat,
+                                       Map<String, Map<String, List<String>>> ordnames,
                                        Map<String, List<String>> caseCoders) {
         String cid = (String) r.get("case_id");
         Map<String, String> cc = ccpi.getOrDefault(cid, Map.of());
@@ -268,6 +285,7 @@ public class CasesViewService {
         List<Map<String, Object>> cs = codes.getOrDefault(cid, List.of());
         u.put("codes", cs.size() > 6 ? cs.subList(0, 6) : cs);
         u.put("orders", ordcat.getOrDefault(cid, Map.of()));
+        u.put("orderNames", ordnames.getOrDefault(cid, Map.of()));
         u.put("created_at", r.get("admissiondatetime")); // real column; null where the extract lacks it
         u.put("updated_at", r.get("dischargedatetime")); // real column; null where the extract lacks it
         u.put("revenue_impact", null); // no real DRG/revenue source exists

@@ -9,8 +9,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -106,6 +109,40 @@ class CasesApiIntegrationTest {
         assertTrue(sample.get("patient").isNull(), "no real patient-name source exists yet");
         assertTrue(sample.get("confidence").isNull(), "no real AI-confidence source exists yet");
         assertTrue(sample.get("revenue_impact").isNull(), "no real revenue source exists yet");
+    }
+
+    @Test
+    void listedCasesCarryOrderNamesBehindEveryOrderCount() throws Exception {
+        // contract addition 2026-07-27: `orderNames` names the items behind the
+        // `orders` counts (the dashboard's nested Study/Item filter reads it).
+        // Both keys are always present; the name lists are distinct + A–Z.
+        JsonNode root = getJson("/api/cases");
+        JsonNode withOrders = null;
+        for (JsonNode c : root.get("complete")) {
+            assertTrue(c.has("orderNames"), "every card carries orderNames, even when empty");
+            if (withOrders == null && !c.get("orders").isEmpty()) {
+                withOrders = c;
+            }
+        }
+        assertNotNull(withOrders, "expected at least one seeded case with orders");
+
+        JsonNode names = withOrders.get("orderNames");
+        assertFalse(names.isEmpty(), "a case with orders should name at least one of them");
+        for (String cat : names.propertyNames()) {
+            // no name list without a matching count — the two views must agree
+            assertTrue(withOrders.get("orders").has(cat),
+                    "orderNames category " + cat + " has no matching orders count");
+            List<String> got = new ArrayList<>();
+            for (JsonNode n : names.get(cat)) {
+                got.add(n.asString());
+            }
+            assertFalse(got.isEmpty(), "an empty name list should be absent, not sent");
+            assertEquals(new TreeSet<>(got).size(), got.size(), "names must be distinct: " + got);
+            assertEquals(new ArrayList<>(new TreeSet<>(got)), got, "names must be A–Z: " + got);
+            // a category can never name more items than it counted
+            assertTrue(got.size() <= withOrders.get("orders").get(cat).asInt(),
+                    "more distinct names than order rows in " + cat);
+        }
     }
 
     @Test

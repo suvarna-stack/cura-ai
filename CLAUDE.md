@@ -13,9 +13,10 @@ database. Build/run/test commands: see `README.md`.
 
 ## The golden rule (rewritten 2026-07-22 — the Flask-clone era is over)
 
-**This backend owns the API contract.** The old React frontend is being
-retired; the next one will be built against `docs/api-contract.md` +
-`docs/types.ts`. Consequences:
+**This backend owns the API contract.** The old React frontend is retired; its
+replacement — the sibling repo `../audit-chart-frontend` — is built against
+`docs/api-contract.md` + `docs/types.ts` and is now LIVE against this backend
+(see the 2026-07-27 entry in Progress). Consequences:
 
 - Key order, absent-vs-null choices, and error text are OUR decisions now —
   deliberate and documented, not cloned. When changing any response shape,
@@ -163,10 +164,31 @@ Milestones (git log --oneline reads as this sequence):
   integration tests updated (tests authenticate as the bootstrap admin; the
   history-guard test now creates a real coder account since body-coder
   auto-creation is gone).
+- ✅ **New frontend wired to this backend (2026-07-27):** the replacement UI
+  lives in the sibling repo `../audit-chart-frontend` (React + Vite + axios,
+  `VITE_API_BASE_URL=http://localhost:8001/api` — the base URL already
+  includes `/api`). It calls 18 of our 20 endpoints for real: auth
+  (login/logout/me), both case reads, all four case writes (approve, reopen,
+  PUT codes, PUT draft), the whole admin surface (accounts CRUD + status +
+  dashboard), and demo reset. Its `lib/axios.ts` attaches
+  `Authorization: Bearer <token>` from `localStorage` on every request and, on
+  any 401 outside the login form, clears the token and redirects to `/login` —
+  matching the Phase 3 auth model. It sends no `coder` name on approve/reopen
+  and relies on our token stamping. NOT wired: `POST /api/sync` and
+  `POST /api/cases/{id}/sync` — the UI's Sync button is still a 2.2s fake
+  timer (`SyncProvider.tsx`), so nothing triggers a hospital pull from the
+  browser yet. Its Analytics, Agent-chat and Training/knowledge-base pages are
+  deliberate mocks/stubs (`USE_MOCK = true` + TODOs) — we have no endpoints
+  behind them and none are planned yet, so DON'T read those TODO paths
+  (`/analytics`, `/agent/*`, `/admin/knowledge/*`) as a contract we owe.
+  Behavior worth knowing: their code/draft/approve writes are best-effort —
+  failures are swallowed and the browser keeps its own `localStorage` copy, so
+  a rejected write still looks saved on screen.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
-  containers), rerun both repos' test suites there, and build the NEW
-  frontend against `docs/types.ts`. The old frontend/Flask pair just keeps
-  running untouched until then.
+  containers) and rerun both repos' test suites there. The frontend half of
+  this milestone is done (above); what remains is prod hosting plus pointing
+  the frontend's `VITE_API_BASE_URL` at it. The old frontend/Flask pair just
+  keeps running untouched until then.
 
 Deploy direction (decided 2026-07-21, updated 2026-07-22): **GCP, three
 containers** — medcode-api, imed-mock-api (until the hospital provides the
@@ -206,8 +228,11 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 
 ## Open tasks
 
-- **Frontend rewrite** against `docs/types.ts` — separate project, not
-  started, out of scope for this repo.
+- **Frontend** (`../audit-chart-frontend`) — built and live against this
+  backend; the repo itself stays out of scope here. Two loose ends on OUR
+  side of the seam: nothing in the UI calls `/api/sync` yet, and the three
+  mocked pages (Analytics, Agent, Training) have no endpoints behind them —
+  neither is a promise we've made.
 - **M7 cutover** (above).
 
 ## Full history

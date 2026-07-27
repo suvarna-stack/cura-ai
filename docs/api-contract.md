@@ -90,6 +90,7 @@ exactly one of `complete`, an `incompleteGroups` group, `reopened` or
 | `pi` | `string` | Present Illness snippet, `""` when none |
 | `codes` | `CodeChip[]` | first 6 of `{code, system, role}`, principal → secondary → procedure → other |
 | `orders` | `object` | `{category: count}`, key order CT, ROIP, X-ray, lab, medicine, other, surgery |
+| `orderNames` | `object` | `{category: [distinct order names A–Z]}`, same key order as `orders` — the items behind each count (feeds the dashboard's nested Study/Item filter). A category whose rows are all nameless is absent; `{}` when the case has no orders |
 | `created_at` | `string \| null` | `cases.admissiondatetime` (raw hospital text). OPD rows lack it → currently always `null` here |
 | `updated_at` | `string \| null` | `cases.dischargedatetime` — same caveat |
 | `revenue_impact` | `null` | no real DRG/revenue source exists |

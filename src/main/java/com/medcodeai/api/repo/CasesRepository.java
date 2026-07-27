@@ -74,6 +74,22 @@ public class CasesRepository {
                          WHEN 'other' THEN 5 WHEN 'surgery' THEN 6 ELSE 7 END""", ROW);
     }
 
+    // distinct order names per case+category (contract addition 2026-07-27,
+    // not in views.py) — feeds the frontend's nested Study/Item filter under
+    // each Order Type option. GROUP BY = DISTINCT. The ORDER BY pins the
+    // CATEGORY key order only; the names themselves are sorted in the service,
+    // since order_name is raw hospital text (much of it Thai) and PG collation
+    // disagrees with Java's — same reason sectionRows() re-sorts in code.
+    public List<Map<String, Object>> orderNameRows() {
+        return jdbc.query("""
+                SELECT case_id, order_category::text AS order_category, order_name FROM case_orders
+                WHERE order_name IS NOT NULL AND order_name <> ''
+                GROUP BY case_id, order_category, order_name
+                ORDER BY case_id, CASE order_category WHEN 'CT' THEN 0 WHEN 'ROIP' THEN 1
+                         WHEN 'X-ray' THEN 2 WHEN 'lab' THEN 3 WHEN 'medicine' THEN 4
+                         WHEN 'other' THEN 5 WHEN 'surgery' THEN 6 ELSE 7 END""", ROW);
+    }
+
     // views.py:145 — every human actor in the audit trail, first-touch order
     public List<Map<String, Object>> coderHistoryRows() {
         return jdbc.query("""
