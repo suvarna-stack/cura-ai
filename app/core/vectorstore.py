@@ -46,7 +46,21 @@ class VectorStore:
         return self._collection
 
     # ------------------------------------------------------------------
-    def add(self, chunks: list[str], source: str, metadata: dict[str, Any] | None = None) -> int:
+    def add(
+        self,
+        chunks: list[str],
+        source: str,
+        metadata: dict[str, Any] | None = None,
+        ids: list[str] | None = None,
+        per_chunk_meta: list[dict[str, Any]] | None = None,
+    ) -> int:
+        """Embed and store chunks.
+
+        Pass `ids` to use deterministic ids (the graph store relies on chunk
+        ids being shared between Chroma and the graph); otherwise random ids
+        are generated. `per_chunk_meta` merges extra fields (e.g. page number)
+        into each chunk's metadata.
+        """
         if not chunks:
             return 0
         collection = self._ensure_collection()
@@ -54,11 +68,27 @@ class VectorStore:
 
         vectors = embedder.embed_documents(chunks)
         base_meta = {"source": source, **(metadata or {})}
-        ids = [f"{source}:{uuid.uuid4().hex}" for _ in chunks]
-        metadatas = [{**base_meta, "chunk_index": i} for i in range(len(chunks))]
+        if ids is None:
+            ids = [f"{source}:{uuid.uuid4().hex}" for _ in chunks]
+        metadatas = [
+            {**base_meta, "chunk_index": i, **(per_chunk_meta[i] if per_chunk_meta else {})}
+            for i in range(len(chunks))
+        ]
 
         collection.add(ids=ids, documents=chunks, embeddings=vectors, metadatas=metadatas)
         return len(chunks)
+
+    def get_by_ids(self, ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Fetch chunk text + metadata by id — how a graph node becomes text again."""
+        if not ids:
+            return {}
+        collection = self._ensure_collection()
+        res = collection.get(ids=ids, include=["documents", "metadatas"])
+        out: dict[str, dict[str, Any]] = {}
+        for cid, doc, meta in zip(res.get("ids", []), res.get("documents", []),
+                                  res.get("metadatas", [])):
+            out[cid] = {"text": doc, "metadata": meta or {}}
+        return out
 
     def query(self, question: str, top_k: int) -> list[dict[str, Any]]:
         collection = self._ensure_collection()
@@ -73,15 +103,17 @@ class VectorStore:
             include=["documents", "metadatas", "distances"],
         )
 
+        ids = res.get("ids", [[]])[0]
         docs = res.get("documents", [[]])[0]
         metas = res.get("metadatas", [[]])[0]
         dists = res.get("distances", [[]])[0]
 
         hits: list[dict[str, Any]] = []
-        for doc, meta, dist in zip(docs, metas, dists):
+        for cid, doc, meta, dist in zip(ids, docs, metas, dists):
             meta = meta or {}
             hits.append(
                 {
+                    "id": cid,
                     "text": doc,
                     "source": meta.get("source", "unknown"),
                     "score": 1.0 - float(dist),  # cosine distance -> similarity

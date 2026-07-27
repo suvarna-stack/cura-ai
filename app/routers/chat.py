@@ -19,9 +19,14 @@ def query(req: QueryRequest) -> QueryResponse:
         top_k=req.top_k,
         temperature=req.temperature,
         max_new_tokens=req.max_new_tokens,
+        mode=req.mode,
     )
     return QueryResponse(
         question=result["question"],
         answer=result["answer"],
-        contexts=[RetrievedChunk(**c) for c in result["contexts"]],
+        mode=result["mode"],
+        contexts=[
+            RetrievedChunk(**{k: v for k, v in c.items() if k != "id"})
+            for c in result["contexts"]
+        ],
     )

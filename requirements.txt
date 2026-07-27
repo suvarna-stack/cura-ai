@@ -8,6 +8,7 @@ python-multipart>=0.0.12
 # --- Retrieval / embeddings ---
 sentence-transformers>=3.3          # provides BAAI/bge-m3
 chromadb>=0.5.20                    # persistent vector store
+networkx>=3.4                       # knowledge graph (Graph RAG)
 
 # --- Generation (tiny local LLM) ---
 transformers>=4.46

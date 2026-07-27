@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT_DIR / "data"
     chroma_dir: Path = ROOT_DIR / "data" / "chroma"
     upload_dir: Path = ROOT_DIR / "data" / "uploads"
+    graph_dir: Path = ROOT_DIR / "data" / "graph"
+    registry_path: Path = ROOT_DIR / "data" / "documents.json"
 
     # --- Embeddings (retrieval) ---
     embed_model: str = "BAAI/bge-m3"          # multilingual dense embeddings
@@ -39,7 +41,19 @@ class Settings(BaseSettings):
     chunk_overlap: int = 120
 
     # --- Retrieval ---
-    top_k: int = 4                             # chunks fed to the LLM
+    top_k: int = 4                             # chunks fed to the LLM (plain mode)
+    retrieval_mode: str = "graph"              # "graph" | "plain" default for /chat
+
+    # --- Graph retrieval (seed with vectors, expand along edges) ---
+    seed_k: int = 3                            # entry-point chunks from vector search
+    graph_budget: int = 6                      # total chunks after expansion
+    hop_decay: float = 0.55                    # neighbour score = seed score * decay
+    max_hub_degree: int = 40                   # ignore entities linked to more chunks
+    max_per_entity: int = 3                    # max chunks pulled through one entity
+
+    # --- Ingestion ---
+    min_pdf_chars: int = 200                   # below this a PDF counts as scanned
+    ingest_batch_size: int = 32                # chunks embedded per progress tick
 
     # --- Generation (tiny local LLM) ---
     llm_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
@@ -51,6 +65,7 @@ class Settings(BaseSettings):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.chroma_dir.mkdir(parents=True, exist_ok=True)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.graph_dir.mkdir(parents=True, exist_ok=True)
 
 
 @lru_cache
