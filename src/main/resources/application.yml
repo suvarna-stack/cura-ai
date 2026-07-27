@@ -6,6 +6,12 @@ server:
 spring:
   application:
     name: medcode-api
+  servlet:
+    multipart:
+      # Knowledge-base PDFs (coding manuals) proxied to the RAG service can be
+      # tens of MB; Spring's 1MB default would reject them at the gate.
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 # Swagger UI is a local-dev convenience: default ON here so `mvnw
 # spring-boot:run` just works, forced OFF in the Dockerfile so every

@@ -364,6 +364,29 @@ success `{"ok": true}`. `404` unknown id.
   "systemStatus": "operational" }
 ```
 
+### /api/admin/knowledge/** — AI Training / RAG proxy (admin)
+
+The admin "AI Training" page. Every route is a thin authenticated proxy to the
+MedCode RAG service (the FastAPI app in the sibling `../RAG` repo,
+`RAG_API_BASE`, default `http://localhost:8000`); the RAG service itself has no
+auth and must only be reachable from this backend. "Training" means indexing
+documents (chunk → embed → knowledge graph), **not** fine-tuning model weights.
+RAG-side 4xx errors (e.g. a scanned PDF with no text layer) are translated
+into the usual `400 {"error": "<detail>"}`; if the RAG service is down these
+routes answer `500` with a "RAG API not reachable" message.
+
+| Route | Proxies | Notes |
+|---|---|---|
+| `GET /api/admin/knowledge/docs` | `GET /documents` | every document with live `status` (`queued`\|`processing`\|`indexed`\|`failed`) + 0-100 `progress`; the page polls this while anything ingests |
+| `GET /api/admin/knowledge/stats` | `GET /stats` | `documents_indexed`, `chunks_in_index`, `embed_model`, `llm_model`, `retrieval_mode`, `graph` |
+| `POST /api/admin/knowledge/docs` | `POST /documents/upload` | multipart `file` (PDF, ≤100MB); accepted immediately, ingests in background |
+| `DELETE /api/admin/knowledge/docs/{source}` | `DELETE /documents/{source}` | removes chunks from vector store + graph |
+| `POST /api/admin/knowledge/train` | `POST /documents/rebuild` | wipes + re-ingests everything; `{"status": "rebuilding", "documents": n}` |
+| `POST /api/admin/knowledge/retrieve` | `POST /retrieve` | `{"question": "..."}` (+ optional `mode`, `top_k`) → matching chunks, no LLM (fast) |
+| `POST /api/admin/knowledge/chat` | `POST /chat` | same body (+ optional `max_new_tokens`, `temperature`) → full LLM answer (slow on CPU) |
+
+Response bodies pass through verbatim from the RAG service (snake_case).
+
 ## Downstream: the hospital iMed API
 
 On approve/reopen this backend calls the hospital's REAL write contract —
