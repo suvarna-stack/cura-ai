@@ -10,9 +10,9 @@ env/
 .env
 
 # Data & model cache
-data/
-.cache/
-*.sqlite3
+# data/
+# .cache/
+# *.sqlite3
 
 # Frontend (npm)
 node_modules/
