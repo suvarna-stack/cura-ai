@@ -72,6 +72,19 @@ class QueryResponse(BaseModel):
     contexts: list[RetrievedChunk]
 
 
+class RetrieveRequest(BaseModel):
+    """Retrieval-only test: which chunks would the index hand the LLM?"""
+    question: str = Field(..., min_length=1)
+    mode: Literal["graph", "plain"] | None = None
+    top_k: int | None = Field(None, ge=1, le=20)
+
+
+class RetrieveResponse(BaseModel):
+    question: str
+    mode: str
+    hits: list[RetrievedChunk]
+
+
 # --------------------------- Misc --------------------------------
 class HealthResponse(BaseModel):
     status: str

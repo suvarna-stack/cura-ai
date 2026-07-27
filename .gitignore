@@ -14,6 +14,10 @@ data/
 .cache/
 *.sqlite3
 
+# Frontend (npm)
+node_modules/
+frontend/dist/
+
 # OS / editor
 .DS_Store
 .idea/

@@ -67,3 +67,12 @@ def test_upload_rejects_scanned_pdf():
 def test_chat_mode_validation():
     r = client.post("/chat", json={"question": "hi", "mode": "banana"})
     assert r.status_code == 422
+
+
+def test_retrieve_validation():
+    # /retrieve shares /chat's validation; the happy path would load the
+    # embedding model, so only routing + schema are checked here.
+    r = client.post("/retrieve", json={"question": ""})
+    assert r.status_code == 422
+    r = client.post("/retrieve", json={"question": "hi", "mode": "banana"})
+    assert r.status_code == 422

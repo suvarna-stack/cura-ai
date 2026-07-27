@@ -151,13 +151,12 @@ def _page_from_id(cid: str) -> int | None:
         return None
 
 
-def answer_question(
+def retrieve_chunks(
     question: str,
     top_k: int | None = None,
-    temperature: float | None = None,
-    max_new_tokens: int | None = None,
     mode: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[str, list[dict[str, Any]]]:
+    """Retrieval only — no LLM generation. Returns (resolved_mode, hits)."""
     settings = get_settings()
     mode = (mode or settings.retrieval_mode).lower()
 
@@ -165,6 +164,17 @@ def answer_question(
         hits = _graph_hits(question)
     else:
         hits = _plain_hits(question, top_k or settings.top_k)
+    return mode, hits
+
+
+def answer_question(
+    question: str,
+    top_k: int | None = None,
+    temperature: float | None = None,
+    max_new_tokens: int | None = None,
+    mode: str | None = None,
+) -> dict[str, Any]:
+    mode, hits = retrieve_chunks(question, top_k=top_k, mode=mode)
 
     if not hits:
         return {
