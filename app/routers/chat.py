@@ -6,12 +6,16 @@ import logging
 from fastapi import APIRouter
 
 from app.core import rag
+from app.core.suggest import suggest_codes
 from app.models.schemas import (
     QueryRequest,
     QueryResponse,
     RetrievedChunk,
     RetrieveRequest,
     RetrieveResponse,
+    SuggestRequest,
+    SuggestResponse,
+    SuggestedCode,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +33,21 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
             RetrievedChunk(**{k: v for k, v in h.items() if k != "id"})
             for h in hits
         ],
+    )
+
+
+@router.post("/suggest", response_model=SuggestResponse)
+def suggest(req: SuggestRequest) -> SuggestResponse:
+    """ICD-9 + ICD-10 suggestions grounded in the indexed knowledge base."""
+    result = suggest_codes(
+        req.clinical_text,
+        top_k=req.top_k,
+        max_per_system=req.max_per_system,
+    )
+    return SuggestResponse(
+        codes=[SuggestedCode(**c) for c in result["codes"]],
+        mode=result["mode"],
+        hits_used=result["hits_used"],
     )
 
 

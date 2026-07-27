@@ -22,6 +22,8 @@ from app.core.vectorstore import get_store
 from app.models.schemas import (
     DeleteResponse,
     DocumentInfo,
+    ExtractedCode,
+    ExtractedCodesResponse,
     IngestResponse,
     IngestTextRequest,
     RebuildResponse,
@@ -114,6 +116,62 @@ def list_documents() -> list[DocumentInfo]:
     return [DocumentInfo(**d) for d in registry.all_documents()]
 
 
+# --------------------------- code extraction ---------------------------
+
+# "A09" / "K59.0" at line start, followed by a title starting with a capital
+# letter. On a rules manual this only matches worked examples; on a tabular
+# code list it matches nearly every line — same endpoint serves both.
+_CODE_LINE_RE = re.compile(
+    r"^([A-Z]\d{2}(?:\.\d{1,2})?)\s+([A-Z][^\n]{4,120}?)\s*$", re.MULTILINE
+)
+_CODE_ONLY_RE = re.compile(r"^[A-Z]\d{2}(?:\.\d{1,2})?$")
+
+
+def _clean_title(raw: str) -> str | None:
+    """Normalize an extracted title; None when it isn't a usable description."""
+    title = " ".join(raw.split()).rstrip(";,.:")
+    # Drop list-continuation tails ("Acute meningococcaemia, or")
+    for tail in (" or", " and"):
+        if title.endswith(tail):
+            title = title[: -len(tail)].rstrip(";,.:")
+    # A "description" that is itself a code (or starts with one) is a table
+    # artefact ("A34    B37.3"), not a title.
+    if len(title) < 5 or _CODE_ONLY_RE.match(title.split()[0]):
+        return None
+    return title
+
+
+@router.get("/codes", response_model=ExtractedCodesResponse)
+def extract_codes() -> ExtractedCodesResponse:
+    """Scan every uploaded document for ICD code + title pairs.
+
+    Read-only and index-independent: works straight off the saved PDFs, so it
+    does not need the embedding model. Deduplicated by code (first title wins,
+    documents scanned in upload order).
+    """
+    settings = get_settings()
+    seen: dict[str, ExtractedCode] = {}
+    scanned = 0
+    for doc in registry.all_documents():
+        source = doc["source"]
+        pdf = settings.upload_dir / f"{source}.pdf"
+        if not pdf.exists():
+            continue
+        scanned += 1
+        pages = _extract_pages(doc.get("filename", f"{source}.pdf"), pdf.read_bytes())
+        for _, text in pages:
+            for code, raw_title in _CODE_LINE_RE.findall(text):
+                title = _clean_title(raw_title)
+                if title and code not in seen:
+                    seen[code] = ExtractedCode(
+                        code=code, description=title, source=source
+                    )
+    return ExtractedCodesResponse(
+        documents_scanned=scanned,
+        codes=sorted(seen.values(), key=lambda c: c.code),
+    )
+
+
 # --------------------------- raw text (kept for tests / small snippets) -----
 
 @router.post("/text", response_model=IngestResponse)
@@ -186,12 +244,61 @@ def _extract_pages(filename: str, raw: bytes) -> list[tuple[int, str]]:
 
 
 def _extract_pdf_pages(raw: bytes) -> list[tuple[int, str]]:
+    """Best-effort text extract. Hospital PDFs are often slightly corrupt;
+    never let one bad page 500 the whole upload. Prefer the extractor that
+    yields more text."""
+    a = _extract_pdf_pages_pypdf(raw)
+    b = _extract_pdf_pages_pymupdf(raw)
+    if not a:
+        return b
+    if not b:
+        return a
+    return b if sum(len(t) for _, t in b) > sum(len(t) for _, t in a) else a
+
+
+def _extract_pdf_pages_pypdf(raw: bytes) -> list[tuple[int, str]]:
     from pypdf import PdfReader
 
-    reader = PdfReader(io.BytesIO(raw))
+    try:
+        reader = PdfReader(io.BytesIO(raw), strict=False)
+    except Exception as e:
+        logger.warning("pypdf could not open PDF: %s", e)
+        return []
+
     pages: list[tuple[int, str]] = []
     for i, page in enumerate(reader.pages):
-        text = (page.extract_text() or "").strip()
-        if len(text) >= 20:              # skip blank / image-only pages
+        try:
+            text = (page.extract_text() or "").strip()
+        except Exception as e:
+            logger.warning("pypdf skipped page %s: %s", i + 1, e)
+            continue
+        if len(text) >= 20:  # skip blank / image-only pages
             pages.append((i + 1, text))
+    return pages
+
+
+def _extract_pdf_pages_pymupdf(raw: bytes) -> list[tuple[int, str]]:
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        return []
+
+    try:
+        doc = fitz.open(stream=raw, filetype="pdf")
+    except Exception as e:
+        logger.warning("pymupdf could not open PDF: %s", e)
+        return []
+
+    pages: list[tuple[int, str]] = []
+    try:
+        for i, page in enumerate(doc):
+            try:
+                text = (page.get_text("text") or "").strip()
+            except Exception as e:
+                logger.warning("pymupdf skipped page %s: %s", i + 1, e)
+                continue
+            if len(text) >= 20:
+                pages.append((i + 1, text))
+    finally:
+        doc.close()
     return pages

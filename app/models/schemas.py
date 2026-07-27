@@ -111,3 +111,38 @@ class StatsResponse(BaseModel):
 
 class DeleteResponse(BaseModel):
     deleted: int
+
+
+class ExtractedCode(BaseModel):
+    """A code + official title pair found in an uploaded reference document."""
+    code: str
+    system: str = "ICD-10"
+    description: str
+    source: str                      # which document it came from
+
+
+class ExtractedCodesResponse(BaseModel):
+    documents_scanned: int
+    codes: list[ExtractedCode]
+
+
+# --------------------------- Suggest (case coding) ---------------------------
+class SuggestRequest(BaseModel):
+    """Clinical narrative from a case report → ICD-9 / ICD-10 suggestions."""
+    clinical_text: str = Field(..., min_length=1)
+    top_k: int | None = Field(None, ge=1, le=20)
+    max_per_system: int = Field(8, ge=1, le=20)
+
+
+class SuggestedCode(BaseModel):
+    code: str
+    system: Literal["ICD-10", "ICD-9"]
+    description: str
+    confidence: int = Field(..., ge=0, le=100)
+    source: str = ""
+
+
+class SuggestResponse(BaseModel):
+    codes: list[SuggestedCode]
+    mode: str
+    hits_used: int = 0

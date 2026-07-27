@@ -17,3 +17,4 @@ accelerate>=1.1
 
 # --- Document loading ---
 pypdf>=5.1
+pymupdf>=1.24                       # tolerant fallback when pypdf chokes on hospital PDFs

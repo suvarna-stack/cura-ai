@@ -11,5 +11,8 @@ if __name__ == "__main__":
         "app.main:app",
         host=settings.host,
         port=settings.port,
+        # Watch only source code: uploads/ingestion write into data/, and an
+        # unrestricted watcher would restart the server mid-request.
         reload=True,
+        reload_dirs=["app"],
     )
