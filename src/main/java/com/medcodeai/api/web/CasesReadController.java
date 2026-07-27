@@ -72,6 +72,7 @@ public class CasesReadController {
                           "pi": "",
                           "codes": [{"code": "E11.9", "system": "ICD-10", "role": "principal_diagnosis"}],
                           "orders": {"lab": 2, "medicine": 3},
+                          "orderNames": {"lab": ["CBC", "Urinalysis"], "medicine": ["Paracetamol 500 mg"]},
                           "created_at": null,
                           "updated_at": null,
                           "revenue_impact": null

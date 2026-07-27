@@ -75,6 +75,10 @@ export interface CaseCard {
   codes: CodeChip[];
   /** {category: count}; key order CT, ROIP, X-ray, lab, medicine, other, surgery */
   orders: Partial<Record<OrderCategory, number>>;
+  /** {category: distinct order names A–Z}; same key order as `orders`. The
+   *  items behind each count — feeds the dashboard's nested Study/Item filter.
+   *  A category with only nameless rows is absent; {} when the case has none */
+  orderNames: Partial<Record<OrderCategory, string[]>>;
   /** cases.admissiondatetime (raw hospital text); null on OPD rows today */
   created_at: string | null;
   /** cases.dischargedatetime — same caveat */
