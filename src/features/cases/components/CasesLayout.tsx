@@ -6,9 +6,11 @@ import {
   Settings,
   Cpu,
   LogOut,
+  RefreshCw,
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
+import { useSync } from '../context/SyncContext'
 import { CasesProviders } from '../context/CasesProviders'
 import { useAuth } from '../../auth/hooks/useAuth'
 
@@ -22,6 +24,7 @@ const NAV = [
 function CoderShell() {
   const { gl } = useTheme()
   const { t } = useLang()
+  const { syncing, lastSync, runSync } = useSync()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
 
@@ -74,8 +77,8 @@ function CoderShell() {
           ))}
         </nav>
 
-        {/* logged-in coder + logout (coders never see the admin sidebar) */}
-        <div className="ml-auto flex items-center gap-2">
+        {/* logged-in coder + iMed sync + logout (coders never see the admin sidebar) */}
+        <div className="ml-auto flex items-center gap-1.5">
           {user && (
             <span
               className="hidden text-[12px] font-semibold sm:inline"
@@ -85,6 +88,20 @@ function CoderShell() {
               {user.fullName ?? user.email}
             </span>
           )}
+          <button
+            type="button"
+            onClick={runSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-opacity hover:opacity-100 disabled:opacity-50"
+            style={{
+              color: lastSync === 'sync.failed' ? gl.danger : gl.text,
+              opacity: lastSync === 'sync.failed' ? 1 : 0.7,
+            }}
+            title={`${t('sync.label')} · ${t(lastSync)}`}
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : undefined} />
+            {syncing ? t('sync.syncing') : t('sync.btn')}
+          </button>
           <button
             type="button"
             onClick={handleLogout}

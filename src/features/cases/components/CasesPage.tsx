@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, AlertCircle, Flag, RotateCcw,
-  Search, Eye, ChevronDown, X,
+  Search, Eye, X,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useSync } from "../context/SyncContext";
@@ -9,7 +9,6 @@ import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
-import { GlassCard } from "./global/GlassCard";
 import { ConfidencePill } from "./global/ConfidencePill";
 import { Pagination } from "./global/Pagination";
 import { CasePreview } from "./global/CasePreview";
@@ -19,6 +18,10 @@ import { formatDate } from "../utils/formatDate";
 import { useCases } from "../hooks/useCases";
 import type { RichCase } from "../hooks/useCases";
 import { useCaseFilters } from "../hooks/useCaseFilters";
+import {
+  listAiConfidence,
+  usePrefetchAiConfidence,
+} from "../utils/prefetchAiConfidence";
 import type { CaseTab, CompleteCase, IncompleteCase, FinishedCase } from "../types/case.types";
 
 const PER_PAGE = 10;
@@ -145,13 +148,15 @@ export function CasesPage({
   setTab: (t: CaseTab) => void;
 }) {
   const { gl } = useTheme();
-  const { syncing } = useSync();
+  const { syncing, syncVersion } = useSync();
   const { t } = useLang();
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
   // shared with the detail pages via ApprovalsProvider (localStorage-persisted)
   const { approvedIds, reopenedIds, casesVersion, approve, reopen, pruneReopened } = useApprovals();
-  // casesVersion bumps when the server confirms a reopen → silent refetch
-  const { completeCases, incompleteGroups, finishedCases, loading, error } = useCases(casesVersion);
+  // casesVersion bumps on reopen; syncVersion bumps after iMed sync → silent refetch
+  const { completeCases, incompleteGroups, finishedCases, loading, error } = useCases(
+    casesVersion + syncVersion,
+  );
   const [animating, setAnimating] = useState(false);
 
   // id → case lookup across both pools (declared before confirmApproval,
@@ -332,15 +337,29 @@ export function CasesPage({
         c.dept.toLowerCase().includes(searchQ))),
     [reopenRows, searchQ, matchesDateIso, matchesFacets]);
 
-  // real pagination over the filtered+sorted complete list (feedback items 1, 7);
-  // page resets during render whenever the result set, sort, or search changes
+  // real pagination over the filtered+sorted complete / incomplete lists
+  // (feedback items 1, 7); page resets during render when the result set,
+  // sort, or search changes
   const [completePage, setCompletePage] = useState(1);
-  // per-group pages on the Incomplete tab — same pager as Complete, one per card
-  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
+  const [incompletePage, setIncompletePage] = useState(1);
+  const filteredIncomplete = useMemo(
+    () => filters.filteredGroups.flatMap((g) => g.cases),
+    [filters.filteredGroups],
+  );
   const pageResetKey = `${filters.totalComplete}|${filters.totalIncomplete}|${filters.sortMode}|${filters.query}`;
   const [prevPageResetKey, setPrevPageResetKey] = useState(pageResetKey);
-  if (prevPageResetKey !== pageResetKey) { setPrevPageResetKey(pageResetKey); setCompletePage(1); setGroupPages({}); }
+  if (prevPageResetKey !== pageResetKey) {
+    setPrevPageResetKey(pageResetKey);
+    setCompletePage(1);
+    setIncompletePage(1);
+  }
   const pagedComplete = filters.filteredComplete.slice((completePage - 1) * PER_PAGE, completePage * PER_PAGE);
+  const pagedIncomplete = filteredIncomplete.slice((incompletePage - 1) * PER_PAGE, incompletePage * PER_PAGE);
+
+  // Prefetch RAG confidence for the visible Complete page (no need to open detail).
+  const { loading: aiLoading } = usePrefetchAiConfidence(
+    tab === "complete" ? pagedComplete : [],
+  );
 
   // unfiltered totals — used to make filtered views explicit in the list itself,
   // so a coder can't finish a filtered queue and think ALL cases are done
@@ -369,45 +388,18 @@ export function CasesPage({
   const approveSelected = () => askApprove([...selectedIds], () => { approve([...selectedIds]); setSelectedIds(new Set()); });
   const approveOne = (id: string) => askApprove([id], () => approve([id]));
 
-  // approval actions (single / group — SRS F14); each applies only to the intended
-  // cases. "Approve all" is now done via the Select all checkbox (same as Complete).
-  const approveGroup = (gid: string) => {
-    const g = filters.filteredGroups.find(x => x.id === gid);
-    if (g) askApprove(g.cases.map(c => c.id), () => approve(g.cases.map(c => c.id)));
-  };
-
-  // bulk selection for the Incomplete tab — mirrors Complete: a "Select all"
-  // toolbar checkbox over every filtered case (across groups), per-case row
-  // checkboxes + a per-group header checkbox, then one "approve selected"
+  // bulk selection for the Incomplete tab — same flat list UX as Complete
   const [selectedIncomplete, setSelectedIncomplete] = useState<Set<string>>(new Set());
   const incompleteSelectionActive = selectedIncomplete.size > 0;
   const allIncompleteSelected = filters.totalIncomplete > 0 && selectedIncomplete.size >= filters.totalIncomplete;
   const toggleSelectAllIncomplete = () =>
     setSelectedIncomplete(allIncompleteSelected
       ? new Set()
-      : new Set(filters.filteredGroups.flatMap(g => g.cases.map(c => c.id))));
+      : new Set(filteredIncomplete.map(c => c.id)));
   const toggleSelectIncomplete = (id: string) =>
     setSelectedIncomplete(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const toggleSelectGroup = (gid: string) => {
-    const g = filters.filteredGroups.find(x => x.id === gid);
-    if (!g) return;
-    const allIn = g.cases.every(c => selectedIncomplete.has(c.id));
-    setSelectedIncomplete(prev => {
-      const n = new Set(prev);
-      g.cases.forEach(c => allIn ? n.delete(c.id) : n.add(c.id));
-      return n;
-    });
-  };
   const approveSelectedIncomplete = () =>
     askApprove([...selectedIncomplete], () => { approve([...selectedIncomplete]); setSelectedIncomplete(new Set()); });
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    cardio: true, neuro: false, resp: false, ortho: false, gastro: false, onco: false, endo: false,
-  });
-  const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !isExpanded(id) }));
-  // order-type grouping yields at most 5 groups, so they start open; the long
-  // disease-group list keeps its collapsed default
-  const isExpanded = (id: string) => expanded[id] ?? id.startsWith("order-");
 
   function switchTab(next: CaseTab) {
     if (next === tab || animating) return;
@@ -597,9 +589,12 @@ export function CasesPage({
                           <CaseMeta c={c} />
                           <CasePreview c={c} />
                         </div>
-                        {/* col 3 — AI confidence */}
+                        {/* col 3 — AI confidence (prefetched on the list; no detail open needed) */}
                         <div className="shrink-0 self-stretch flex items-center px-2">
-                          <ConfidencePill value={c.confidence} />
+                          <ConfidencePill
+                            value={listAiConfidence(c.id, c.confidence)}
+                            loading={!!aiLoading[c.id]}
+                          />
                         </div>
                         {/* col 4 — actions */}
                         <div className="flex items-center gap-2 shrink-0 self-stretch">
@@ -619,7 +614,7 @@ export function CasesPage({
                 </div>
               </div>
 
-              {/* INCOMPLETE */}
+              {/* INCOMPLETE — flat list, same layout as Complete (no group cards) */}
               <div style={panelStyle(1)}>
                 <div className="p-3 space-y-2">
                   {filters.active && filters.totalIncomplete === 0 && unfilteredIncomplete > 0 && (
@@ -633,9 +628,6 @@ export function CasesPage({
                       </button>
                     </div>
                   )}
-                  {/* selection toolbar — same UI as the Complete tab: the header
-                      checkbox selects/clears ALL filtered cases across groups;
-                      row + group checkboxes below pick subsets */}
                   <div className="flex items-center gap-2.5 px-1 py-0.5">
                     <label className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
                       style={{ background: gl.inputBg, border: gl.border }}>
@@ -661,92 +653,52 @@ export function CasesPage({
                       </button>
                     )}
                   </div>
-                  {filters.filteredGroups.map((g) => {
-                    const groupAllSelected = g.cases.length > 0 && g.cases.every(c => selectedIncomplete.has(c.id));
-                    const groupSomeSelected = g.cases.some(c => selectedIncomplete.has(c.id));
-                    // clamp so a shrinking group never leaves the page out of range
-                    const gPage = Math.min(groupPages[g.id] ?? 1, Math.max(1, Math.ceil(g.cases.length / PER_PAGE)));
-                    return (
-                      <GlassCard key={g.id} className="overflow-hidden">
-                        <div onClick={() => toggle(g.id)}
-                          className="flex items-center gap-2.5 px-4 py-3 cursor-pointer hover:opacity-90 transition-all"
-                          style={{ background: `rgba(${gl.accentRgb},0.08)`, borderBottom: isExpanded(g.id) ? gl.borderSm : "none" }}>
-                          <input type="checkbox" checked={groupAllSelected}
-                            ref={el => { if (el) el.indeterminate = groupSomeSelected && !groupAllSelected; }}
-                            onClick={e => e.stopPropagation()}
-                            onChange={() => toggleSelectGroup(g.id)}
-                            className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
-                          <g.icon size={13} style={{ color: gl.accent }} />
-                          <span className="text-[13px] font-bold flex-1" style={{ color: gl.text }}>{g.label}</span>
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>{t("group.cases", { n: g.cases.length })}</span>
-                          <button onClick={(e) => { e.stopPropagation(); approveGroup(g.id); }}
-                            className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 ml-1 transition-all"
-                            style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
-                            {t("btn.approveGroup")}
-                          </button>
-                          <ChevronDown size={13} style={{ color: gl.muted, transform: isExpanded(g.id) ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
-                        </div>
-                        {(isExpanded(g.id) || searchQ !== "") && (
-                          <div>
-                            {g.cases.slice((gPage - 1) * PER_PAGE, gPage * PER_PAGE).map((c, i) => (
-                              <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 transition-all"
-                                style={{
-                                  borderTop: i > 0 ? gl.borderSm : "none",
-                                  background: selectedIncomplete.has(c.id) ? `rgba(${gl.accentRgb},0.06)` : undefined,
-                                }}>
-                                <input type="checkbox" checked={selectedIncomplete.has(c.id)}
-                                  onChange={() => toggleSelectIncomplete(c.id)}
-                                  className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
-                                {/* col 1 — identity + what is missing */}
-                                <div className="w-60 shrink-0 min-w-0 self-center">
-                                  <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
-                                    const missingDocs = c.missing.split(",").map(m => m.trim()).filter(m => m && m !== "—");
-                                    if (missingDocs.length === 0) return null;
-                                    const abbrKeys = missingDocs.map(m => missingDocAbbr[m]);
-                                    const label = abbrKeys.every(Boolean)
-                                      ? abbrKeys.map(k => t(k)).join(" · ")
-                                      : t("missing.count", { n: missingDocs.length });
-                                    return (
-                                      <span title={c.missing}
-                                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
-                                        style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
-                                        <AlertCircle size={8} /> {label}
-                                      </span>
-                                    );
-                                  })()} />
-                                </div>
-                                {/* col 2 — info */}
-                                <div className="flex-1 min-w-0 self-center">
-                                  <CaseMeta c={c} />
-                                  <CasePreview c={c} />
-                                </div>
-                                {/* no confidence pill on Incomplete rows (Prompt 2 Fix 5):
-                                    the score is meaningless while documents are missing */}
-                                {/* col 3 — actions */}
-                                <div className="flex items-center gap-2 shrink-0 self-stretch">
-                                  <button onClick={() => openIncompleteCase({ ...c, group: g.id })}
-                                    className="text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-80 transition-all"
-                                    style={viewBtn}>{t("btn.review")}</button>
-                                  <button onClick={() => approveOne(c.id)}
-                                    className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
-                                    style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
-                                    {t("btn.approve")}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            {/* the SAME working pager as the Complete tab, per
-                                group — numbered buttons + jump-to-page */}
-                            <div className="px-3 pb-1.5" style={{ borderTop: gl.borderSm }}>
-                              <Pagination current={gPage} total={g.cases.length} perPage={PER_PAGE}
-                                onPage={(n) => setGroupPages((p) => ({ ...p, [g.id]: n }))} />
-                            </div>
-                          </div>
-                        )}
-                      </GlassCard>
-                    );
-                  })}
+                  {pagedIncomplete.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
+                      style={{
+                        background: gl.row,
+                        backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
+                        border: selectedIncomplete.has(c.id) ? `1px solid rgba(${gl.accentRgb},0.45)` : gl.border,
+                        boxShadow: gl.shadowSm,
+                      }}>
+                      <input type="checkbox" checked={selectedIncomplete.has(c.id)}
+                        onChange={() => toggleSelectIncomplete(c.id)}
+                        className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
+                      <div className="w-60 shrink-0 min-w-0 self-center">
+                        <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
+                          const missingDocs = c.missing.split(",").map(m => m.trim()).filter(m => m && m !== "—");
+                          if (missingDocs.length === 0) return null;
+                          const abbrKeys = missingDocs.map(m => missingDocAbbr[m]);
+                          const label = abbrKeys.every(Boolean)
+                            ? abbrKeys.map(k => t(k!)).join(" · ")
+                            : t("missing.count", { n: missingDocs.length });
+                          return (
+                            <span title={c.missing}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
+                              style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
+                              <AlertCircle size={8} /> {label}
+                            </span>
+                          );
+                        })()} />
+                      </div>
+                      <div className="flex-1 min-w-0 self-center">
+                        <CaseMeta c={c} />
+                        <CasePreview c={c} />
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-stretch">
+                        <button onClick={() => openIncompleteCase({ ...c, group: c.group })}
+                          className="text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-80 transition-all"
+                          style={viewBtn}>{t("btn.review")}</button>
+                        <button onClick={() => approveOne(c.id)}
+                          className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                          style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
+                          {t("btn.approve")}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <Pagination current={incompletePage} total={filters.totalIncomplete} perPage={PER_PAGE}
+                    onPage={setIncompletePage} />
                 </div>
               </div>
 

@@ -129,6 +129,22 @@ export async function testRetrieval(query: string): Promise<RetrievalHit[]> {
   return data.hits.map(toHit)
 }
 
+export interface CodeSyncResult {
+  documentsScanned: number
+  extracted: number
+  added: number
+  descriptionsFilled: number
+  unchanged: number
+}
+
+/** Extract ICD codes from the uploaded documents into the system DB. */
+export async function syncCodesToSystem(): Promise<CodeSyncResult> {
+  const { data } = await apiClient.post<CodeSyncResult>(
+    '/admin/knowledge/sync-codes',
+  )
+  return data
+}
+
 /** Full RAG answer from the local LLM — can take a while on CPU. */
 export async function testChat(query: string): Promise<ChatAnswer> {
   const { data } = await apiClient.post<RagChatResponse>(

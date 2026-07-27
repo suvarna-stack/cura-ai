@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText, CheckCircle2, BadgeCheck, AlertCircle,
   Edit3, ArrowLeft, X, Check, RotateCcw, Trash2, Clock,
@@ -9,6 +9,8 @@ import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
+import { suggestCodes } from "../api/casesService";
+import { fillEmptySystems, isIcd9Type } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY } from "./codes/AddCodeModal";
 import { CodesColumn } from "./codes/CodesColumn";
@@ -249,7 +251,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             code: "???", type: "ICD-10", desc: `${m} — not documented in the iMed record`,
             confidence: 0, missing: true, missingMsg: `Missing: ${m}`,
           }));
-        setCodes(real.length + missingRows.length > 0 ? [...real, ...missingRows] : initialCodes);
+        setCodes(real.length + missingRows.length > 0 ? [...real, ...missingRows] : []);
       }
     } else if (status === "error") {
       // fetch failed -> graceful mock fallback (core design property, keep the demo alive)
@@ -257,8 +259,33 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       if (!loadCodeEdits(c.id)) setCodes(initialCodes);
     }
   }
+
+  // Fill empty ICD-9 / ICD-10 columns from the RAG knowledge index.
+  const [suggesting, setSuggesting] = useState(false);
+  useEffect(() => {
+    if (status !== "ready" || !c.id) return;
+    let cancelled = false;
+    setSuggesting(true);
+    void (async () => {
+      try {
+        const ai = await suggestCodes(c.id);
+        if (cancelled || !ai.length) return;
+        setCodes((prev) => {
+          const next = fillEmptySystems(prev, ai);
+          if (next.length !== prev.length) saveCodeEdits(c.id, next);
+          return next;
+        });
+      } catch {
+        /* RAG down */
+      } finally {
+        if (!cancelled) setSuggesting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, c.id]);
+
   const loadingContent = status === "loading" && loadReportDraft(c.id) === null;
-  const loadingCodes = status === "loading" && codes.length === 0;
+  const loadingCodes = (status === "loading" || suggesting) && codes.filter(x => !x.missing).length === 0;
 
   const missingCount = codes.filter(x => x.missing).length;
 
@@ -389,16 +416,21 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         </div>
 
         {/* three containers side by side: Report | ICD-10 | ICD-9 */}
-        {(["icd10", "icd9"] as CodeSystem[]).map((sys) => (
-          <CodesColumn key={sys} system={sys}
-            codes={codes}
-            loading={loadingCodes}
-            onReorder={persistCodes}
-            onEdit={setEditingIdx}
-            onDelete={setDeletingIdx}
-            onAdd={setAdding}
-          />
-        ))}
+        {(["icd10", "icd9"] as CodeSystem[]).map((sys) => {
+          const filled = codes.some(
+            (c) => (sys === "icd9") === isIcd9Type(c.type) && !c.missing && c.code !== "???",
+          );
+          return (
+            <CodesColumn key={sys} system={sys}
+              codes={codes}
+              loading={loadingCodes || (suggesting && !filled)}
+              onReorder={persistCodes}
+              onEdit={setEditingIdx}
+              onDelete={setDeletingIdx}
+              onAdd={setAdding}
+            />
+          );
+        })}
       </div>
     </main>
   );

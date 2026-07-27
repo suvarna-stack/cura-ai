@@ -1,13 +1,20 @@
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 
-export function ConfidencePill({ value }: { value: number }) {
+export function ConfidencePill({
+  value,
+  loading,
+}: {
+  value: number | null | undefined
+  loading?: boolean
+}) {
   const { gl } = useTheme();
   const { t } = useLang();
+  const n = value == null || value <= 0 ? null : Math.round(value);
   return (
     // px-2 py-0.5 gives a proper oval pill — not too wide, not circular
     <span
-      className="text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center justify-center whitespace-nowrap"
+      className={`text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center justify-center whitespace-nowrap ${loading ? "animate-pulse" : ""}`}
       title={t("confidence.tooltip")}
       style={{
         background: `rgba(${gl.accentRgb},0.18)`,
@@ -17,7 +24,11 @@ export function ConfidencePill({ value }: { value: number }) {
         textAlign: "center",
       }}
     >
-      {t("confidence.label", { n: value })}
+      {loading && n == null
+        ? t("confidence.loading")
+        : n == null
+          ? t("confidence.none")
+          : t("confidence.label", { n })}
     </span>
   );
 }

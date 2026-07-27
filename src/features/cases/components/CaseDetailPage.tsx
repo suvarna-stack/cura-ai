@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText, CheckCircle2, BadgeCheck, Edit3, Check, ArrowLeft, X, RotateCcw,
   Trash2, Clock,
@@ -9,6 +9,8 @@ import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
+import { suggestCodes } from "../api/casesService";
+import { fillEmptySystems, isIcd9Type } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY } from "./codes/AddCodeModal";
 import { CodesColumn } from "./codes/CodesColumn";
@@ -233,12 +235,40 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         desc: `${k.description ?? ""}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}` || k.code,
         confidence: k.source === "imported_from_imed" ? 100 : 85, // imported codes are facts, not AI guesses
       })));
+    } else if (status === "ready") {
+      // no iMed codes — leave empty; RAG suggest effect fills the columns
+      setCodes([]);
     } else if (status !== "loading") {
-      // fetch failed or no codes in the detail JSON -> graceful mock fallback
+      // fetch failed -> graceful mock fallback
       setCodes(defaultCodes);
     }
   }
-  const loadingCodes = status === "loading" && codes.length === 0;
+
+  // Fill empty ICD-9 / ICD-10 columns from the RAG knowledge index.
+  const [suggesting, setSuggesting] = useState(false);
+  useEffect(() => {
+    if (status !== "ready" || !c.id) return;
+    let cancelled = false;
+    setSuggesting(true);
+    void (async () => {
+      try {
+        const ai = await suggestCodes(c.id);
+        if (cancelled || !ai.length) return;
+        setCodes((prev) => {
+          const next = fillEmptySystems(prev, ai);
+          if (next.length !== prev.length) saveCodeEdits(c.id, next);
+          return next;
+        });
+      } catch {
+        /* RAG down — columns stay as iMed/empty */
+      } finally {
+        if (!cancelled) setSuggesting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, c.id]);
+
+  const loadingCodes = (status === "loading" || suggesting) && codes.length === 0;
 
   const panel: React.CSSProperties = {
     background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
@@ -380,16 +410,21 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         </div>
 
         {/* three containers side by side: Report | ICD-10 | ICD-9 */}
-        {(["icd10", "icd9"] as CodeSystem[]).map((sys) => (
-          <CodesColumn key={sys} system={sys}
-            codes={codes}
-            loading={loadingCodes}
-            onReorder={persistCodes}
-            onEdit={setEditingIdx}
-            onDelete={setDeletingIdx}
-            onAdd={setAdding}
-          />
-        ))}
+        {(["icd10", "icd9"] as CodeSystem[]).map((sys) => {
+          const filled = codes.some(
+            (c) => (sys === "icd9") === isIcd9Type(c.type) && !c.missing && c.code !== "???",
+          );
+          return (
+            <CodesColumn key={sys} system={sys}
+              codes={codes}
+              loading={loadingCodes || (suggesting && !filled)}
+              onReorder={persistCodes}
+              onEdit={setEditingIdx}
+              onDelete={setDeletingIdx}
+              onAdd={setAdding}
+            />
+          );
+        })}
       </div>
     </main>
   );

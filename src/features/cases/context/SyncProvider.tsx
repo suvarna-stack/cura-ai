@@ -5,22 +5,31 @@
 // ============================================================
 import { useState } from "react";
 import { SyncCtx } from "./SyncContext";
+import { syncFromHospital } from "../api/casesService";
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState("sync.ago2m");
+  const [syncVersion, setSyncVersion] = useState(0);
 
   const runSync = () => {
     if (syncing) return;
     setSyncing(true);
-    setTimeout(() => {
-      setSyncing(false);
-      setLastSync("sync.justNow");
-    }, 2200);
+    void (async () => {
+      try {
+        await syncFromHospital();
+        setLastSync("sync.justNow");
+        setSyncVersion((v) => v + 1);
+      } catch {
+        setLastSync("sync.failed");
+      } finally {
+        setSyncing(false);
+      }
+    })();
   };
 
   return (
-    <SyncCtx.Provider value={{ syncing, lastSync, runSync }}>
+    <SyncCtx.Provider value={{ syncing, lastSync, syncVersion, runSync }}>
       {children}
     </SyncCtx.Provider>
   );

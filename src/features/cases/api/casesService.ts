@@ -62,3 +62,33 @@ export const saveCodesRemote = (id: string, codes: ApiStoredCode[]) =>
 /** PUT /api/cases/{id}/draft — save report draft (deprecated feature). */
 export const saveDraftRemote = (id: string, text: string) =>
   send(`/cases/${encodeURIComponent(id)}/draft`, 'PUT', { text })
+
+/** POST /api/sync — pull every hospital case into medcode (non-destructive). */
+export interface SyncResult {
+  ok: boolean
+  imported: string[]
+  refreshed: string[]
+  skippedApproved: string[]
+  failed: Array<{ caseId: string; error: string }>
+}
+
+export async function syncFromHospital(): Promise<SyncResult> {
+  const { data } = await apiClient.post<SyncResult>('/sync')
+  return data
+}
+
+/** One RAG suggestion for a case (POST /api/cases/{id}/suggest-codes). */
+export interface SuggestedCode {
+  code: string
+  system: string
+  description: string
+  confidence: number
+  source?: string
+}
+
+export async function suggestCodes(caseId: string): Promise<SuggestedCode[]> {
+  const { data } = await apiClient.post<{ codes: SuggestedCode[] }>(
+    `/cases/${encodeURIComponent(caseId)}/suggest-codes`,
+  )
+  return data.codes ?? []
+}

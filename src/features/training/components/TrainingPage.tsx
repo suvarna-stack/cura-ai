@@ -24,10 +24,12 @@ import {
   fetchKnowledgeStats,
   removeKnowledgeDoc,
   startTrainingRun,
+  syncCodesToSystem,
   testChat,
   testRetrieval,
   uploadKnowledgeDocs,
 } from '../api/trainingService'
+import type { CodeSyncResult } from '../api/trainingService'
 import type {
   ChatAnswer,
   KbDoc,
@@ -105,6 +107,10 @@ export function TrainingPage() {
 
   const [training, setTraining] = useState(false)
   const [log, setLog] = useState<string[]>([])
+
+  const [syncingCodes, setSyncingCodes] = useState(false)
+  const [codeSync, setCodeSync] = useState<CodeSyncResult | null>(null)
+  const [codeSyncError, setCodeSyncError] = useState<string | null>(null)
 
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
@@ -259,6 +265,24 @@ export function TrainingPage() {
           ...l,
           `✗ ${apiErrorMessage(err, 'Could not start the training run.')}`,
         ])
+      }
+    })()
+  }
+
+  const runCodeSync = () => {
+    if (syncingCodes) return
+    setSyncingCodes(true)
+    setCodeSyncError(null)
+    void (async () => {
+      try {
+        setCodeSync(await syncCodesToSystem())
+      } catch (err) {
+        setCodeSync(null)
+        setCodeSyncError(
+          apiErrorMessage(err, 'Could not sync codes to the system database.'),
+        )
+      } finally {
+        setSyncingCodes(false)
       }
     })()
   }
@@ -520,6 +544,50 @@ export function TrainingPage() {
               Waiting for uploads to finish ingesting…
             </p>
           )}
+
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-2 text-[11px] text-muted">
+              Extract ICD codes + titles from uploaded documents into{' '}
+              <code>icd_codes</code>. Existing descriptions are never
+              overwritten.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={runCodeSync}
+              disabled={syncingCodes || !docs.length}
+              fullWidth
+            >
+              {syncingCodes ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" /> Syncing
+                  codes…
+                </>
+              ) : (
+                <>
+                  <Database size={14} /> Sync codes to system DB
+                </>
+              )}
+            </Button>
+            {!docs.length && (
+              <p className="mt-2 text-[11px] text-muted">
+                Upload at least one PDF first.
+              </p>
+            )}
+            {codeSync && (
+              <p className="mt-2 text-[11px] font-semibold text-success">
+                {codeSync.extracted.toLocaleString()} codes found —{' '}
+                {codeSync.added.toLocaleString()} added,{' '}
+                {codeSync.descriptionsFilled.toLocaleString()} descriptions
+                filled, {codeSync.unchanged.toLocaleString()} already present.
+              </p>
+            )}
+            {codeSyncError && (
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+                <AlertTriangle size={12} className="mt-[1px] shrink-0" />
+                {codeSyncError}
+              </p>
+            )}
+          </div>
 
           {(training || log.length > 0) && (
             <>

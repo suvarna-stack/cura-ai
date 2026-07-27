@@ -18,6 +18,7 @@ export const dict: Record<string, { en: string; th: string }> = {
   "sync.label":    { en: "iMed sync",  th: "ซิงค์ iMed" },
   "sync.ago2m":    { en: "2 min ago",  th: "2 นาทีที่แล้ว" },
   "sync.justNow":  { en: "just now",   th: "เมื่อสักครู่" },
+  "sync.failed":   { en: "sync failed", th: "ซิงค์ไม่สำเร็จ" },
   "sync.btn":      { en: "Sync",       th: "ซิงค์" },
   "sync.syncing":  { en: "Syncing…",   th: "กำลังซิงค์…" },
   // tabs
@@ -99,6 +100,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   "sort.codeAz":  { en: "Code A–Z",             th: "รหัส A–Z" },
   // confidence pill (feedback: label the number so coders know what it means)
   "confidence.label":   { en: "AI Confidence: {n}%", th: "ความมั่นใจ AI: {n}%" },
+  "confidence.none":    { en: "AI Confidence: —", th: "ความมั่นใจ AI: —" },
+  "confidence.loading": { en: "AI Confidence: …", th: "ความมั่นใจ AI: …" },
   "confidence.tooltip": {
     en: "This percentage indicates how confident the AI model is about the suggested ICD codes for this case.",
     th: "เปอร์เซ็นต์นี้แสดงระดับความมั่นใจของโมเดล AI ต่อรหัส ICD ที่แนะนำสำหรับเคสนี้",
