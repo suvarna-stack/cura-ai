@@ -49,4 +49,59 @@ public class IcdCatalogRepository {
                         + "AND (description IS NULL OR description = '')",
                 rows);
     }
+
+    /**
+     * Typeahead search over the catalog. Matches code or description (case-insensitive).
+     * Optional {@code system} filters to ICD-10 / ICD-9. Prefers prefix matches on code.
+     */
+    public List<Map<String, Object>> search(String q, String system, int limit) {
+        String query = q == null ? "" : q.trim();
+        if (query.isEmpty()) {
+            return List.of();
+        }
+        int cap = Math.max(1, Math.min(limit, 40));
+        String like = "%" + query + "%";
+        String prefix = query + "%";
+        if (system != null && !system.isBlank()) {
+            return jdbc.query("""
+                            SELECT code, code_system::text AS system,
+                                   COALESCE(description, '') AS description
+                            FROM icd_codes
+                            WHERE code_system::text = ?
+                              AND (code ILIKE ? OR COALESCE(description, '') ILIKE ?)
+                            ORDER BY CASE WHEN code ILIKE ? THEN 0
+                                          WHEN code ILIKE ? THEN 1
+                                          ELSE 2 END,
+                                     code
+                            LIMIT ?
+                            """,
+                    (rs, i) -> {
+                        Map<String, Object> m = new java.util.LinkedHashMap<>();
+                        m.put("code", rs.getString("code"));
+                        m.put("system", rs.getString("system"));
+                        m.put("description", rs.getString("description"));
+                        return m;
+                    },
+                    system, like, like, query, prefix, cap);
+        }
+        return jdbc.query("""
+                        SELECT code, code_system::text AS system,
+                               COALESCE(description, '') AS description
+                        FROM icd_codes
+                        WHERE code ILIKE ? OR COALESCE(description, '') ILIKE ?
+                        ORDER BY CASE WHEN code ILIKE ? THEN 0
+                                      WHEN code ILIKE ? THEN 1
+                                      ELSE 2 END,
+                                 code
+                        LIMIT ?
+                        """,
+                (rs, i) -> {
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("code", rs.getString("code"));
+                    m.put("system", rs.getString("system"));
+                    m.put("description", rs.getString("description"));
+                    return m;
+                },
+                like, like, query, prefix, cap);
+    }
 }
