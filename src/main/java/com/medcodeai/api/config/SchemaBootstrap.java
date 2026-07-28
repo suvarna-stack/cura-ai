@@ -57,6 +57,8 @@ public class SchemaBootstrap implements ApplicationRunner {
                 )""");
         jdbc.execute("CREATE INDEX IF NOT EXISTS imed_write_ops_case_idx ON imed_write_ops (case_id)");
 
+        splitIcdCatalog();
+
         Long admins = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM users WHERE role = 'admin'", Long.class);
         if (admins != null && admins > 0) {
@@ -77,6 +79,79 @@ public class SchemaBootstrap implements ApplicationRunner {
         } else {
             log.info("Created bootstrap admin '{}'.", email);
         }
+    }
+
+    /**
+     * Splits the single `icd_codes` catalog into `icd_10` + `icd_9` (2026-07-28),
+     * idempotently. The seed dump still ships the old one-table shape, so a fresh
+     * re-seed lands here again on the next boot and re-applies the move.
+     *
+     * Original icd_code_id values become the new primary keys: both systems drew
+     * from one sequence, so their id spaces are disjoint and each old pointer
+     * resolves into exactly one of the two tables. Mirrored in
+     * db/migrations/0003_split_icd_codes.sql.
+     */
+    private void splitIcdCatalog() {
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS icd_10 (
+                    icd_10_id   serial PRIMARY KEY,
+                    code        varchar(20) NOT NULL UNIQUE,
+                    description text
+                )""");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS icd_9 (
+                    icd_9_id    serial PRIMARY KEY,
+                    code        varchar(20) NOT NULL UNIQUE,
+                    description text
+                )""");
+        jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS icd_10_id int REFERENCES icd_10(icd_10_id)");
+        jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS icd_9_id  int REFERENCES icd_9(icd_9_id)");
+
+        Boolean legacy = jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_schema = 'public' AND table_name = 'icd_codes')""",
+                Boolean.class);
+        if (Boolean.TRUE.equals(legacy)) {
+            jdbc.execute("""
+                    INSERT INTO icd_10 (icd_10_id, code, description)
+                    SELECT icd_code_id, code, description FROM icd_codes WHERE code_system = 'ICD-10'
+                    ON CONFLICT DO NOTHING""");
+            jdbc.execute("""
+                    INSERT INTO icd_9 (icd_9_id, code, description)
+                    SELECT icd_code_id, code, description FROM icd_codes WHERE code_system = 'ICD-9'
+                    ON CONFLICT DO NOTHING""");
+            jdbc.execute("""
+                    UPDATE case_codes cc SET icd_10_id = cc.icd_code_id
+                    WHERE cc.icd_code_id IS NOT NULL
+                      AND EXISTS (SELECT 1 FROM icd_10 t WHERE t.icd_10_id = cc.icd_code_id)""");
+            jdbc.execute("""
+                    UPDATE case_codes cc SET icd_9_id = cc.icd_code_id
+                    WHERE cc.icd_code_id IS NOT NULL
+                      AND EXISTS (SELECT 1 FROM icd_9 t WHERE t.icd_9_id = cc.icd_code_id)""");
+            jdbc.execute("ALTER TABLE case_codes DROP COLUMN icd_code_id");
+            jdbc.execute("DROP TABLE icd_codes");
+            log.info("Split icd_codes into icd_10 + icd_9 (seed dump ships the pre-split shape).");
+        }
+
+        // hand-assigned ids above bypass the sequences; realign or the first
+        // find-or-create insert collides with an existing key
+        jdbc.execute("""
+                SELECT setval(pg_get_serial_sequence('icd_10', 'icd_10_id'),
+                              GREATEST((SELECT COALESCE(max(icd_10_id), 0) FROM icd_10), 1))""");
+        jdbc.execute("""
+                SELECT setval(pg_get_serial_sequence('icd_9', 'icd_9_id'),
+                              GREATEST((SELECT COALESCE(max(icd_9_id), 0) FROM icd_9), 1))""");
+
+        jdbc.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'case_codes_one_catalog_ck') THEN
+                        ALTER TABLE case_codes ADD CONSTRAINT case_codes_one_catalog_ck
+                            CHECK (num_nonnulls(icd_10_id, icd_9_id) = 1);
+                    END IF;
+                END $$""");
+        jdbc.execute("CREATE INDEX IF NOT EXISTS case_codes_icd_10_idx ON case_codes (icd_10_id)");
+        jdbc.execute("CREATE INDEX IF NOT EXISTS case_codes_icd_9_idx  ON case_codes (icd_9_id)");
     }
 
     private static String env(String name, String fallback) {

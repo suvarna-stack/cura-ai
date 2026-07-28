@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * Pulls the code + official-title pairs the RAG service extracted from the
- * uploaded reference documents and upserts them into icd_codes.
+ * uploaded reference documents and upserts them into icd_10 / icd_9.
  *
  * Non-destructive by design: new codes are inserted, blank descriptions are
  * filled, but descriptions that already exist (typically free text from real

@@ -284,7 +284,7 @@ public class ApprovalService {
                 role = "other";
             }
 
-            coding.insertCaseCode(tn, icdId, role, "coder_assigned", null, uid, now);
+            coding.insertCaseCode(tn, ctype, icdId, role, "coder_assigned", null, uid, now);
             bump(stats, "coder_codes_created");
             written++;
         }
@@ -307,7 +307,8 @@ public class ApprovalService {
         if (row == null) {
             return; // nothing to confirm
         }
-        coding.insertCaseCode(tn, ((Number) row.get("icd_code_id")).intValue(),
+        coding.insertCaseCode(tn, (String) row.get("code_system"),
+                ((Number) row.get("icd_code_id")).intValue(),
                 (String) row.get("code_role"), "coder_assigned", null, uid, now);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);

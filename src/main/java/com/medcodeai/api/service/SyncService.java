@@ -268,14 +268,14 @@ public class SyncService {
         coding.insertHistory(tn, null, "case_synced", json.writeValueAsString(detail));
     }
 
-    // sync.py:207 code_row() — find-or-create the icd_codes row, then link it
+    // sync.py:207 code_row() — find-or-create the catalog row, then link it
     private void importCode(String tn, String code, String system, String desc,
                             String role, String ref, Map<String, Integer> stats) {
         Integer icdId = coding.findIcdCodeId(code, system);
         if (icdId == null) {
             icdId = coding.insertIcdCode(code, system, desc);
         }
-        sync.insertImportedCode(tn, icdId, role, ref);
+        sync.insertImportedCode(tn, system, icdId, role, ref);
         bump(stats, "codes");
     }
 

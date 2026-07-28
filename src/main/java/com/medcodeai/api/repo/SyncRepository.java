@@ -92,10 +92,13 @@ public class SyncRepository {
 
     // sync.py:215 code_row() — imported code row; assigned_by/assigned_at keep
     // their DB defaults (this is not coder work)
-    public void insertImportedCode(String caseId, int icdCodeId, String role, String imedRefId) {
+    public void insertImportedCode(String caseId, String codeSystem, int icdCodeId,
+                                   String role, String imedRefId) {
+        boolean nine = IcdSystem.of(codeSystem) == IcdSystem.ICD_9;
         jdbc.update("""
-                INSERT INTO case_codes (case_id, icd_code_id, code_role, source, imed_ref_id)
-                VALUES (?,?,?,'imported_from_imed',?)""", caseId, icdCodeId, role, imedRefId);
+                INSERT INTO case_codes (case_id, icd_10_id, icd_9_id, code_role, source, imed_ref_id)
+                VALUES (?,?,?,?,'imported_from_imed',?)""",
+                caseId, nine ? null : icdCodeId, nine ? icdCodeId : null, role, imedRefId);
     }
 
     // sync.py:224 order_row() — one order; order_detail is the raw hospital row as JSON

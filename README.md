@@ -92,6 +92,46 @@ password, roles `coder`/`admin`, opaque Bearer tokens stored server-side in
   `HandlerInterceptor` — deliberately **not** `spring-boot-starter-security`,
   which would auto-lock the public endpoints.
 
+## Updating an existing database (pulling changes)
+
+There is no migration tool. Schema changes made after the frozen `db/seed.sql.gz`
+dump are applied **at startup**, idempotently, by `config/SchemaBootstrap`. So on
+a machine that already has a working `medcode` database:
+
+```bash
+git pull
+./mvnw spring-boot:run     # applies anything missing on boot
+```
+
+That is the whole procedure — no psql, no re-seed, and **your local data is kept**
+(rows are moved, never recreated). Stop the app before pulling: old code against
+a new schema errors, whereas new code against an old schema fixes itself.
+
+Applied on boot today:
+
+| Change | Also committed as |
+|---|---|
+| `users.password_hash` + bootstrap admin | `db/migrations/0001_add_password_hash.sql` |
+| `imed_write_ops` revert journal | `db/migrations/0002_imed_write_ops.sql` |
+| `icd_codes` split into `icd_10` + `icd_9` (2026-07-28) | `db/migrations/0003_split_icd_codes.sql` |
+
+Check it worked — `icd_codes` should be gone, replaced by two tables:
+
+```bash
+psql -d medcode -c "\dt" | grep icd
+```
+
+For a database you can't boot the app against (prod, or a shared server), apply
+the migration files by hand instead; each is safe to run twice:
+
+```bash
+psql -d medcode -f db/migrations/0003_split_icd_codes.sql
+```
+
+**A re-seed undoes these.** `scripts/seed_local_pg.sh` restores the frozen dump,
+which predates all three changes — so `icd_codes` comes back and the admin
+disappears. Just start the app again and they re-apply.
+
 ## The API
 
 [docs/api-contract.md](docs/api-contract.md) — every endpoint with exact

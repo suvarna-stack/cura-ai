@@ -57,8 +57,13 @@ public class CasesRepository {
     // views.py:122 — code chips, role-priority order then insertion order
     public List<Map<String, Object>> codePreviewRows() {
         return jdbc.query("""
-                SELECT cc.case_id, ic.code, ic.code_system::text AS code_system, cc.code_role::text AS code_role
-                FROM case_codes cc JOIN icd_codes ic ON ic.icd_code_id = cc.icd_code_id
+                SELECT cc.case_id, COALESCE(t10.code, t9.code) AS code,
+                       CASE WHEN cc.icd_10_id IS NOT NULL THEN 'ICD-10' ELSE 'ICD-9' END AS code_system,
+                       cc.code_role::text AS code_role
+                FROM case_codes cc
+                LEFT JOIN icd_10 t10 ON t10.icd_10_id = cc.icd_10_id
+                LEFT JOIN icd_9  t9  ON t9.icd_9_id   = cc.icd_9_id
+                WHERE cc.icd_10_id IS NOT NULL OR cc.icd_9_id IS NOT NULL
                 ORDER BY CASE cc.code_role WHEN 'principal_diagnosis' THEN 0
                          WHEN 'secondary_diagnosis' THEN 1 WHEN 'procedure' THEN 2 ELSE 3 END,
                          cc.case_code_id""", ROW);
@@ -169,9 +174,14 @@ public class CasesRepository {
     // views.py:310 — detail codes in insertion order
     public List<Map<String, Object>> detailCodeRows(String caseId) {
         return jdbc.query("""
-                SELECT ic.code, ic.code_system::text AS code_system, ic.description,
+                SELECT COALESCE(t10.code, t9.code) AS code,
+                       CASE WHEN cc.icd_10_id IS NOT NULL THEN 'ICD-10' ELSE 'ICD-9' END AS code_system,
+                       COALESCE(t10.description, t9.description) AS description,
                        cc.code_role::text AS code_role, cc.source::text AS source
-                FROM case_codes cc JOIN icd_codes ic ON ic.icd_code_id=cc.icd_code_id WHERE cc.case_id=?
+                FROM case_codes cc
+                LEFT JOIN icd_10 t10 ON t10.icd_10_id = cc.icd_10_id
+                LEFT JOIN icd_9  t9  ON t9.icd_9_id   = cc.icd_9_id
+                WHERE cc.case_id=? AND (cc.icd_10_id IS NOT NULL OR cc.icd_9_id IS NOT NULL)
                 ORDER BY cc.case_code_id""", ROW, caseId);
     }
 

@@ -104,10 +104,10 @@ public class KnowledgeController {
     }
 
     @PostMapping("/api/admin/knowledge/sync-codes")
-    @Operation(summary = "Sync extracted ICD codes into icd_codes",
+    @Operation(summary = "Sync extracted ICD codes into the icd_10 / icd_9 catalogs",
             description = "Scans the uploaded reference documents for code + official-title pairs "
-                    + "and upserts them into this database's icd_codes table. Inserts new codes and "
-                    + "fills blank descriptions; existing descriptions are never overwritten.")
+                    + "and upserts them into this database's icd_10 and icd_9 tables. Inserts new "
+                    + "codes and fills blank descriptions; existing descriptions are never overwritten.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             content = @Content(mediaType = "application/json", examples = @ExampleObject(value =
                     "{\"documentsScanned\": 1, \"extracted\": 180, \"added\": 165, "

@@ -11,6 +11,18 @@ sends approval results to the hospital's iMed API — locally the sibling repo
 `../imed-mock-api`, a fake hospital server owning the separate `imed`
 database. Build/run/test commands: see `README.md`.
 
+**Domain vocabulary: `docs/medical-glossary.md`.** Plain-language meanings of
+every medical term this project touches — visit/OPD/IPD/HN, ICD-10 vs ICD-9 and
+the code roles, the note sections, lab/drug/imaging order names, the Thai
+coverage schemes and departments, the clinical shorthand inside note text, and
+(important) which "clinical-looking" fields are really our own [POC] rules
+(disease group, severity, completeness). It also carries the **ICD-10-TM
+Standard Coding Guidelines** our coders are judged against — one principal
+diagnosis only, comorbidity vs complication, "a lab result is never a
+diagnosis", TTM U50–U77 and the 7-digit Thai procedure codes — with sources.
+Read it before reasoning about hospital data or writing anything user-facing
+about the domain; extend it when new terms appear in the data.
+
 ## The golden rule (rewritten 2026-07-22 — the Flask-clone era is over)
 
 **This backend owns the API contract.** The old React frontend is retired; its
@@ -184,6 +196,27 @@ Milestones (git log --oneline reads as this sequence):
   Behavior worth knowing: their code/draft/approve writes are best-effort —
   failures are swallowed and the browser keeps its own `localStorage` copy, so
   a rejected write still looks saved on screen.
+- ✅ **ICD catalog split into two tables (2026-07-28):** the single `icd_codes`
+  table (discriminated by the `code_system_t` enum) became **`icd_10` + `icd_9`**,
+  because the two systems are expected to DIVERGE — ICD-9-CM procedure codes and
+  ICD-10 diagnosis codes want different columns, and one shared table can only
+  grow columns that are null for half its rows. Consequences: `case_codes` now
+  carries **two nullable FK columns** (`icd_10_id`, `icd_9_id`) with
+  `case_codes_one_catalog_ck` pinning exactly one per row — so a catalog id is
+  meaningless without its system, and the two always travel together
+  (`CodingRepository.insertCaseCode(caseId, codeSystem, id, …)`,
+  `SyncRepository.insertImportedCode(caseId, codeSystem, id, …)`). The old
+  `icd_code_id` values were PRESERVED as the new primary keys (both systems drew
+  from one sequence → disjoint id spaces → unambiguous backfill, and the split
+  is reversible). Reads use `LEFT JOIN` to both tables + `COALESCE`, with a
+  `WHERE … IS NOT NULL` guard preserving the old INNER JOIN semantics. New
+  `repo/IcdSystem` enum is the one place that maps a system label to a table and
+  is deliberately **strict** — an unknown label throws, matching the enum column's
+  old type-cast rejection. **The API contract did NOT change** (`code` + `system`
+  chips are byte-identical; verified by checksumming every case's resolved
+  code/system/description before and after), so `docs/api-contract.md` and
+  `docs/types.ts` were untouched. `code_system_t` is left defined but unused —
+  the discriminator is now which column is populated.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -213,6 +246,21 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 - The seed dumps are the frozen demo baseline — regenerating them requires
   the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
   build output.
+- The sibling `imed` database keeps every table in a schema named **`imed`**,
+  not `public` (a leftover from the pre-split single-database era, frozen into
+  its dump). Doesn't affect us — we only reach it over HTTP — but two things
+  follow for M7: the hospital-side SQL must stay schema-qualified, and
+  provisioning needs `GRANT USAGE ON SCHEMA imed` for any non-owner app role
+  or it fails with "permission denied for schema imed". Details in
+  `../imed-mock-api/README.md`.
+- The **ICD catalog split is also outside the seed dump** (same trap as auth):
+  `db/seed.sql.gz` still ships the pre-split single `icd_codes` table, so a fresh
+  re-seed resurrects it and `config/SchemaBootstrap.splitIcdCatalog()` re-applies
+  the split on the next boot (idempotent, mirrored in
+  `db/migrations/0003_split_icd_codes.sql`). Don't "fix" a re-appeared
+  `icd_codes` by editing the dump — just boot the app. Note the runner returns
+  early once a bootstrap admin exists, so **any new DDL must go ABOVE that
+  return**, as the split does.
 - Auth schema lives OUTSIDE the seed dump: `config/SchemaBootstrap` adds the
   `users.password_hash` column + the bootstrap admin at every startup
   (idempotent). So a fresh re-seed drops them and the next boot restores them —
