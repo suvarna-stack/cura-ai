@@ -4,12 +4,13 @@
 // side by side, mirroring the AI Suggested Codes panel — the
 // coder picks the box, not a code system from a dropdown.
 // Each side offers the same two roles as before: primary
-// diagnosis and comorbidity.
+// diagnosis and comorbidity. Code number is a catalog search.
 // ============================================================
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import { CodeSearchField } from "./CodeSearchField";
 
 // canonical stored values — the dropdown shows the translated labels.
 // The code system is part of the type so CodesPanel can file the card in
@@ -22,11 +23,11 @@ export const CODE_TYPE_ICD10_COMORBIDITY = "ICD-10 Comorbidity";
 type SystemKey = "icd10" | "icd9";
 
 const SYSTEMS: { key: SystemKey; label: string; placeholder: string; descPlaceholder: string;
-                 primary: string; comorbidity: string }[] = [
-  { key: "icd10", label: "ICD-10", placeholder: "I21.09", descPlaceholder: "Acute myocardial infarction",
-    primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY },
-  { key: "icd9",  label: "ICD-9",  placeholder: "427.31", descPlaceholder: "Atrial fibrillation",
-    primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY },
+                 primary: string; comorbidity: string; catalog: "ICD-10" | "ICD-9" }[] = [
+  { key: "icd10", label: "ICD-10", placeholder: "Search ICD-10…", descPlaceholder: "Acute myocardial infarction",
+    primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY, catalog: "ICD-10" },
+  { key: "icd9",  label: "ICD-9",  placeholder: "Search ICD-9…", descPlaceholder: "Atrial fibrillation",
+    primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY, catalog: "ICD-9" },
 ];
 
 export function AddCodeModal({
@@ -97,9 +98,22 @@ export function AddCodeModal({
               </div>
               <div>
                 <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.codeLabel")}</label>
-                <input value={form[s.key].code} placeholder={s.placeholder}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], code: e.target.value } }))}
-                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl" style={fieldStyle} />
+                <CodeSearchField
+                  value={form[s.key].code}
+                  system={s.catalog}
+                  placeholder={s.placeholder}
+                  inputStyle={fieldStyle}
+                  onSelect={(hit) =>
+                    setForm((f) => ({
+                      ...f,
+                      [s.key]: {
+                        ...f[s.key],
+                        code: hit.code,
+                        desc: hit.description || f[s.key].desc,
+                      },
+                    }))
+                  }
+                />
               </div>
               <div>
                 <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.typeLabel")}</label>

@@ -13,6 +13,7 @@ import { suggestCodes } from "../api/casesService";
 import { fillEmptySystems, isIcd9Type } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY } from "./codes/AddCodeModal";
+import { CodeSearchField, systemFromCodeType } from "./codes/CodeSearchField";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
@@ -66,7 +67,12 @@ function HighlightedReport({ text, accentRgb }: { text: string; accentRgb: strin
 const CODE_TYPES = [CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
                     CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY];
 
-function EditCodeModal({ entry, onSave, onClose }: { entry: CodeEntry; onSave: (u: CodeEntry) => void; onClose: () => void }) {
+function EditCodeModal({ entry, onSave, onClose, localHits }: {
+  entry: CodeEntry
+  onSave: (u: CodeEntry) => void
+  onClose: () => void
+  localHits?: { code: string; system: string; description: string }[]
+}) {
   const { gl } = useTheme();
   const [form, setForm] = useState<CodeEntry>({ ...entry });
   const modalBg = gl.isDark ? "#1e1218" : "#ffffff";
@@ -101,9 +107,25 @@ function EditCodeModal({ entry, onSave, onClose }: { entry: CodeEntry; onSave: (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>Code Number</label>
-              <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
-                onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
-                className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl" style={inputStyle} />
+              <CodeSearchField
+                value={form.code}
+                system={systemFromCodeType(form.type)}
+                placeholder="Search ICD code…"
+                inputStyle={inputStyle}
+                localHits={localHits}
+                onSelect={(hit) =>
+                  setForm((f) => ({
+                    ...f,
+                    code: hit.code,
+                    desc: hit.description || f.desc,
+                    type: /icd[- ]?9/i.test(hit.system)
+                      ? (f.type.toLowerCase().includes('comorbid') ? CODE_TYPE_COMORBIDITY : CODE_TYPE_PRIMARY)
+                      : (f.type.toLowerCase().includes('comorbid')
+                          ? CODE_TYPE_ICD10_COMORBIDITY
+                          : CODE_TYPE_ICD10_PRIMARY),
+                  }))
+                }
+              />
             </div>
             <div>
               <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>Code Type</label>
@@ -282,6 +304,13 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
       {editingIdx !== null && (
         <EditCodeModal
           entry={codes[editingIdx]}
+          localHits={codes
+            .filter((c) => !c.missing && c.code && c.code !== '???')
+            .map((c) => ({
+              code: c.code,
+              system: /icd[- ]?9|pcs/i.test(c.type) ? 'ICD-9' : 'ICD-10',
+              description: c.desc,
+            }))}
           onSave={u => {
             const before = codes[editingIdx];
             const next = codes.map((e, i) => i === editingIdx ? { ...before, ...u } : e);
