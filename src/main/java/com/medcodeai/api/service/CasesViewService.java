@@ -1,6 +1,7 @@
 package com.medcodeai.api.service;
 
 import com.medcodeai.api.repo.CasesRepository;
+import com.medcodeai.api.repo.UsersRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -27,7 +28,9 @@ import java.util.Set;
  * reopenedBy no longer come from synthesized placeholder data — they're the
  * real DB values (null where no real value exists yet). Confidence is the
  * average of saved code-edit confidences (RAG suggestions / coder scores)
- * when present.
+ * when present. Coder display names resolve from users.full_name so an
+ * admin rename (e.g. demo.coder → Peter) shows up on the coder facet and
+ * finished cards without rewriting audit stamps.
  */
 @Service
 public class CasesViewService {
@@ -48,11 +51,14 @@ public class CasesViewService {
 
     private final CasesRepository repo;
     private final WorkingStateRepository workingState;
+    private final UsersRepository users;
     private final JsonMapper json = new JsonMapper();
 
-    public CasesViewService(CasesRepository repo, WorkingStateRepository workingState) {
+    public CasesViewService(CasesRepository repo, WorkingStateRepository workingState,
+                            UsersRepository users) {
         this.repo = repo;
         this.workingState = workingState;
+        this.users = users;
     }
 
     // views.py:99 build_cases_payload()
@@ -107,6 +113,7 @@ public class CasesViewService {
         }
 
         // views.py:144 — case_id -> [display names], first-touch order, demo.reset excluded
+        Map<String, String> coderNames = users.displayNameByStamp();
         Map<String, List<String>> caseCoders = new HashMap<>();
         for (Map<String, Object> r : repo.coderHistoryRows()) {
             String caseId = (String) r.get("case_id");
@@ -114,9 +121,10 @@ public class CasesViewService {
             if (!Py.truthy(by) || "demo.reset".equals(by)) {
                 continue;
             }
+            String display = coderDisplay(by, coderNames);
             List<String> lst = caseCoders.computeIfAbsent(caseId, k -> new ArrayList<>());
-            if (!lst.contains(by)) {
-                lst.add(by);
+            if (!lst.contains(display)) {
+                lst.add(display);
             }
         }
 
@@ -170,8 +178,8 @@ public class CasesViewService {
                 }
                 fin.put("codedDate",
                         Py.or_(approvedAt.get(id), Py.slice(Py.or_((String) r.get("fetched_at"), ""), 10)));
-                fin.put("coder", by);
-                fin.put("coderId", Py.or_(by, "—"));
+                fin.put("coder", coderDisplay(by, coderNames));
+                fin.put("coderId", Py.or_(by, "—")); // raw audit stamp
                 fin.put("drg", "—");
                 fin.put("reopenable", true); // DEPRECATED: any coder may reopen any case
                 finished.add(fin);
@@ -187,7 +195,7 @@ public class CasesViewService {
                         u.put("reopenedAt", lf[2]);
                     }
                     if (Py.truthy(lf[1])) {
-                        u.put("reopenedBy", lf[1]);
+                        u.put("reopenedBy", coderDisplay(lf[1], coderNames));
                     }
                 }
                 if ("complete".equals(r.get("completeness_status"))) {
@@ -324,6 +332,7 @@ public class CasesViewService {
         // (omitted when empty). demo.reset churn is excluded, like the
         // dashboard's coders list.
         List<Map<String, Object>> history = new ArrayList<>();
+        Map<String, String> coderNames = users.displayNameByStamp();
         for (Map<String, Object> r : repo.caseHistoryRows(caseId)) {
             Map<String, Object> d = detailJson((String) r.get("action_detail"));
             String by = str(d.get("by"));
@@ -332,7 +341,7 @@ public class CasesViewService {
             }
             Map<String, Object> e = new LinkedHashMap<>();
             e.put("action", r.get("action_type"));
-            e.put("coder", Py.or_(by, ""));
+            e.put("coder", coderDisplay(Py.or_(by, ""), coderNames));
             e.put("at", Py.slice(Py.or_((String) r.get("created_at"), ""), 19));
             if (!d.isEmpty()) {
                 e.put("detail", d);
@@ -364,6 +373,15 @@ public class CasesViewService {
 
     private String detailBy(String actionDetail) {
         return str(detailJson(actionDetail).get("by"));
+    }
+
+    /** Resolve an audit stamp (email / demo.coder / old name) to users.full_name. */
+    private static String coderDisplay(String stamp, Map<String, String> names) {
+        if (stamp == null || stamp.isBlank()) {
+            return stamp == null ? "" : stamp;
+        }
+        String mapped = names.get(stamp);
+        return mapped != null ? mapped : stamp;
     }
 
     private static String str(Object o) {

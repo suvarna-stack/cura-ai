@@ -122,4 +122,34 @@ public class UsersRepository {
                 "SELECT COUNT(*) FROM users WHERE last_login_at::date = CURRENT_DATE", Long.class);
         return n == null ? 0 : n;
     }
+
+    /**
+     * Maps every identity stamp that may appear in coding_history.action_detail.by
+     * (email, email local-part like {@code demo.coder}, or an old full_name) to the
+     * account's current display name. Used so renaming a coder in Accounts updates
+     * the coder facet + finished cards without rewriting audit history.
+     */
+    public Map<String, String> displayNameByStamp() {
+        Map<String, String> out = new java.util.HashMap<>();
+        for (Map<String, Object> row : listAll()) {
+            String email = row.get("email") == null ? null : row.get("email").toString();
+            String fullName = row.get("full_name") == null ? null : row.get("full_name").toString();
+            String display = (fullName != null && !fullName.isBlank()) ? fullName
+                    : (email != null ? email : null);
+            if (display == null) {
+                continue;
+            }
+            if (email != null && !email.isBlank()) {
+                out.put(email, display);
+                int at = email.indexOf('@');
+                if (at > 0) {
+                    out.putIfAbsent(email.substring(0, at), display);
+                }
+            }
+            if (fullName != null && !fullName.isBlank()) {
+                out.putIfAbsent(fullName, display);
+            }
+        }
+        return out;
+    }
 }
