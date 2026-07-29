@@ -13,7 +13,8 @@ import java.util.Map;
 
 /**
  * Catalog search for the coder UI's code pickers (Edit / Add code modals).
- * Reads the shared {@code icd_codes} table — hospital imports + knowledge sync.
+ * Reads the {@code icd_10} and {@code icd_9} tables — hospital imports plus
+ * knowledge sync. (One {@code icd_codes} table until the 2026-07-28 split.)
  */
 @RestController
 @Tag(name = "icd catalog", description = "Search ICD-9 / ICD-10 catalog for code pickers")

@@ -83,7 +83,12 @@ public class IcdCatalogRepository {
 
     /**
      * Typeahead search over the catalog. Matches code or description (case-insensitive).
-     * Optional {@code system} filters to ICD-10 / ICD-9. Prefers prefix matches on code.
+     * Optional {@code system} narrows to one of the two tables; without it both are
+     * scanned and ranked together. Prefers exact-then-prefix matches on code.
+     *
+     * The caller ({@code IcdCatalogController}) has already rejected a blank {@code q}
+     * and any system outside ICD-10 / ICD-9 with a 400, so {@link IcdSystem#of} here
+     * cannot throw.
      */
     public List<Map<String, Object>> search(String q, String system, int limit) {
         String query = q == null ? "" : q.trim();
@@ -93,39 +98,35 @@ public class IcdCatalogRepository {
         int cap = Math.max(1, Math.min(limit, 40));
         String like = "%" + query + "%";
         String prefix = query + "%";
+
+        // Two args (code LIKE, description LIKE) per table scanned.
+        List<Object> args = new ArrayList<>(List.of(like, like));
+        String source;
         if (system != null && !system.isBlank()) {
-            return jdbc.query("""
-                            SELECT code, code_system::text AS system,
-                                   COALESCE(description, '') AS description
-                            FROM icd_codes
-                            WHERE code_system::text = ?
-                              AND (code ILIKE ? OR COALESCE(description, '') ILIKE ?)
-                            ORDER BY CASE WHEN code ILIKE ? THEN 0
-                                          WHEN code ILIKE ? THEN 1
-                                          ELSE 2 END,
-                                     code
-                            LIMIT ?
-                            """,
-                    (rs, i) -> {
-                        Map<String, Object> m = new java.util.LinkedHashMap<>();
-                        m.put("code", rs.getString("code"));
-                        m.put("system", rs.getString("system"));
-                        m.put("description", rs.getString("description"));
-                        return m;
-                    },
-                    system, like, like, query, prefix, cap);
+            source = matchingRows(IcdSystem.of(system));
+        } else {
+            source = matchingRows(IcdSystem.ICD_10) + "\nUNION ALL\n" + matchingRows(IcdSystem.ICD_9);
+            args.add(like);
+            args.add(like);
         }
+        args.add(query);
+        args.add(prefix);
+        args.add(cap);
+
+        // The UNION goes in a subquery so the ranking and LIMIT apply across the
+        // combined set — Postgres restricts what a bare UNION's ORDER BY may reference.
+        // `system` is the last tiebreak so equal-ranked codes from the two tables
+        // come back in a stable order.
         return jdbc.query("""
-                        SELECT code, code_system::text AS system,
-                               COALESCE(description, '') AS description
-                        FROM icd_codes
-                        WHERE code ILIKE ? OR COALESCE(description, '') ILIKE ?
+                        SELECT code, system, description FROM (
+                        %s
+                        ) c
                         ORDER BY CASE WHEN code ILIKE ? THEN 0
                                       WHEN code ILIKE ? THEN 1
                                       ELSE 2 END,
-                                 code
+                                 code, system
                         LIMIT ?
-                        """,
+                        """.formatted(source),
                 (rs, i) -> {
                     Map<String, Object> m = new java.util.LinkedHashMap<>();
                     m.put("code", rs.getString("code"));
@@ -133,6 +134,20 @@ public class IcdCatalogRepository {
                     m.put("description", rs.getString("description"));
                     return m;
                 },
-                like, like, query, prefix, cap);
+                args.toArray());
+    }
+
+    /**
+     * One catalog table's matching rows, tagged with its system label — the shape
+     * both search branches build on. The interpolated table and label come from the
+     * {@link IcdSystem} enum, never from a caller.
+     * Placeholders: code LIKE, description LIKE.
+     */
+    private static String matchingRows(IcdSystem s) {
+        return """
+                SELECT code, '%s' AS system, COALESCE(description, '') AS description
+                FROM %s
+                WHERE code ILIKE ? OR COALESCE(description, '') ILIKE ?"""
+                .formatted(s.label(), s == IcdSystem.ICD_9 ? "icd_9" : "icd_10");
     }
 }

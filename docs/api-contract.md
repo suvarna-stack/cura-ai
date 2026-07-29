@@ -260,6 +260,32 @@ No request body. Same non-destructive rules as `POST /api/sync`, scoped to one
 transaction number; same response shape (arrays hold at most that one id).
 `404` when the hospital doesn't expose that case.
 
+### GET /api/icd-codes — catalog typeahead
+
+Backs the coder UI's code pickers (the Edit / Add-code modals). Query params:
+
+| param    | required | notes |
+|----------|----------|-------|
+| `q`      | yes      | matched case-insensitively against **code or description** (substring) |
+| `system` | no       | `ICD-10` or `ICD-9` (case-insensitive); omitted → both are searched |
+| `limit`  | no       | default `20`, capped at `40` |
+
+Returns a **bare array**, best matches first — exact code match, then code
+prefix, then everything else; ties break on `code`, then `system`:
+
+```jsonc
+[ { "code": "J18.9", "system": "ICD-10", "description": "Pneumonia, unspecified organism" },
+  … ]
+```
+
+`description` is `""` rather than null when the catalog row has none. `400
+{"error": "q is required"}` for a blank `q`, `400 {"error": "system must be
+ICD-10 or ICD-9"}` for any other system value.
+
+Since the 2026-07-28 split this reads the `icd_10` and `icd_9` tables (one
+`icd_codes` table before then); `system` in the response says which one a row
+came from, and a code may legitimately exist in both.
+
 ## Authentication
 
 Since 2026-07-25 (Phase 3) auth guards the **whole API surface except**

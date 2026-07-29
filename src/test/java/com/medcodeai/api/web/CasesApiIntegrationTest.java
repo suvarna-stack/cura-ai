@@ -299,6 +299,94 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    // ---- GET /api/icd-codes -------------------------------------------------
+    // Added 2026-07-29 after the ICD-catalog split silently broke this endpoint:
+    // its SQL still read the dropped `icd_codes` table, which compiles fine
+    // (the table name lives in a string) and passed every test, because there
+    // were none. These assert the behavior, not just that the route exists.
+
+    // "lumbar" matches descriptions in BOTH seeded catalogs, and the codes are
+    // disjoint — so asserting on the CODES (not just the system labels) pins
+    // which table was actually read. Checking labels alone would pass even if
+    // both branches read icd_10 and merely tagged half the rows "ICD-9", which
+    // would hand the coder a mislabelled chip and write the wrong system to the
+    // hospital.
+    private static final String LUMBAR_ICD9 = "03.31";                  // Lumbar puncture
+    private static final String LUMBAR_ICD10 = "M51.1";                 // Lumbar disc disorder
+
+    @Test
+    void icdCatalogSearchSpansBothSystems() throws Exception {
+        JsonNode hits = getJson("/api/icd-codes?q=lumbar&limit=40");
+        assertFalse(hits.isEmpty(), "seeded catalog should match 'lumbar'");
+
+        for (JsonNode h : hits) {
+            String system = h.get("system").asString();
+            assertTrue("ICD-10".equals(system) || "ICD-9".equals(system), "unexpected system " + system);
+            assertNotNull(h.get("code").asString());
+            // COALESCEd server-side, so the picker never renders a null title
+            assertNotNull(h.get("description").asString());
+        }
+        assertTrue(hasHit(hits, LUMBAR_ICD9, "ICD-9"), "the icd_9 catalog was not searched");
+        assertTrue(hasHit(hits, LUMBAR_ICD10, "ICD-10"), "the icd_10 catalog was not searched");
+    }
+
+    @Test
+    void icdCatalogSearchFiltersBySystem() throws Exception {
+        JsonNode hits = getJson("/api/icd-codes?q=lumbar&system=ICD-9&limit=40");
+        assertFalse(hits.isEmpty());
+        for (JsonNode h : hits) {
+            assertEquals("ICD-9", h.get("system").asString(), "system filter leaked the other catalog");
+        }
+        assertTrue(hasHit(hits, LUMBAR_ICD9, "ICD-9"));
+        // the filter must select the TABLE, not just stamp the label
+        assertFalse(hasHit(hits, LUMBAR_ICD10, "ICD-9"),
+                "an ICD-10 code came back labelled ICD-9 — the filter is tagging, not filtering");
+    }
+
+    private boolean hasHit(JsonNode hits, String code, String system) {
+        for (JsonNode h : hits) {
+            if (code.equals(h.get("code").asString()) && system.equals(h.get("system").asString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Test
+    void icdCatalogSearchRanksExactCodeFirst() throws Exception {
+        // the picker is a typeahead — a coder typing a full code wants it on top
+        JsonNode hits = getJson("/api/icd-codes?q=J18.9");
+        assertFalse(hits.isEmpty());
+        assertEquals("J18.9", hits.get(0).get("code").asString());
+        assertEquals("ICD-10", hits.get(0).get("system").asString());
+    }
+
+    @Test
+    void icdCatalogSearchCapsTheLimit() throws Exception {
+        // cap survives the UNION — it applies to the combined set, not per table
+        assertTrue(getJson("/api/icd-codes?q=a&limit=100").size() <= 40,
+                "limit must be capped at 40 however large the caller asks for");
+    }
+
+    @Test
+    void icdCatalogSearchRejectsBadInput() throws Exception {
+        mvc.perform(get("/api/icd-codes?q=").header("Authorization", auth()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("q is required"));
+        // an unknown system must 400 at the controller, NOT reach IcdSystem.of()
+        // and surface as a 500
+        mvc.perform(get("/api/icd-codes?q=x&system=ICD-11").header("Authorization", auth()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("system must be ICD-10 or ICD-9"));
+    }
+
+    @Test
+    void icdCatalogSearchRequiresAToken() throws Exception {
+        mvc.perform(get("/api/icd-codes?q=J18"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("unauthorized"));
+    }
+
     private JsonNode postJson(String url) throws Exception {
         String body = mvc.perform(post(url).header("Authorization", auth()))
                 .andExpect(status().isOk())

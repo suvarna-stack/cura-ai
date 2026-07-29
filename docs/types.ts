@@ -277,6 +277,22 @@ export interface SyncResponse {
   };
 }
 
+// ---------- GET /api/icd-codes ----------
+
+/**
+ * One catalog hit. GET /api/icd-codes?q=…&system=…&limit=… returns
+ * IcdCatalogHit[] — a BARE array, best matches first (exact code, then code
+ * prefix, then the rest). `system` says which catalog table the row came from,
+ * so the same `code` may appear under both. `description` is "" when the
+ * catalog row has none, never null. 400 on a blank `q` or a `system` outside
+ * ICD-10 / ICD-9.
+ */
+export interface IcdCatalogHit {
+  code: string;
+  system: "ICD-10" | "ICD-9";
+  description: string;
+}
+
 /** 400 / 404 body. 500s return Spring's default error body — the triggering
  *  action (approve/reopen) is idempotent: retry it. */
 export interface ApiError {
