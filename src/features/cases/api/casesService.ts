@@ -92,3 +92,25 @@ export async function suggestCodes(caseId: string): Promise<SuggestedCode[]> {
   )
   return data.codes ?? []
 }
+
+/** One row from GET /api/icd-codes (catalog typeahead). */
+export interface IcdCatalogHit {
+  code: string
+  system: string
+  description: string
+}
+
+/** Search the shared icd_codes catalog (ICD-10 / ICD-9). */
+export async function searchIcdCatalog(
+  q: string,
+  opts?: { system?: 'ICD-10' | 'ICD-9'; limit?: number },
+): Promise<IcdCatalogHit[]> {
+  const { data } = await apiClient.get<IcdCatalogHit[]>('/icd-codes', {
+    params: {
+      q,
+      ...(opts?.system ? { system: opts.system } : {}),
+      limit: opts?.limit ?? 20,
+    },
+  })
+  return data ?? []
+}
