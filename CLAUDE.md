@@ -179,20 +179,25 @@ Milestones (git log --oneline reads as this sequence):
 - ✅ **New frontend wired to this backend (2026-07-27):** the replacement UI
   lives in the sibling repo `../audit-chart-frontend` (React + Vite + axios,
   `VITE_API_BASE_URL=http://localhost:8001/api` — the base URL already
-  includes `/api`). It calls 18 of our 20 endpoints for real: auth
+  includes `/api`). It calls nearly the whole surface for real: auth
   (login/logout/me), both case reads, all four case writes (approve, reopen,
   PUT codes, PUT draft), the whole admin surface (accounts CRUD + status +
   dashboard), and demo reset. Its `lib/axios.ts` attaches
   `Authorization: Bearer <token>` from `localStorage` on every request and, on
   any 401 outside the login form, clears the token and redirects to `/login` —
   matching the Phase 3 auth model. It sends no `coder` name on approve/reopen
-  and relies on our token stamping. NOT wired: `POST /api/sync` and
-  `POST /api/cases/{id}/sync` — the UI's Sync button is still a 2.2s fake
-  timer (`SyncProvider.tsx`), so nothing triggers a hospital pull from the
-  browser yet. Its Analytics, Agent-chat and Training/knowledge-base pages are
-  deliberate mocks/stubs (`USE_MOCK = true` + TODOs) — we have no endpoints
-  behind them and none are planned yet, so DON'T read those TODO paths
-  (`/analytics`, `/agent/*`, `/admin/knowledge/*`) as a contract we owe.
+  and relies on our token stamping.
+  **Wiring status (re-checked 2026-07-29 — the earlier "18 of 20 / Sync is a
+  fake timer" note was already stale when written down):** bulk sync IS wired
+  (`SyncProvider.runSync` → `syncFromHospital()` → `POST /api/sync`, triggered
+  from `CasesLayout.tsx`, with `CasesPage` refetching on `syncVersion`); the
+  **Training page is LIVE** against all seven `/api/admin/knowledge/**` routes
+  (`trainingService.ts`, `sync-codes` included); and `suggest-codes` +
+  `icd-codes` are called from the case detail pages and the Add-code modal.
+  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller,
+  and **Analytics + Agent-chat remain `USE_MOCK = true`** stubs — we have no
+  endpoints behind those two and none are planned, so DON'T read `/analytics`
+  or `/agent/*` TODOs as a contract we owe.
   Behavior worth knowing: their code/draft/approve writes are best-effort —
   failures are swallowed and the browser keeps its own `localStorage` copy, so
   a rejected write still looks saved on screen.
@@ -217,6 +222,23 @@ Milestones (git log --oneline reads as this sequence):
   code/system/description before and after), so `docs/api-contract.md` and
   `docs/types.ts` were untouched. `code_system_t` is left defined but unused —
   the discriminator is now which column is populated.
+- ✅ **Catalog-search repair + contract drift closed (2026-07-29):** merging
+  `origin/main` after the ICD split was textually clean but semantically broken.
+  The incoming `GET /api/icd-codes` typeahead (and its frontend client, the
+  Add-code modal's `CodeSearchField`) queried `FROM icd_codes` — the table
+  `SchemaBootstrap` now DROPS. Nothing caught it: no test covered the endpoint,
+  and it compiled fine because the table name lives in a SQL string.
+  `IcdCatalogRepository.search()` now reads both tables — one table when
+  `system` is given, `UNION ALL` inside a subquery when it isn't (so ranking and
+  `LIMIT` apply across the combined set), via a private `matchingRows(IcdSystem)`
+  fragment builder. The controller already 400s a blank `q` or an unknown
+  `system`, so `IcdSystem.of()` can't throw there.
+  Then the wider problem behind it: **`OpenApiDocsTest` only checked one direction**
+  — that its hand-kept `EXPECTED_PATHS` were present — so any endpoint added
+  without touching the list shipped undocumented. `icd-codes`,
+  `cases/{id}/suggest-codes` and `admin/knowledge/sync-codes` had all drifted
+  that way. The test now asserts **both** directions and all three are
+  documented in `docs/api-contract.md` + `docs/types.ts`.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -243,6 +265,12 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   and `binaryTransfer=false`.
 - Response-shape changes must update `docs/api-contract.md` + `docs/types.ts`
   and pass `CasesApiIntegrationTest`.
+- **Adding an endpoint fails the build until you list it** in
+  `OpenApiDocsTest.EXPECTED_PATHS` (two-way since 2026-07-29). That assertion is
+  the ONLY mechanical force keeping the docs honest — springdoc generates the
+  spec from the controller annotations, so nothing else notices a new route.
+  When it fails, the fix is to document the endpoint in `docs/api-contract.md`
+  + `docs/types.ts` and *then* add the path, not to add the path alone.
 - The seed dumps are the frozen demo baseline — regenerating them requires
   the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
   build output.
@@ -277,10 +305,16 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 ## Open tasks
 
 - **Frontend** (`../audit-chart-frontend`) — built and live against this
-  backend; the repo itself stays out of scope here. Two loose ends on OUR
-  side of the seam: nothing in the UI calls `/api/sync` yet, and the three
-  mocked pages (Analytics, Agent, Training) have no endpoints behind them —
-  neither is a promise we've made.
+  backend; the repo itself stays out of scope here. Two loose ends on OUR side
+  of the seam, both re-checked 2026-07-29: `POST /api/cases/{id}/sync`
+  (per-case) has no caller — bulk `/api/sync` and the whole Training/knowledge
+  surface ARE wired — and the two still-mocked pages (Analytics, Agent) have no
+  endpoints behind them. Neither is a promise we've made.
+- **`GET /api/icd-codes` has no automated test.** It is documented and
+  hand-verified, but nothing asserts its behavior — which is precisely how the
+  2026-07-29 break shipped green. Covering the UNION path, the `system` filter,
+  the limit cap and the two 400s in `CasesApiIntegrationTest` is the natural
+  next step.
 - **M7 cutover** (above).
 
 ## Full history

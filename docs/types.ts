@@ -277,6 +277,37 @@ export interface SyncResponse {
   };
 }
 
+// ---------- POST /api/cases/{caseId}/suggest-codes ----------
+
+/** One RAG candidate. `code`/`system` are always present (a candidate missing
+ *  either is dropped server-side); `description` and `source` may be null. */
+export interface SuggestedCode {
+  code: string;
+  system: "ICD-10" | "ICD-9";
+  description: string | null;
+  /** 0-100. Defaults to 70 when RAG returns no score. */
+  confidence: number;
+  /** The indexed document the suggestion came from. */
+  source: string | null;
+}
+
+/**
+ * No request body. Reads only — the coder saves accepted suggestions via
+ * PUT /api/cases/{caseId}/codes. A case with no usable section text returns
+ * 200 with codes: [], mode: "none" and zeroed counters, NOT an error.
+ * 404 for an unknown case; 500 when the RAG service is unreachable.
+ */
+export interface SuggestCodesResponse {
+  caseId: string;
+  codes: SuggestedCode[];
+  /** RAG retrieval mode; "none" when there was no clinical text to send. */
+  mode: "graph" | "plain" | "none";
+  /** Retrieved chunks the suggester saw. */
+  hitsUsed: number;
+  /** Length of the narrative sent to RAG (capped at 6000). */
+  clinicalChars: number;
+}
+
 // ---------- GET /api/icd-codes ----------
 
 /**

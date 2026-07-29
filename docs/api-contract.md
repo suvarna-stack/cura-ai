@@ -260,6 +260,36 @@ No request body. Same non-destructive rules as `POST /api/sync`, scoped to one
 transaction number; same response shape (arrays hold at most that one id).
 `404` when the hospital doesn't expose that case.
 
+### POST /api/cases/{caseId}/suggest-codes — RAG code suggestions
+
+No request body. Builds a clinical narrative from the case's report sections
+(diagnosis-ish sections first, capped at 6000 chars) and asks the RAG knowledge
+index for ICD-10 diagnosis and ICD-9 procedure candidates.
+
+**Writes nothing.** The coder accepts or edits the suggestions in the UI, then
+saves them with `PUT /api/cases/{caseId}/codes` — this endpoint never touches
+`case_codes` or history.
+
+```jsonc
+{ "caseId": "8700123456",
+  "codes": [ { "code": "S82.6", "system": "ICD-10",
+               "description": "Fracture of lateral malleolus",
+               "confidence": 88,          // 0-100; 70 when RAG sends none
+               "source": "icd10_vol1" } ],  // indexed document; may be null
+  "mode": "plain",        // RAG retrieval mode ("graph" | "plain")
+  "hitsUsed": 8,          // retrieved chunks the suggester saw
+  "clinicalChars": 1240 } // length of the narrative sent to RAG
+```
+
+`code` and `system` are always present — a candidate missing either is dropped.
+`description` and `source` may be null. A case whose sections hold no usable
+text short-circuits to a **200** with `codes: []`, `mode: "none"` and both
+counters `0` — not an error.
+
+`404 {"error": "not found"}` for an unknown case. Depends on the RAG service
+(`RAG_API_BASE`), so like `/api/admin/knowledge/**` it fails with a `500` when
+RAG is unreachable and translates RAG-side 4xx into `400 {"error": "…"}`.
+
 ### GET /api/icd-codes — catalog typeahead
 
 Backs the coder UI's code pickers (the Edit / Add-code modals). Query params:
@@ -411,8 +441,21 @@ routes answer `500` with a "RAG API not reachable" message.
 | `POST /api/admin/knowledge/train` | `POST /documents/rebuild` | wipes + re-ingests everything; `{"status": "rebuilding", "documents": n}` |
 | `POST /api/admin/knowledge/retrieve` | `POST /retrieve` | `{"question": "..."}` (+ optional `mode`, `top_k`) → matching chunks, no LLM (fast) |
 | `POST /api/admin/knowledge/chat` | `POST /chat` | same body (+ optional `max_new_tokens`, `temperature`) → full LLM answer (slow on CPU) |
+| `POST /api/admin/knowledge/sync-codes` | *(nothing — see below)* | scans the indexed documents for code + official-title pairs and upserts them into OUR `icd_10` / `icd_9` catalogs |
 
-Response bodies pass through verbatim from the RAG service (snake_case).
+Response bodies pass through verbatim from the RAG service (snake_case) — with
+one exception. `sync-codes` is **not** a proxy: it reads what RAG has already
+indexed and writes to this database's catalog tables, so it answers in our own
+camelCase:
+
+```jsonc
+{ "documentsScanned": 1, "extracted": 180, "added": 165,
+  "descriptionsFilled": 3, "unchanged": 12 }
+```
+
+It only ever **adds** codes and **fills blank** descriptions — an existing
+description is never overwritten, so re-running is safe and a coding manual
+can't clobber titles that came from the hospital.
 
 ## Downstream: the hospital iMed API
 
