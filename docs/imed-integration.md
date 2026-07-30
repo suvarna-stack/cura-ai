@@ -65,8 +65,17 @@ Decisions taken 2026-07-24 (with the team):
 | stored `imed_object_id` | `object_id` |
 | `code` | `icd9_code` |
 | `desc` | `icd9_description` + `beginning_operation` |
+| `operation_start` (2026-07-30; split on the space) | `date_in` + `time_in` |
+| `operation_end` (ditto) | `date_out` + `time_out` |
 | — | `fix_operation_type_id` (master data TBD; mock accepts any non-blank) |
 | constant | `is_from: "MED_DC"` |
+
+The operation window rides the same never-blank rule as descriptions: sent
+only when we hold a value, so approve never erases times the hospital already
+has. Sync imports the extract's `startdatetime`/`enddatetime` into
+`case_codes.operation_start/_end`; coders can edit them (CodeEdit
+`operation_start`/`operation_end`) and the diff treats a changed window as an
+update (PUT).
 
 ### Coding status (our proposed extension — not in their PDF)
 

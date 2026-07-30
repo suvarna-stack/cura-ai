@@ -91,14 +91,19 @@ public class SyncRepository {
     }
 
     // sync.py:215 code_row() — imported code row; assigned_by/assigned_at keep
-    // their DB defaults (this is not coder work)
+    // their DB defaults (this is not coder work). The operation window is only
+    // ever non-null on ICD-9 (procedure) rows — the guard here keeps stray
+    // values off diagnoses no matter what the caller passes.
     public void insertImportedCode(String caseId, String codeSystem, int icdCodeId,
-                                   String role, String imedRefId) {
+                                   String role, String imedRefId,
+                                   String operationStart, String operationEnd) {
         boolean nine = IcdSystem.of(codeSystem) == IcdSystem.ICD_9;
         jdbc.update("""
-                INSERT INTO case_codes (case_id, icd_10_id, icd_9_id, code_role, source, imed_ref_id)
-                VALUES (?,?,?,?,'imported_from_imed',?)""",
-                caseId, nine ? null : icdCodeId, nine ? icdCodeId : null, role, imedRefId);
+                INSERT INTO case_codes (case_id, icd_10_id, icd_9_id, code_role, source, imed_ref_id,
+                                        operation_start, operation_end)
+                VALUES (?,?,?,?,'imported_from_imed',?,?,?)""",
+                caseId, nine ? null : icdCodeId, nine ? icdCodeId : null, role, imedRefId,
+                nine ? operationStart : null, nine ? operationEnd : null);
     }
 
     // sync.py:224 order_row() — one order; order_detail is the raw hospital row as JSON

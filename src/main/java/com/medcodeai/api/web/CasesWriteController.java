@@ -170,8 +170,10 @@ public class CasesWriteController {
     @Operation(summary = "Save the coder's working code list",
             description = "The body is a **bare JSON array**, stored verbatim and echoed back as "
                     + "`codeEdits` on the detail endpoint. Fields the backend interprets at "
-                    + "approve time: `code` (skipped if empty or `???`), `type` (default "
-                    + "`ICD-10`; `ICD-9`/`…PCS` → procedure), `missing` (truthy → row skipped). "
+                    + "approve time: `code` (skipped if empty or `???`), `type` (labels matching "
+                    + "`icd-9`/`pcs` → ICD-9 procedure, anything else → ICD-10), `missing` "
+                    + "(truthy → row skipped), and on ICD-9 rows `operation_start`/"
+                    + "`operation_end` (the procedure's time window, sent to iMed). "
                     + "Extra fields are stored and echoed, never interpreted.\n\n"
                     + "Working state never invalidates the dashboard cache and survives reopen.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",

@@ -52,6 +52,9 @@ class CasesApiIntegrationTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final JsonMapper json = new JsonMapper();
 
     private String cachedAuth;
@@ -256,6 +259,90 @@ class CasesApiIntegrationTest {
                 "reopened case should enter the reopened queue");
         assertFalse(containsCaseId(afterReopen.get("complete"), APPROVABLE_CASE_ID),
                 "reopened case must not stay in the complete list");
+    }
+
+    // ---- ICD-9 operation time window (2026-07-30) ----
+    // An ICD-9 code is a procedure, and a procedure happens over a time window.
+    // The hospital records it on both surfaces (extract startdatetime/enddatetime,
+    // write API date_in/time_in/date_out/time_out); we carry it end-to-end.
+
+    @Test
+    void syncImportsTheHospitalOperationWindowOntoIcd9Codes() throws Exception {
+        // KNOWN_CASE_ID is open with four timed procedures in the frozen imed
+        // seed; the per-case sync re-imports its codes with the window attached
+        postJson("/api/cases/" + KNOWN_CASE_ID + "/sync");
+
+        JsonNode codes = getJson("/api/cases/" + KNOWN_CASE_ID).get("codes");
+        boolean sawTimedIcd9 = false;
+        for (JsonNode c : codes) {
+            assertTrue(c.has("operation_start") && c.has("operation_end"),
+                    "every code row carries the operation window keys");
+            if ("ICD-10".equals(c.get("code_system").asString())) {
+                assertTrue(c.get("operation_start").isNull() && c.get("operation_end").isNull(),
+                        "a diagnosis has no operation window");
+            }
+            if ("54.23".equals(c.get("code").asString())) {
+                // the biopsy row's window, verbatim from the hospital extract
+                assertEquals("2026-04-02 23:55:00", c.get("operation_start").asString());
+                assertEquals("2026-04-02 05:05:00", c.get("operation_end").asString());
+                sawTimedIcd9 = true;
+            }
+        }
+        assertTrue(sawTimedIcd9, "expected the imported 54.23 procedure with its hospital times");
+    }
+
+    @Test
+    void operationTimesFlowFromSavedEditsThroughApproveAndRevertOnReopen() throws Exception {
+        // Coder path: save edits whose ICD-9 row carries a window (one value in
+        // datetime-local form, one already normalized), approve, and the
+        // materialized detail row serves both normalized. The edit list mirrors
+        // the case's imported codes so the hospital diff only CREATES our new
+        // procedure (reverted by reopen); saved edits are cleared in the finally
+        // so the no-edits approve test keeps its re-confirm-the-principal path.
+        JsonNode imported = getJson("/api/cases/" + APPROVABLE_CASE_ID).get("codes");
+        List<String> entries = new ArrayList<>();
+        for (JsonNode c : imported) {
+            entries.add(json.writeValueAsString(java.util.Map.of(
+                    "code", c.get("code").asString(),
+                    "type", c.get("code_system").asString(),
+                    "desc", c.get("description").isNull() ? "" : c.get("description").asString())));
+        }
+        // the type label is the UI's verbose vocabulary on purpose — approve
+        // must resolve it to the ICD-9 catalog (it used to 500 on IcdSystem.of)
+        entries.add("""
+                {"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
+                 "operation_start":"2026-04-08T11:20","operation_end":"2026-04-08 12:05:00"}""");
+        try {
+            mvc.perform(put("/api/cases/{id}/codes", APPROVABLE_CASE_ID).header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("[" + String.join(",", entries) + "]"))
+                    .andExpect(status().isOk());
+            mvc.perform(post("/api/cases/approve").header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"ids\":[\"" + APPROVABLE_CASE_ID + "\"]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.approved[0]").value(APPROVABLE_CASE_ID));
+
+            JsonNode codes = getJson("/api/cases/" + APPROVABLE_CASE_ID).get("codes");
+            JsonNode ours = null;
+            for (JsonNode c : codes) {
+                if ("coder_assigned".equals(c.get("source").asString())
+                        && "93.22".equals(c.get("code").asString())) {
+                    ours = c;
+                }
+            }
+            assertNotNull(ours, "the approved edit should materialize as a coder_assigned row");
+            assertEquals("2026-04-08 11:20:00", ours.get("operation_start").asString(),
+                    "datetime-local input is normalized to YYYY-MM-DD HH:MM:SS");
+            assertEquals("2026-04-08 12:05:00", ours.get("operation_end").asString());
+        } finally {
+            // revert the hospital create + our coder_assigned rows…
+            mvc.perform(post("/api/cases/{id}/reopen", APPROVABLE_CASE_ID).header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isOk());
+            // …and drop the saved edits (no API clears working state; reopen keeps it)
+            jdbc.update("DELETE FROM case_code_edits WHERE case_id=?", APPROVABLE_CASE_ID);
+        }
     }
 
     // ---- sync (pull from the hospital) ----

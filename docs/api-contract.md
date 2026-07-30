@@ -141,7 +141,9 @@ real values here when the extract has them).
   "sections": [ { "documenttype": "…", "fieldname": "…", "value": "…",
                   "recorddatetime": "…" }, ... ],    // sorted by recorddatetime, nulls first
   "codes":    [ { "code": "…", "code_system": "ICD-10|ICD-9", "description": "…",
-                  "code_role": "…", "source": "imported_from_imed|coder_assigned" }, ... ],
+                  "code_role": "…", "source": "imported_from_imed|coder_assigned",
+                  "operation_start": "YYYY-MM-DD HH:MM:SS|null",   // procedure time window —
+                  "operation_end": "YYYY-MM-DD HH:MM:SS|null" }, ... ],  // ICD-9 rows only, always null on ICD-10
   "orders":   [ { "order_category": "…", "imed_source": "…", "order_name": "…",
                   "ordered_at": "…" }, ... ],        // max 150, category-grouped
   "history":  [ { "action": "approved_single", "coder": "demo.coder",
@@ -169,11 +171,24 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
 
 ```jsonc
 [ { "code": "E11.9",          // skipped if empty or "???"
-    "type": "ICD-10",         // default "ICD-10"; "ICD-9"/"…PCS" → procedure
+    "type": "ICD-10",         // any label matching /icd[- ]?9|pcs/i → ICD-9 procedure;
+                              // everything else → ICD-10 (default). The UI's verbose
+                              // labels ("ICD-9 Primary Diagnosis", "Comorbidities",
+                              // "ICD-10 Comorbidity") are accepted; "…comorbid…" → secondary
     "desc": "Type 2 diabetes",
-    "missing": false          // truthy → row skipped at approve
+    "missing": false,         // truthy → row skipped at approve
+    "operation_start": "2026-04-02 23:55:00",  // ICD-9 rows only: the procedure's time
+    "operation_end": "2026-04-03 05:05:00"     // window, written to iMed on approve
   }, ... ]                    // extra fields are stored + echoed, not interpreted
 ```
+
+`operation_start`/`operation_end` are interpreted at approve time on ICD-9
+(procedure) rows only — they land in `case_codes` and go to the hospital as
+`date_in`/`time_in`/`date_out`/`time_out`. Accepted formats:
+`YYYY-MM-DD HH:MM[:SS]` and datetime-local's `YYYY-MM-DDTHH:MM` (normalized to
+`YYYY-MM-DD HH:MM:SS`; unparseable values degrade to null, like the rest of
+the edit parsing). The UI treats the window as required and pre-fills "now";
+the backend stays lenient because hospital-synced rows may lack times.
 
 Responses: `{"ok": true}` · `400` (not an array) · `404` (unknown case).
 Working state never invalidates the dashboard cache and survives reopen.

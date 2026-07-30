@@ -59,6 +59,15 @@ public class SchemaBootstrap implements ApplicationRunner {
 
         splitIcdCatalog();
 
+        // Operation time window on procedure rows (2026-07-30): the hospital
+        // records when an ICD-9 procedure started/ended (extract startdatetime/
+        // enddatetime; write API date_in/time_in/date_out/time_out) — we now
+        // carry it end-to-end. Text, not timestamp: raw strings in, raw strings
+        // out, like every other datetime here. Null on ICD-10 rows. Mirrored in
+        // db/migrations/0004_case_code_operation_times.sql.
+        jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_start text");
+        jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_end text");
+
         Long admins = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM users WHERE role = 'admin'", Long.class);
         if (admins != null && admins > 0) {

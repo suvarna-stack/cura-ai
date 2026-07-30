@@ -37,6 +37,14 @@ import java.util.Map;
 @Service
 public class ApprovalService {
 
+    // the frontend's isIcd9Type / systemFromCodeType regexes, mirrored — the
+    // UI stores role-bearing `type` labels and these are the shared rule for
+    // which catalog such a label means
+    private static final java.util.regex.Pattern ICD9_TYPE =
+            java.util.regex.Pattern.compile("(?i)icd[- ]?9|pcs");
+    private static final java.util.regex.Pattern ICD10_TYPE =
+            java.util.regex.Pattern.compile("(?i)icd[- ]?10");
+
     // sync.py:86 DIAG_ROLE reversed (writeback.py:27 ROLE_TO_DIAGTYPE)
     private static final Map<String, String> ROLE_TO_DIAGTYPE = Map.of(
             "principal_diagnosis", "PRIMARY_DIAGNOSIS",
@@ -267,24 +275,37 @@ public class ApprovalService {
             String ctype = Py.or_(str(e.get("type")), "ICD-10").strip();
             String desc = Py.or_(str(e.get("desc")), "");
 
-            Integer icdId = coding.findIcdCodeId(code, ctype);
+            // The UI's `type` vocabulary is looser than the two catalog labels —
+            // its Add/Edit dialogs store role-bearing strings ("ICD-9 Primary
+            // Diagnosis", "Comorbidities", "ICD-10 Comorbidity"). Mirror the
+            // frontend's own column rule (isIcd9Type: /icd[- ]?9|pcs/i → ICD-9,
+            // everything else ICD-10) so a saved edit resolves to a catalog
+            // instead of 500ing the approve on IcdSystem.of.
+            boolean nine = ICD9_TYPE.matcher(ctype).find();
+            String system = nine ? "ICD-9" : "ICD-10";
+
+            Integer icdId = coding.findIcdCodeId(code, system);
             if (icdId == null) {
-                icdId = coding.insertIcdCode(code, ctype, desc);
+                icdId = coding.insertIcdCode(code, system, desc);
             }
 
             // [POC] StoredCode carries no explicit role; derive one: procedures
-            // by system, first ICD-10 = principal, other ICD-10 secondary
+            // by system, an explicit "…comorbid…" label = secondary, otherwise
+            // first ICD-10 = principal, other ICD-10 secondary
             String role;
-            if (ctype.equals("ICD-9") || ctype.contains("PCS")) {
+            if (nine) {
                 role = "procedure";
-            } else if (ctype.startsWith("ICD-10")) {
+            } else if (ctype.toLowerCase().contains("comorbid")) {
+                role = "secondary_diagnosis";
+            } else if (ICD10_TYPE.matcher(ctype).find()) {
                 role = firstIcd10 ? "principal_diagnosis" : "secondary_diagnosis";
                 firstIcd10 = false;
             } else {
                 role = "other";
             }
 
-            coding.insertCaseCode(tn, ctype, icdId, role, "coder_assigned", null, uid, now);
+            coding.insertCaseCode(tn, system, icdId, role, "coder_assigned", null, uid, now,
+                    opTime(e.get("operation_start")), opTime(e.get("operation_end")));
             bump(stats, "coder_codes_created");
             written++;
         }
@@ -309,7 +330,7 @@ public class ApprovalService {
         }
         coding.insertCaseCode(tn, (String) row.get("code_system"),
                 ((Number) row.get("icd_code_id")).intValue(),
-                (String) row.get("code_role"), "coder_assigned", null, uid, now);
+                (String) row.get("code_role"), "coder_assigned", null, uid, now, null, null);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);
         detail.put("simulated", true);
@@ -348,7 +369,10 @@ public class ApprovalService {
                     (String) cc.get("description"),
                     // reverse Q3 role mapping, ours -> theirs (diagnoses only)
                     procedure ? null
-                            : ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS")));
+                            : ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS"),
+                    // operation window (procedures only; null on diagnoses by schema)
+                    (String) cc.get("operation_start"),
+                    (String) cc.get("operation_end")));
         }
         ops.add(new ImedOp(tn, encountertype, targets, coder, now));
         bump(stats, "status_rows");
@@ -392,6 +416,14 @@ public class ApprovalService {
             }
         }
         return writes;
+    }
+
+    /** A CodeEdit operation_start/end value normalized to "YYYY-MM-DD HH:MM:SS"
+     *  (the UI's datetime-local sends "YYYY-MM-DDTHH:MM"); garbage → null, in
+     *  the same silent-degrade spirit as the rest of the edit parsing. */
+    private static String opTime(Object v) {
+        String s = str(v);
+        return s == null ? null : SyncRules.parseDt(s.replace('T', ' '));
     }
 
     // Python truthiness for JSON values (e.get("missing") checks)

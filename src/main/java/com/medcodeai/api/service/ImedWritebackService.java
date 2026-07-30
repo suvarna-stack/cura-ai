@@ -44,8 +44,10 @@ import java.util.UUID;
 @Service
 public class ImedWritebackService {
 
-    /** One finalized code the hospital should hold after approve. */
-    public record TargetCode(String kind, String code, String name, String diagnosisType) {
+    /** One finalized code the hospital should hold after approve. start/end
+     *  are the operation window ("YYYY-MM-DD HH:MM:SS"), icd9 only. */
+    public record TargetCode(String kind, String code, String name, String diagnosisType,
+            String start, String end) {
     }
 
     private final ImedApiClient imed;
@@ -215,6 +217,7 @@ public class ImedWritebackService {
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("icd9_code", t.code());
                 putName(r, "icd9_description", "beginning_operation", t.name());
+                putWindow(r, t);
                 // placeholder until the hospital's master data arrives (open q.2)
                 r.put("fix_operation_type_id", "GENERAL_OPERATION");
                 r.put("is_from", "MED_DC");
@@ -254,6 +257,7 @@ public class ImedWritebackService {
             } else {
                 r.put("icd9_code", t.code());
                 putName(r, "icd9_description", "beginning_operation", t.name());
+                putWindow(r, t);
             }
             rows.add(r);
         }
@@ -277,10 +281,28 @@ public class ImedWritebackService {
         }
     }
 
+    /** The operation window, in the API's split shape: "YYYY-MM-DD HH:MM:SS" →
+     *  date_in/time_in (start) and date_out/time_out (end). Absent when we have
+     *  no value — never blank the hospital's own times (same rule as names). */
+    private static void putWindow(Map<String, Object> r, TargetCode t) {
+        putSplitDt(r, "date_in", "time_in", t.start());
+        putSplitDt(r, "date_out", "time_out", t.end());
+    }
+
+    private static void putSplitDt(Map<String, Object> r, String dateKey, String timeKey, String dt) {
+        if (dt == null || dt.isBlank()) {
+            return;
+        }
+        int sp = dt.indexOf(' ');
+        r.put(dateKey, sp < 0 ? dt : dt.substring(0, sp));
+        r.put(timeKey, sp < 0 ? null : dt.substring(sp + 1));
+    }
+
     // ---- diff helpers -------------------------------------------------------
 
     /** Change detection: code matched by key; name only when we HAVE one
-     *  (never blank the hospital's), diagnosistype for ICD-10 only. */
+     *  (never blank the hospital's), diagnosistype for ICD-10 only, the
+     *  operation window for ICD-9 only (again only when we have a value). */
     private static boolean differs(String kind, TargetCode t, Map<String, Object> liveRow) {
         String liveName = str(liveRow.get("name"));
         if (t.name() != null && !t.name().isBlank() && !t.name().equals(liveName)) {
@@ -290,12 +312,23 @@ public class ImedWritebackService {
                 && !t.diagnosisType().equals(str(liveRow.get("diagnosistype")))) {
             return true;
         }
+        if ("icd9".equals(kind)
+                && (dtDiffers(t.start(), str(liveRow.get("startdatetime")))
+                        || dtDiffers(t.end(), str(liveRow.get("enddatetime"))))) {
+            return true;
+        }
         return false;
+    }
+
+    private static boolean dtDiffers(String ours, String live) {
+        return ours != null && !ours.isBlank() && !ours.equals(SyncRules.parseDt(live));
     }
 
     private static TargetCode targetFromRow(String kind, Map<String, Object> row) {
         return new TargetCode(kind, str(row.get("icd")), str(row.get("name")),
-                str(row.get("diagnosistype")));
+                str(row.get("diagnosistype")),
+                SyncRules.parseDt(str(row.get("startdatetime"))),
+                SyncRules.parseDt(str(row.get("enddatetime"))));
     }
 
     private List<Map<String, Object>> liveRows(String tn, String kind) {

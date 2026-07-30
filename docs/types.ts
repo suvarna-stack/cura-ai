@@ -196,6 +196,10 @@ export interface DetailCodeRow {
   description: string | null;
   code_role: CodeChip["role"];
   source: "imported_from_imed" | "coder_assigned";
+  /** Procedure time window, "YYYY-MM-DD HH:MM:SS" — ICD-9 rows only, always
+   *  null on ICD-10 (and null on ICD-9 when the hospital never recorded it). */
+  operation_start: string | null;
+  operation_end: string | null;
 }
 
 export interface DetailOrderRow {
@@ -213,11 +217,20 @@ export interface DetailOrderRow {
 export interface CodeEdit {
   /** skipped at approve when empty or "???" */
   code: string;
-  /** default "ICD-10"; "ICD-9" / "…PCS" → procedure */
+  /** Which catalog/role the row means. Any label matching /icd[- ]?9|pcs/i →
+   *  ICD-9 procedure; everything else → ICD-10 (default). The UI's verbose
+   *  labels round-trip: "…comorbid…" → secondary diagnosis, other ICD-10
+   *  labels → first row principal, rest secondary. */
   type?: string;
   desc?: string;
   /** truthy → row skipped at approve (unresolved placeholder) */
   missing?: boolean;
+  /** Procedure time window — interpreted on ICD-9 rows only; written to iMed
+   *  as date_in/time_in/date_out/time_out on approve. "YYYY-MM-DD HH:MM[:SS]"
+   *  or datetime-local's "YYYY-MM-DDTHH:MM"; unparseable → null. The UI
+   *  requires it (pre-filled with "now"); the backend is lenient. */
+  operation_start?: string;
+  operation_end?: string;
   [extra: string]: unknown;
 }
 

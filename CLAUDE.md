@@ -239,6 +239,35 @@ Milestones (git log --oneline reads as this sequence):
   `cases/{id}/suggest-codes` and `admin/knowledge/sync-codes` had all drifted
   that way. The test now asserts **both** directions and all three are
   documented in `docs/api-contract.md` + `docs/types.ts`.
+- ✅ **ICD-9 operation time window, end-to-end (2026-07-30):** an ICD-9 code is
+  a procedure, and a procedure happens over a time window — the hospital records
+  it on BOTH surfaces (extract `startdatetime`/`enddatetime`; write API
+  `date_in`/`time_in`/`date_out`/`time_out`, real PDF fields) and we were the
+  only link dropping it. Now: `case_codes.operation_start/_end` (text, nullable,
+  ICD-9 rows only — guarded in both insert paths; SchemaBootstrap +
+  `db/migrations/0004`), sync imports the extract times (normalized via
+  `SyncRules.parseDt`), detail `codes[]` serves them (`operation_start/_end`,
+  null on ICD-10), CodeEdit rows carry them into approve (datetime-local
+  `YYYY-MM-DDTHH:MM` accepted, garbage → null), and the write-back diff sends
+  them split into the four iMed fields — same never-blank rule as names, window
+  change = PUT, reopen restores from the journal before-image. Frontend
+  (`../audit-chart-frontend`): Add-code ICD-9 box + both Edit modals get
+  datetime-local inputs **pre-filled with "now"** (decision: a procedure must
+  have times; default-now + coder edits, not a hard 400 — hospital rows with
+  blank times stay valid), cards show a Clock line, detail seeding keeps the
+  hospital times. Two adjacent bugs found and fixed: (1) sync 500'd on any
+  case whose hospital diagnosis has a null `diagnosistype` (Java `Map.of` NPEs
+  on null keys where Python's `.get(None)` didn't — KNOWN_CASE_ID could never
+  sync); (2) approve 500'd on the UI's verbose `type` labels ("ICD-9 Primary
+  Diagnosis", "Comorbidities") via strict `IcdSystem.of` — materialize now
+  mirrors the frontend's own `/icd[- ]?9|pcs/i` rule ("…comorbid…" → secondary),
+  and the frontend's ICD-9 comorbidity label became "ICD-9 Comorbidity" (the
+  bare legacy "Comorbidities" reads as ICD-10 on both sides — old saved rows
+  keep that consistently). Hospital data itself can be dirty (a seeded overnight
+  surgery ends "before" it starts) — we store/display verbatim, no end>start
+  validation. imed-mock-api needed NO change (it already persisted the four
+  fields). Tests: sync-import + edit→approve→reopen round trips in
+  `CasesApiIntegrationTest` (the second also covers the verbose-label fix).
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

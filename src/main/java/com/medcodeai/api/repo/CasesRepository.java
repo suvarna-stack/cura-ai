@@ -177,7 +177,8 @@ public class CasesRepository {
                 SELECT COALESCE(t10.code, t9.code) AS code,
                        CASE WHEN cc.icd_10_id IS NOT NULL THEN 'ICD-10' ELSE 'ICD-9' END AS code_system,
                        COALESCE(t10.description, t9.description) AS description,
-                       cc.code_role::text AS code_role, cc.source::text AS source
+                       cc.code_role::text AS code_role, cc.source::text AS source,
+                       cc.operation_start, cc.operation_end
                 FROM case_codes cc
                 LEFT JOIN icd_10 t10 ON t10.icd_10_id = cc.icd_10_id
                 LEFT JOIN icd_9  t9  ON t9.icd_9_id   = cc.icd_9_id

@@ -40,6 +40,8 @@ import java.util.Set;
 @Service
 public class SyncService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SyncService.class);
+
     private final ImedApiClient imed;
     private final SyncRepository sync;
     private final CodingRepository coding;
@@ -112,6 +114,7 @@ public class SyncService {
                     });
                     (isNew ? imported : refreshed).add(tn);
                 } catch (RuntimeException e) {
+                    log.warn("sync failed for case {}", tn, e);
                     Map<String, Object> f = new LinkedHashMap<>();
                     f.put("caseId", tn);
                     f.put("error", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
@@ -220,19 +223,26 @@ public class SyncService {
             }
         }
 
-        // READ → codes: diagnoses (ICD-10) then procedures (ICD-9)
+        // READ → codes: diagnoses (ICD-10) then procedures (ICD-9, which carry
+        // the hospital's operation time window)
         for (Map<String, Object> d : b.diags()) {
             String icd = str(d.get("icd"));
             if (truthy(icd)) {
+                // null-safe: Map.of NPEs on a null key, and the hospital does
+                // ship diagnoses with no diagnosistype (Python's .get(None)
+                // quietly fell back to 'other'; match that)
+                String dtype = str(d.get("diagnosistype"));
                 importCode(tn, icd, "ICD-10", str(d.get("name")),
-                        SyncRules.DIAG_ROLE.getOrDefault(str(d.get("diagnosistype")), "other"),
-                        str(d.get("id")), stats);
+                        dtype == null ? "other" : SyncRules.DIAG_ROLE.getOrDefault(dtype, "other"),
+                        str(d.get("id")), null, null, stats);
             }
         }
         for (Map<String, Object> pr : b.procs()) {
             String icd = str(pr.get("icd"));
             if (truthy(icd)) {
-                importCode(tn, icd, "ICD-9", str(pr.get("name")), "procedure", str(pr.get("id")), stats);
+                importCode(tn, icd, "ICD-9", str(pr.get("name")), "procedure", str(pr.get("id")),
+                        SyncRules.parseDt(str(pr.get("startdatetime"))),
+                        SyncRules.parseDt(str(pr.get("enddatetime"))), stats);
             }
         }
 
@@ -270,12 +280,13 @@ public class SyncService {
 
     // sync.py:207 code_row() — find-or-create the catalog row, then link it
     private void importCode(String tn, String code, String system, String desc,
-                            String role, String ref, Map<String, Integer> stats) {
+                            String role, String ref, String operationStart, String operationEnd,
+                            Map<String, Integer> stats) {
         Integer icdId = coding.findIcdCodeId(code, system);
         if (icdId == null) {
             icdId = coding.insertIcdCode(code, system, desc);
         }
-        sync.insertImportedCode(tn, system, icdId, role, ref);
+        sync.insertImportedCode(tn, system, icdId, role, ref, operationStart, operationEnd);
         bump(stats, "codes");
     }
 
