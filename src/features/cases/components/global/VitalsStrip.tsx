@@ -38,7 +38,10 @@ export function VitalsStrip({ detail }: { detail: ApiCaseDetail | null }) {
           {t("vitals.title")}
         </p>
       </div>
-      <div className="overflow-x-auto rounded-lg" style={{ border: gl.borderSm }}>
+      {/* IPD cases can carry hundreds of readings — scroll inside the strip
+          (like the hospital's own pane) instead of pushing the report down */}
+      <div className="overflow-x-auto overflow-y-auto rounded-lg scroll-thin"
+        style={{ border: gl.borderSm, maxHeight: "180px" }}>
         <table className="w-full text-[12px]" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
