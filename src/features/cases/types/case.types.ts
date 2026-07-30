@@ -54,6 +54,10 @@ export interface CodeEntry {
   type: string;
   desc: string;
   confidence: number;
+  /** Procedure time window ("YYYY-MM-DD HH:MM:SS") — ICD-9 codes only; the
+   *  backend interprets these at approve and writes them to the hospital. */
+  operation_start?: string;
+  operation_end?: string;
 }
 
 export type CaseTab = "complete" | "incomplete" | "reopen" | "finished";

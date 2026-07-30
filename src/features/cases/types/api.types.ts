@@ -138,7 +138,9 @@ export interface ApiCaseDetail {
   case: Record<string, string | null>;
   coverage: Record<string, string | null> | null; // REF: full coverage_types row (doc B4)
   sections: { documenttype: string; fieldname: string; value: string | null; recorddatetime: string | null }[];
-  codes: { code: string; code_system: string; description: string | null; code_role: string; source: string }[];
+  codes: { code: string; code_system: string; description: string | null; code_role: string; source: string;
+           /** procedure time window — ICD-9 rows only, null on ICD-10 */
+           operation_start: string | null; operation_end: string | null }[];
   orders: {
     order_category: string;
     imed_source: string;

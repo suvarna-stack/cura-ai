@@ -11,12 +11,17 @@ import { Plus, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeSearchField } from "./CodeSearchField";
+import { nowOperationTime, toInputValue, fromInputValue } from "../../utils/operationTime";
 
 // canonical stored values — the dropdown shows the translated labels.
 // The code system is part of the type so CodesPanel can file the card in
 // the right box and writeback.py can derive the role.
 export const CODE_TYPE_PRIMARY = "ICD-9 Primary Diagnosis";
-export const CODE_TYPE_COMORBIDITY = "Comorbidities";
+// was the bare legacy "Comorbidities", which the column filter (isIcd9) and the
+// backend both read as ICD-10 — an ICD-9 comorbidity would jump columns and
+// drop its operation time window. Rows saved with the old label keep the
+// legacy ICD-10 treatment on both sides, consistently.
+export const CODE_TYPE_COMORBIDITY = "ICD-9 Comorbidity";
 export const CODE_TYPE_ICD10_PRIMARY = "ICD-10 Primary Diagnosis";
 export const CODE_TYPE_ICD10_COMORBIDITY = "ICD-10 Comorbidity";
 
@@ -33,17 +38,24 @@ const SYSTEMS: { key: SystemKey; label: string; placeholder: string; descPlaceho
 export function AddCodeModal({
   onAdd, onClose, only,
 }: {
-  onAdd: (entry: { code: string; type: string; desc: string }) => void;
+  onAdd: (entry: { code: string; type: string; desc: string;
+                   operation_start?: string; operation_end?: string }) => void;
   onClose: () => void;
   /** opened from one box's "+": show only that code system */
   only?: SystemKey;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
-  // one independent draft per box; the coder fills the one they need
-  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: "primary" | "comorbidity" }>>({
-    icd10: { code: "", desc: "", role: "primary" },
-    icd9:  { code: "", desc: "", role: "primary" },
+  // one independent draft per box; the coder fills the one they need.
+  // ICD-9 = procedure, so its box carries a time window — pre-filled with
+  // "now" (a procedure must have times; the coder corrects them).
+  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: "primary" | "comorbidity";
+                                                      start: string; end: string }>>(() => {
+    const now = nowOperationTime();
+    return {
+      icd10: { code: "", desc: "", role: "primary", start: now, end: now },
+      icd9:  { code: "", desc: "", role: "primary", start: now, end: now },
+    };
   });
   const boxes = only ? SYSTEMS.filter((s) => s.key === only) : SYSTEMS;
   const filled = (k: SystemKey) => form[k].code.trim() !== "" && form[k].desc.trim() !== "";
@@ -54,10 +66,16 @@ export function AddCodeModal({
   };
 
   const submit = () => {
-    // both boxes may be filled — each becomes its own code
+    // both boxes may be filled — each becomes its own code; only the ICD-9
+    // (procedure) side carries the operation window
     for (const s of ready) {
       const f = form[s.key];
-      onAdd({ code: f.code.trim(), type: f.role === "primary" ? s.primary : s.comorbidity, desc: f.desc.trim() });
+      onAdd({
+        code: f.code.trim(),
+        type: f.role === "primary" ? s.primary : s.comorbidity,
+        desc: f.desc.trim(),
+        ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end } : {}),
+      });
     }
   };
 
@@ -130,6 +148,23 @@ export function AddCodeModal({
                   onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
                   className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
               </div>
+              {/* ICD-9 = procedure → it happened over a time window */}
+              {s.key === "icd9" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opStart")}</label>
+                    <input type="datetime-local" value={toInputValue(form.icd9.start)}
+                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, start: fromInputValue(e.target.value) ?? "" } }))}
+                      className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opEnd")}</label>
+                    <input type="datetime-local" value={toInputValue(form.icd9.end)}
+                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, end: fromInputValue(e.target.value) ?? "" } }))}
+                      className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

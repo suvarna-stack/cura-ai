@@ -157,6 +157,9 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.addBoth":          { en: "Add both codes",          th: "เพิ่มทั้งสองรหัส" },
   "code.typeLabel":        { en: "Code Type",               th: "ประเภทรหัส" },
   "code.descLabel":        { en: "Description",             th: "คำอธิบาย" },
+  // ICD-9 = procedure, and a procedure happens over a time window (2026-07-30)
+  "code.opStart":          { en: "Operation Start",         th: "เวลาเริ่มหัตถการ" },
+  "code.opEnd":            { en: "Operation End",           th: "เวลาสิ้นสุดหัตถการ" },
   // case history
   "btn.viewHistory": { en: "View History", th: "ดูประวัติ" },
   "history.title":   { en: "Case History", th: "ประวัติเคส" },

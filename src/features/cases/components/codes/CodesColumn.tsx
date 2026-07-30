@@ -13,11 +13,12 @@
 // (21/07/2026): dragging reads as "priority list" at a glance.
 // ============================================================
 import { useState } from "react";
-import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles } from "lucide-react";
+import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles, Clock } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeCardsSkeleton, SkeletonBar } from "../global/DetailSkeletons";
 import type { StoredCode } from "../../utils/caseLocal";
+import { formatWindow } from "../../utils/operationTime";
 
 /** Which column a code belongs in. Procedure systems (ICD-9, *-PCS) are ICD-9;
  *  everything else (ICD-10, DRG, legacy "Comorbidities") is ICD-10. */
@@ -172,7 +173,15 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             </span>
           )}
         </div>
-        {/* line 3 — the code description / role */}
+        {/* line 3 — the operation window (ICD-9 = procedure = has times) */}
+        {system === "icd9" && formatWindow(entry.operation_start, entry.operation_end) && (
+          <p className="text-[10px] font-semibold mt-1 flex items-center gap-1"
+            style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
+            <Clock size={9} style={{ color: gl.accent, flexShrink: 0 }} />
+            {formatWindow(entry.operation_start, entry.operation_end)}
+          </p>
+        )}
+        {/* line 4 — the code description / role */}
         {description && (
           <p className="text-[11px] font-normal leading-relaxed mt-0.5"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>

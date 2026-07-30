@@ -21,6 +21,7 @@ import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
+import { nowOperationTime, toInputValue, fromInputValue } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
 
 const dischargeReport = `DISCHARGE SUMMARY
@@ -74,7 +75,23 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
   localHits?: { code: string; system: string; description: string }[]
 }) {
   const { gl } = useTheme();
-  const [form, setForm] = useState<CodeEntry>({ ...entry });
+  const { t } = useLang();
+  // an ICD-9 code is a procedure — it must carry a time window, so an entry
+  // without one (e.g. hospital data with blank times) is pre-filled with now
+  const [form, setForm] = useState<CodeEntry>(() => ({
+    ...entry,
+    ...(isIcd9Type(entry.type) ? {
+      operation_start: entry.operation_start ?? nowOperationTime(),
+      operation_end: entry.operation_end ?? nowOperationTime(),
+    } : {}),
+  }));
+  /** save with the window normalized to the final type: ICD-9 always has one
+   *  (missing → now), a diagnosis never does */
+  const normalized = (): CodeEntry => isIcd9Type(form.type)
+    ? { ...form,
+        operation_start: form.operation_start ?? nowOperationTime(),
+        operation_end: form.operation_end ?? nowOperationTime() }
+    : { ...form, operation_start: undefined, operation_end: undefined };
   const modalBg = gl.isDark ? "#1e1218" : "#ffffff";
   const fieldBg = gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const fieldBorder = `1px solid rgba(${gl.accentRgb},0.30)`;
@@ -141,12 +158,29 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
               onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
               className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
           </div>
+          {/* ICD-9 = procedure → its time window is editable here too */}
+          {isIcd9Type(form.type) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opStart")}</label>
+                <input type="datetime-local" value={toInputValue(form.operation_start)}
+                  onChange={e => setForm(f => ({ ...f, operation_start: fromInputValue(e.target.value) }))}
+                  className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
+              </div>
+              <div>
+                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opEnd")}</label>
+                <input type="datetime-local" value={toInputValue(form.operation_end)}
+                  onChange={e => setForm(f => ({ ...f, operation_end: fromInputValue(e.target.value) }))}
+                  className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
+              </div>
+            </div>
+          )}
         </div>
         <div className="px-5 py-4 flex gap-2.5"
           style={{ borderTop: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.03)` }}>
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold hover:opacity-80 transition-all"
             style={{ border: `1.5px solid rgba(${gl.accentRgb},0.30)`, color: gl.text, background: "transparent" }}>Cancel</button>
-          <button onClick={() => onSave(form)}
+          <button onClick={() => onSave(normalized())}
             className="flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"
             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 4px 16px rgba(${gl.accentRgb},0.35)` }}>
             <Check size={13} /> Save Changes
@@ -195,7 +229,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
-  const handleAddCode = (entry: { code: string; type: string; desc: string }) => {
+  const handleAddCode = (entry: { code: string; type: string; desc: string;
+                                  operation_start?: string; operation_end?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
     persistCodes([...codes, added]);
     setAdding(null);
@@ -256,6 +291,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         type: k.code_system,
         desc: `${k.description ?? ""}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}` || k.code,
         confidence: k.source === "imported_from_imed" ? 100 : 85, // imported codes are facts, not AI guesses
+        // procedure time window (ICD-9 rows; the hospital's own record)
+        operation_start: k.operation_start ?? undefined,
+        operation_end: k.operation_end ?? undefined,
       })));
     } else if (status === "ready") {
       // no iMed codes — leave empty; RAG suggest effect fills the columns

@@ -116,6 +116,9 @@ export function FinishedCaseDetailPage({
           code: k.code, type: k.code_system,
           desc: `${k.description ?? k.code}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}`,
           confidence: 100, // imported from iMed = fact
+          // procedure time window (ICD-9 rows; the hospital's own record)
+          operation_start: k.operation_start ?? undefined,
+          operation_end: k.operation_end ?? undefined,
         }))
       : []);
   const codes = fullCodes.filter(k => !k.missing);
@@ -124,7 +127,8 @@ export function FinishedCaseDetailPage({
   // edit) and bump the tick so the derived list re-reads localStorage
   const persistCodes = (next: StoredCode[]) => { saveCodeEdits(c.id, next); setCodesTick(v => v + 1); };
 
-  const handleAddCode = (entry: { code: string; type: string; desc: string }) => {
+  const handleAddCode = (entry: { code: string; type: string; desc: string;
+                                  operation_start?: string; operation_end?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true };
     persistCodes([...fullCodes, added]);
     setAdding(null);
