@@ -301,11 +301,18 @@ Milestones (git log --oneline reads as this sequence):
   column) — deliberately INTERNAL-ONLY: a `note` field riding the CodeEdit
   verbatim round-trip (stored + echoed, never materialized, never sent to
   iMed — its write API has no note field; labeled "(internal)" in the UI).
-  The rest of the hospital's UI fields (doctor, clinic, chronic flag,
-  recorder, WHO/TM/CM edition, Extension Code) are NOT in the extract —
-  blocked on the hospital, tracked as `docs/imed-integration.md` open
-  questions 11–13; the user chose NOT to contact the hospital for now, so
-  don't draft outreach unprompted.
+  **Round 3 (same day):** labs render as the hospital-style results table
+  (`global/LabResults.tsx` — grouped by panel, `item : value unit`, report
+  datetime in the header), fed by the lab order rows' detail JSON
+  (panelname/itemname/itemvalue/itemuom) that sync always stored;
+  `ReportOrders` dropped its generic "Lab" category (and filters lab rows
+  from its empty-guard). NO abnormal-value highlighting on purpose — the
+  extract has no reference ranges (open question 14). The rest of the
+  hospital's UI fields (doctor, clinic, chronic flag, recorder, WHO/TM/CM
+  edition, Extension Code, lab ranges) are NOT in the extract — blocked on
+  the hospital, tracked as `docs/imed-integration.md` open questions 11–14;
+  the user chose NOT to contact the hospital for now, so don't draft
+  outreach unprompted.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

@@ -137,3 +137,9 @@ the shape is ours to negotiate.
     What catalog source (and edition marking) does the hospital use, or is
     there a code-range rule (e.g. TTM U50–U77) we should apply, so our
     typeahead can offer the same filter honestly?
+14. **Lab normal ranges**: the coder UI highlights abnormal lab values
+    (yellow). The extract's `medhack_orderlab` sends item values + units but
+    no reference ranges, so our lab table (2026-07-30) shows values without
+    abnormal marking — inventing our own ranges would be fake clinical
+    judgment. Can the extract include the reference range or an abnormal
+    flag per item?
