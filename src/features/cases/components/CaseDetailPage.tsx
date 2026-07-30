@@ -21,6 +21,7 @@ import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
+import { LabResults } from "./global/LabResults";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
@@ -505,6 +506,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             ) : (
               <HighlightedReport text={dischargeReport} accentRgb={gl.accentRgb} />
             )}
+            {/* labs as a hospital-style results table, then the other orders */}
+            {status !== "loading" && <LabResults detail={detail} />}
             {/* item 8: the orders/results behind the case, in the report */}
             {status !== "loading" && <ReportOrders detail={detail} />}
           </div>

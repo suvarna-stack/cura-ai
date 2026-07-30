@@ -10,14 +10,15 @@
 // than a fixed column list.
 // ============================================================
 import { useState } from "react";
-import { ChevronDown, Pill, FlaskConical, Scan, Scissors, ClipboardList } from "lucide-react";
+import { ChevronDown, Pill, Scan, Scissors, ClipboardList } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import type { ApiCaseDetail } from "../../types/api.types";
 
+// "lab" is deliberately absent: lab rows render as the hospital-style
+// results table (LabResults, 2026-07-30), not as generic order rows
 const CATS: [string, string, typeof Pill][] = [
   ["medicine", "Order (medication)", Pill],
-  ["lab", "Lab", FlaskConical],
   ["X-ray", "CT / X-ray", Scan],
   ["surgery", "Operative / procedure", Scissors],
   ["other", "Other", ClipboardList],
@@ -44,7 +45,9 @@ export function ReportOrders({ detail }: { detail: ApiCaseDetail | null }) {
   const { gl } = useTheme();
   const { t } = useLang();
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const orders = detail?.orders ?? [];
+  // labs live in their own LabResults table — without this filter a lab-only
+  // case would render an empty "Orders & results" heading
+  const orders = (detail?.orders ?? []).filter((o) => o.order_category !== "lab");
   if (orders.length === 0) return null;
 
   const row = (o: ApiCaseDetail["orders"][number], i: number) => {

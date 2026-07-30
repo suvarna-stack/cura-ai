@@ -16,6 +16,7 @@ import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
+import { LabResults } from "./global/LabResults";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { codeTypeFromRole } from "../utils/aiSuggestions";
@@ -286,6 +287,7 @@ export function FinishedCaseDetailPage({
                 No report sections synced for this case.
               </p>
             )}
+            {status !== "loading" && <LabResults detail={detail} />}
             {status !== "loading" && <ReportOrders detail={detail} />}
           </div>
         </div>

@@ -165,6 +165,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.opEnd":            { en: "Operation End",           th: "เวลาสิ้นสุดหัตถการ" },
   // …and has a type — the hospital UI's "Type" dropdown on the operation grid
   "code.opType":           { en: "Operation Type",          th: "ประเภทหัตถการ" },
+  // hospital-style laboratory results table (grouped by panel)
+  "report.labs":           { en: "Laboratory",              th: "ผลตรวจทางห้องปฏิบัติการ" },
   // per-code note, like the hospital UI's Note column — internal to MedCode AI
   "code.noteLabel":        { en: "Note (internal)",         th: "หมายเหตุ (ภายในระบบ)" },
   "code.notePlaceholder":  { en: "Kept in MedCode AI only — not sent to the hospital",

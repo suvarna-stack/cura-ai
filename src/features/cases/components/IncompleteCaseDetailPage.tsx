@@ -21,6 +21,7 @@ import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
+import { LabResults } from "./global/LabResults";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
@@ -507,7 +508,9 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             ) : (
               <HighlightedReport text={report} accentRgb={gl.accentRgb} accent={gl.accent} />
             )}
-            {/* item 8: orders / lab / X-ray / operative rows behind this case */}
+            {/* labs as a hospital-style results table, then the other orders */}
+            {!loadingContent && <LabResults detail={detail} />}
+            {/* item 8: orders / X-ray / operative rows behind this case */}
             {!loadingContent && <ReportOrders detail={detail} />}
           </div>
         </div>
