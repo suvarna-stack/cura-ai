@@ -131,6 +131,8 @@ export interface ApiStoredCode {
   confidence: number;
   missing?: boolean;     // unresolved "???" placeholder row
   missingMsg?: string;
+  /** internal coder note — round-trips verbatim, never reaches the hospital */
+  note?: string;
 }
 
 /** GET /api/cases/{id} — full case detail. */

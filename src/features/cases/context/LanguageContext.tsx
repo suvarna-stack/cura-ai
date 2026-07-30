@@ -147,9 +147,12 @@ export const dict: Record<string, { en: string; th: string }> = {
     th: "คุณกำลังจะอนุมัติ {n} รหัสสำหรับ {patientName} เคสนี้จะถูกทำเครื่องหมายว่าเสร็จสมบูรณ์",
   },
   // the code system now comes from which box the coder fills (item 11), so
-  // the role labels are system-neutral
+  // the role labels are system-neutral; other/external complete the hospital
+  // dropdown's four diagnosis kinds (ICD-10 box only, 2026-07-30)
   "code.type.primary":     { en: "Primary Diagnosis",       th: "การวินิจฉัยหลัก" },
   "code.type.comorbidity": { en: "Comorbidity",             th: "โรคร่วม" },
+  "code.type.other":       { en: "Other",                   th: "อื่น ๆ" },
+  "code.type.external":    { en: "External Cause of Injury", th: "สาเหตุภายนอกของการบาดเจ็บ" },
   "code.manualBadge":      { en: "Manually Added",          th: "เพิ่มด้วยตนเอง" },
   "code.codeLabel":        { en: "Code",                    th: "รหัส" },
   "code.addHint":          { en: "Fill in either box — or both to add an ICD-10 and an ICD-9 code at once.",
@@ -162,6 +165,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.opEnd":            { en: "Operation End",           th: "เวลาสิ้นสุดหัตถการ" },
   // …and has a type — the hospital UI's "Type" dropdown on the operation grid
   "code.opType":           { en: "Operation Type",          th: "ประเภทหัตถการ" },
+  // per-code note, like the hospital UI's Note column — internal to MedCode AI
+  "code.noteLabel":        { en: "Note (internal)",         th: "หมายเหตุ (ภายในระบบ)" },
+  "code.notePlaceholder":  { en: "Kept in MedCode AI only — not sent to the hospital",
+                             th: "เก็บในระบบ MedCode AI เท่านั้น ไม่ส่งไปโรงพยาบาล" },
   // hospital vital-sign readings (the strip above CC/PI/PE in the original coder UI)
   "vitals.title":          { en: "Vital Signs",             th: "สัญญาณชีพ" },
   // case history

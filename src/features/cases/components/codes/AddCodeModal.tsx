@@ -24,15 +24,24 @@ export const CODE_TYPE_PRIMARY = "ICD-9 Primary Diagnosis";
 export const CODE_TYPE_COMORBIDITY = "ICD-9 Comorbidity";
 export const CODE_TYPE_ICD10_PRIMARY = "ICD-10 Primary Diagnosis";
 export const CODE_TYPE_ICD10_COMORBIDITY = "ICD-10 Comorbidity";
+// the hospital dropdown's other two diagnosis kinds (2026-07-30) — the backend
+// reads "…other…" / "…external…" in the label, and the write API's diagnosis
+// types (OTHERS / EXTERNAL_CAUSE_OF_INJURY) have existed all along
+export const CODE_TYPE_ICD10_OTHER = "ICD-10 Other";
+export const CODE_TYPE_ICD10_EXTERNAL = "ICD-10 External Cause";
 
 type SystemKey = "icd10" | "icd9";
+type RoleKey = "primary" | "comorbidity" | "other" | "external";
 
 const SYSTEMS: { key: SystemKey; label: string; placeholder: string; descPlaceholder: string;
-                 primary: string; comorbidity: string; catalog: "ICD-10" | "ICD-9" }[] = [
+                 roles: Partial<Record<RoleKey, string>>; catalog: "ICD-10" | "ICD-9" }[] = [
+  // ICD-10 offers the hospital dropdown's four diagnosis kinds; ICD-9 keeps
+  // two (a procedure's own type is the Operation Type dropdown below)
   { key: "icd10", label: "ICD-10", placeholder: "Search ICD-10…", descPlaceholder: "Acute myocardial infarction",
-    primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY, catalog: "ICD-10" },
+    roles: { primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY,
+             other: CODE_TYPE_ICD10_OTHER, external: CODE_TYPE_ICD10_EXTERNAL }, catalog: "ICD-10" },
   { key: "icd9",  label: "ICD-9",  placeholder: "Search ICD-9…", descPlaceholder: "Atrial fibrillation",
-    primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY, catalog: "ICD-9" },
+    roles: { primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY }, catalog: "ICD-9" },
 ];
 
 export function AddCodeModal({
@@ -40,7 +49,7 @@ export function AddCodeModal({
 }: {
   onAdd: (entry: { code: string; type: string; desc: string;
                    operation_start?: string; operation_end?: string;
-                   operation_type?: string }) => void;
+                   operation_type?: string; note?: string }) => void;
   onClose: () => void;
   /** opened from one box's "+": show only that code system */
   only?: SystemKey;
@@ -50,12 +59,12 @@ export function AddCodeModal({
   // one independent draft per box; the coder fills the one they need.
   // ICD-9 = procedure, so its box carries a time window — pre-filled with
   // "now" (a procedure must have times; the coder corrects them).
-  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: "primary" | "comorbidity";
-                                                      start: string; end: string; opType: string }>>(() => {
+  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: RoleKey;
+                                                      start: string; end: string; opType: string; note: string }>>(() => {
     const now = nowOperationTime();
     return {
-      icd10: { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0] },
-      icd9:  { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0] },
+      icd10: { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
+      icd9:  { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
     };
   });
   const boxes = only ? SYSTEMS.filter((s) => s.key === only) : SYSTEMS;
@@ -73,10 +82,11 @@ export function AddCodeModal({
       const f = form[s.key];
       onAdd({
         code: f.code.trim(),
-        type: f.role === "primary" ? s.primary : s.comorbidity,
+        type: s.roles[f.role] ?? s.roles.primary!,
         desc: f.desc.trim(),
         ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end,
                                  operation_type: f.opType } : {}),
+        ...(f.note.trim() ? { note: f.note.trim() } : {}),
       });
     }
   };
@@ -138,16 +148,25 @@ export function AddCodeModal({
               <div>
                 <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.typeLabel")}</label>
                 <select value={form[s.key].role}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as "primary" | "comorbidity" } }))}
+                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as RoleKey } }))}
                   className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
-                  <option value="primary">{t("code.type.primary")}</option>
-                  <option value="comorbidity">{t("code.type.comorbidity")}</option>
+                  {(Object.keys(s.roles) as RoleKey[]).map(r => (
+                    <option key={r} value={r}>{t(`code.type.${r}`)}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.descLabel")}</label>
                 <input value={form[s.key].desc} placeholder={s.descPlaceholder}
                   onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
+                  className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
+              </div>
+              {/* per-code note, like the hospital UI's Note column — but OURS:
+                  saved with the working code list, never sent to the hospital */}
+              <div>
+                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.noteLabel")}</label>
+                <input value={form[s.key].note} placeholder={t("code.notePlaceholder")}
+                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], note: e.target.value } }))}
                   className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
               </div>
               {/* ICD-9 = procedure → it has an operation type (the hospital

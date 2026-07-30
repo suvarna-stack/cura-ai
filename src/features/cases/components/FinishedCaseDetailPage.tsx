@@ -18,6 +18,7 @@ import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { codeTypeFromRole } from "../utils/aiSuggestions";
 import type { FinishedCase } from "../types/case.types";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
@@ -114,7 +115,9 @@ export function FinishedCaseDetailPage({
   const fullCodes: StoredCode[] = saved
     ?? (detail
       ? detail.codes.map(k => ({
-          code: k.code, type: k.code_system,
+          // role-bearing label (external cause / other included), same as the
+          // open-case pages
+          code: k.code, type: codeTypeFromRole(k.code_system, k.code_role),
           desc: `${k.description ?? k.code}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}`,
           confidence: 100, // imported from iMed = fact
           // procedure time window + type (ICD-9 rows; the hospital's own record)
@@ -131,7 +134,7 @@ export function FinishedCaseDetailPage({
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
                                   operation_start?: string; operation_end?: string;
-                                  operation_type?: string }) => {
+                                  operation_type?: string; note?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true };
     persistCodes([...fullCodes, added]);
     setAdding(null);

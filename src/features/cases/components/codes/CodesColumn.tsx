@@ -13,7 +13,7 @@
 // (21/07/2026): dragging reads as "priority list" at a glance.
 // ============================================================
 import { useState } from "react";
-import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles, Clock } from "lucide-react";
+import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles, Clock, StickyNote } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeCardsSkeleton, SkeletonBar } from "../global/DetailSkeletons";
@@ -194,6 +194,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           <p className="text-[11px] font-normal leading-relaxed mt-0.5"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
             {description}
+          </p>
+        )}
+        {/* line 5 — the coder's internal note (never sent to the hospital) */}
+        {entry.note && (
+          <p className="text-[10px] font-normal italic mt-0.5 flex items-start gap-1"
+            style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
+            <StickyNote size={9} style={{ color: gl.accent, flexShrink: 0, marginTop: "2px" }} />
+            {entry.note}
           </p>
         )}
         {entry.missing && entry.missingMsg && (

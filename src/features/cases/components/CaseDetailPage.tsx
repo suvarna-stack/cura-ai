@@ -10,9 +10,10 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { suggestCodes } from "../api/casesService";
-import { fillEmptySystems, isIcd9Type } from "../utils/aiSuggestions";
+import { fillEmptySystems, isIcd9Type, codeTypeFromRole } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
-         CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY } from "./codes/AddCodeModal";
+         CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
+         CODE_TYPE_ICD10_OTHER, CODE_TYPE_ICD10_EXTERNAL } from "./codes/AddCodeModal";
 import { CodeSearchField, systemFromCodeType } from "./codes/CodeSearchField";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
@@ -65,8 +66,10 @@ function HighlightedReport({ text, accentRgb }: { text: string; accentRgb: strin
   );
 }
 
-// the allowed code types, per system (item 11 — same as the Add Code dialog)
+// the allowed code types, per system (item 11 — same as the Add Code dialog;
+// ICD-10 carries the hospital dropdown's four diagnosis kinds)
 const CODE_TYPES = [CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
+                    CODE_TYPE_ICD10_OTHER, CODE_TYPE_ICD10_EXTERNAL,
                     CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY];
 
 function EditCodeModal({ entry, onSave, onClose, localHits }: {
@@ -162,6 +165,14 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
               onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
               className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
           </div>
+          {/* per-code note, like the hospital UI's Note column — internal only */}
+          <div>
+            <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.noteLabel")}</label>
+            <textarea rows={2} value={form.note ?? ""} placeholder={t("code.notePlaceholder")}
+              onChange={e => setForm(f => ({ ...f, note: e.target.value || undefined }))}
+              onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
+              className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
+          </div>
           {/* ICD-9 = procedure → its operation type + time window are editable here too */}
           {isIcd9Type(form.type) && (
             <div>
@@ -248,7 +259,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
                                   operation_start?: string; operation_end?: string;
-                                  operation_type?: string }) => {
+                                  operation_type?: string; note?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
     persistCodes([...codes, added]);
     setAdding(null);
@@ -306,7 +317,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     } else if (status === "ready" && detail && detail.codes.length > 0) {
       setCodes(detail.codes.map((k) => ({
         code: k.code,
-        type: k.code_system,
+        // role-bearing label, so the Edit dialog opens on the right type and
+        // approve keeps the hospital's role (external cause / other included)
+        type: codeTypeFromRole(k.code_system, k.code_role),
         desc: `${k.description ?? ""}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}` || k.code,
         confidence: k.source === "imported_from_imed" ? 100 : 85, // imported codes are facts, not AI guesses
         // procedure time window + type (ICD-9 rows; the hospital's own record)

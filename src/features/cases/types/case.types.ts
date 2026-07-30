@@ -61,6 +61,9 @@ export interface CodeEntry {
   /** Operation type ("OR Procedure" / "NON OR Procedure" / "OTH") — ICD-9
    *  codes only; sent to the hospital as fix_operation_type_id on approve. */
   operation_type?: string;
+  /** Internal coder note — saved with the working code list (verbatim
+   *  round-trip), shown only in our UI, never sent to the hospital. */
+  note?: string;
 }
 
 export type CaseTab = "complete" | "incomplete" | "reopen" | "finished";
