@@ -25,6 +25,7 @@ generated document cannot.
 
 | URL | What |
 |---|---|
+| `/console.html` | Minimal try-it-out console (single static page, reads `/v3/api-docs` live) |
 | `/swagger-ui.html` | Browsable API, try-it-out against the seeded data |
 | `/v3/api-docs` | OpenAPI 3.1 JSON |
 | `/v3/api-docs.yaml` | OpenAPI 3.1 YAML — **the file to hand the hospital's integrators** |
@@ -116,7 +117,7 @@ shipped pre-built — you create it from the committed seed file:
 ```bash
 brew install postgresql@18 && brew services start postgresql@18   # once per machine
 scripts/seed_local_imed_pg.sh     # creates + seeds db "imed" from db/seed.sql.gz
-./mvnw spring-boot:run            # :8003 — browse http://localhost:8003/swagger-ui.html
+./mvnw spring-boot:run            # :8003 — browse http://localhost:8003/console.html
 ```
 
 Good to know:
@@ -130,6 +131,42 @@ Good to know:
   for the two-repo setup.
 - Java 21 required; `./mvnw` fetches Maven itself. Postgres not from
   Homebrew? Point `PGBIN` at your Postgres `bin` directory.
+
+## The `imed` schema — tables are NOT in `public`
+
+Every table lives in a schema named **`imed`**, inside a database also named
+`imed`. Nothing is in `public` — it exists but is empty.
+
+That is history, not design: the hospital extracts and medcode's own tables
+once shared a single database, where the `imed` schema kept the two apart.
+The 2026-07-22 repo split gave this side its own database, but `db/seed.sql.gz`
+is frozen baseline data (regenerating it needs the retired POC pipeline), so
+the dump's `CREATE SCHEMA imed` came along unchanged.
+
+Consequences, all of them ordinary once you know:
+
+- **Always qualify the schema in SQL** — `FROM imed.medhack_patient`, never
+  `FROM medhack_patient`. Every statement in `repo/` already does. A missing
+  prefix compiles fine and fails at *runtime* with "relation does not exist",
+  possibly only on a rarely-hit endpoint — the one real trap here. Deliberately
+  no `currentSchema=imed` in the JDBC URL: it would paper over a missing
+  prefix instead of surfacing it.
+- **Database clients hide it.** DataGrip/DBeaver/pgAdmin show only `public` by
+  default, so the database looks empty. Tick the `imed` schema in the client's
+  schema chooser (the "1 of 4" style badge on the database node). For ad-hoc
+  psql, `SET search_path TO imed;` once per session.
+- **Deploying needs an explicit grant.** Locally you own the schema so this
+  never shows up; with a separate application role it fails as "permission
+  denied for schema imed". Grant it when provisioning:
+
+  ```sql
+  GRANT USAGE ON SCHEMA imed TO <app_role>;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA imed TO <app_role>;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA imed
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <app_role>;
+  ```
+
+  (The last line covers tables `SchemaBootstrap` creates at startup.)
 
 ## Environment variables
 
