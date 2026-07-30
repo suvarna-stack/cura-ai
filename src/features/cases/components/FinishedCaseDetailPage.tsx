@@ -15,6 +15,7 @@ import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
+import { VitalsStrip } from "./global/VitalsStrip";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import type { FinishedCase } from "../types/case.types";
@@ -116,9 +117,10 @@ export function FinishedCaseDetailPage({
           code: k.code, type: k.code_system,
           desc: `${k.description ?? k.code}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}`,
           confidence: 100, // imported from iMed = fact
-          // procedure time window (ICD-9 rows; the hospital's own record)
+          // procedure time window + type (ICD-9 rows; the hospital's own record)
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,
+          operation_type: k.operation_type ?? undefined,
         }))
       : []);
   const codes = fullCodes.filter(k => !k.missing);
@@ -128,7 +130,8 @@ export function FinishedCaseDetailPage({
   const persistCodes = (next: StoredCode[]) => { saveCodeEdits(c.id, next); setCodesTick(v => v + 1); };
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
-                                  operation_start?: string; operation_end?: string }) => {
+                                  operation_start?: string; operation_end?: string;
+                                  operation_type?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true };
     persistCodes([...fullCodes, added]);
     setAdding(null);
@@ -269,6 +272,8 @@ export function FinishedCaseDetailPage({
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin" style={{ color: gl.text }}>
+            {/* hospital vital signs above the note text, like the original coder UI */}
+            {status !== "loading" && <VitalsStrip detail={detail} />}
             {reportText ? (
               <HighlightedReport text={reportText} accent={gl.accent} />
             ) : status === "loading" ? (

@@ -160,6 +160,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   // ICD-9 = procedure, and a procedure happens over a time window (2026-07-30)
   "code.opStart":          { en: "Operation Start",         th: "เวลาเริ่มหัตถการ" },
   "code.opEnd":            { en: "Operation End",           th: "เวลาสิ้นสุดหัตถการ" },
+  // …and has a type — the hospital UI's "Type" dropdown on the operation grid
+  "code.opType":           { en: "Operation Type",          th: "ประเภทหัตถการ" },
+  // hospital vital-sign readings (the strip above CC/PI/PE in the original coder UI)
+  "vitals.title":          { en: "Vital Signs",             th: "สัญญาณชีพ" },
   // case history
   "btn.viewHistory": { en: "View History", th: "ดูประวัติ" },
   "history.title":   { en: "Case History", th: "ประวัติเคส" },

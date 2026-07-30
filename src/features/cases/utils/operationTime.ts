@@ -8,6 +8,12 @@
 // and <input type="datetime-local"> values.
 // ============================================================
 
+/** The hospital's operation-type vocabulary for ICD-9 procedures, verbatim
+ *  from its own coder UI / extract (the "Type" dropdown on the operation
+ *  grid). Stored as-is and echoed back to iMed as fix_operation_type_id on
+ *  approve. "OR" = done in an operating room. First entry = dialog default. */
+export const OPERATION_TYPES = ["OR Procedure", "NON OR Procedure", "OTH"];
+
 /** "YYYY-MM-DD HH:MM:SS" for the local clock right now — the default the
  *  Add/Edit dialogs pre-fill so a new ICD-9 code always has a window. */
 export function nowOperationTime(): string {

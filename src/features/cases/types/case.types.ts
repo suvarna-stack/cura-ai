@@ -58,6 +58,9 @@ export interface CodeEntry {
    *  backend interprets these at approve and writes them to the hospital. */
   operation_start?: string;
   operation_end?: string;
+  /** Operation type ("OR Procedure" / "NON OR Procedure" / "OTH") — ICD-9
+   *  codes only; sent to the hospital as fix_operation_type_id on approve. */
+  operation_type?: string;
 }
 
 export type CaseTab = "complete" | "incomplete" | "reopen" | "finished";

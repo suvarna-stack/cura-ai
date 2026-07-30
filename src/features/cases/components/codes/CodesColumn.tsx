@@ -172,6 +172,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
               {t("code.manualBadge")}
             </span>
           )}
+          {/* the hospital's operation type ("OR Procedure" …) as a chip, like
+              the Type column on its own coder UI's operation grid */}
+          {system === "icd9" && entry.operation_type && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+              style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }}>
+              {entry.operation_type}
+            </span>
+          )}
         </div>
         {/* line 3 — the operation window (ICD-9 = procedure = has times) */}
         {system === "icd9" && formatWindow(entry.operation_start, entry.operation_end) && (

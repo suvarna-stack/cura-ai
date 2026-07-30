@@ -19,9 +19,10 @@ import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
+import { VitalsStrip } from "./global/VitalsStrip";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
-import { nowOperationTime, toInputValue, fromInputValue } from "../utils/operationTime";
+import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { IncompleteCase, CodeEntry } from "../types/case.types";
 
 // the allowed code types, per system (item 11)
@@ -92,15 +93,18 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
     ...(isIcd9Type(entry.type) ? {
       operation_start: entry.operation_start ?? nowOperationTime(),
       operation_end: entry.operation_end ?? nowOperationTime(),
+      operation_type: entry.operation_type ?? OPERATION_TYPES[0],
     } : {}),
   }));
-  /** save with the window normalized to the final type: ICD-9 always has one
-   *  (missing → now), a diagnosis never does */
+  /** save with the window + type normalized to the final type: ICD-9 always
+   *  has them (missing → now / OR Procedure), a diagnosis never does */
   const normalized = (): CodeEntry => isIcd9Type(form.type)
     ? { ...form,
         operation_start: form.operation_start ?? nowOperationTime(),
-        operation_end: form.operation_end ?? nowOperationTime() }
-    : { ...form, operation_start: undefined, operation_end: undefined };
+        operation_end: form.operation_end ?? nowOperationTime(),
+        operation_type: form.operation_type ?? OPERATION_TYPES[0] }
+    : { ...form, operation_start: undefined, operation_end: undefined,
+        operation_type: undefined };
   const modalBg = gl.isDark ? "#1e1218" : "#ffffff";
   const fieldBg = gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const fieldBorder = `1px solid rgba(${gl.accentRgb},0.30)`;
@@ -167,7 +171,20 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
               onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
               className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
           </div>
-          {/* ICD-9 = procedure → its time window is editable here too */}
+          {/* ICD-9 = procedure → its operation type + time window are editable here too */}
+          {isIcd9Type(form.type) && (
+            <div>
+              <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opType")}</label>
+              <select value={form.operation_type ?? OPERATION_TYPES[0]}
+                onChange={e => setForm(f => ({ ...f, operation_type: e.target.value }))}
+                className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
+                {/* a hospital value outside our list still renders + round-trips */}
+                {(OPERATION_TYPES.includes(form.operation_type ?? OPERATION_TYPES[0])
+                  ? OPERATION_TYPES : [form.operation_type as string, ...OPERATION_TYPES])
+                  .map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          )}
           {isIcd9Type(form.type) && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -227,7 +244,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
-                                  operation_start?: string; operation_end?: string }) => {
+                                  operation_start?: string; operation_end?: string;
+                                  operation_type?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
     persistCodes([...codes, added]);
     setAdding(null);
@@ -297,9 +315,10 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           code: k.code, type: k.code_system,
           desc: k.description ?? k.code,
           confidence: 100, // imported from iMed = fact, not AI guess
-          // procedure time window (ICD-9 rows; the hospital's own record)
+          // procedure time window + type (ICD-9 rows; the hospital's own record)
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,
+          operation_type: k.operation_type ?? undefined,
         }));
         const missingRows = (caseData?.missing ?? "")
           .split(",").map(m => m.trim()).filter(m => m && m !== "—")
@@ -468,6 +487,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin">
+            {/* hospital vital signs above the note text, like the original coder UI */}
+            {!loadingContent && <VitalsStrip detail={detail} />}
             {loadingContent ? (
               <ReportSkeleton />
             ) : (

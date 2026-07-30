@@ -140,7 +140,11 @@ export interface ApiCaseDetail {
   sections: { documenttype: string; fieldname: string; value: string | null; recorddatetime: string | null }[];
   codes: { code: string; code_system: string; description: string | null; code_role: string; source: string;
            /** procedure time window — ICD-9 rows only, null on ICD-10 */
-           operation_start: string | null; operation_end: string | null }[];
+           operation_start: string | null; operation_end: string | null;
+           /** the hospital's operation type, extract vocabulary verbatim
+            *  ("OR Procedure" / "NON OR Procedure" / "OTH" / …) — ICD-9 rows
+            *  only, null on ICD-10 */
+           operation_type: string | null }[];
   orders: {
     order_category: string;
     imed_source: string;
@@ -153,6 +157,13 @@ export interface ApiCaseDetail {
   }[];
   /** true per-category order totals, even when `orders` is truncated */
   orderCounts?: Record<string, number>;
+  /** Hospital vital-sign readings (the strip above CC/PI/PE in the original
+   *  coder UI), chronological. Every value is raw hospital text or null.
+   *  Optional so the static JSON export stays valid. */
+  vitals?: { measured_at: string | null; temperature: string | null;
+             systolic: string | null; diastolic: string | null;
+             heart_rate: string | null; oxygen_saturation: string | null;
+             weight: string | null; height: string | null }[];
   history?: ApiCaseHistoryEntry[];
   // Present only when served by the live server (server/app.py), which echoes
   // the coder's saved working state; absent in the static JSON export.

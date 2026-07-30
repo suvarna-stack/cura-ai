@@ -11,7 +11,7 @@ import { Plus, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeSearchField } from "./CodeSearchField";
-import { nowOperationTime, toInputValue, fromInputValue } from "../../utils/operationTime";
+import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../../utils/operationTime";
 
 // canonical stored values — the dropdown shows the translated labels.
 // The code system is part of the type so CodesPanel can file the card in
@@ -39,7 +39,8 @@ export function AddCodeModal({
   onAdd, onClose, only,
 }: {
   onAdd: (entry: { code: string; type: string; desc: string;
-                   operation_start?: string; operation_end?: string }) => void;
+                   operation_start?: string; operation_end?: string;
+                   operation_type?: string }) => void;
   onClose: () => void;
   /** opened from one box's "+": show only that code system */
   only?: SystemKey;
@@ -50,11 +51,11 @@ export function AddCodeModal({
   // ICD-9 = procedure, so its box carries a time window — pre-filled with
   // "now" (a procedure must have times; the coder corrects them).
   const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: "primary" | "comorbidity";
-                                                      start: string; end: string }>>(() => {
+                                                      start: string; end: string; opType: string }>>(() => {
     const now = nowOperationTime();
     return {
-      icd10: { code: "", desc: "", role: "primary", start: now, end: now },
-      icd9:  { code: "", desc: "", role: "primary", start: now, end: now },
+      icd10: { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0] },
+      icd9:  { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0] },
     };
   });
   const boxes = only ? SYSTEMS.filter((s) => s.key === only) : SYSTEMS;
@@ -74,7 +75,8 @@ export function AddCodeModal({
         code: f.code.trim(),
         type: f.role === "primary" ? s.primary : s.comorbidity,
         desc: f.desc.trim(),
-        ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end } : {}),
+        ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end,
+                                 operation_type: f.opType } : {}),
       });
     }
   };
@@ -148,7 +150,18 @@ export function AddCodeModal({
                   onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
                   className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
               </div>
-              {/* ICD-9 = procedure → it happened over a time window */}
+              {/* ICD-9 = procedure → it has an operation type (the hospital
+                  UI's "Type" dropdown) and happened over a time window */}
+              {s.key === "icd9" && (
+                <div>
+                  <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opType")}</label>
+                  <select value={form.icd9.opType}
+                    onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, opType: e.target.value } }))}
+                    className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
+                    {OPERATION_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              )}
               {s.key === "icd9" && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
