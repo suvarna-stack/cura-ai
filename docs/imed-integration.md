@@ -117,3 +117,23 @@ the shape is ours to negotiate.
     nowhere in the write-API PDF fields or the extract we sync. What is it,
     where does it live in the data, and do our diff writes need to carry it
     (or risk dropping it when we PUT a changed row)?
+12. **Extract fields for the coder-UI parity ask** (2026-07-30: the hospital
+    wants our app to show the same fields as its own coder UI, but the
+    extract doesn't carry most of them). Can the diagnosis/procedure feeds be
+    extended with: the **doctor** (แพทย์) per code row; the **clinic**
+    (คลินิก) per code row and on the ICD-9 detail popup; the **entry
+    date/time** (วัน-เวลา) on ICD-10 diagnoses (procedures already have
+    start/end); the free-text **Note** per diagnosis and the **remarks**
+    (หมายเหตุ) on the ICD-9 popup; the **chronic-disease flag**
+    (โรคประจำตัว); and the **recording coder** (เวชสถิติ)? For any that
+    become coder-editable on our side, the write API would also need matching
+    fields — today it has none of these (notes included), so we treat them
+    all as read-only display pending answers. Until then these UI elements
+    are deliberately NOT rendered (golden rule: no field without a real
+    source).
+13. **ICD-10 catalog edition (the All/WHO/TM/CM filter)**: the coder UI
+    filters diagnosis codes by catalog edition — WHO original vs the Thai
+    modifications (TM) vs CM. Our `icd_10` table is code + description only.
+    What catalog source (and edition marking) does the hospital use, or is
+    there a code-range rule (e.g. TTM U50–U77) we should apply, so our
+    typeahead can offer the same filter honestly?

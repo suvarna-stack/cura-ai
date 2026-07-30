@@ -181,8 +181,14 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
     "type": "ICD-10",         // any label matching /icd[- ]?9|pcs/i → ICD-9 procedure;
                               // everything else → ICD-10 (default). The UI's verbose
                               // labels ("ICD-9 Primary Diagnosis", "Comorbidities",
-                              // "ICD-10 Comorbidity") are accepted; "…comorbid…" → secondary
+                              // "ICD-10 Comorbidity") are accepted; role from the label:
+                              // "…external…" → external cause of injury, "…comorbid…" →
+                              // secondary, "…other…" → other, else first ICD-10 =
+                              // principal, rest secondary
     "desc": "Type 2 diabetes",
+    "note": "internal coder note",  // NOT interpreted: stored + echoed verbatim like any
+                              // extra field, shown only in our UI — never sent to iMed
+                              // (the hospital write API has no note field)
     "missing": false,         // truthy → row skipped at approve
     "operation_start": "2026-04-02 23:55:00",  // ICD-9 rows only: the procedure's time
     "operation_end": "2026-04-03 05:05:00",    // window, written to iMed on approve

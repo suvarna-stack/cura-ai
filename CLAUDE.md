@@ -290,10 +290,22 @@ Milestones (git log --oneline reads as this sequence):
   dropdown (`OPERATION_TYPES` in `utils/operationTime.ts`, default "OR
   Procedure", unknown hospital values still render + round-trip), and a
   `VitalsStrip` table (Time | BT | BP | PR | O2Sat | Wt | Ht, hospital-style)
-  sits above the report text on all three detail pages. The rest of the
-  hospital's UI fields (doctor, clinic, per-dx note, chronic flag, recorder,
-  WHO/TM/CM, Extension Code) are NOT in the extract — blocked on the hospital,
-  tracked in `docs/imed-integration.md` open questions.
+  sits above the report text on all three detail pages. **Round 2 (same
+  day):** the ICD-10 type dropdown grew the hospital's other two diagnosis
+  kinds — "ICD-10 Other" / "ICD-10 External Cause" labels; materialize now
+  reads "…external…" → `external_cause` and "…other…" → `other` (both roles,
+  sync mapping and write-back diagnosis types existed all along), and detail
+  seeding became role-aware (`codeTypeFromRole`) so an imported external-cause
+  diagnosis opens the Edit dialog on the right type instead of collapsing to
+  first-ICD-10-= principal. Plus a per-code **Note** (the hospital UI's Note
+  column) — deliberately INTERNAL-ONLY: a `note` field riding the CodeEdit
+  verbatim round-trip (stored + echoed, never materialized, never sent to
+  iMed — its write API has no note field; labeled "(internal)" in the UI).
+  The rest of the hospital's UI fields (doctor, clinic, chronic flag,
+  recorder, WHO/TM/CM edition, Extension Code) are NOT in the extract —
+  blocked on the hospital, tracked as `docs/imed-integration.md` open
+  questions 11–13; the user chose NOT to contact the hospital for now, so
+  don't draft outreach unprompted.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

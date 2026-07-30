@@ -351,6 +351,12 @@ class CasesApiIntegrationTest {
                 {"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
                  "operation_start":"2026-04-08T11:20","operation_end":"2026-04-08 12:05:00",
                  "operation_type":"OR Procedure"}""");
+        // the UI's two other ICD-10 dropdown options (2026-07-30): "…external…"
+        // → external_cause, "…other…" → other; a `note` is an internal extra
+        // field — stored + echoed verbatim, never materialized or sent to iMed
+        entries.add("""
+                {"code":"V89.2","type":"ICD-10 External Cause","note":"MVA, per ER note",
+                 "desc":"Person injured in unspecified motor-vehicle accident, traffic"}""");
         try {
             mvc.perform(put("/api/cases/{id}/codes", APPROVABLE_CASE_ID).header("Authorization", auth())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -364,13 +370,21 @@ class CasesApiIntegrationTest {
 
             JsonNode codes = getJson("/api/cases/" + APPROVABLE_CASE_ID).get("codes");
             JsonNode ours = null;
+            JsonNode external = null;
             for (JsonNode c : codes) {
                 if ("coder_assigned".equals(c.get("source").asString())
                         && "93.22".equals(c.get("code").asString())) {
                     ours = c;
                 }
+                if ("coder_assigned".equals(c.get("source").asString())
+                        && "V89.2".equals(c.get("code").asString())) {
+                    external = c;
+                }
             }
             assertNotNull(ours, "the approved edit should materialize as a coder_assigned row");
+            assertNotNull(external, "the external-cause edit should materialize too");
+            assertEquals("external_cause", external.get("code_role").asString(),
+                    "an '…external…' type label materializes with the external_cause role");
             assertEquals("2026-04-08 11:20:00", ours.get("operation_start").asString(),
                     "datetime-local input is normalized to YYYY-MM-DD HH:MM:SS");
             assertEquals("2026-04-08 12:05:00", ours.get("operation_end").asString());

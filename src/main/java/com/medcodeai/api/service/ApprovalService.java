@@ -289,14 +289,22 @@ public class ApprovalService {
                 icdId = coding.insertIcdCode(code, system, desc);
             }
 
-            // [POC] StoredCode carries no explicit role; derive one: procedures
-            // by system, an explicit "…comorbid…" label = secondary, otherwise
-            // first ICD-10 = principal, other ICD-10 secondary
+            // [POC] StoredCode carries no explicit role; derive one from the
+            // label: procedures by system; "…external…" = external cause of
+            // injury and "…other…" = other (the two dropdown options added
+            // 2026-07-30 for hospital-UI parity — sync and the write-back
+            // already speak both); "…comorbid…" = secondary; otherwise first
+            // ICD-10 = principal, other ICD-10 secondary
             String role;
+            String lower = ctype.toLowerCase();
             if (nine) {
                 role = "procedure";
-            } else if (ctype.toLowerCase().contains("comorbid")) {
+            } else if (lower.contains("external")) {
+                role = "external_cause";
+            } else if (lower.contains("comorbid")) {
                 role = "secondary_diagnosis";
+            } else if (lower.contains("other")) {
+                role = "other";
             } else if (ICD10_TYPE.matcher(ctype).find()) {
                 role = firstIcd10 ? "principal_diagnosis" : "secondary_diagnosis";
                 firstIcd10 = false;

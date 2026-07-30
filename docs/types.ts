@@ -244,11 +244,16 @@ export interface CodeEdit {
   /** skipped at approve when empty or "???" */
   code: string;
   /** Which catalog/role the row means. Any label matching /icd[- ]?9|pcs/i →
-   *  ICD-9 procedure; everything else → ICD-10 (default). The UI's verbose
-   *  labels round-trip: "…comorbid…" → secondary diagnosis, other ICD-10
-   *  labels → first row principal, rest secondary. */
+   *  ICD-9 procedure; everything else → ICD-10 (default). Role from the
+   *  label: "…external…" → external cause of injury, "…comorbid…" →
+   *  secondary diagnosis, "…other…" → other, remaining ICD-10 labels →
+   *  first row principal, rest secondary. */
   type?: string;
   desc?: string;
+  /** Internal coder note — NOT interpreted at approve: stored + echoed
+   *  verbatim like any extra field, shown only in our UI, never sent to the
+   *  hospital (its write API has no note field). */
+  note?: string;
   /** truthy → row skipped at approve (unresolved placeholder) */
   missing?: boolean;
   /** Procedure time window — interpreted on ICD-9 rows only; written to iMed
