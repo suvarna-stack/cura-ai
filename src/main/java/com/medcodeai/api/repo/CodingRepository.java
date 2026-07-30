@@ -63,18 +63,20 @@ public class CodingRepository {
     // app.py:179 / writeback.py:63 — one coder-assigned (or re-confirmed) code row.
     // The catalog id is only meaningful alongside its system: it selects which of
     // the two FK columns is filled, and a CHECK pins the other to null. The
-    // operation window is only ever non-null on ICD-9 (procedure) rows.
+    // operation window and type are only ever non-null on ICD-9 (procedure) rows.
     public void insertCaseCode(String caseId, String codeSystem, int icdCodeId, String role,
                                String source, String imedRefId, Integer assignedBy, String assignedAt,
-                               String operationStart, String operationEnd) {
+                               String operationStart, String operationEnd, String operationType) {
         boolean nine = IcdSystem.of(codeSystem) == IcdSystem.ICD_9;
         jdbc.update("""
                 INSERT INTO case_codes (case_id, icd_10_id, icd_9_id, code_role, source, imed_ref_id,
-                                        assigned_by, assigned_at, operation_start, operation_end)
-                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                                        assigned_by, assigned_at, operation_start, operation_end,
+                                        operation_type)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 caseId, nine ? null : icdCodeId, nine ? icdCodeId : null,
                 role, source, imedRefId, assignedBy, assignedAt,
-                nine ? operationStart : null, nine ? operationEnd : null);
+                nine ? operationStart : null, nine ? operationEnd : null,
+                nine ? operationType : null);
     }
 
     // app.py:185 / writeback.py:67,82,121 — audit-trail row (created_at = DB default)
@@ -128,7 +130,7 @@ public class CodingRepository {
                        COALESCE(t10.code, t9.code) AS code,
                        CASE WHEN cc.icd_10_id IS NOT NULL THEN 'ICD-10' ELSE 'ICD-9' END AS code_system,
                        COALESCE(t10.description, t9.description) AS description,
-                       cc.operation_start, cc.operation_end
+                       cc.operation_start, cc.operation_end, cc.operation_type
                 FROM case_codes cc
                 LEFT JOIN icd_10 t10 ON t10.icd_10_id = cc.icd_10_id
                 LEFT JOIN icd_9  t9  ON t9.icd_9_id   = cc.icd_9_id

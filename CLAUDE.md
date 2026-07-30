@@ -268,6 +268,32 @@ Milestones (git log --oneline reads as this sequence):
   validation. imed-mock-api needed NO change (it already persisted the four
   fields). Tests: sync-import + edit→approve→reopen round trips in
   `CasesApiIntegrationTest` (the second also covers the verbose-label fix).
+- ✅ **Hospital-UI elements: operation type + vital signs (2026-07-30):** the
+  hospital wants our app to show the same fields as its own coder UI (screenshots
+  in the 2026-07-30 session; gap analysis → memory + open question 11). The two
+  gaps closeable without hospital help, both end-to-end: (1) **operation type**
+  — the extract's `operationtype` on ICD-9 procedures ("OR Procedure" / "NON OR
+  Procedure" / "OTH" / "GENERAL_OPERATION"), previously read by sync only as a
+  surgery-order filter and discarded. Now: `case_codes.operation_type` (text,
+  ICD-9 only, guarded in both insert paths; SchemaBootstrap + migration 0005),
+  sync imports it, detail `codes[]` serves it, CodeEdit `operation_type` carries
+  it through approve, and the write-back POST sends it as
+  `fix_operation_type_id` when present (else the GENERAL_OPERATION placeholder,
+  unchanged; PUT/diff still ignore it — settable on create only). Reopen
+  re-creates carry the hospital's original value via the journal before-image.
+  (2) **vital signs** — `medhack_vitalsign` existed in the imed DB and the mock
+  already served `GET /api/cases/{tn}/vital-signs`; nothing on our side read it.
+  Now: `case_vitals` table (hospital-sourced, refresh = delete+reinsert, blanks
+  → null), synced per case, served as detail `vitals[]` (chronological), sync
+  stats gains `vitals`. Frontend (`../audit-chart-frontend`): ICD-9 cards show
+  an operation-type chip, Add-code ICD-9 box + both Edit modals get a Type
+  dropdown (`OPERATION_TYPES` in `utils/operationTime.ts`, default "OR
+  Procedure", unknown hospital values still render + round-trip), and a
+  `VitalsStrip` table (Time | BT | BP | PR | O2Sat | Wt | Ht, hospital-style)
+  sits above the report text on all three detail pages. The rest of the
+  hospital's UI fields (doctor, clinic, per-dx note, chronic flag, recorder,
+  WHO/TM/CM, Extension Code) are NOT in the extract — blocked on the hospital,
+  tracked in `docs/imed-integration.md` open questions.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

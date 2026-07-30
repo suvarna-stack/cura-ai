@@ -67,7 +67,7 @@ Decisions taken 2026-07-24 (with the team):
 | `desc` | `icd9_description` + `beginning_operation` |
 | `operation_start` (2026-07-30; split on the space) | `date_in` + `time_in` |
 | `operation_end` (ditto) | `date_out` + `time_out` |
-| — | `fix_operation_type_id` (master data TBD; mock accepts any non-blank) |
+| `operation_type` (2026-07-30; extract `operationtype` verbatim) | `fix_operation_type_id` when present, else the `GENERAL_OPERATION` placeholder (master data TBD; mock accepts any non-blank) |
 | constant | `is_from: "MED_DC"` |
 
 The operation window rides the same never-blank rule as descriptions: sent
@@ -112,3 +112,8 @@ the shape is ours to negotiate.
    What status does an unknown `visit_id` return (the mock uses 400
    `invalid_request`)?
 10. **UAT**: URL, Bearer-token issuance, and test visits we may write to.
+11. **ICD-9 Extension Code**: the coder UI's operation grid has an
+    "Extension Code" column (seen in screenshots 2026-07-30) that appears
+    nowhere in the write-API PDF fields or the extract we sync. What is it,
+    where does it live in the data, and do our diff writes need to carry it
+    (or risk dropping it when we PUT a changed row)?

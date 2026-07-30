@@ -143,9 +143,16 @@ real values here when the extract has them).
   "codes":    [ { "code": "…", "code_system": "ICD-10|ICD-9", "description": "…",
                   "code_role": "…", "source": "imported_from_imed|coder_assigned",
                   "operation_start": "YYYY-MM-DD HH:MM:SS|null",   // procedure time window —
-                  "operation_end": "YYYY-MM-DD HH:MM:SS|null" }, ... ],  // ICD-9 rows only, always null on ICD-10
+                  "operation_end": "YYYY-MM-DD HH:MM:SS|null",     // ICD-9 rows only, always null on ICD-10
+                  "operation_type": "OR Procedure|NON OR Procedure|OTH|…|null"
+                  }, ... ],   // ^ the extract's operationtype verbatim — ICD-9 rows only, null on ICD-10
   "orders":   [ { "order_category": "…", "imed_source": "…", "order_name": "…",
                   "ordered_at": "…" }, ... ],        // max 150, category-grouped
+  "vitals":   [ { "measured_at": "YYYY-MM-DD HH:MM:SS|null", "temperature": "36.5",
+                  "systolic": "119", "diastolic": "80", "heart_rate": "98",
+                  "oxygen_saturation": "97", "weight": "65", "height": "157"
+                  }, ... ],   // hospital vital-sign readings, chronological (nulls first);
+                              // every value raw hospital text or null (blank → null)
   "history":  [ { "action": "approved_single", "coder": "demo.coder",
                   "at": "2026-07-20 09:00:00",
                   "detail": { "by": "demo.coder", "codes": 1 } }, ... ],  // coder audit trail, oldest first
@@ -178,7 +185,10 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
     "desc": "Type 2 diabetes",
     "missing": false,         // truthy → row skipped at approve
     "operation_start": "2026-04-02 23:55:00",  // ICD-9 rows only: the procedure's time
-    "operation_end": "2026-04-03 05:05:00"     // window, written to iMed on approve
+    "operation_end": "2026-04-03 05:05:00",    // window, written to iMed on approve
+    "operation_type": "OR Procedure"           // ICD-9 rows only: extract vocabulary
+                              // ("OR Procedure" / "NON OR Procedure" / "OTH");
+                              // blank → null, ignored on ICD-10 rows
   }, ... ]                    // extra fields are stored + echoed, not interpreted
 ```
 
@@ -189,6 +199,9 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
 `YYYY-MM-DD HH:MM:SS`; unparseable values degrade to null, like the rest of
 the edit parsing). The UI treats the window as required and pre-fills "now";
 the backend stays lenient because hospital-synced rows may lack times.
+`operation_type` rides along the same way: stored on the ICD-9 `case_codes`
+row at approve and sent to iMed as `fix_operation_type_id` when present
+(absent → the `GENERAL_OPERATION` placeholder, unchanged behavior).
 
 Responses: `{"ok": true}` · `400` (not an array) · `404` (unknown case).
 Working state never invalidates the dashboard cache and survives reopen.
@@ -262,7 +275,7 @@ it briefly blocks approve/reopen. Response:
   "skippedApproved": ["<case_id>", …],   // finalized, left untouched
   "failed": [ { "caseId": "<case_id>", "error": "<message>" }, … ],
   "stats": { "cases": 0, "sections": 0, "codes": 0, "orders": 0,
-             "chunks": 0, "coverageTypes": 0 } }
+             "chunks": 0, "vitals": 0, "coverageTypes": 0 } }
 ```
 
 Note: the hospital's list endpoint has no "changed since" filter, so the fetch

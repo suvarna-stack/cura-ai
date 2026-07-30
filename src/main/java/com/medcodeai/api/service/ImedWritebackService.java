@@ -45,9 +45,10 @@ import java.util.UUID;
 public class ImedWritebackService {
 
     /** One finalized code the hospital should hold after approve. start/end
-     *  are the operation window ("YYYY-MM-DD HH:MM:SS"), icd9 only. */
+     *  are the operation window ("YYYY-MM-DD HH:MM:SS") and opType the
+     *  extract-vocabulary operation type ("OR Procedure" …), icd9 only. */
     public record TargetCode(String kind, String code, String name, String diagnosisType,
-            String start, String end) {
+            String start, String end, String opType) {
     }
 
     private final ImedApiClient imed;
@@ -218,8 +219,11 @@ public class ImedWritebackService {
                 r.put("icd9_code", t.code());
                 putName(r, "icd9_description", "beginning_operation", t.name());
                 putWindow(r, t);
-                // placeholder until the hospital's master data arrives (open q.2)
-                r.put("fix_operation_type_id", "GENERAL_OPERATION");
+                // the stored extract-vocabulary type when we hold one;
+                // GENERAL_OPERATION stays the placeholder until the hospital's
+                // master data arrives (open q.2)
+                r.put("fix_operation_type_id",
+                        t.opType() != null && !t.opType().isBlank() ? t.opType() : "GENERAL_OPERATION");
                 r.put("is_from", "MED_DC");
                 icd9.add(r);
             }
@@ -328,7 +332,8 @@ public class ImedWritebackService {
         return new TargetCode(kind, str(row.get("icd")), str(row.get("name")),
                 str(row.get("diagnosistype")),
                 SyncRules.parseDt(str(row.get("startdatetime"))),
-                SyncRules.parseDt(str(row.get("enddatetime"))));
+                SyncRules.parseDt(str(row.get("enddatetime"))),
+                str(row.get("operationtype")));
     }
 
     private List<Map<String, Object>> liveRows(String tn, String kind) {

@@ -275,20 +275,58 @@ class CasesApiIntegrationTest {
         JsonNode codes = getJson("/api/cases/" + KNOWN_CASE_ID).get("codes");
         boolean sawTimedIcd9 = false;
         for (JsonNode c : codes) {
-            assertTrue(c.has("operation_start") && c.has("operation_end"),
-                    "every code row carries the operation window keys");
+            assertTrue(c.has("operation_start") && c.has("operation_end") && c.has("operation_type"),
+                    "every code row carries the operation window + type keys");
             if ("ICD-10".equals(c.get("code_system").asString())) {
-                assertTrue(c.get("operation_start").isNull() && c.get("operation_end").isNull(),
-                        "a diagnosis has no operation window");
+                assertTrue(c.get("operation_start").isNull() && c.get("operation_end").isNull()
+                                && c.get("operation_type").isNull(),
+                        "a diagnosis has no operation window or type");
             }
             if ("54.23".equals(c.get("code").asString())) {
-                // the biopsy row's window, verbatim from the hospital extract
+                // the biopsy row's window and type, verbatim from the hospital extract
                 assertEquals("2026-04-02 23:55:00", c.get("operation_start").asString());
                 assertEquals("2026-04-02 05:05:00", c.get("operation_end").asString());
+                assertEquals("OR Procedure", c.get("operation_type").asString());
                 sawTimedIcd9 = true;
             }
         }
         assertTrue(sawTimedIcd9, "expected the imported 54.23 procedure with its hospital times");
+    }
+
+    @Test
+    void syncImportsTheHospitalVitalSigns() throws Exception {
+        // KNOWN_CASE_ID has vital-sign readings in the frozen imed seed; the
+        // detail serves them chronologically with blanks normalized to null
+        postJson("/api/cases/" + KNOWN_CASE_ID + "/sync");
+
+        JsonNode vitals = getJson("/api/cases/" + KNOWN_CASE_ID).get("vitals");
+        assertNotNull(vitals, "detail must carry a vitals array");
+        assertTrue(vitals.size() > 0, "KNOWN_CASE_ID has seeded vital-sign rows");
+        JsonNode reading = null;
+        String prev = null;
+        for (JsonNode v : vitals) {
+            for (String k : List.of("measured_at", "temperature", "systolic", "diastolic",
+                    "heart_rate", "oxygen_saturation", "weight", "height")) {
+                assertTrue(v.has(k), "every vitals row carries the " + k + " key");
+            }
+            if (!v.get("measured_at").isNull()) {
+                String at = v.get("measured_at").asString();
+                assertTrue(prev == null || prev.compareTo(at) <= 0, "vitals sort chronologically");
+                prev = at;
+            }
+            if ("2026-04-02 10:00:00".equals(v.get("measured_at").asString())) {
+                reading = v;
+            }
+        }
+        // one seeded reading, verbatim — and its blank columns served as null
+        assertNotNull(reading, "expected the seeded 2026-04-02 10:00 reading");
+        assertEquals("37", reading.get("temperature").asString());
+        assertEquals("98", reading.get("systolic").asString());
+        assertEquals("60", reading.get("diastolic").asString());
+        assertEquals("94", reading.get("heart_rate").asString());
+        assertEquals("96", reading.get("oxygen_saturation").asString());
+        assertTrue(reading.get("weight").isNull() && reading.get("height").isNull(),
+                "blank hospital values are normalized to null");
     }
 
     @Test
@@ -311,7 +349,8 @@ class CasesApiIntegrationTest {
         // must resolve it to the ICD-9 catalog (it used to 500 on IcdSystem.of)
         entries.add("""
                 {"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
-                 "operation_start":"2026-04-08T11:20","operation_end":"2026-04-08 12:05:00"}""");
+                 "operation_start":"2026-04-08T11:20","operation_end":"2026-04-08 12:05:00",
+                 "operation_type":"OR Procedure"}""");
         try {
             mvc.perform(put("/api/cases/{id}/codes", APPROVABLE_CASE_ID).header("Authorization", auth())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -335,6 +374,8 @@ class CasesApiIntegrationTest {
             assertEquals("2026-04-08 11:20:00", ours.get("operation_start").asString(),
                     "datetime-local input is normalized to YYYY-MM-DD HH:MM:SS");
             assertEquals("2026-04-08 12:05:00", ours.get("operation_end").asString());
+            assertEquals("OR Procedure", ours.get("operation_type").asString(),
+                    "the edit's operation_type materializes onto the coder_assigned row");
         } finally {
             // revert the hospital create + our coder_assigned rows…
             mvc.perform(post("/api/cases/{id}/reopen", APPROVABLE_CASE_ID).header("Authorization", auth())

@@ -152,6 +152,10 @@ public class ImedApiClient {
         return getRows("/api/cases/{tn}/bed-management", tn);
     }
 
+    public List<Map<String, Object>> vitalSigns(String tn) {
+        return getRows("/api/cases/{tn}/vital-signs", tn);
+    }
+
     public List<Map<String, Object>> billingItems(String tn) {
         return getRows("/api/cases/{tn}/billing-items", tn);
     }

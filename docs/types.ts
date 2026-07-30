@@ -128,6 +128,8 @@ export interface CaseDetail {
   codes: DetailCodeRow[];
   /** max 150, grouped by category */
   orders: DetailOrderRow[];
+  /** hospital vital-sign readings, chronological (empty array when none) */
+  vitals: DetailVitalRow[];
   /** this case's coder audit trail, oldest first (empty array when none) */
   history: CaseHistoryEntry[];
   /** last PUT …/codes payload, echoed verbatim; null when never saved */
@@ -200,6 +202,30 @@ export interface DetailCodeRow {
    *  null on ICD-10 (and null on ICD-9 when the hospital never recorded it). */
   operation_start: string | null;
   operation_end: string | null;
+  /** The hospital's operation type, extract vocabulary verbatim ("OR
+   *  Procedure" / "NON OR Procedure" / "OTH" / …) — ICD-9 rows only, always
+   *  null on ICD-10 (and null when the hospital left it blank). */
+  operation_type: string | null;
+}
+
+/** One hospital vital-sign reading (the strip above CC/PI/PE in the coder
+ *  UI). Every value is raw hospital text or null — blanks are normalized to
+ *  null, nothing is parsed or unit-converted. */
+export interface DetailVitalRow {
+  /** "YYYY-MM-DD HH:MM:SS"; rows sort by this, nulls first */
+  measured_at: string | null;
+  /** °C */
+  temperature: string | null;
+  /** blood pressure, mmHg — the UI's "119/80" is systolic "/" diastolic */
+  systolic: string | null;
+  diastolic: string | null;
+  /** beats per minute */
+  heart_rate: string | null;
+  /** % */
+  oxygen_saturation: string | null;
+  /** kg / cm */
+  weight: string | null;
+  height: string | null;
 }
 
 export interface DetailOrderRow {
@@ -231,6 +257,10 @@ export interface CodeEdit {
    *  requires it (pre-filled with "now"); the backend is lenient. */
   operation_start?: string;
   operation_end?: string;
+  /** Operation type — interpreted on ICD-9 rows only, stored verbatim
+   *  (extract vocabulary: "OR Procedure" / "NON OR Procedure" / "OTH");
+   *  blank → null. Sent to iMed as fix_operation_type_id when present. */
+  operation_type?: string;
   [extra: string]: unknown;
 }
 
@@ -286,6 +316,7 @@ export interface SyncResponse {
     codes: number;
     orders: number;
     chunks: number;
+    vitals: number;
     coverageTypes: number;
   };
 }

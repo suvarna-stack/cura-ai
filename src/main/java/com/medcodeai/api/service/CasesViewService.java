@@ -355,6 +355,7 @@ public class CasesViewService {
         out.put("sections", sections);
         out.put("codes", repo.detailCodeRows(caseId));
         out.put("orders", repo.detailOrderRows(caseId));
+        out.put("vitals", repo.detailVitalRows(caseId));
         out.put("history", history);
         return out;
     }

@@ -144,7 +144,8 @@ public class SyncService {
             List<Map<String, Object>> drugs,
             List<Map<String, Object>> labs,
             List<Map<String, Object>> beds,
-            List<Map<String, Object>> bills) {
+            List<Map<String, Object>> bills,
+            List<Map<String, Object>> vitals) {
     }
 
     private CaseBundle fetchBundle(String tn) {
@@ -156,7 +157,8 @@ public class SyncService {
                 imed.orderDrugs(tn),
                 imed.orderLabs(tn),
                 imed.bedManagement(tn),
-                imed.billingItems(tn));
+                imed.billingItems(tn),
+                imed.vitalSigns(tn));
     }
 
     // sync.py:147 the per-case body: derive CREATE fields, then load READ rows
@@ -208,6 +210,7 @@ public class SyncService {
             sync.deleteChunks(tn);
             sync.deleteOrders(tn);
             sync.deleteImportedCodes(tn);
+            sync.deleteVitals(tn);
         }
         bump(stats, "cases");
 
@@ -234,7 +237,7 @@ public class SyncService {
                 String dtype = str(d.get("diagnosistype"));
                 importCode(tn, icd, "ICD-10", str(d.get("name")),
                         dtype == null ? "other" : SyncRules.DIAG_ROLE.getOrDefault(dtype, "other"),
-                        str(d.get("id")), null, null, stats);
+                        str(d.get("id")), null, null, null, stats);
             }
         }
         for (Map<String, Object> pr : b.procs()) {
@@ -242,8 +245,23 @@ public class SyncService {
             if (truthy(icd)) {
                 importCode(tn, icd, "ICD-9", str(pr.get("name")), "procedure", str(pr.get("id")),
                         SyncRules.parseDt(str(pr.get("startdatetime"))),
-                        SyncRules.parseDt(str(pr.get("enddatetime"))), stats);
+                        SyncRules.parseDt(str(pr.get("enddatetime"))),
+                        trimOrNull(str(pr.get("operationtype"))), stats);
             }
+        }
+
+        // READ → vital-sign readings (the hospital UI's strip above CC/PI/PE);
+        // verbatim text, blanks normalized to null
+        for (Map<String, Object> v : b.vitals()) {
+            sync.insertVital(tn, SyncRules.parseDt(str(v.get("measuredatetime"))),
+                    trimOrNull(str(v.get("temperature"))),
+                    trimOrNull(str(v.get("systolicbloodpressure"))),
+                    trimOrNull(str(v.get("diastolicbloodpressure"))),
+                    trimOrNull(str(v.get("heartrate"))),
+                    trimOrNull(str(v.get("oxygensaturation"))),
+                    trimOrNull(str(v.get("weight"))),
+                    trimOrNull(str(v.get("height"))));
+            bump(stats, "vitals");
         }
 
         // READ → orders (drugs, labs, radiology results, OR procedures, billing)
@@ -281,12 +299,12 @@ public class SyncService {
     // sync.py:207 code_row() — find-or-create the catalog row, then link it
     private void importCode(String tn, String code, String system, String desc,
                             String role, String ref, String operationStart, String operationEnd,
-                            Map<String, Integer> stats) {
+                            String operationType, Map<String, Integer> stats) {
         Integer icdId = coding.findIcdCodeId(code, system);
         if (icdId == null) {
             icdId = coding.insertIcdCode(code, system, desc);
         }
-        sync.insertImportedCode(tn, system, icdId, role, ref, operationStart, operationEnd);
+        sync.insertImportedCode(tn, system, icdId, role, ref, operationStart, operationEnd, operationType);
         bump(stats, "codes");
     }
 
@@ -313,7 +331,7 @@ public class SyncService {
 
     private static Map<String, Integer> newStats() {
         Map<String, Integer> s = new LinkedHashMap<>();
-        for (String k : List.of("cases", "sections", "codes", "orders", "chunks", "coverageTypes")) {
+        for (String k : List.of("cases", "sections", "codes", "orders", "chunks", "vitals", "coverageTypes")) {
             s.put(k, 0);
         }
         return s;

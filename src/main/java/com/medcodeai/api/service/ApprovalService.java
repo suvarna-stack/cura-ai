@@ -305,7 +305,8 @@ public class ApprovalService {
             }
 
             coding.insertCaseCode(tn, system, icdId, role, "coder_assigned", null, uid, now,
-                    opTime(e.get("operation_start")), opTime(e.get("operation_end")));
+                    opTime(e.get("operation_start")), opTime(e.get("operation_end")),
+                    blankToNull(str(e.get("operation_type"))));
             bump(stats, "coder_codes_created");
             written++;
         }
@@ -330,7 +331,7 @@ public class ApprovalService {
         }
         coding.insertCaseCode(tn, (String) row.get("code_system"),
                 ((Number) row.get("icd_code_id")).intValue(),
-                (String) row.get("code_role"), "coder_assigned", null, uid, now, null, null);
+                (String) row.get("code_role"), "coder_assigned", null, uid, now, null, null, null);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);
         detail.put("simulated", true);
@@ -370,9 +371,11 @@ public class ApprovalService {
                     // reverse Q3 role mapping, ours -> theirs (diagnoses only)
                     procedure ? null
                             : ROLE_TO_DIAGTYPE.getOrDefault((String) cc.get("code_role"), "OTHERS"),
-                    // operation window (procedures only; null on diagnoses by schema)
+                    // operation window + type (procedures only; null on
+                    // diagnoses by schema)
                     (String) cc.get("operation_start"),
-                    (String) cc.get("operation_end")));
+                    (String) cc.get("operation_end"),
+                    (String) cc.get("operation_type")));
         }
         ops.add(new ImedOp(tn, encountertype, targets, coder, now));
         bump(stats, "status_rows");
@@ -424,6 +427,10 @@ public class ApprovalService {
     private static String opTime(Object v) {
         String s = str(v);
         return s == null ? null : SyncRules.parseDt(s.replace('T', ' '));
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.strip();
     }
 
     // Python truthiness for JSON values (e.get("missing") checks)

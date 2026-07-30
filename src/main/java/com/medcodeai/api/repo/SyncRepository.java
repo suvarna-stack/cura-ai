@@ -91,19 +91,32 @@ public class SyncRepository {
     }
 
     // sync.py:215 code_row() — imported code row; assigned_by/assigned_at keep
-    // their DB defaults (this is not coder work). The operation window is only
-    // ever non-null on ICD-9 (procedure) rows — the guard here keeps stray
-    // values off diagnoses no matter what the caller passes.
+    // their DB defaults (this is not coder work). The operation window and type
+    // are only ever non-null on ICD-9 (procedure) rows — the guard here keeps
+    // stray values off diagnoses no matter what the caller passes.
     public void insertImportedCode(String caseId, String codeSystem, int icdCodeId,
                                    String role, String imedRefId,
-                                   String operationStart, String operationEnd) {
+                                   String operationStart, String operationEnd, String operationType) {
         boolean nine = IcdSystem.of(codeSystem) == IcdSystem.ICD_9;
         jdbc.update("""
                 INSERT INTO case_codes (case_id, icd_10_id, icd_9_id, code_role, source, imed_ref_id,
-                                        operation_start, operation_end)
-                VALUES (?,?,?,?,'imported_from_imed',?,?,?)""",
+                                        operation_start, operation_end, operation_type)
+                VALUES (?,?,?,?,'imported_from_imed',?,?,?,?)""",
                 caseId, nine ? null : icdCodeId, nine ? icdCodeId : null, role, imedRefId,
-                nine ? operationStart : null, nine ? operationEnd : null);
+                nine ? operationStart : null, nine ? operationEnd : null,
+                nine ? operationType : null);
+    }
+
+    /** One hospital vital-signs reading (medhack_vitalsign), verbatim text. */
+    public void insertVital(String caseId, String measuredAt, String temperature,
+                            String systolic, String diastolic, String heartRate,
+                            String oxygenSaturation, String weight, String height) {
+        jdbc.update("""
+                INSERT INTO case_vitals (case_id, measured_at, temperature, systolic, diastolic,
+                                         heart_rate, oxygen_saturation, weight, height)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                caseId, measuredAt, temperature, systolic, diastolic,
+                heartRate, oxygenSaturation, weight, height);
     }
 
     // sync.py:224 order_row() — one order; order_detail is the raw hospital row as JSON
@@ -138,6 +151,10 @@ public class SyncRepository {
 
     public void deleteOrders(String caseId) {
         jdbc.update("DELETE FROM case_orders WHERE case_id=?", caseId);
+    }
+
+    public void deleteVitals(String caseId) {
+        jdbc.update("DELETE FROM case_vitals WHERE case_id=?", caseId);
     }
 
     /** Imported codes ONLY — coder_assigned rows are never removed by a sync. */

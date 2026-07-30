@@ -68,6 +68,32 @@ public class SchemaBootstrap implements ApplicationRunner {
         jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_start text");
         jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_end text");
 
+        // Operation type on procedure rows (2026-07-30): the extract's
+        // operationtype ("OR Procedure" / "NON OR Procedure" / "OTH" / …),
+        // stored verbatim like the window above; null on ICD-10 rows. Feeds the
+        // coder UI's Type element and, when present, the write-back's
+        // fix_operation_type_id. Mirrored in db/migrations/0005.
+        jdbc.execute("ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_type text");
+
+        // Vital signs (2026-07-30): the extract's medhack_vitalsign rows, one
+        // table per hospital reading — the coder UI shows them above CC/PI/PE.
+        // Hospital-sourced (sync refresh deletes + reinserts), raw text
+        // verbatim, blanks normalized to null. Mirrored in db/migrations/0005.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS case_vitals (
+                    vital_id          serial PRIMARY KEY,
+                    case_id           varchar(50) NOT NULL,
+                    measured_at       text,
+                    temperature       text,
+                    systolic          text,
+                    diastolic         text,
+                    heart_rate        text,
+                    oxygen_saturation text,
+                    weight            text,
+                    height            text
+                )""");
+        jdbc.execute("CREATE INDEX IF NOT EXISTS case_vitals_case_idx ON case_vitals (case_id)");
+
         Long admins = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM users WHERE role = 'admin'", Long.class);
         if (admins != null && admins > 0) {
