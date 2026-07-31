@@ -91,3 +91,17 @@ body {
   outline: 2px solid var(--focus-ring, #2563eb);
   outline-offset: 2px;
 }
+
+/* WCAG 2.3.3 — kill decorative motion (tab slide, pulse/spin skeletons,
+   hover scale) for users who asked the OS for reduced motion. !important
+   also overrides inline transition styles. Tab switching still works: it
+   settles via setTimeout, not transitionend. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

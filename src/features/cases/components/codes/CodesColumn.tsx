@@ -148,7 +148,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             {onEdit && (
               <button onClick={() => onEdit(index)} title={t("code.edit")}
                 aria-label={`${t("code.edit")} ${entry.code}`}
-                className="w-5 h-5 flex items-center justify-center rounded-md transition-all hover:scale-110"
+                className="w-6 h-6 flex items-center justify-center rounded-md transition-all hover:scale-110"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>
                 <Edit3 size={10} />
               </button>
@@ -156,7 +156,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             {onDelete && (
               <button onClick={() => onDelete(index)} title={t("confirm.deleteCode")}
                 aria-label={`${t("confirm.deleteCode")} ${entry.code}`}
-                className="w-5 h-5 flex items-center justify-center rounded-md transition-all hover:scale-110"
+                className="w-6 h-6 flex items-center justify-center rounded-md transition-all hover:scale-110"
                 style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>
                 <Trash2 size={10} />
               </button>

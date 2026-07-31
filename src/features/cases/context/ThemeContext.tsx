@@ -17,7 +17,7 @@ const themes: Record<ThemeId, ThemeConfig> = {
   "light-rose": {
     label: "Rose Gold Light",
     // preview: [background, secondary, accent] — used in the theme picker UI
-    preview: ["#FDF5F7", "#fce4ec", "#C9748A"],
+    preview: ["#FDF5F7", "#fce4ec", "#A34D66"],
     bg: {
       // Multi-layer radial gradients for a soft blush halo effect on a light base
       background: `
@@ -35,12 +35,15 @@ const themes: Record<ThemeId, ThemeConfig> = {
       border: "1px solid rgba(255,255,255,0.90)", borderSm: "1px solid rgba(255,255,255,0.80)",
       // Drop shadows with rose-tinted color
       shadow: "0 4px 20px rgba(180,80,100,0.08)", shadowSm: "0 2px 8px rgba(180,80,100,0.06)",
-      // Typography — dark base text, 50% opacity muted color
-      text: "#1A0810", muted: "rgba(80,20,40,0.50)",
-      // Accent color (rose-gold) used for highlights, active states, icons
-      accent: "#C9748A", accentGrad: "#C9748A", accentRgb: "201,116,138",
+      // Typography — dark base text; muted at 70% passes 4.5:1 (WCAG 1.4.3;
+      // the old 0.50 sat near 3:1)
+      text: "#1A0810", muted: "rgba(80,20,40,0.70)",
+      // Accent (rose-gold) used AS TEXT for headings/labels/chips, so it must
+      // pass 4.5:1 on the blush background — #A34D66 is the same hue, darker
+      // (the old #C9748A was ~3.1:1)
+      accent: "#A34D66", accentGrad: "#A34D66", accentRgb: "163,77,102",
       // Semantic colors
-      success: "#C9748A", warning: "#D97706", danger: "#DC2626", info: "#2563EB",
+      success: "#A34D66", warning: "#D97706", danger: "#DC2626", info: "#2563EB",
       // Sticky header + form input backgrounds
       headerBg: "rgba(253,245,247,0.80)", inputBg: "rgba(255,255,255,0.60)",
       sidebarBorder: "1px solid rgba(201,116,138,0.12)",
@@ -71,8 +74,9 @@ const themes: Record<ThemeId, ThemeConfig> = {
       border: "1px solid rgba(255,255,255,0.10)", borderSm: "1px solid rgba(255,255,255,0.08)",
       // Stronger black shadows for depth in dark mode
       shadow: "0 4px 24px rgba(0,0,0,0.30)", shadowSm: "0 2px 12px rgba(0,0,0,0.25)",
-      // Light cream text on dark backgrounds
-      text: "#F5ECED", muted: "rgba(255,220,225,0.50)",
+      // Light cream text on dark backgrounds; muted at 70% clears 4.5:1 on
+      // the glass cards (WCAG 1.4.3)
+      text: "#F5ECED", muted: "rgba(255,220,225,0.70)",
       accent: "#C9748A", accentGrad: "#C9748A", accentRgb: "201,116,138",
       // Lighter pink tones for success/warning in dark context for better readability
       success: "#F0A0B0", warning: "#E8907A", danger: "#F87171", info: "#60A5FA",
@@ -138,7 +142,8 @@ const themes: Record<ThemeId, ThemeConfig> = {
       // Pure black borders for clear edge definition in a colorless theme
       border: "1px solid rgba(0,0,0,0.10)", borderSm: "1px solid rgba(0,0,0,0.08)",
       shadow: "0 4px 20px rgba(0,0,0,0.08)", shadowSm: "0 2px 8px rgba(0,0,0,0.06)",
-      text: "#111111", muted: "rgba(0,0,0,0.42)",
+      // muted at 60% black passes 4.5:1 on the near-white base (old 0.42 ≈ 3:1)
+      text: "#111111", muted: "rgba(0,0,0,0.60)",
       // Near-black accent for a high-contrast, accessible mono palette
       accent: "#1A1A1A", accentGrad: "#1A1A1A", accentRgb: "26,26,26",
       success: "#2D2D2D", warning: "#555555", danger: "#DC2626", info: "#2563EB",
