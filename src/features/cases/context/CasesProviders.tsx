@@ -57,7 +57,10 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   return (
     <ThemeCtx.Provider value={{ themeId, setThemeId, gl }}>
       <div
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+        // h-dvh, not h-full: nothing above (#root/body/html) carries a height,
+        // so h-full collapsed to content height and every internal scroll area
+        // (report panel, code columns' pinned "+ Add code" foot) stopped working
+        className="flex h-dvh min-h-0 w-full flex-col overflow-hidden"
         style={
           {
             ...theme.bg,
