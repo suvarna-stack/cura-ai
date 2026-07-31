@@ -24,20 +24,27 @@ const COLS: { label: string; value: (v: Vital) => string | null }[] = [
   { label: "Ht(cm)",    value: (v) => v.height },
 ];
 
-export function VitalsStrip({ detail }: { detail: ApiCaseDetail | null }) {
+export function VitalsStrip({ detail, embedded }: {
+  detail: ApiCaseDetail | null;
+  /** inside a HospitalPanels panel: the CC,PI,PE box already gives context,
+   *  so skip the heading and tighten the margin */
+  embedded?: boolean;
+}) {
   const { gl } = useTheme();
   const { t } = useLang();
   const vitals = detail?.vitals ?? [];
   if (vitals.length === 0) return null;
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Activity size={12} style={{ color: gl.accent }} />
-        <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>
-          {t("vitals.title")}
-        </p>
-      </div>
+    <div className={embedded ? "mb-2.5" : "mb-4"}>
+      {!embedded && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Activity size={12} style={{ color: gl.accent }} />
+          <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>
+            {t("vitals.title")}
+          </p>
+        </div>
+      )}
       {/* IPD cases can carry hundreds of readings — scroll inside the strip
           (like the hospital's own pane) instead of pushing the report down */}
       <div className="overflow-x-auto overflow-y-auto rounded-lg scroll-thin"

@@ -173,6 +173,24 @@ export const dict: Record<string, { en: string; th: string }> = {
                              th: "เก็บในระบบ MedCode AI เท่านั้น ไม่ส่งไปโรงพยาบาล" },
   // hospital vital-sign readings (the strip above CC/PI/PE in the original coder UI)
   "vitals.title":          { en: "Vital Signs",             th: "สัญญาณชีพ" },
+  // hospital-style panel view of the record (2026-07-31), panel titles copied
+  // from the hospital's own coder screen
+  "hosp.view":        { en: "Hospital view",            th: "มุมมองโรงพยาบาล" },
+  "hosp.viewChrono":  { en: "Chronological",            th: "ตามลำดับเวลา" },
+  "hosp.ccpipe":      { en: "CC, PI, PE",               th: "CC, PI, PE" },
+  "hosp.pastHistory": { en: "Past History",             th: "ประวัติในอดีต" },
+  "hosp.labxray":     { en: "Lab / X-ray",              th: "แลบ / เอกซเรย์" },
+  "hosp.xray":        { en: "X-Ray",                    th: "เอกซเรย์" },
+  "hosp.diagproc":    { en: "Diagnosis / Procedure",    th: "การวินิจฉัย / หัตถการ" },
+  "hosp.procedures":  { en: "Procedures (หัตถการ)",     th: "หัตถการ" },
+  "hosp.cpoe":        { en: "Order Entry (CPOE)",       th: "รายการสั่งแพทย์ (CPOE)" },
+  "hosp.invfinding":  { en: "Investigations Finding",   th: "ผลการตรวจเพิ่มเติม" },
+  "hosp.mgmt":        { en: "Management / Suggestion",  th: "การรักษา / คำแนะนำ" },
+  "hosp.progress":    { en: "Progress / Other Notes",   th: "บันทึกความคืบหน้า / อื่น ๆ" },
+  "hosp.orderName":   { en: "Order Name",               th: "ชื่อรายการ" },
+  "hosp.qty":         { en: "Qty.",                     th: "จำนวน" },
+  "hosp.empty":       { en: "No entries",               th: "ไม่มีข้อมูล" },
+  "hosp.shownOf":     { en: "showing {shown} of {total} orders", th: "แสดง {shown} จาก {total} รายการ" },
   // case history
   "btn.viewHistory": { en: "View History", th: "ดูประวัติ" },
   "history.title":   { en: "Case History", th: "ประวัติเคส" },

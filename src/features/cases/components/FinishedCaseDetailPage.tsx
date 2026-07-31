@@ -17,6 +17,7 @@ import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
+import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { codeTypeFromRole } from "../utils/aiSuggestions";
@@ -101,6 +102,8 @@ export function FinishedCaseDetailPage({
   // real report + final codes from the synced iMed data; the status tells
   // "still loading" apart from "fetch failed" so neither shows the wrong text
   const { detail, status } = useCaseDetail(caseData?.id);
+  // hospital-panel vs chronological record view (persisted, shared across pages)
+  const [view, setView] = useReportView();
   if (!caseData) return null;
   const c = caseData;
   const reportText = detail && detail.sections.length > 0
@@ -260,7 +263,8 @@ export function FinishedCaseDetailPage({
           <div className="px-5 py-4 shrink-0" style={{ borderBottom: gl.borderSm }}>
             <div className="flex items-center gap-2 mb-3">
               <FileText size={15} style={{ color: gl.accent }} />
-              <h2 className="text-[17px] font-bold" style={{ color: gl.text }}>Discharge Report</h2>
+              <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
+              <ReportViewToggle view={view} onChange={setView} />
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-1"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
@@ -276,6 +280,11 @@ export function FinishedCaseDetailPage({
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin" style={{ color: gl.text }}>
+            {/* hospital view = the record regrouped into the hospital's own
+                panels; the chronological path below is unchanged */}
+            {view === "hospital" && status !== "loading" && detail ? (
+              <HospitalPanels detail={detail} />
+            ) : (<>
             {/* hospital vital signs above the note text, like the original coder UI */}
             {status !== "loading" && <VitalsStrip detail={detail} />}
             {reportText ? (
@@ -289,6 +298,7 @@ export function FinishedCaseDetailPage({
             )}
             {status !== "loading" && <LabResults detail={detail} />}
             {status !== "loading" && <ReportOrders detail={detail} />}
+            </>)}
           </div>
         </div>
 

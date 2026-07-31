@@ -22,6 +22,7 @@ import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
+import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
@@ -363,6 +364,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   const loadingCodes = (status === "loading" || suggesting) && codes.length === 0;
 
+  // hospital-panel vs chronological record view (persisted, shared across pages)
+  const [view, setView] = useReportView();
+
   const panel: React.CSSProperties = {
     background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
     border: gl.border, boxShadow: gl.shadow,
@@ -473,6 +477,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             <div className="flex items-center gap-2 mb-3">
               <FileText size={15} style={{ color: gl.accent }} />
               <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
+              <ReportViewToggle view={view} onChange={setView} />
               {/* item 9: Edit Report removed — the record is read-only here */}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
@@ -480,6 +485,12 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin" style={{ color: gl.text }}>
+            {/* hospital view = the same record regrouped into the panels the
+                hospital's own coder UI shows; chronological view below is
+                unchanged and keeps the day-by-day document order */}
+            {view === "hospital" && status !== "loading" && detail ? (
+              <HospitalPanels detail={detail} />
+            ) : (<>
             {/* hospital vital signs above the note sections, like the original coder UI */}
             {status !== "loading" && <VitalsStrip detail={detail} />}
             {status === "loading" ? (
@@ -510,6 +521,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             {status !== "loading" && <LabResults detail={detail} />}
             {/* item 8: the orders/results behind the case, in the report */}
             {status !== "loading" && <ReportOrders detail={detail} />}
+            </>)}
           </div>
         </div>
 

@@ -22,6 +22,7 @@ import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
+import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
@@ -374,6 +375,9 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   }, [status, c.id]);
 
   const loadingContent = status === "loading" && loadReportDraft(c.id) === null;
+
+  // hospital-panel vs chronological record view (persisted, shared across pages)
+  const [view, setView] = useReportView();
   const loadingCodes = (status === "loading" || suggesting) && codes.filter(x => !x.missing).length === 0;
 
   const missingCount = codes.filter(x => x.missing).length;
@@ -494,13 +498,21 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
               <h2 className="text-[17px] font-bold" style={{ color: gl.text }}>Discharge Report</h2>
             </div>
             {/* item 9: Edit Report removed */}
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
+            <div className="flex items-center gap-2">
+              <ReportViewToggle view={view} onChange={setView} />
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
+            </div>
           </div>
           <div className="px-5 py-3 shrink-0" style={{ borderBottom: gl.borderSm }}>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin">
+            {/* hospital view = the record regrouped into the hospital's own
+                panels; the chronological path below is unchanged */}
+            {view === "hospital" && !loadingContent && detail ? (
+              <HospitalPanels detail={detail} />
+            ) : (<>
             {/* hospital vital signs above the note text, like the original coder UI */}
             {!loadingContent && <VitalsStrip detail={detail} />}
             {loadingContent ? (
@@ -512,6 +524,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             {!loadingContent && <LabResults detail={detail} />}
             {/* item 8: orders / X-ray / operative rows behind this case */}
             {!loadingContent && <ReportOrders detail={detail} />}
+            </>)}
           </div>
         </div>
 

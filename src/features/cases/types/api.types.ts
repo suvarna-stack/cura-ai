@@ -154,8 +154,9 @@ export interface ApiCaseDetail {
     ordered_at: string | null;
     /** the exact iMed source row — dosage, quantity, result value, unit,
      *  procedure times… Keys differ per imed_source, so the UI renders
-     *  whatever is present. Capped at 150 orders; see orderCounts. */
-    detail?: Record<string, string | null>;
+     *  whatever is present. Null when sync stored no source row. The array
+     *  is capped at 50 rows per category; see orderCounts for true totals. */
+    detail?: Record<string, string | null> | null;
   }[];
   /** true per-category order totals, even when `orders` is truncated */
   orderCounts?: Record<string, number>;

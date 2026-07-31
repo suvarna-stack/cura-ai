@@ -22,7 +22,9 @@ function reportParts(detail: ApiCaseDetail | null) {
   const has = (...names: string[]) =>
     (detail?.sections ?? []).some(
       (s) => names.some((n) => (s.fieldname ?? "").toLowerCase().includes(n)) && (s.value ?? "").trim() !== "");
-  const orders = (cat: string) => (detail?.orders ?? []).filter((o) => o.order_category === cat).length;
+  // true totals from orderCounts — the orders[] array is capped per category
+  const orders = (cat: string) =>
+    detail?.orderCounts?.[cat] ?? (detail?.orders ?? []).filter((o) => o.order_category === cat).length;
   return [
     { key: "CC&PI",     ok: has("chief complaint", "present illness", "subjective"), n: 0 },
     { key: "PE",        ok: has("physical examination", "objective"), n: 0 },

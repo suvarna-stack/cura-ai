@@ -27,14 +27,20 @@ function byPanel(rows: OrderRow[]): Map<string, OrderRow[]> {
   return panels;
 }
 
-export function LabResults({ detail }: { detail: ApiCaseDetail | null }) {
+export function LabResults({ detail, embedded }: {
+  detail: ApiCaseDetail | null;
+  /** inside a HospitalPanels panel: keep the Laboratory heading (the panel is
+   *  "Lab / X-ray") but drop the standalone divider chrome */
+  embedded?: boolean;
+}) {
   const { gl } = useTheme();
   const { t } = useLang();
   const labs = (detail?.orders ?? []).filter((o) => o.order_category === "lab");
   if (labs.length === 0) return null;
 
   return (
-    <div className="mt-5 pt-4" style={{ borderTop: `1px solid rgba(${gl.accentRgb},${gl.isDark ? 0.22 : 0.16})` }}>
+    <div className={embedded ? undefined : "mt-5 pt-4"}
+      style={embedded ? undefined : { borderTop: `1px solid rgba(${gl.accentRgb},${gl.isDark ? 0.22 : 0.16})` }}>
       <p className="text-[11px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: gl.accent }}>
         <FlaskConical size={12} /> {t("report.labs")}
       </p>
@@ -69,6 +75,12 @@ export function LabResults({ detail }: { detail: ApiCaseDetail | null }) {
           </div>
         ))}
       </div>
+      {/* the payload caps lab rows per category — say so, don't hide it */}
+      {(detail?.orderCounts?.lab ?? 0) > labs.length && (
+        <p className="text-[10px] font-normal mt-1" style={{ color: gl.muted }}>
+          {t("hosp.shownOf", { shown: labs.length, total: detail!.orderCounts!.lab })}
+        </p>
+      )}
     </div>
   );
 }
