@@ -143,3 +143,10 @@ the shape is ours to negotiate.
     abnormal marking — inventing our own ranges would be fake clinical
     judgment. Can the extract include the reference range or an abnormal
     flag per item?
+15. **Negative drug quantities**: `medhack_orderdrug.quantity` is sometimes
+    negative in the extract (e.g. NALBUPHINE `-6` next to positive rows for
+    the same drug on the same visit). We ASSUME that's a return/credit row
+    and display the value verbatim in the hospital-style Order Entry (CPOE)
+    panel (2026-07-31). Is that reading right, and should return rows be
+    shown, netted against the ordered quantity, or hidden in a coder-facing
+    order list? (Their own CPOE screen shows plain positive quantities.)

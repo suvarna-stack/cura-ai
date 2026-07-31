@@ -11,6 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -191,6 +192,45 @@ class CasesApiIntegrationTest {
                 .andExpect(jsonPath("$.case.admissiondatetime").value("2026-04-01 06:45:00"))
                 .andExpect(jsonPath("$.case.dischargedatetime").value("2026-04-10 16:22:41"))
                 .andExpect(jsonPath("$.case.encountertype").value("1"));
+    }
+
+    @Test
+    void caseDetailOrdersCarryDetailJsonAndTrueCounts() throws Exception {
+        // each order row serves its raw hospital source row as a `detail`
+        // object — the UI's lab results table (panelname/itemname/itemvalue)
+        // and medication chips (dosage, quantity) read it. The cap is 50 rows
+        // PER CATEGORY, so this lab-heavy case (400+ lab rows) still serves
+        // its medicine orders — the old global LIMIT 150 starved them out.
+        JsonNode body = getJson("/api/cases/" + KNOWN_CASE_ID);
+        JsonNode orders = body.get("orders");
+        assertTrue(orders.isArray() && orders.size() > 0, "expected a non-empty orders array");
+        boolean sawLabItem = false, sawMedicineQty = false;
+        Map<String, Integer> perCat = new java.util.HashMap<>();
+        for (JsonNode o : orders) {
+            assertTrue(o.has("detail"), "every order row carries the detail key");
+            perCat.merge(o.get("order_category").asString(), 1, Integer::sum);
+            if ("lab".equals(o.get("order_category").asString()) && o.get("detail").isObject()) {
+                sawLabItem |= o.get("detail").has("itemname") && o.get("detail").has("itemvalue");
+            }
+            if ("medicine".equals(o.get("order_category").asString()) && o.get("detail").isObject()
+                    && o.get("detail").hasNonNull("quantity")) {
+                // negative = a return/credit row (seed data really has "-6")
+                assertTrue(o.get("detail").get("quantity").asString().matches("-?\\d+"),
+                        "quantity is raw integer text, got " + o.get("detail").get("quantity"));
+                sawMedicineQty = true;
+            }
+        }
+        assertTrue(sawLabItem, "expected a lab row with itemname/itemvalue in its detail");
+        assertTrue(sawMedicineQty, "expected a medicine order with a quantity in its detail");
+        perCat.forEach((cat, n) ->
+                assertTrue(n <= 50, "per-category cap: " + cat + " served " + n + " rows"));
+        assertTrue(perCat.getOrDefault("lab", 0) == 50, "lab-heavy case should hit the 50-row lab cap");
+
+        // orderCounts = true totals per category, immune to the per-category cap
+        JsonNode counts = body.get("orderCounts");
+        assertNotNull(counts, "detail must carry orderCounts");
+        assertTrue(counts.get("lab").asInt() > 50,
+                "known case has 400+ lab orders; got " + counts.get("lab"));
     }
 
     @Test

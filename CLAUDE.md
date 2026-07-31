@@ -313,6 +313,30 @@ Milestones (git log --oneline reads as this sequence):
   the hospital, tracked as `docs/imed-integration.md` open questions 11–14;
   the user chose NOT to contact the hospital for now, so don't draft
   outreach unprompted.
+- ✅ **Hospital-style panel view of the case detail (2026-07-31):** the case
+  detail's report side can now render as the SAME six-panel layout the
+  hospital's own coder screen shows — CC,PI,PE (vitals table + note text) ·
+  Past history (allergies in red) · Lab/X-ray · Diagnosis/Procedure (codes
+  with roles, หัตถการ list with op type/window, Assessment text) · Order
+  Entry (CPOE, name + qty) · Investigations finding · Management/Suggestion —
+  with a persisted toggle back to the chronological document view (which
+  keeps day-by-day order; unmapped fieldnames land in a "Progress / other
+  notes" panel so nothing is dropped). Frontend: `global/HospitalPanels.tsx`
+  + wiring in all three detail pages (`../audit-chart-frontend`). Backend
+  enabler — and a latent-bug fix: detail `orders[]` never served the stored
+  `order_detail` JSONB, though the frontend's lab table and order chips had
+  read `o.detail.*` all along (they silently degraded to name-only rows with
+  "—" values). Now each order row carries `detail` (raw hospital row, parsed
+  from JSONB text in the service) + a new `orderCounts` map (true per-category
+  totals), and the orders cap became **50 rows per category** (old global
+  LIMIT 150 let 400-lab IPD cases starve medicine rows out entirely — the
+  CPOE/med panels would have been empty exactly on the big cases). Contract +
+  docs/types.ts updated; `caseDetailOrdersCarryDetailJsonAndTrueCounts` is
+  the test (fun fact it caught: medicine quantity can be negative — we read
+  that as a return/credit row and display it verbatim; recorded as open
+  question 15 in `docs/imed-integration.md`). Still blocked on hospital
+  data, unchanged: lab normal ranges (no abnormal-value highlighting, Q14)
+  and doctor/recorder names (MD field shows "—", Q11).
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

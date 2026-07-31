@@ -126,8 +126,12 @@ export interface CaseDetail {
   /** sorted by recorddatetime (nulls first, stable) */
   sections: SectionRow[];
   codes: DetailCodeRow[];
-  /** max 150, grouped by category */
+  /** grouped by category, max 50 rows per category (see orderCounts for
+   *  the true totals) */
   orders: DetailOrderRow[];
+  /** true per-category totals for this case — `orders` is capped, these
+   *  are not (empty object when the case has no orders) */
+  orderCounts: Partial<Record<OrderCategory, number>>;
   /** hospital vital-sign readings, chronological (empty array when none) */
   vitals: DetailVitalRow[];
   /** this case's coder audit trail, oldest first (empty array when none) */
@@ -233,6 +237,12 @@ export interface DetailOrderRow {
   imed_source: string | null;
   order_name: string | null;
   ordered_at: string | null;
+  /** The raw hospital order row (order_detail JSONB) verbatim. Keys differ
+   *  per imed_source: drugs carry dosagesignature / dosageinstruction /
+   *  quantity (raw integer text, negative on return/credit rows), lab rows
+   *  carry panelname / itemname / itemvalue / itemuom, procedures carry
+   *  start/enddatetime… Null when sync stored no source row. */
+  detail: Record<string, string | null> | null;
 }
 
 // ---------- PUT /api/cases/{caseId}/codes ----------

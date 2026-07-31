@@ -147,7 +147,17 @@ real values here when the extract has them).
                   "operation_type": "OR Procedure|NON OR Procedure|OTH|…|null"
                   }, ... ],   // ^ the extract's operationtype verbatim — ICD-9 rows only, null on ICD-10
   "orders":   [ { "order_category": "…", "imed_source": "…", "order_name": "…",
-                  "ordered_at": "…" }, ... ],        // max 150, category-grouped
+                  "ordered_at": "…",
+                  "detail": { "…": "…" }             // the raw hospital order row (order_detail
+                  }, ... ],                          //   JSONB) verbatim — keys differ per
+                                                     //   imed_source (dosage/quantity on drugs,
+                                                     //   panelname/itemname/itemvalue/itemuom on
+                                                     //   labs, …); null when no source row stored.
+                                                     //   Category-grouped, max 50 rows PER
+                                                     //   category (a global cap starved late
+                                                     //   categories on lab-heavy cases)
+  "orderCounts": { "lab": 402, "medicine": 112 },    // true per-category totals for THIS case —
+                                                     //   orders[] is capped, these are not
   "vitals":   [ { "measured_at": "YYYY-MM-DD HH:MM:SS|null", "temperature": "36.5",
                   "systolic": "119", "diastolic": "80", "heart_rate": "98",
                   "oxygen_saturation": "97", "weight": "65", "height": "157"

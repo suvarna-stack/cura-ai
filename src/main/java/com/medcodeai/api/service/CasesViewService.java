@@ -354,7 +354,22 @@ public class CasesViewService {
         out.put("coverage", cov);
         out.put("sections", sections);
         out.put("codes", repo.detailCodeRows(caseId));
-        out.put("orders", repo.detailOrderRows(caseId));
+        // each order carries its raw hospital row (order_detail JSONB) as a
+        // `detail` object — the lab results table and order field chips read
+        // it. Parsed here because JDBC hands JSONB back as text (gotcha), and
+        // null stays null (an order sync stored without a source row).
+        List<Map<String, Object>> orders = repo.detailOrderRows(caseId);
+        for (Map<String, Object> o : orders) {
+            String raw = (String) o.get("detail");
+            o.put("detail", raw == null ? null : detailJson(raw));
+        }
+        out.put("orders", orders);
+        // true per-category totals — `orders` itself is capped at 150 rows
+        Map<String, Object> orderCounts = new LinkedHashMap<>();
+        for (Map<String, Object> r : repo.detailOrderCounts(caseId)) {
+            orderCounts.put((String) r.get("order_category"), r.get("n"));
+        }
+        out.put("orderCounts", orderCounts);
         out.put("vitals", repo.detailVitalRows(caseId));
         out.put("history", history);
         return out;

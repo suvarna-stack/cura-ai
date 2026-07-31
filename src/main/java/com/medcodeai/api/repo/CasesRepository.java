@@ -197,14 +197,36 @@ public class CasesRepository {
                 ORDER BY measured_at NULLS FIRST, vital_id""", ROW, caseId);
     }
 
-    // views.py:314 — detail orders, category CASE + order_id tiebreak, LIMIT 150
+    // views.py:314 — detail orders, category CASE + order_id tiebreak.
+    // detail = the raw hospital order row (order_detail JSONB) as text; the
+    // service parses it back to an object so the UI can read dosage, quantity,
+    // lab item values… whatever the source table carried.
+    // Cap is 50 rows PER CATEGORY (was a global LIMIT 150): an IPD case with
+    // 400 lab rows used to starve every later category out of the payload, so
+    // its medications never reached the UI at all. detailOrderCounts() carries
+    // the true totals for "showing N of M" notices.
     public List<Map<String, Object>> detailOrderRows(String caseId) {
         return jdbc.query("""
-                SELECT order_category::text AS order_category, imed_source, order_name, ordered_at
-                FROM case_orders WHERE case_id=?
+                SELECT order_category, imed_source, order_name, ordered_at, detail FROM (
+                    SELECT order_category::text AS order_category, imed_source, order_name,
+                           ordered_at, order_detail::text AS detail, order_id,
+                           ROW_NUMBER() OVER (PARTITION BY order_category ORDER BY order_id) AS rn
+                    FROM case_orders WHERE case_id=?
+                ) t WHERE rn <= 50
                 ORDER BY CASE order_category WHEN 'CT' THEN 0 WHEN 'ROIP' THEN 1 WHEN 'X-ray' THEN 2
                          WHEN 'lab' THEN 3 WHEN 'medicine' THEN 4 WHEN 'other' THEN 5 WHEN 'surgery' THEN 6
-                         ELSE 7 END, order_id LIMIT 150""", ROW, caseId);
+                         ELSE 7 END, order_id""", ROW, caseId);
+    }
+
+    // true per-category totals for the same case — the detail `orders` array is
+    // capped at 150 rows, so the UI needs these to say "showing N of M"
+    public List<Map<String, Object>> detailOrderCounts(String caseId) {
+        return jdbc.query("""
+                SELECT order_category::text AS order_category, COUNT(*) AS n
+                FROM case_orders WHERE case_id=? GROUP BY order_category
+                ORDER BY CASE order_category WHEN 'CT' THEN 0 WHEN 'ROIP' THEN 1 WHEN 'X-ray' THEN 2
+                         WHEN 'lab' THEN 3 WHEN 'medicine' THEN 4 WHEN 'other' THEN 5 WHEN 'surgery' THEN 6
+                         ELSE 7 END""", ROW, caseId);
     }
 
     // this case's coder audit trail for the detail `history` array — the same
