@@ -12,3 +12,6 @@ export interface CreateAccountInput {
   email: string
   password: string
 }
+
+/** Mirrors the backend rule — POST /api/admin/accounts 400s below this. */
+export const MIN_PASSWORD_LENGTH = 8

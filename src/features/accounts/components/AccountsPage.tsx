@@ -5,6 +5,7 @@ import {
   Plus,
   ToggleLeft,
   ToggleRight,
+  X,
 } from 'lucide-react'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
@@ -13,14 +14,23 @@ import { ConfirmModal } from '../../../components/ui/Modal'
 import {
   createAccount,
   deleteAccount,
+  extractApiError,
   fetchAccounts,
   updateAccount,
 } from '../api/accountService'
-import type { Account } from '../types/account.types'
+import type { Account, CreateAccountInput } from '../types/account.types'
 import { EditAccountModal, NewAccountModal } from './AccountModals'
+
+/** The list endpoint returns full_name order; keep local edits in that order. */
+const byName = (a: Account, b: Account) =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
 
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [loading, setLoading] = useState(true)
+  // Failures the modals can't show themselves (list load, confirm dialogs).
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [toggling, setToggling] = useState<Account | null>(null)
   const [deleting, setDeleting] = useState<Account | null>(null)
@@ -30,11 +40,69 @@ export function AccountsPage() {
     void (async () => {
       try {
         setAccounts(await fetchAccounts())
-      } catch {
-        // 401/network — the axios interceptor handles dead tokens
+        setError(null)
+      } catch (err) {
+        // a dead token is already handled globally by the axios interceptor
+        setError(
+          extractApiError(err, 'Could not load accounts — is the backend running?'),
+        )
+      } finally {
+        setLoading(false)
       }
     })()
   }, [])
+
+  // The modals await these: a rejection keeps the modal open with its message,
+  // so the row list only ever shows what the server actually stored.
+  const handleCreate = async (input: CreateAccountInput) => {
+    const created = await createAccount(input)
+    setAccounts((prev) => [...prev, created].sort(byName))
+    setError(null)
+    setCreating(false)
+  }
+
+  const handleEdit = async (next: Account) => {
+    const saved = await updateAccount(next)
+    setAccounts((prev) =>
+      prev.map((a) => (a.id === saved.id ? saved : a)).sort(byName),
+    )
+    setError(null)
+    setEditing(null)
+  }
+
+  const handleToggle = async () => {
+    if (!toggling || busy) return
+    setBusy(true)
+    try {
+      const saved = await updateAccount({
+        ...toggling,
+        status: toggling.status === 'Active' ? 'Inactive' : 'Active',
+      })
+      setAccounts((prev) => prev.map((a) => (a.id === saved.id ? saved : a)))
+      setError(null)
+    } catch (err) {
+      setError(extractApiError(err, 'Could not update the account'))
+    } finally {
+      setBusy(false)
+      setToggling(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleting || busy) return
+    setBusy(true)
+    try {
+      await deleteAccount(deleting.id)
+      setAccounts((prev) => prev.filter((a) => a.id !== deleting.id))
+      setError(null)
+    } catch (err) {
+      // 409 = the account has coding history; it is still there, so keep the row
+      setError(extractApiError(err, 'Could not delete the account'))
+    } finally {
+      setBusy(false)
+      setDeleting(null)
+    }
+  }
 
   return (
     <>
@@ -48,6 +116,20 @@ export function AccountsPage() {
         Manage coder access to MedCode AI. Accounts are hospital-wide — a coder
         is not tied to a department.
       </p>
+
+      {error && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-error/40 bg-error/10 px-4 py-3">
+          <p className="flex-1 text-[12px] font-semibold text-error">{error}</p>
+          <button
+            type="button"
+            title="Dismiss"
+            onClick={() => setError(null)}
+            className="text-error/70 transition-colors hover:text-error"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <Card padded={false} className="overflow-hidden shadow-none">
         <div className="overflow-x-auto">
@@ -65,6 +147,13 @@ export function AccountsPage() {
               </tr>
             </thead>
             <tbody>
+              {(loading || accounts.length === 0) && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-[13px] text-muted">
+                    {loading ? 'Loading accounts…' : 'No accounts yet.'}
+                  </td>
+                </tr>
+              )}
               {accounts.map((a) => (
                 <tr
                   key={a.id}
@@ -127,15 +216,7 @@ export function AccountsPage() {
       {editing && (
         <EditAccountModal
           account={editing}
-          onSave={(next) => {
-            setAccounts((prev) =>
-              prev.map((a) => (a.id === next.id ? next : a)),
-            )
-            void updateAccount(next).catch(() => {
-              /* placeholder until backend exists */
-            })
-            setEditing(null)
-          }}
+          onSubmit={handleEdit}
           onClose={() => setEditing(null)}
         />
       )}
@@ -156,55 +237,27 @@ export function AccountsPage() {
             toggling.status === 'Active' ? 'Deactivate' : 'Activate'
           }
           variant="primary"
-          onConfirm={() => {
-            const next: Account = {
-              ...toggling,
-              status: toggling.status === 'Active' ? 'Inactive' : 'Active',
-            }
-            setAccounts((prev) =>
-              prev.map((a) => (a.id === next.id ? next : a)),
-            )
-            void updateAccount(next).catch(() => {
-              /* placeholder */
-            })
-            setToggling(null)
-          }}
-          onClose={() => setToggling(null)}
+          busy={busy}
+          onConfirm={() => void handleToggle()}
+          onClose={() => !busy && setToggling(null)}
         />
       )}
 
       {deleting && (
         <ConfirmModal
           title="Delete account"
-          message={`Delete ${deleting.name}'s account? This cannot be undone.`}
+          message={`Delete ${deleting.name}'s account? This cannot be undone. An account that has already coded cases cannot be deleted — deactivate it instead.`}
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => {
-            setAccounts((prev) => prev.filter((a) => a.id !== deleting.id))
-            void deleteAccount(deleting.id).catch(() => {
-              /* placeholder */
-            })
-            setDeleting(null)
-          }}
-          onClose={() => setDeleting(null)}
+          busy={busy}
+          onConfirm={() => void handleDelete()}
+          onClose={() => !busy && setDeleting(null)}
         />
       )}
 
       {creating && (
         <NewAccountModal
-          onCreate={(input) => {
-            const created: Account = {
-              id: `a${Date.now()}`,
-              name: input.name,
-              email: input.email,
-              status: 'Active',
-            }
-            setAccounts((prev) => [...prev, created])
-            void createAccount(input).catch(() => {
-              /* placeholder */
-            })
-            setCreating(false)
-          }}
+          onSubmit={handleCreate}
           onClose={() => setCreating(false)}
         />
       )}

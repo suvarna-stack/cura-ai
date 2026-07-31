@@ -44,6 +44,8 @@ export interface ConfirmModalProps {
   onConfirm: () => void
   onClose: () => void
   variant?: 'primary' | 'danger'
+  /** Request in flight — locks both buttons so it can't be fired twice. */
+  busy?: boolean
 }
 
 export function ConfirmModal({
@@ -53,19 +55,21 @@ export function ConfirmModal({
   onConfirm,
   onClose,
   variant = 'danger',
+  busy = false,
 }: ConfirmModalProps) {
   return (
     <Modal title={title} onClose={onClose}>
       <p className="mb-5 text-[13px] leading-relaxed text-muted">{message}</p>
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel
         </Button>
         <Button
           variant={variant === 'danger' ? 'danger' : 'primary'}
           onClick={onConfirm}
+          disabled={busy}
         >
-          {confirmLabel}
+          {busy ? 'Working…' : confirmLabel}
         </Button>
       </div>
     </Modal>
