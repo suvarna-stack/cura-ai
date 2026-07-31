@@ -21,11 +21,14 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      // A11y rules start as warnings while the backlog is being worked off
-      // (flipped to errors once Phase 2 of the WCAG plan lands).
-      ...Object.fromEntries(
-        Object.keys(jsxA11y.flatConfigs.recommended.rules).map((r) => [r, 'warn']),
-      ),
+      // `role` is also an ordinary prop name on our own components (RequireRole)
+      'jsx-a11y/aria-role': ['error', { ignoreNonDOM: true }],
+      // deprecated rule that rejects valid htmlFor/nesting; the modern
+      // label-has-associated-control below covers the same ground correctly
+      'jsx-a11y/label-has-for': 'off',
+      'jsx-a11y/label-has-associated-control': 'error',
+      // dialogs and the login form place initial focus on purpose
+      'jsx-a11y/no-autofocus': 'off',
     },
   },
 ])

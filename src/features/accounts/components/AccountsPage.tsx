@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState } from 'react'
 import {
   Pencil,
@@ -26,6 +27,7 @@ const byName = (a: Account, b: Account) =>
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
 
 export function AccountsPage() {
+  useDocumentTitle("Accounts")
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   // Failures the modals can't show themselves (list load, confirm dialogs).
@@ -135,11 +137,13 @@ export function AccountsPage() {
       <Card padded={false} className="overflow-hidden shadow-none">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
+            <caption className="sr-only">Coder accounts</caption>
             <thead>
               <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
                 {['Name', 'Email', 'Status', 'Actions'].map((h) => (
                   <th
                     key={h}
+                    scope="col"
                     className="px-5 py-3 font-semibold whitespace-nowrap"
                   >
                     {h}

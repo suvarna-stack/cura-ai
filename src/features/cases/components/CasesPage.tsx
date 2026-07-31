@@ -17,6 +17,7 @@ import { FilterPanel } from "./filters/FilterPanel";
 import { DateFilterBar } from "./filters/DateFilterBar";
 import { formatDate } from "../utils/formatDate";
 import { useCases } from "../hooks/useCases";
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import type { RichCase } from "../hooks/useCases";
 import { useCaseFilters } from "../hooks/useCaseFilters";
 import {
@@ -151,6 +152,7 @@ export function CasesPage({
   const { gl } = useTheme();
   const { syncing, syncVersion } = useSync();
   const { t } = useLang();
+  useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
   // shared with the detail pages via ApprovalsProvider (localStorage-persisted)
   const { approvedIds, reopenedIds, casesVersion, approve, reopen, pruneReopened } = useApprovals();
@@ -426,6 +428,8 @@ export function CasesPage({
 
   return (
     <main className="flex-1 flex flex-col overflow-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
+      {/* the page's name for screen readers — visually the tabs are the title */}
+      <h1 className="sr-only">{t("nav.dashboard")}</h1>
 
       <div className="p-5 space-y-4">
 
@@ -451,10 +455,28 @@ export function CasesPage({
 
           <div className="flex-1 min-w-0">
           <div className="flex items-end gap-2.5">
+            <div role="tablist" aria-label={t("a11y.caseTabs")} className="flex items-end gap-2.5">
             {tabs.map((t) => {
               const active = tab === t.id;
               return (
                 <button key={t.id} onClick={() => switchTab(t.id)}
+                  id={`cases-tab-${t.id}`}
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={`cases-panel-${t.id}`}
+                  tabIndex={active ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+                    e.preventDefault();
+                    const cur = tabs.findIndex((x) => x.id === tab);
+                    const next =
+                      e.key === "Home" ? 0 :
+                      e.key === "End" ? tabs.length - 1 :
+                      e.key === "ArrowRight" ? (cur + 1) % tabs.length :
+                      (cur - 1 + tabs.length) % tabs.length;
+                    switchTab(tabs[next].id);
+                    document.getElementById(`cases-tab-${tabs[next].id}`)?.focus();
+                  }}
                   className="flex items-center gap-1.5 px-4 py-2 transition-all duration-200"
                   style={{
                     borderRadius: "10px 10px 0 0",
@@ -491,6 +513,7 @@ export function CasesPage({
                 </button>
               );
             })}
+            </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2 px-3 py-2 mb-1 rounded-xl w-72"
               style={{ background: gl.inputBg, border: gl.border }}>
@@ -534,7 +557,8 @@ export function CasesPage({
               {/* COMPLETE — off-screen panels are inert: their buttons and
                   checkboxes must leave the tab order and the a11y tree, or a
                   keyboard user could act on rows they cannot see */}
-              <div style={panelStyle(0)} inert={currentIdx !== 0 || undefined}>
+              <div style={panelStyle(0)} inert={currentIdx !== 0 || undefined}
+                role="tabpanel" id="cases-panel-complete" aria-labelledby="cases-tab-complete">
                 <div className="p-3 space-y-2">
                   {/* forgot-the-filter guard: empty filtered list ≠ finished queue */}
                   {filters.active && filters.totalComplete === 0 && unfilteredComplete > 0 && (
@@ -584,6 +608,7 @@ export function CasesPage({
                           boxShadow: gl.shadowSm,
                         }}>
                         <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)}
+                          aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                           className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
                         {/* col 1 — identity: VN, HN */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
@@ -620,7 +645,8 @@ export function CasesPage({
               </div>
 
               {/* INCOMPLETE — flat list, same layout as Complete (no group cards) */}
-              <div style={panelStyle(1)} inert={currentIdx !== 1 || undefined}>
+              <div style={panelStyle(1)} inert={currentIdx !== 1 || undefined}
+                role="tabpanel" id="cases-panel-incomplete" aria-labelledby="cases-tab-incomplete">
                 <div className="p-3 space-y-2">
                   {filters.active && filters.totalIncomplete === 0 && unfilteredIncomplete > 0 && (
                     <div className="text-center py-8">
@@ -668,6 +694,7 @@ export function CasesPage({
                       }}>
                       <input type="checkbox" checked={selectedIncomplete.has(c.id)}
                         onChange={() => toggleSelectIncomplete(c.id)}
+                        aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                         className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
                       <div className="w-60 shrink-0 min-w-0 self-center">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
@@ -709,7 +736,8 @@ export function CasesPage({
 
               {/* REOPENED — cases any coder pulled back from Finished; they sit
                   here (out of the queues) until they are approved again */}
-              <div style={panelStyle(2)} inert={currentIdx !== 2 || undefined}>
+              <div style={panelStyle(2)} inert={currentIdx !== 2 || undefined}
+                role="tabpanel" id="cases-panel-reopen" aria-labelledby="cases-tab-reopen">
                 <div className="p-3 space-y-2">
                   {reopenRows.length === 0 && (
                     <div className="text-center py-8">
@@ -795,9 +823,13 @@ export function CasesPage({
               </div>
 
               {/* FINISHED */}
-              <div style={panelStyle(3)} inert={currentIdx !== 3 || undefined}>
+              <div style={panelStyle(3)} inert={currentIdx !== 3 || undefined}
+                role="tabpanel" id="cases-panel-finished" aria-labelledby="cases-tab-finished">
                 <div className="p-3 space-y-2">
                   {visibleFinished.map((c) => (
+                    // whole-row click is a mouse convenience; the View button below
+                    // is the keyboard/screen-reader path to the same action
+                    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
                     <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:opacity-90"
                       style={{ background: gl.row, backdropFilter: gl.blur16, border: gl.border, boxShadow: gl.shadowSm }}
                       onClick={() => openFinishedCase(c)}>

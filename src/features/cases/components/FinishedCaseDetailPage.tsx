@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState } from "react";
 import {
   FileText, Flag, ArrowLeft, BadgeCheck, Download, Printer,
@@ -90,6 +91,7 @@ export function FinishedCaseDetailPage({
   const { gl } = useTheme();
   const { t } = useLang();
   const { reopen } = useApprovals();
+  useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
   const { showToast } = useToast();
   const [showReopen, setShowReopen] = useState(false);

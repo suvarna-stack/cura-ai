@@ -48,7 +48,7 @@ export function AdminLayout() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 py-4">
+      <nav aria-label="Primary" className="flex-1 space-y-1 py-4">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -80,6 +80,13 @@ export function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-bg text-text">
+      {/* keyboard users skip the sidebar on every page (WCAG 2.4.1) */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:border focus:border-border focus:bg-surface focus:px-3 focus:py-2 focus:text-[13px] focus:font-bold"
+      >
+        Skip to main content
+      </a>
       <aside className="hidden w-60 shrink-0 border-r border-border bg-surface md:block">
         {sidebar}
       </aside>
@@ -87,9 +94,11 @@ export function AdminLayout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden" role="presentation">
           <div
+            role="presentation"
             className="absolute inset-0 bg-overlay"
             onClick={() => setMobileOpen(false)}
           />
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape/Tab handling on the dialog container is the APG dialog pattern */}
           <aside
             ref={drawerRef}
             role="dialog"
@@ -126,7 +135,7 @@ export function AdminLayout() {
             MedCode AI <span className="text-primary">SuperAdmin</span>
           </p>
         </div>
-        <main className="flex-1 p-6">
+        <main id="main" tabIndex={-1} className="flex-1 p-6">
           <Outlet />
         </main>
       </div>

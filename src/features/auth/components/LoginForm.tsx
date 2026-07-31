@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -17,6 +18,7 @@ export function LoginForm() {
   const navigate = useNavigate()
   const { user, ready, login } = useAuth()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  useDocumentTitle("Sign in")
 
   const {
     register,

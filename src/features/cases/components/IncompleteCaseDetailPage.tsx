@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState, useEffect } from "react";
 import {
   FileText, CheckCircle2, BadgeCheck, AlertCircle,
@@ -249,6 +250,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const { gl } = useTheme();
   const { t } = useLang();
   const { approvedIds, approve, reopen } = useApprovals();
+  useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
   const { showToast } = useToast();
   const c = caseData ?? { id: "C-0043", patient: "Frank Okafor", dept: "Cardiology 3B", confidence: 57, missing: "Procedure specificity", group: "cardio" };

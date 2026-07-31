@@ -41,6 +41,7 @@ export function ModalShell({
       onClick={onClose}
       role="presentation"
     >
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape/Tab handling on the dialog container is the APG dialog pattern */}
       <div
         ref={dialogRef}
         role="dialog"

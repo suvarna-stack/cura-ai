@@ -50,10 +50,11 @@ export function VitalsStrip({ detail, embedded }: {
       <div className="overflow-x-auto overflow-y-auto rounded-lg scroll-thin"
         style={{ border: gl.borderSm, maxHeight: "180px" }}>
         <table className="w-full text-[12px]" style={{ borderCollapse: "collapse" }}>
+          <caption className="sr-only">{t("vitals.title")}</caption>
           <thead>
             <tr style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
               {COLS.map((c) => (
-                <th key={c.label} className="text-left font-bold px-2.5 py-1.5 whitespace-nowrap"
+                <th key={c.label} scope="col" className="text-left font-bold px-2.5 py-1.5 whitespace-nowrap"
                   style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   {c.label}
                 </th>

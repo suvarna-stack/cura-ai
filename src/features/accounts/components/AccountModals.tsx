@@ -180,8 +180,9 @@ export function NewAccountModal({ onSubmit, onClose }: NewAccountModalProps) {
             />
             <button
               type="button"
-              tabIndex={-1}
               onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+              aria-pressed={showPw}
               className="absolute top-1/2 right-3 -translate-y-1/2 text-muted hover:text-text"
             >
               {showPw ? <EyeOff size={14} /> : <Eye size={14} />}

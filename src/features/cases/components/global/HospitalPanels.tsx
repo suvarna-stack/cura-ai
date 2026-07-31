@@ -247,12 +247,13 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
             <>
               <div className="overflow-y-auto rounded-lg scroll-thin" style={{ border: gl.borderSm, maxHeight: "240px" }}>
                 <table className="w-full text-[12px]" style={{ borderCollapse: "collapse" }}>
+                  <caption className="sr-only">{t("hosp.cpoe")}</caption>
                   <thead>
                     <tr style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
-                      <th className="text-left font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <th scope="col" className="text-left font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         {t("hosp.orderName")}
                       </th>
-                      <th className="text-right font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <th scope="col" className="text-right font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         {t("hosp.qty")}
                       </th>
                     </tr>

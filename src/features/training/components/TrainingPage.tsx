@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BrainCircuit,
@@ -95,6 +96,7 @@ function StatusPill({ doc }: { doc: KbDoc }) {
 }
 
 export function TrainingPage() {
+  useDocumentTitle("AI Training")
   const [docs, setDocs] = useState<KbDoc[]>([])
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [ragError, setRagError] = useState<string | null>(null)
@@ -380,6 +382,9 @@ export function TrainingPage() {
           <h2 className="mb-3 text-[14px] font-bold text-text">
             Knowledge base
           </h2>
+          {/* click/drag on the zone is a mouse convenience; the sr-only file
+              input inside is the keyboard/screen-reader path */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
           <div
             onDragOver={(e) => {
               e.preventDefault()
@@ -439,15 +444,18 @@ export function TrainingPage() {
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left">
+              <caption className="sr-only">Knowledge-base documents</caption>
               <thead>
                 <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
-                  {['Document', 'Size', 'Pages', 'Chunks', 'Status', ''].map(
+                  {['Document', 'Size', 'Pages', 'Chunks', 'Status', 'Actions'].map(
                     (h, i) => (
                       <th
                         key={i}
+                        scope="col"
                         className="px-2 py-2.5 font-semibold whitespace-nowrap"
                       >
-                        {h}
+                        {/* the actions column header is visually blank by design */}
+                        {h === 'Actions' ? <span className="sr-only">{h}</span> : h}
                       </th>
                     ),
                   )}

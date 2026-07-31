@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState, type CSSProperties } from 'react'
 import {
   Sun,
@@ -43,6 +44,7 @@ const langOptions: { id: Lang; label: string }[] = [
 export function SettingsPage() {
   const { gl, themeId, setThemeId } = useTheme()
   const { lang, setLang, t } = useLang()
+  useDocumentTitle(t("settings.title"))
 
   const [profile, setProfile] = useState<CoderProfile>(EMPTY_PROFILE)
   const [approvedIds, setApprovedIds] = useState<string[]>([])

@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState, useEffect } from "react";
 import {
   FileText, CheckCircle2, BadgeCheck, Edit3, Check, ArrowLeft, X, RotateCcw,
@@ -250,6 +251,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
   const { gl } = useTheme();
   const { t } = useLang();
   const { approvedIds, approve, reopen } = useApprovals();
+  useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
   const { showToast } = useToast();
   const c = caseData ?? { id: "C-0041", patient: "Margaret Liu", dept: "Cardiology", group: "Cardiovascular", confidence: 94 };

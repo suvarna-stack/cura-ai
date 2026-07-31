@@ -3,9 +3,10 @@
 // Selecting a hit fills code (+ description via onSelect). Free typing
 // alone is not enough: the coder must pick a suggestion card.
 // ============================================================
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import { useLang } from '../../context/LanguageContext'
 import { searchIcdCatalog, type IcdCatalogHit } from '../../api/casesService'
 
 export function CodeSearchField({
@@ -29,13 +30,16 @@ export function CodeSearchField({
   localHits?: IcdCatalogHit[]
 }) {
   const { gl } = useTheme()
+  const { t } = useLang()
   const [query, setQuery] = useState(value)
   const [hits, setHits] = useState<IcdCatalogHit[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState(!!value)
+  const [activeIdx, setActiveIdx] = useState(-1)
   const wrap = useRef<HTMLDivElement>(null)
+  const listId = useId()
 
   useEffect(() => {
     setQuery(value)
@@ -124,6 +128,50 @@ export function CodeSearchField({
     onSelect(hit)
   }
 
+  // ARIA combobox state: is the popup actually on screen (mirrors the render
+  // condition below), and which option the arrow keys have reached
+  const popupVisible =
+    open && (loading || hits.length > 0 || !!error || (query.trim().length > 0 && !picked))
+
+  // clamp instead of resetting via effect: if results shrank under the
+  // highlight, the highlight simply disappears until the next arrow key
+  const highlighted = activeIdx >= 0 && activeIdx < hits.length ? activeIdx : -1
+
+  useEffect(() => {
+    if (highlighted < 0) return
+    document
+      .getElementById(`${listId}-opt-${highlighted}`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted, listId])
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!popupVisible) {
+        if (hits.length || query.trim()) setOpen(true)
+        return
+      }
+      if (hits.length === 0) return
+      setActiveIdx(() => {
+        const n = hits.length
+        return e.key === 'ArrowDown' ? (highlighted + 1) % n : (highlighted - 1 + n) % n
+      })
+      return
+    }
+    if (e.key === 'Enter') {
+      if (popupVisible && highlighted >= 0) {
+        e.preventDefault()
+        pick(hits[highlighted])
+      }
+      return
+    }
+    if (e.key === 'Escape' && popupVisible) {
+      // first Escape closes only the list; the surrounding dialog gets the next one
+      e.stopPropagation()
+      setOpen(false)
+    }
+  }
+
   return (
     <div ref={wrap} className="relative">
       <div className="relative">
@@ -135,13 +183,20 @@ export function CodeSearchField({
         <input
           id={id}
           aria-label={id ? undefined : (placeholder ?? 'Search code or title…')}
+          role="combobox"
+          aria-expanded={popupVisible}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={highlighted >= 0 ? `${listId}-opt-${highlighted}` : undefined}
           value={query}
           placeholder={placeholder ?? 'Search code or title…'}
           onChange={(e) => {
             setQuery(e.target.value)
             setPicked(false)
             setOpen(true)
+            setActiveIdx(-1)
           }}
+          onKeyDown={onKeyDown}
           onFocus={() => {
             if (hits.length || query.trim()) setOpen(true)
           }}
@@ -155,8 +210,14 @@ export function CodeSearchField({
           inputMode="search"
         />
       </div>
-      {open && (loading || hits.length > 0 || error || (query.trim().length > 0 && !picked)) && (
+      {/* result count for screen readers — the visual list is silent */}
+      <span role="status" className="sr-only">
+        {popupVisible && !loading ? t('a11y.results', { n: hits.length }) : ''}
+      </span>
+      {popupVisible && (
         <div
+          id={listId}
+          role="listbox"
           className="absolute z-50 mt-1.5 max-h-56 w-full overflow-y-auto rounded-xl shadow-lg"
           style={{
             background: gl.isDark ? '#1e1218' : '#fff',
@@ -178,16 +239,20 @@ export function CodeSearchField({
               No matching ICD codes
             </p>
           )}
-          {hits.map((h) => (
+          {hits.map((h, i) => (
             <button
               key={`${h.system}:${h.code}`}
               type="button"
+              id={`${listId}-opt-${i}`}
+              role="option"
+              aria-selected={i === highlighted}
+              tabIndex={-1}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(h)}
               className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors hover:opacity-90"
               style={{
                 borderBottom: `1px solid rgba(${gl.accentRgb},0.10)`,
-                background: 'transparent',
+                background: i === highlighted ? `rgba(${gl.accentRgb},0.12)` : 'transparent',
               }}
             >
               <div className="flex w-full items-center gap-2">

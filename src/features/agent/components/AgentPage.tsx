@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Bot, User, Send, Sparkles, BookOpen, Brain } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
@@ -38,6 +39,7 @@ function RichText({ text }: { text: string }) {
 
 export function AgentPage() {
   const { gl } = useTheme()
+  useDocumentTitle("AI Agent")
   const [mode, setMode] = useState<ChatMode>('learn')
   const [convo, setConvo] = useState<AgentMessage[]>([])
   const [input, setInput] = useState('')

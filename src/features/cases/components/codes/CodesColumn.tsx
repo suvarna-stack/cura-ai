@@ -100,6 +100,9 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
     const description = rest.join(" · ").trim();
     const sortable = !!onReorder;
     return (
+      // mouse-only drag-to-reorder is an enhancement; the card's buttons stay
+      // the accessible path (keyboard reordering is a tracked follow-up)
+      // eslint-disable-next-line jsx-a11y/no-static-element-interactions
       <div key={index}
         draggable={sortable && armedPos === pos}
         onDragStart={(e) => {
@@ -129,6 +132,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           {/* priority handle (item 12): position in the column IS the priority —
               drag starts here only, so card text stays selectable */}
           {sortable && (
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- mouse drag handle, see above
             <div onMouseDown={() => setArmedPos(pos)}
               title={t("code.drag")}
               className="w-6 self-stretch flex items-center justify-center shrink-0 rounded-md cursor-grab active:cursor-grabbing transition-all opacity-50 group-hover:opacity-100"

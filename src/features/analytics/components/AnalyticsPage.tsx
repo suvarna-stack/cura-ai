@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Layers, CheckCircle2, AlertCircle, Flag } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
@@ -101,6 +102,7 @@ function BarList({
 
 export function AnalyticsPage() {
   const { gl } = useTheme()
+  useDocumentTitle("Analytics")
   const useMock = isAnalyticsMock()
   const [data, setData] = useState<AnalyticsData>(MOCK_ANALYTICS)
   const [loading, setLoading] = useState(!useMock)

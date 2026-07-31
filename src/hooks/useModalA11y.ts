@@ -11,10 +11,11 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
   'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-// queried live on every Tab — dropdown options mount/unmount while open
+// queried live on every Tab — dropdown options mount/unmount while open.
+// tabIndex < 0 drops roving/option elements that are focusable only by script.
 function focusablesIn(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (el) => el.getClientRects().length > 0,
+    (el) => el.tabIndex >= 0 && el.getClientRects().length > 0,
   )
 }
 

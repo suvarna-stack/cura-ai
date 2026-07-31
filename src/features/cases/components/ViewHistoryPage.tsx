@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 // ============================================================
 // ViewHistory (Prompt 5) — per-case timeline of everything coders
 // did to a case, from the shared activity log. Entries inside the
@@ -46,6 +47,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
   const { gl } = useTheme();
   const { t } = useLang();
   const { logs, undoLog } = useActivityLog();
+  useDocumentTitle(t("history.title"));
   const [undoneToast, setUndoneToast] = useState(false);
 
   // local (this browser, undoable) + server (every coder, read-only), newest first

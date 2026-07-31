@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState } from 'react'
 import { Users, Activity, Database, CheckCircle2 } from 'lucide-react'
 import { Badge } from '../../../components/ui/Badge'
@@ -21,6 +22,7 @@ const EMPTY_OVERVIEW: DashboardOverview = {
 }
 
 export function DashboardPage() {
+  useDocumentTitle("Dashboard")
   const [overview, setOverview] = useState<DashboardOverview>(EMPTY_OVERVIEW)
   const [accounts, setAccounts] = useState<DashboardAccountRow[]>([])
 
@@ -89,10 +91,11 @@ export function DashboardPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
+            <caption className="sr-only">Coder accounts</caption>
             <thead>
               <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
-                <th className="px-5 py-3 font-semibold">Name</th>
-                <th className="px-5 py-3 font-semibold">Status</th>
+                <th scope="col" className="px-5 py-3 font-semibold">Name</th>
+                <th scope="col" className="px-5 py-3 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>

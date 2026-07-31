@@ -36,6 +36,14 @@ function CoderShell() {
 
   return (
     <>
+      {/* keyboard users skip the nav/sync/logout run on every page (WCAG 2.4.1) */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-[13px] focus:font-bold"
+        style={{ color: gl.text, background: gl.card }}
+      >
+        {t('a11y.skip')}
+      </a>
       <header
         className="sticky top-0 z-20 flex shrink-0 items-center gap-1 px-5 py-2.5"
         style={{
@@ -55,7 +63,7 @@ function CoderShell() {
           </p>
         </div>
 
-        <nav className="flex items-center gap-1">
+        <nav aria-label="Primary" className="flex items-center gap-1">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -129,7 +137,8 @@ function CoderShell() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      {/* #main skip-link target — the pages inside render their own <main> */}
+      <div id="main" tabIndex={-1} className="flex min-h-0 flex-1">
         <Outlet />
       </div>
     </>

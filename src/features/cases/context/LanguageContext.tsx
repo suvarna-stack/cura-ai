@@ -225,6 +225,9 @@ export const dict: Record<string, { en: string; th: string }> = {
   "a11y.close":     { en: "Close",     th: "ปิด" },
   "a11y.loading":   { en: "Loading…",  th: "กำลังโหลด…" },
   "a11y.selectCase": { en: "Select case {vn}", th: "เลือกเคส {vn}" },
+  "a11y.results":   { en: "{n} results",  th: "{n} รายการ" },
+  "a11y.skip":      { en: "Skip to main content", th: "ข้ามไปยังเนื้อหาหลัก" },
+  "a11y.caseTabs":  { en: "Case queues", th: "คิวเคส" },
   // settings
   "settings.title":         { en: "Settings", th: "การตั้งค่า" },
   "settings.sub":           { en: "Preferences & appearance", th: "การตั้งค่าและธีม" },
