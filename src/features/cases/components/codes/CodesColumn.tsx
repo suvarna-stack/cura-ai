@@ -52,9 +52,17 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
 
   // keep the original positions: the columns are two views of ONE array, and
   // the priority lives in that array
-  const rows = codes
+  const filtered = codes
     .map((entry, index) => ({ entry, index }))
     .filter((r) => (system === "icd9") === isIcd9(r.entry.type));
+  // coder-entered codes group above the imported/AI ones. Reordering writes
+  // the DISPLAY order back into the array (applyReorder), so a drag across
+  // the group line snaps back — the group wins over free ordering. Safe for
+  // approve: manual codes carry role-bearing labels, so putting them first
+  // never steals the positional principal-diagnosis pick from a bare-labeled
+  // hospital/AI code unless the coder explicitly added a Primary Diagnosis.
+  const rows = [...filtered.filter((r) => r.entry.manual), ...filtered.filter((r) => !r.entry.manual)];
+  const manualCount = rows.filter((r) => r.entry.manual).length;
   const scored = rows.filter((r) => !r.entry.missing);
   const avg = scored.length
     ? Math.round(scored.reduce((s, r) => s + r.entry.confidence, 0) / scored.length)
@@ -85,6 +93,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
     }
     endDrag();
   };
+
+  /** small label above each origin group (manual vs hospital/AI) */
+  const groupHeader = (label: string) => (
+    <p className="text-[12px] font-bold uppercase tracking-wide px-1 pb-1"
+      style={{ color: gl.muted, opacity: 0.85 }}>
+      {label}
+    </p>
+  );
 
   /** a thin accent bar marking where the drop would land */
   const dropIndicator = (
@@ -125,11 +141,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         style={{
           // gl.row/gl.border are white-on-white here (the card sits on gl.card),
           // so code cards get a solider fill + accent-tinted border to separate
-          // from the panel behind them
+          // from the panel behind them; manual (coder-entered) cards get a
+          // stronger accent tint so the two groups read apart at a glance
           background: entry.missing
             ? `rgba(${gl.accentRgb},0.06)`
-            : gl.isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.85)",
-          border: `1px solid rgba(${gl.accentRgb},${entry.missing ? 0.20 : gl.isDark ? 0.35 : 0.30})`,
+            : entry.manual
+              ? `rgba(${gl.accentRgb},${gl.isDark ? 0.16 : 0.10})`
+              : gl.isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.85)",
+          border: `1px solid rgba(${gl.accentRgb},${entry.missing ? 0.20 : entry.manual ? 0.45 : gl.isDark ? 0.35 : 0.30})`,
           boxShadow: gl.shadowSm,
           opacity: dragPos === pos ? 0.35 : 1,   // ghost of the card in flight
         }}>
@@ -267,6 +286,10 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           <>
             {rows.map((r, pos) => (
               <div key={r.index}>
+                {/* group sub-headers, only when the column actually has both kinds */}
+                {manualCount > 0 && pos === 0 && groupHeader(t("code.groupManual"))}
+                {manualCount > 0 && manualCount < rows.length && pos === manualCount &&
+                  groupHeader(t("code.groupAuto"))}
                 {dragPos !== null && insertAt === pos && dropIndicator}
                 {card(r, pos)}
               </div>

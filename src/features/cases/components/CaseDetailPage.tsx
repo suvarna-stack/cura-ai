@@ -280,7 +280,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
-    persistCodes([...codes, added]);
+    // prepend: manual codes display grouped on top, and the saved order must
+    // match what's shown (approve reads array order for the principal pick)
+    persistCodes([added, ...codes]);
     setAdding(null);
     const logId = addLog({
       userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",

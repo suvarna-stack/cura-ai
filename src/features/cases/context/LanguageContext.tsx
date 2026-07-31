@@ -156,6 +156,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.type.other":       { en: "Other",                   th: "อื่น ๆ" },
   "code.type.external":    { en: "External Cause of Injury", th: "สาเหตุภายนอกของการบาดเจ็บ" },
   "code.manualBadge":      { en: "Manually Added",          th: "เพิ่มด้วยตนเอง" },
+  // origin-group sub-headers inside a code column (shown only when a column
+  // holds both coder-entered and hospital/AI codes)
+  "code.groupManual":      { en: "Manually added",          th: "เพิ่มด้วยตนเอง" },
+  "code.groupAuto":        { en: "From hospital / AI",      th: "จากโรงพยาบาล / AI" },
   "code.codeLabel":        { en: "Code",                    th: "รหัส" },
   "code.addHint":          { en: "Fill in either box — or both to add an ICD-10 and an ICD-9 code at once.",
                              th: "กรอกกล่องใดกล่องหนึ่ง หรือทั้งสองกล่องเพื่อเพิ่มรหัส ICD-10 และ ICD-9 พร้อมกัน" },

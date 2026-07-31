@@ -142,7 +142,8 @@ export function FinishedCaseDetailPage({
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true };
-    persistCodes([...fullCodes, added]);
+    // prepend: manual codes display grouped on top (see CodesColumn)
+    persistCodes([added, ...fullCodes]);
     setAdding(null);
     const logId = addLog({
       userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",
