@@ -55,12 +55,14 @@ export function ReportViewToggle({ view, onChange }: {
     ["chrono", t("hosp.viewChrono")],
   ];
   return (
-    <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: gl.borderSm }}>
+    <div className="flex rounded-lg p-0.5 gap-0.5 shrink-0"
+      style={{ background: `rgba(${gl.accentRgb},0.10)`, border: gl.borderSm }}>
       {opts.map(([v, label]) => (
-        <button key={v} onClick={() => onChange(v)}
-          className="text-[12px] font-bold px-2 py-1 transition-all"
+        <button key={v} onClick={() => onChange(v)} aria-pressed={v === view}
+          className="text-[12px] font-bold px-2 py-1 rounded-md transition-all"
           style={v === view
-            ? { background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }
+            ? { background: gl.isDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.92)",
+                color: gl.accent, boxShadow: gl.shadowSm }
             : { background: "transparent", color: gl.muted }}>
           {label}
         </button>
