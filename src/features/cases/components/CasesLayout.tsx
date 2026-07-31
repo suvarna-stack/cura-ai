@@ -32,6 +32,8 @@ function CoderShell() {
     void logout().finally(() => navigate('/login', { replace: true }))
   }
 
+  const syncFailed = lastSync === 'sync.failed'
+
   return (
     <>
       <header
@@ -78,35 +80,48 @@ function CoderShell() {
         </nav>
 
         {/* logged-in coder + iMed sync + logout (coders never see the admin sidebar) */}
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-2">
+          {/* identity badge — quietest of the three, it is a label not a control */}
           {user && (
             <span
-              className="hidden text-[12px] font-semibold sm:inline"
-              style={{ color: gl.text, opacity: 0.7 }}
+              className="hidden rounded-full px-3 py-1 text-[12px] font-bold sm:inline"
+              style={{
+                color: gl.accent,
+                background: `rgba(${gl.accentRgb},0.12)`,
+                border: `1px solid rgba(${gl.accentRgb},0.20)`,
+              }}
               title={user.email}
             >
               {user.fullName ?? user.email}
             </span>
           )}
+          {/* Sync is the primary header action — accent fill, same pill language
+              as the active nav item; turns danger-tinted when the last run failed */}
           <button
             type="button"
             onClick={runSync}
             disabled={syncing}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-opacity hover:opacity-100 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-95 disabled:opacity-60"
             style={{
-              color: lastSync === 'sync.failed' ? gl.danger : gl.text,
-              opacity: lastSync === 'sync.failed' ? 1 : 0.7,
+              color: syncFailed ? gl.danger : gl.accent,
+              background: syncFailed
+                ? `color-mix(in srgb, ${gl.danger} 14%, transparent)`
+                : `rgba(${gl.accentRgb},0.16)`,
+              border: syncFailed
+                ? `1px solid color-mix(in srgb, ${gl.danger} 32%, transparent)`
+                : `1px solid rgba(${gl.accentRgb},0.28)`,
             }}
             title={`${t('sync.label')} · ${t(lastSync)}`}
           >
             <RefreshCw size={14} className={syncing ? 'animate-spin' : undefined} />
             {syncing ? t('sync.syncing') : t('sync.btn')}
           </button>
+          {/* Logout — neutral glass chip: defined, but never competes with Sync */}
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold opacity-70 transition-opacity hover:opacity-100"
-            style={{ color: gl.text }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-95"
+            style={{ color: gl.text, background: gl.card, border: gl.borderSm }}
           >
             <LogOut size={14} />
             Logout
