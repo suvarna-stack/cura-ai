@@ -123,8 +123,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         onMouseUp={() => setArmedPos(null)}      // grip released without dragging
         className="group rounded-lg px-2.5 py-2 transition-all"
         style={{
-          background: entry.missing ? `rgba(${gl.accentRgb},0.06)` : gl.row,
-          border: entry.missing ? `1px solid rgba(${gl.accentRgb},0.20)` : gl.border,
+          // gl.row/gl.border are white-on-white here (the card sits on gl.card),
+          // so code cards get a solider fill + accent-tinted border to separate
+          // from the panel behind them
+          background: entry.missing
+            ? `rgba(${gl.accentRgb},0.06)`
+            : gl.isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.85)",
+          border: `1px solid rgba(${gl.accentRgb},${entry.missing ? 0.20 : gl.isDark ? 0.35 : 0.30})`,
+          boxShadow: gl.shadowSm,
           opacity: dragPos === pos ? 0.35 : 1,   // ghost of the card in flight
         }}>
         {/* line 1 — the diagnosis, plus the row's controls */}
