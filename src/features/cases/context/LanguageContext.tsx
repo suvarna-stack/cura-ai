@@ -150,6 +150,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   // the role labels are system-neutral; other/external complete the hospital
   // dropdown's four diagnosis kinds (ICD-10 box only, 2026-07-30)
   "code.type.primary":     { en: "Primary Diagnosis",       th: "การวินิจฉัยหลัก" },
+  // one primary ICD-10 per case — suffix shown on the disabled dropdown option
+  "code.primaryTaken":     { en: " — already assigned",     th: " — กำหนดไว้แล้ว" },
   "code.type.comorbidity": { en: "Comorbidity",             th: "โรคร่วม" },
   "code.type.other":       { en: "Other",                   th: "อื่น ๆ" },
   "code.type.external":    { en: "External Cause of Injury", th: "สาเหตุภายนอกของการบาดเจ็บ" },

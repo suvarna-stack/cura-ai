@@ -5,6 +5,19 @@ import { loadCodeEdits, type StoredCode } from '../utils/caseLocal'
 export const isIcd9Type = (type: string) => /icd[- ]?9|pcs/i.test(type)
 
 /**
+ * ICD-10 principal-diagnosis type label ("ICD-10 Primary Diagnosis", plus any
+ * legacy "Primary…" spelling). The coding guideline allows exactly ONE per
+ * case, so the add/edit dialogs use this to block a second one; an ICD-9
+ * "Primary" is a procedure and doesn't count.
+ */
+export const isIcd10PrimaryType = (type: string) =>
+  !isIcd9Type(type) && /primary|principal/i.test(type)
+
+/** True when the case already carries a real (resolved) primary ICD-10 row. */
+export const hasIcd10Primary = (codes: { type: string; code: string; missing?: boolean }[], exceptIdx?: number) =>
+  codes.some((c, i) => i !== exceptIdx && !c.missing && c.code !== '???' && isIcd10PrimaryType(c.type))
+
+/**
  * Detail-row (code_system, code_role) → the UI's role-bearing type label, so
  * seeded codes open the Edit dialog with the right dropdown value and keep
  * their hospital role through approve (2026-07-30). ICD-9 stays the bare

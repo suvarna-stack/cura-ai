@@ -11,7 +11,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { suggestCodes } from "../api/casesService";
-import { fillEmptySystems, isIcd9Type, codeTypeFromRole } from "../utils/aiSuggestions";
+import { fillEmptySystems, isIcd9Type, codeTypeFromRole, hasIcd10Primary } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
          CODE_TYPE_ICD10_OTHER, CODE_TYPE_ICD10_EXTERNAL } from "./codes/AddCodeModal";
@@ -86,11 +86,13 @@ function HighlightedReport({ text, accentRgb, accent }: { text: string; accentRg
   );
 }
 
-function EditCodeModal({ entry, onSave, onClose, localHits }: {
+function EditCodeModal({ entry, onSave, onClose, localHits, icd10PrimaryTaken }: {
   entry: CodeEntry & { missing?: boolean; missingMsg?: string };
   onSave: (u: CodeEntry) => void;
   onClose: () => void;
   localHits?: { code: string; system: string; description: string }[];
+  /** ANOTHER row already holds the primary ICD-10 — only one per case */
+  icd10PrimaryTaken?: boolean;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
@@ -160,7 +162,7 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
                       desc: hit.description || f.desc,
                       type: /icd[- ]?9/i.test(hit.system)
                         ? (f.type.toLowerCase().includes('comorbid') ? CODE_TYPE_COMORBIDITY : CODE_TYPE_PRIMARY)
-                        : (f.type.toLowerCase().includes('comorbid')
+                        : (f.type.toLowerCase().includes('comorbid') || icd10PrimaryTaken
                             ? CODE_TYPE_ICD10_COMORBIDITY
                             : CODE_TYPE_ICD10_PRIMARY),
                     }))
@@ -172,7 +174,10 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
               {(id) => (
                 <select id={id} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                   className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
-                  {CODE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {CODE_TYPES.map(ct => {
+                    const taken = ct === CODE_TYPE_ICD10_PRIMARY && !!icd10PrimaryTaken;
+                    return <option key={ct} value={ct} disabled={taken}>{ct}{taken ? t("code.primaryTaken") : ""}</option>;
+                  })}
                 </select>
               )}
             </Field>
@@ -405,6 +410,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       {editingIdx !== null && (
         <EditCodeModal
           entry={codes[editingIdx]}
+          icd10PrimaryTaken={hasIcd10Primary(codes, editingIdx)}
           localHits={codes
             .filter((c) => !c.missing && c.code && c.code !== '???')
             .map((c) => ({
@@ -432,7 +438,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           onClose={() => setEditingIdx(null)}
         />
       )}
-      {adding && <AddCodeModal only={adding} onAdd={handleAddCode} onClose={() => setAdding(null)} />}
+      {adding && <AddCodeModal only={adding} icd10PrimaryTaken={hasIcd10Primary(codes)}
+        onAdd={handleAddCode} onClose={() => setAdding(null)} />}
       {deletingIdx !== null && (
         <ConfirmDialog
           icon={Trash2} danger

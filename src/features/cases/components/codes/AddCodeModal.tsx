@@ -47,7 +47,7 @@ const SYSTEMS: { key: SystemKey; label: string; placeholder: string; descPlaceho
 ];
 
 export function AddCodeModal({
-  onAdd, onClose, only,
+  onAdd, onClose, only, icd10PrimaryTaken,
 }: {
   onAdd: (entry: { code: string; type: string; desc: string;
                    operation_start?: string; operation_end?: string;
@@ -55,6 +55,9 @@ export function AddCodeModal({
   onClose: () => void;
   /** opened from one box's "+": show only that code system */
   only?: SystemKey;
+  /** the case already has a primary ICD-10 → the guideline allows only one,
+   *  so the ICD-10 box can't offer that role again */
+  icd10PrimaryTaken?: boolean;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
@@ -65,7 +68,9 @@ export function AddCodeModal({
                                                       start: string; end: string; opType: string; note: string }>>(() => {
     const now = nowOperationTime();
     return {
-      icd10: { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
+      // primary taken → the ICD-10 box starts (and stays) on comorbidity
+      icd10: { code: "", desc: "", role: icd10PrimaryTaken ? "comorbidity" : "primary",
+               start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
       icd9:  { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
     };
   });
@@ -82,9 +87,12 @@ export function AddCodeModal({
     // (procedure) side carries the operation window
     for (const s of ready) {
       const f = form[s.key];
+      // belt-and-braces for the one-primary rule (the option is disabled too)
+      const role = s.key === "icd10" && icd10PrimaryTaken && f.role === "primary"
+        ? "comorbidity" : f.role;
       onAdd({
         code: f.code.trim(),
-        type: s.roles[f.role] ?? s.roles.primary!,
+        type: s.roles[role] ?? s.roles.primary!,
         desc: f.desc.trim(),
         ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end,
                                  operation_type: f.opType } : {}),
@@ -153,9 +161,14 @@ export function AddCodeModal({
                   <select id={id} value={form[s.key].role}
                     onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as RoleKey } }))}
                     className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
-                    {(Object.keys(s.roles) as RoleKey[]).map(r => (
-                      <option key={r} value={r}>{t(`code.type.${r}`)}</option>
-                    ))}
+                    {(Object.keys(s.roles) as RoleKey[]).map(r => {
+                      const taken = s.key === "icd10" && r === "primary" && !!icd10PrimaryTaken;
+                      return (
+                        <option key={r} value={r} disabled={taken}>
+                          {t(`code.type.${r}`)}{taken ? t("code.primaryTaken") : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
               </Field>

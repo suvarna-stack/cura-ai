@@ -22,7 +22,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
-import { codeTypeFromRole } from "../utils/aiSuggestions";
+import { codeTypeFromRole, hasIcd10Primary } from "../utils/aiSuggestions";
 import type { FinishedCase } from "../types/case.types";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
@@ -195,7 +195,8 @@ export function FinishedCaseDetailPage({
           onClose={() => setShowReopen(false)}
         />
       )}
-      {adding && <AddCodeModal only={adding} onAdd={handleAddCode} onClose={() => setAdding(null)} />}
+      {adding && <AddCodeModal only={adding} icd10PrimaryTaken={hasIcd10Primary(codes)}
+        onAdd={handleAddCode} onClose={() => setAdding(null)} />}
       {deleting && (
         <ConfirmDialog
           icon={Trash2} danger
