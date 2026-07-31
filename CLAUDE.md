@@ -337,6 +337,28 @@ Milestones (git log --oneline reads as this sequence):
   question 15 in `docs/imed-integration.md`). Still blocked on hospital
   data, unchanged: lab normal ranges (no abnormal-value highlighting, Q14)
   and doctor/recorder names (MD field shows "—", Q11).
+- ✅ **Frontend WCAG 2.2 AA pass (2026-07-31):** three commits in
+  `../audit-chart-frontend` (67ab714 / ac8e9da / fb4b76d+69a496d) after a full
+  audit found ~20+ AA failures. Phase 1: shared `useModalA11y` (Escape, focus
+  trap, focus restore) + `ModalShell` behind all 8 hand-rolled overlays, label
+  wiring via a `Field` render-prop in the three code modals, aria-labels on
+  every icon button/input, live-region toasts + alert banners, global
+  `:focus-visible` ring, **inert hidden tab panels** (keyboard users could
+  approve invisible cases), keyboard-reachable PDF dropzone. Phase 2: the ICD
+  typeahead is a real ARIA combobox (arrows/Enter/double-Escape), case tabs are
+  a real tablist, per-route `document.title`, `<html lang>` follows the EN/TH
+  toggle, skip links, table scope/captions; `eslint-plugin-jsx-a11y` enforced
+  as **errors** (deliberate mouse-only conveniences carry inline disables
+  naming the accessible path). Phase 3 (user pre-approved look changes):
+  contrast tokens fixed — light-rose muted 0.50→0.70 and accent `#C9748A`→
+  `#A34D66` (accentRgb follows), dark-rose muted →0.70, mono muted →0.60;
+  all ≤11px text bumped to 12px (isolated commit 69a496d, revert if something
+  wraps); 24px touch targets; `prefers-reduced-motion`; real `<title>`.
+  Still manual-only: VoiceOver/keyboard walkthrough scripts + a visual pass of
+  the 4 themes (in the plan file `~/.claude/plans/glittery-forging-waffle.md`);
+  keyboard drag-reorder of code priority is the one tracked follow-up. Lint's
+  7 remaining errors are PRE-EXISTING react-hooks/react-refresh findings,
+  untouched deliberately.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
