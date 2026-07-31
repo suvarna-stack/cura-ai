@@ -108,7 +108,7 @@ export function AddCodeModal({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>{t("confirm.addCode")}</h3>
-            <p className="text-[11px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
+            <p className="text-[12px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
           </div>
           <button onClick={onClose} aria-label={t("a11y.close")}
             className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
@@ -122,8 +122,8 @@ export function AddCodeModal({
             <div key={s.key} className="flex-1 min-w-0 rounded-xl p-3 space-y-3"
               style={{ background: `rgba(${gl.accentRgb},0.04)`, border: `1px solid rgba(${gl.accentRgb},0.16)` }}>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.label}</span>
-                <span className="text-[10px] font-normal" style={{ color: gl.muted }}>
+                <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.label}</span>
+                <span className="text-[12px] font-normal" style={{ color: gl.muted }}>
                   {s.key === "icd10" ? t("code.icd10Box") : t("code.icd9Box")}
                 </span>
               </div>

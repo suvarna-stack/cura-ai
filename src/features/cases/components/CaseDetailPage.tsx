@@ -124,7 +124,7 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
             </div>
             <div>
               <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>Edit Code</h3>
-              <p className="text-[11px] font-normal" style={{ color: gl.muted }}>Modify code details and type</p>
+              <p className="text-[12px] font-normal" style={{ color: gl.muted }}>Modify code details and type</p>
             </div>
           </div>
           <button onClick={onClose} aria-label={t("a11y.close")}
@@ -491,7 +491,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
               <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
               <ReportViewToggle view={view} onChange={setView} />
               {/* item 9: Edit Report removed — the record is read-only here */}
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
@@ -519,8 +519,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
                   <div key={i} className={i > 0 ? "mt-4 pt-4" : ""}
                     style={i > 0 ? { borderTop: `1px solid rgba(${gl.accentRgb},${gl.isDark ? 0.22 : 0.16})` } : undefined}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.fieldname}</span>
-                      <span className="text-[10px] font-normal" style={{ color: gl.muted }}>{s.documenttype}{s.recorddatetime ? ` · ${s.recorddatetime}` : ""}</span>
+                      <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.fieldname}</span>
+                      <span className="text-[12px] font-normal" style={{ color: gl.muted }}>{s.documenttype}{s.recorddatetime ? ` · ${s.recorddatetime}` : ""}</span>
                     </div>
                     <p className="text-[14px] leading-6 whitespace-pre-wrap">{s.value ?? "—"}</p>
                   </div>

@@ -133,7 +133,7 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
             </div>
             <div>
               <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>Edit Code</h3>
-              <p className="text-[11px]" style={{ color: gl.muted }}>Modify code details and type</p>
+              <p className="text-[12px]" style={{ color: gl.muted }}>Modify code details and type</p>
             </div>
           </div>
           <button onClick={onClose} aria-label={t("a11y.close")}
@@ -512,7 +512,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             {/* item 9: Edit Report removed */}
             <div className="flex items-center gap-2">
               <ReportViewToggle view={view} onChange={setView} />
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
           </div>

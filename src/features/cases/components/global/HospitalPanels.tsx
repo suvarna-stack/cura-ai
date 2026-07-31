@@ -58,7 +58,7 @@ export function ReportViewToggle({ view, onChange }: {
     <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: gl.borderSm }}>
       {opts.map(([v, label]) => (
         <button key={v} onClick={() => onChange(v)}
-          className="text-[10px] font-bold px-2 py-1 transition-all"
+          className="text-[12px] font-bold px-2 py-1 transition-all"
           style={v === view
             ? { background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }
             : { background: "transparent", color: gl.muted }}>
@@ -74,7 +74,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return (
     <section className="rounded-xl overflow-hidden" style={{ border: gl.borderSm }}>
       <header className="px-3 py-1.5" style={{ background: `rgba(${gl.accentRgb},0.10)` }}>
-        <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{title}</h3>
+        <h3 className="text-[12px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{title}</h3>
       </header>
       <div className="px-3 py-2.5">{children}</div>
     </section>
@@ -84,7 +84,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function Empty() {
   const { gl } = useTheme();
   const { t } = useLang();
-  return <p className="text-[11px] italic" style={{ color: gl.muted }}>{t("hosp.empty")}</p>;
+  return <p className="text-[12px] italic" style={{ color: gl.muted }}>{t("hosp.empty")}</p>;
 }
 
 /** Section entries with their fieldname + document/date label; `color`
@@ -96,8 +96,8 @@ function Entries({ list, color }: { list: Sec[]; color?: string }) {
       {list.map((s, i) => (
         <div key={i}>
           <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: color ?? gl.accent }}>{s.fieldname}</span>
-            <span className="text-[9px] font-normal" style={{ color: gl.muted }}>
+            <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: color ?? gl.accent }}>{s.fieldname}</span>
+            <span className="text-[12px] font-normal" style={{ color: gl.muted }}>
               {s.documenttype}{s.recorddatetime ? ` · ${s.recorddatetime}` : ""}
             </span>
           </div>
@@ -175,7 +175,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
                     <div key={i} className="flex items-baseline gap-2 flex-wrap">
                       <span className="text-[12px] font-bold" style={{ color: gl.text }}>{c.code}</span>
                       <span className="text-[12px] font-normal" style={{ color: gl.text }}>{c.description ?? ""}</span>
-                      <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: gl.muted }}>
+                      <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted }}>
                         {c.code_role.replace(/_/g, " ")}
                       </span>
                     </div>
@@ -184,7 +184,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
               )}
               {px.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
+                  <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
                     {t("hosp.procedures")}
                   </p>
                   <div className="space-y-1">
@@ -194,13 +194,13 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
                           <span className="text-[12px] font-bold" style={{ color: gl.text }}>{c.code}</span>
                           <span className="text-[12px] font-normal" style={{ color: gl.text }}>{c.description ?? ""}</span>
                           {c.operation_type && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: gl.muted }}>
+                            <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted }}>
                               {c.operation_type}
                             </span>
                           )}
                         </div>
                         {(c.operation_start || c.operation_end) && (
-                          <p className="text-[10px] font-normal" style={{ color: gl.muted }}>
+                          <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
                             {c.operation_start ?? "—"} → {c.operation_end ?? "—"}
                           </p>
                         )}
@@ -218,7 +218,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
           <LabResults detail={detail} embedded />
           {xray.length > 0 && (
             <div className={(detail.orders ?? []).some((o) => o.order_category === "lab") ? "mt-2.5" : ""}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
+              <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
                 {t("hosp.xray")}
               </p>
               <div className="space-y-1.5">
@@ -228,7 +228,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
                       {o.detail?.name ?? o.order_name ?? "—"}
                     </p>
                     {o.detail?.value && (
-                      <p className="text-[11px] leading-4 whitespace-pre-wrap" style={{ color: gl.muted }}>{o.detail.value}</p>
+                      <p className="text-[12px] leading-4 whitespace-pre-wrap" style={{ color: gl.muted }}>{o.detail.value}</p>
                     )}
                   </div>
                 ))}
@@ -240,7 +240,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
         <Panel title={t("hosp.cpoe")}>
           {cpoe.length === 0 && cpoeTotal > 0 ? (
             /* orders exist but were truncated out of the capped payload */
-            <p className="text-[10px] font-normal" style={{ color: gl.muted }}>
+            <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
               {t("hosp.shownOf", { shown: 0, total: cpoeTotal })}
             </p>
           ) : cpoe.length === 0 ? <Empty /> : (
@@ -250,10 +250,10 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
                   <caption className="sr-only">{t("hosp.cpoe")}</caption>
                   <thead>
                     <tr style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
-                      <th scope="col" className="text-left font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <th scope="col" className="text-left font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         {t("hosp.orderName")}
                       </th>
-                      <th scope="col" className="text-right font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <th scope="col" className="text-right font-bold px-2.5 py-1.5" style={{ color: gl.muted, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         {t("hosp.qty")}
                       </th>
                     </tr>
@@ -272,7 +272,7 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
               </div>
               {/* the detail payload caps orders at 150 — say so, don't hide it */}
               {cpoeTotal > cpoe.length && (
-                <p className="text-[10px] font-normal mt-1" style={{ color: gl.muted }}>
+                <p className="text-[12px] font-normal mt-1" style={{ color: gl.muted }}>
                   {t("hosp.shownOf", { shown: cpoe.length, total: cpoeTotal })}
                 </p>
               )}

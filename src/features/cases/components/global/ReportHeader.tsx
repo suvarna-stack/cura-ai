@@ -80,14 +80,14 @@ export function ReportHeader({ detail, caseId, dept }: {
       </div>
       {/* encounter type + which clinical parts the record actually holds */}
       <div className="flex items-center gap-1.5 flex-wrap mt-2">
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+        <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
           style={{ background: `rgba(${gl.accentRgb},0.14)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}>
           {enc === "1" ? "IPD" : "OPD"}
         </span>
         {reportParts(detail).map((p) => (
           <span key={p.key}
             title={p.ok ? undefined : t("report.partMissing", { part: p.key })}
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            className="text-[12px] font-semibold px-2 py-0.5 rounded-full"
             style={p.ok
               ? { background: gl.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", color: gl.text, border: gl.borderSm }
               : { background: "transparent", color: gl.muted, border: gl.borderSm, opacity: 0.7 }}>

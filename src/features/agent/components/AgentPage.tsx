@@ -274,7 +274,7 @@ export function AgentPage() {
 
                 {m.learned && (
                   <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                    className="rounded-full px-2.5 py-1 text-[12px] font-semibold"
                     style={{
                       color: gl.accent,
                       border: `1px solid rgba(${gl.accentRgb},0.35)`,
@@ -287,7 +287,7 @@ export function AgentPage() {
 
                 {m.time !== '' && (
                   <span
-                    className="px-1 text-[11px] font-normal"
+                    className="px-1 text-[12px] font-normal"
                     style={{ color: gl.muted }}
                   >
                     {m.time}
@@ -309,7 +309,7 @@ export function AgentPage() {
             key={p}
             type="button"
             onClick={() => void send(p)}
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all hover:opacity-80"
+            className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium whitespace-nowrap transition-all hover:opacity-80"
             style={{
               background: gl.row,
               backdropFilter: gl.blur16,
@@ -385,11 +385,11 @@ export function AgentPage() {
           </button>
         </div>
         <p
-          className="mt-2 text-center text-[11px] font-normal"
+          className="mt-2 text-center text-[12px] font-normal"
           style={{ color: gl.muted }}
         >
           <kbd
-            className="rounded-md px-1.5 py-0.5 text-[10px]"
+            className="rounded-md px-1.5 py-0.5 text-[12px]"
             style={{
               background: gl.row,
               border: gl.borderSm,
@@ -400,7 +400,7 @@ export function AgentPage() {
           </kbd>{' '}
           to send {' · '}
           <kbd
-            className="rounded-md px-1.5 py-0.5 text-[10px]"
+            className="rounded-md px-1.5 py-0.5 text-[12px]"
             style={{
               background: gl.row,
               border: gl.borderSm,

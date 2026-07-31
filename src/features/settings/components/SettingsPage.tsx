@@ -198,7 +198,7 @@ export function SettingsPage() {
                           <Sun size={9} style={{ color: gl.muted }} />
                         )}
                         <p
-                          className="text-[11px] font-normal"
+                          className="text-[12px] font-normal"
                           style={{ color: gl.muted }}
                         >
                           {theme.gl.isDark ? 'Dark' : 'Light'}

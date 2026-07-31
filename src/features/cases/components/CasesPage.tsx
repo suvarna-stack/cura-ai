@@ -54,7 +54,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
   const { gl } = useTheme();
   const { t } = useLang();
   // labels bold, values regular; sizes +1 across the row (requests 22/07/2026)
-  const label = "text-[11px] font-bold uppercase tracking-wide";
+  const label = "text-[12px] font-bold uppercase tracking-wide";
   return (
     <>
       <div className="flex items-center gap-1.5 mb-1">
@@ -66,7 +66,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
       <p className="text-[14px] font-semibold truncate" style={{ color: hn ? gl.text : gl.muted }}
         title={hn ? `HN ${hn}` : t("ident.hnMissing")}>
         <span className="text-[12px] font-bold opacity-70">HN </span>{hn ?? "—"}
-        {!hn && <span className="text-[11px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
+        {!hn && <span className="text-[12px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
       </p>
       {(coverage || date) && (
         <div className="flex items-center gap-x-2 flex-wrap mt-1">
@@ -76,7 +76,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
               <span className="text-[12px] font-medium" style={{ color: gl.text }}>{coverage}</span>
             </span>
           )}
-          {coverage && date && <span className="text-[10px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+          {coverage && date && <span className="text-[12px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
           {date && (
             <span className="flex items-center gap-1">
               <span className={label} style={{ color: gl.muted, opacity: 0.75 }}>{t("meta.date")}</span>
@@ -102,8 +102,8 @@ function CaseMeta({ c }: { c: RichCase }) {
     <div className="flex items-center gap-x-2 flex-wrap">
       {items.map((item, i) => (
         <span key={item.label} className="flex items-center gap-1.5" title={item.title}>
-          {i > 0 && <span className="text-[10px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
-          <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{item.label}</span>
+          {i > 0 && <span className="text-[12px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+          <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{item.label}</span>
           <span className="text-[12px] font-medium" style={{ color: gl.text }}>{item.value}</span>
         </span>
       ))}
@@ -495,7 +495,7 @@ export function CasesPage({
                 >
                   <t.icon size={11} style={{ color: active ? gl.accent : gl.muted }} />
                   <span className="text-[13px] font-semibold">{t.label}</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full"
                     style={active
                       ? { background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff" }
                       : { background: gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)", color: gl.muted }}>
@@ -509,7 +509,7 @@ export function CasesPage({
                       : t.count}
                   </span>
                   {/* date-filter indicator (Prompt 3): the counts are a dated view */}
-                  {filters.dateActive && <span className="text-[10px]">📅</span>}
+                  {filters.dateActive && <span className="text-[12px]">📅</span>}
                 </button>
               );
             })}
@@ -706,7 +706,7 @@ export function CasesPage({
                             : t("missing.count", { n: missingDocs.length });
                           return (
                             <span title={c.missing}
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
+                              className="text-[12px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
                               style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
                               <AlertCircle size={8} /> {label}
                             </span>
@@ -771,7 +771,7 @@ export function CasesPage({
                             column, same trade-off as the Finished rows) */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
                           <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
+                            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
                               style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                               <RotateCcw size={8} /> {t("tab.reopen")}
                             </span>
@@ -785,15 +785,15 @@ export function CasesPage({
                               {who.finishedBy && (
                                 <span className="flex items-center gap-1">
                                   <Flag size={9} style={{ color: gl.muted, opacity: 0.75 }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.finishedBy")}</span>
+                                  <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.finishedBy")}</span>
                                   <span className="text-[12px] font-semibold" style={{ color: gl.text }}>{who.finishedBy}</span>
                                 </span>
                               )}
                               {who.reopenedBy && (
                                 <span className="flex items-center gap-1">
-                                  {who.finishedBy && <span className="text-[10px] mr-1" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+                                  {who.finishedBy && <span className="text-[12px] mr-1" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
                                   <RotateCcw size={9} style={{ color: gl.accent, opacity: 0.85 }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.reopenedBy")}</span>
+                                  <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.reopenedBy")}</span>
                                   <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{who.reopenedBy}</span>
                                 </span>
                               )}
@@ -835,7 +835,7 @@ export function CasesPage({
                       onClick={() => openFinishedCase(c)}>
                       <div className="flex-1 min-w-0">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
                             style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                             <Flag size={8} /> {t("tab.finished")}
                           </span>

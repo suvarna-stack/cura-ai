@@ -139,7 +139,7 @@ export function AccountsPage() {
           <table className="w-full text-left">
             <caption className="sr-only">Coder accounts</caption>
             <thead>
-              <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
+              <tr className="border-b border-border text-[12px] tracking-wide text-muted uppercase">
                 {['Name', 'Email', 'Status', 'Actions'].map((h) => (
                   <th
                     key={h}

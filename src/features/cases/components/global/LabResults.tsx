@@ -41,7 +41,7 @@ export function LabResults({ detail, embedded }: {
   return (
     <div className={embedded ? undefined : "mt-5 pt-4"}
       style={embedded ? undefined : { borderTop: `1px solid rgba(${gl.accentRgb},${gl.isDark ? 0.22 : 0.16})` }}>
-      <p className="text-[11px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: gl.accent }}>
+      <p className="text-[12px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: gl.accent }}>
         <FlaskConical size={12} /> {t("report.labs")}
       </p>
       <div className="space-y-2">
@@ -49,9 +49,9 @@ export function LabResults({ detail, embedded }: {
           <div key={panel} className="rounded-lg overflow-hidden" style={{ border: gl.borderSm }}>
             <div className="px-2.5 py-1.5 flex items-center justify-between gap-2"
               style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
-              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: gl.accent }}>{panel}</span>
+              <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: gl.accent }}>{panel}</span>
               {rows[0].detail?.reportdatetime && (
-                <span className="text-[10px] font-normal shrink-0" style={{ color: gl.muted }}>
+                <span className="text-[12px] font-normal shrink-0" style={{ color: gl.muted }}>
                   {rows[0].detail.reportdatetime}
                 </span>
               )}
@@ -77,7 +77,7 @@ export function LabResults({ detail, embedded }: {
       </div>
       {/* the payload caps lab rows per category — say so, don't hide it */}
       {(detail?.orderCounts?.lab ?? 0) > labs.length && (
-        <p className="text-[10px] font-normal mt-1" style={{ color: gl.muted }}>
+        <p className="text-[12px] font-normal mt-1" style={{ color: gl.muted }}>
           {t("hosp.shownOf", { shown: labs.length, total: detail!.orderCounts!.lab })}
         </p>
       )}

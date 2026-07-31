@@ -114,7 +114,7 @@ export function LoginForm() {
           onClick={fillDemoCredentials}
           className="mt-6 w-full rounded-lg border border-dashed border-border bg-bg p-3 text-left transition-colors hover:border-primary"
         >
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+          <p className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-muted">
             Demo admin — click to fill
           </p>
           <p className="text-[12px] text-text">

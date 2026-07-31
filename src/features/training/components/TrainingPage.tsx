@@ -416,7 +416,7 @@ export function TrainingPage() {
                 ? 'Uploading…'
                 : 'Drop PDFs here, or click to browse'}
             </p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[12px] text-muted">
               Coding guidelines, grouper handbooks, hospital SOPs — PDF only
             </p>
             {/* sr-only (not display:none) keeps the input focusable — Tab to it,
@@ -436,7 +436,7 @@ export function TrainingPage() {
             />
           </div>
           {uploadError && (
-            <p role="alert" className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+            <p role="alert" className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-error">
               <AlertTriangle size={12} className="mt-[1px] shrink-0" />
               {uploadError}
             </p>
@@ -446,7 +446,7 @@ export function TrainingPage() {
             <table className="w-full text-left">
               <caption className="sr-only">Knowledge-base documents</caption>
               <thead>
-                <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
+                <tr className="border-b border-border text-[12px] tracking-wide text-muted uppercase">
                   {['Document', 'Size', 'Pages', 'Chunks', 'Status', 'Actions'].map(
                     (h, i) => (
                       <th
@@ -490,7 +490,7 @@ export function TrainingPage() {
                           >
                             {d.name}
                           </p>
-                          <p className="text-[11px] text-muted">
+                          <p className="text-[12px] text-muted">
                             {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
                           </p>
                         </div>
@@ -529,7 +529,7 @@ export function TrainingPage() {
           <h2 className="mb-1 flex items-center gap-2 text-[14px] font-bold text-text">
             <BrainCircuit size={15} className="text-primary" /> Train
           </h2>
-          <p className="mb-4 text-[11px] text-muted">
+          <p className="mb-4 text-[12px] text-muted">
             Re-embeds every document and rebuilds the vector index the coding
             AI queries. Uploads already index themselves — retrain after
             removing documents or changing models.
@@ -552,13 +552,13 @@ export function TrainingPage() {
             )}
           </Button>
           {busy && !training && (
-            <p className="mt-2 text-[11px] text-muted">
+            <p className="mt-2 text-[12px] text-muted">
               Waiting for uploads to finish ingesting…
             </p>
           )}
 
           <div className="mt-4 border-t border-border pt-4">
-            <p className="mb-2 text-[11px] text-muted">
+            <p className="mb-2 text-[12px] text-muted">
               Extract ICD codes + titles from uploaded documents into{' '}
               <code>icd_codes</code>. Existing descriptions are never
               overwritten.
@@ -581,12 +581,12 @@ export function TrainingPage() {
               )}
             </Button>
             {!docs.length && (
-              <p className="mt-2 text-[11px] text-muted">
+              <p className="mt-2 text-[12px] text-muted">
                 Upload at least one PDF first.
               </p>
             )}
             {codeSync && (
-              <p className="mt-2 text-[11px] font-semibold text-success">
+              <p className="mt-2 text-[12px] font-semibold text-success">
                 {codeSync.extracted.toLocaleString()} codes found —{' '}
                 {codeSync.added.toLocaleString()} added,{' '}
                 {codeSync.descriptionsFilled.toLocaleString()} descriptions
@@ -594,7 +594,7 @@ export function TrainingPage() {
               </p>
             )}
             {codeSyncError && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+              <p className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-error">
                 <AlertTriangle size={12} className="mt-[1px] shrink-0" />
                 {codeSyncError}
               </p>
@@ -620,7 +620,7 @@ export function TrainingPage() {
           )}
 
           {lastRun && !training && (
-            <p className="mt-3 text-[11px] text-muted">
+            <p className="mt-3 text-[12px] text-muted">
               Last run {fmtDate(lastRun.finishedAt)} — {lastRun.docCount} docs,{' '}
               {lastRun.chunkCount.toLocaleString()} chunks in{' '}
               {(lastRun.durationMs / 1000).toFixed(1)}s.
@@ -633,7 +633,7 @@ export function TrainingPage() {
         <h2 className="mb-1 flex items-center gap-2 text-[14px] font-bold text-text">
           <Search size={15} className="text-primary" /> Test retrieval
         </h2>
-        <p className="mb-4 text-[11px] text-muted">
+        <p className="mb-4 text-[12px] text-muted">
           Ask what a coder would ask and see which chunks the index hands the
           AI. Optionally generate a full AI answer from those chunks.
         </p>
@@ -662,7 +662,7 @@ export function TrainingPage() {
           </Button>
         </form>
         {!hasIndex && (
-          <p className="mt-2 text-[11px] text-muted">
+          <p className="mt-2 text-[12px] text-muted">
             Upload and index at least one document before testing retrieval.
           </p>
         )}
@@ -698,7 +698,7 @@ export function TrainingPage() {
                         {h.via}
                       </span>
                     </p>
-                    <span className="text-[11px] font-bold whitespace-nowrap text-primary">
+                    <span className="text-[12px] font-bold whitespace-nowrap text-primary">
                       {h.score.toFixed(2)}
                     </span>
                   </div>

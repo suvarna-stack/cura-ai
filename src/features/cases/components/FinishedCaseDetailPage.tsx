@@ -57,7 +57,7 @@ function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
             </div>
             <div>
               <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>Re-open for Editing?</h3>
-              <p className="text-[11px]" style={{ color: gl.muted }}>This will move the case back to Incomplete</p>
+              <p className="text-[12px]" style={{ color: gl.muted }}>This will move the case back to Incomplete</p>
             </div>
           </div>
         </div>
@@ -267,7 +267,7 @@ export function FinishedCaseDetailPage({
               <FileText size={15} style={{ color: gl.accent }} />
               <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
               <ReportViewToggle view={view} onChange={setView} />
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-1"
+              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full ml-1"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
@@ -278,7 +278,7 @@ export function FinishedCaseDetailPage({
               <span className="text-[12px] font-semibold truncate" style={{ color: gl.text }}>
                 {coders.join(" → ")}
               </span>
-              <span className="text-[10px] font-normal" style={{ color: gl.muted }}>· {c.codedDate}</span>
+              <span className="text-[12px] font-normal" style={{ color: gl.muted }}>· {c.codedDate}</span>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin" style={{ color: gl.text }}>

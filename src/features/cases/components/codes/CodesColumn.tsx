@@ -170,10 +170,10 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             {entry.code}
           </span>
           {!entry.missing && (
-            <span className="text-[10px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
+            <span className="text-[12px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
           )}
           {entry.manual && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
               {t("code.manualBadge")}
             </span>
@@ -181,7 +181,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           {/* the hospital's operation type ("OR Procedure" …) as a chip, like
               the Type column on its own coder UI's operation grid */}
           {system === "icd9" && entry.operation_type && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
               style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }}>
               {entry.operation_type}
             </span>
@@ -189,7 +189,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         </div>
         {/* line 3 — the operation window (ICD-9 = procedure = has times) */}
         {system === "icd9" && formatWindow(entry.operation_start, entry.operation_end) && (
-          <p className="text-[10px] font-semibold mt-1 flex items-center gap-1"
+          <p className="text-[12px] font-semibold mt-1 flex items-center gap-1"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
             <Clock size={9} style={{ color: gl.accent, flexShrink: 0 }} />
             {formatWindow(entry.operation_start, entry.operation_end)}
@@ -197,21 +197,21 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         )}
         {/* line 4 — the code description / role */}
         {description && (
-          <p className="text-[11px] font-normal leading-relaxed mt-0.5"
+          <p className="text-[12px] font-normal leading-relaxed mt-0.5"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
             {description}
           </p>
         )}
         {/* line 5 — the coder's internal note (never sent to the hospital) */}
         {entry.note && (
-          <p className="text-[10px] font-normal italic mt-0.5 flex items-start gap-1"
+          <p className="text-[12px] font-normal italic mt-0.5 flex items-start gap-1"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
             <StickyNote size={9} style={{ color: gl.accent, flexShrink: 0, marginTop: "2px" }} />
             {entry.note}
           </p>
         )}
         {entry.missing && entry.missingMsg && (
-          <p className="text-[11px] font-semibold mt-1 flex items-center gap-1" style={{ color: gl.accent, opacity: 0.65 }}>
+          <p className="text-[12px] font-semibold mt-1 flex items-center gap-1" style={{ color: gl.accent, opacity: 0.65 }}>
             <AlertCircle size={9} /> {entry.missingMsg}
           </p>
         )}
@@ -230,10 +230,10 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         <div className="flex items-center gap-2">
           <Sparkles size={14} style={{ color: gl.accent }} />
           <h2 className="text-[15px] font-bold flex-1" style={{ color: gl.text }}>{LABEL[system]}</h2>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>{rows.length}</span>
         </div>
-        <p className="text-[11px] font-normal mt-0.5" style={{ color: gl.muted }}>
+        <p className="text-[12px] font-normal mt-0.5" style={{ color: gl.muted }}>
           {loading
             ? <SkeletonBar className="h-2.5 w-24" />
             : avg !== null
@@ -254,7 +254,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setInsertAt(null);
         }}>
         {loading ? <CodeCardsSkeleton /> : rows.length === 0 ? (
-          <p className="text-[11px] px-1 py-2" style={{ color: gl.muted, opacity: 0.8 }}>
+          <p className="text-[12px] px-1 py-2" style={{ color: gl.muted, opacity: 0.8 }}>
             {t("code.emptyBox", { system: LABEL[system] })}
           </p>
         ) : (

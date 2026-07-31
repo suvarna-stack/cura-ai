@@ -93,7 +93,7 @@ export function DashboardPage() {
           <table className="w-full text-left">
             <caption className="sr-only">Coder accounts</caption>
             <thead>
-              <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
+              <tr className="border-b border-border text-[12px] tracking-wide text-muted uppercase">
                 <th scope="col" className="px-5 py-3 font-semibold">Name</th>
                 <th scope="col" className="px-5 py-3 font-semibold">Status</th>
               </tr>

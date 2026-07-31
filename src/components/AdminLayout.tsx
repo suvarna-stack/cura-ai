@@ -42,7 +42,7 @@ export function AdminLayout() {
           <p className="text-[14px] font-bold leading-tight text-text">
             MedCode AI
           </p>
-          <p className="text-[11px] font-semibold leading-tight text-primary">
+          <p className="text-[12px] font-semibold leading-tight text-primary">
             SuperAdmin
           </p>
         </div>

@@ -40,7 +40,7 @@ export function VitalsStrip({ detail, embedded }: {
       {!embedded && (
         <div className="flex items-center gap-1.5 mb-1.5">
           <Activity size={12} style={{ color: gl.accent }} />
-          <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>
+          <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>
             {t("vitals.title")}
           </p>
         </div>
@@ -55,7 +55,7 @@ export function VitalsStrip({ detail, embedded }: {
             <tr style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
               {COLS.map((c) => (
                 <th key={c.label} scope="col" className="text-left font-bold px-2.5 py-1.5 whitespace-nowrap"
-                  style={{ color: gl.muted, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  style={{ color: gl.muted, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   {c.label}
                 </th>
               ))}

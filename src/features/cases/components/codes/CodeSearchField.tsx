@@ -265,7 +265,7 @@ export function CodeSearchField({
                 >
                   {h.code}
                 </span>
-                <span className="text-[10px] font-semibold uppercase" style={{ color: gl.muted }}>
+                <span className="text-[12px] font-semibold uppercase" style={{ color: gl.muted }}>
                   {h.system}
                 </span>
               </div>
