@@ -54,7 +54,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
+    <main className="flex min-h-screen items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-sm">
         {/* brand */}
         <div className="mb-8 flex flex-col items-center gap-2">
@@ -75,6 +75,7 @@ export function LoginForm() {
             type="email"
             label="Email"
             autoFocus
+            autoComplete="email"
             placeholder="you@hospital.th"
             error={errors.email?.message}
             {...register('email', {
@@ -86,6 +87,7 @@ export function LoginForm() {
             id="password"
             type="password"
             label="Password"
+            autoComplete="current-password"
             placeholder="••••••••••••"
             error={errors.password?.message}
             {...register('password', {
@@ -94,7 +96,7 @@ export function LoginForm() {
           />
 
           {submitError && (
-            <p className="text-[12px] font-semibold text-error">
+            <p role="alert" className="text-[12px] font-semibold text-error">
               {submitError}
             </p>
           )}
@@ -123,6 +125,6 @@ export function LoginForm() {
           </p>
         </button>
       </Card>
-    </div>
+    </main>
   )
 }

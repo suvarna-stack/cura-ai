@@ -11,6 +11,8 @@ import { Plus, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeSearchField } from "./CodeSearchField";
+import { Field } from "./Field";
+import { ModalShell } from "../../../../components/ui/Modal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../../utils/operationTime";
 
 // canonical stored values — the dropdown shows the translated labels.
@@ -72,7 +74,7 @@ export function AddCodeModal({
   const ready = boxes.filter((s) => filled(s.key));
 
   const fieldStyle: React.CSSProperties = {
-    background: gl.inputBg, border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.text, outline: "none",
+    background: gl.inputBg, border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.text,
   };
 
   const submit = () => {
@@ -92,15 +94,13 @@ export function AddCodeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-      onClick={onClose}>
-      <div className={`w-full ${only ? "max-w-sm" : "max-w-2xl"} rounded-2xl p-5`}
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-          border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
-        }}>
+    <ModalShell onClose={onClose} ariaLabel={t("confirm.addCode")}
+      overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+      className={`w-full ${only ? "max-w-sm" : "max-w-2xl"} rounded-2xl p-5`}
+      style={{
+        background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+        border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
+      }}>
         <div className="flex items-center gap-2.5 mb-4">
           <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
             style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>
@@ -110,7 +110,8 @@ export function AddCodeModal({
             <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>{t("confirm.addCode")}</h3>
             <p className="text-[11px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
           </div>
-          <button onClick={onClose} className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+          <button onClick={onClose} aria-label={t("a11y.close")}
+            className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
             <X size={15} />
           </button>
         </div>
@@ -126,75 +127,83 @@ export function AddCodeModal({
                   {s.key === "icd10" ? t("code.icd10Box") : t("code.icd9Box")}
                 </span>
               </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.codeLabel")}</label>
-                <CodeSearchField
-                  value={form[s.key].code}
-                  system={s.catalog}
-                  placeholder={s.placeholder}
-                  inputStyle={fieldStyle}
-                  onSelect={(hit) =>
-                    setForm((f) => ({
-                      ...f,
-                      [s.key]: {
-                        ...f[s.key],
-                        code: hit.code,
-                        desc: hit.description || f[s.key].desc,
-                      },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.typeLabel")}</label>
-                <select value={form[s.key].role}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as RoleKey } }))}
-                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
-                  {(Object.keys(s.roles) as RoleKey[]).map(r => (
-                    <option key={r} value={r}>{t(`code.type.${r}`)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.descLabel")}</label>
-                <input value={form[s.key].desc} placeholder={s.descPlaceholder}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
-                  className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
-              </div>
+              <Field label={t("code.codeLabel")}>
+                {(id) => (
+                  <CodeSearchField
+                    id={id}
+                    value={form[s.key].code}
+                    system={s.catalog}
+                    placeholder={s.placeholder}
+                    inputStyle={fieldStyle}
+                    onSelect={(hit) =>
+                      setForm((f) => ({
+                        ...f,
+                        [s.key]: {
+                          ...f[s.key],
+                          code: hit.code,
+                          desc: hit.description || f[s.key].desc,
+                        },
+                      }))
+                    }
+                  />
+                )}
+              </Field>
+              <Field label={t("code.typeLabel")}>
+                {(id) => (
+                  <select id={id} value={form[s.key].role}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as RoleKey } }))}
+                    className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
+                    {(Object.keys(s.roles) as RoleKey[]).map(r => (
+                      <option key={r} value={r}>{t(`code.type.${r}`)}</option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+              <Field label={t("code.descLabel")}>
+                {(id) => (
+                  <input id={id} value={form[s.key].desc} placeholder={s.descPlaceholder}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
+                    className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
+                )}
+              </Field>
               {/* per-code note, like the hospital UI's Note column — but OURS:
                   saved with the working code list, never sent to the hospital */}
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.noteLabel")}</label>
-                <input value={form[s.key].note} placeholder={t("code.notePlaceholder")}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], note: e.target.value } }))}
-                  className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
-              </div>
+              <Field label={t("code.noteLabel")}>
+                {(id) => (
+                  <input id={id} value={form[s.key].note} placeholder={t("code.notePlaceholder")}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], note: e.target.value } }))}
+                    className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
+                )}
+              </Field>
               {/* ICD-9 = procedure → it has an operation type (the hospital
                   UI's "Type" dropdown) and happened over a time window */}
               {s.key === "icd9" && (
-                <div>
-                  <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opType")}</label>
-                  <select value={form.icd9.opType}
-                    onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, opType: e.target.value } }))}
-                    className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
-                    {OPERATION_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
+                <Field label={t("code.opType")}>
+                  {(id) => (
+                    <select id={id} value={form.icd9.opType}
+                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, opType: e.target.value } }))}
+                      className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
+                      {OPERATION_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  )}
+                </Field>
               )}
               {s.key === "icd9" && (
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opStart")}</label>
-                    <input type="datetime-local" value={toInputValue(form.icd9.start)}
-                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, start: fromInputValue(e.target.value) ?? "" } }))}
-                      className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
-                  </div>
-                  <div>
-                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opEnd")}</label>
-                    <input type="datetime-local" value={toInputValue(form.icd9.end)}
-                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, end: fromInputValue(e.target.value) ?? "" } }))}
-                      className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
-                  </div>
+                  <Field label={t("code.opStart")}>
+                    {(id) => (
+                      <input id={id} type="datetime-local" value={toInputValue(form.icd9.start)}
+                        onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, start: fromInputValue(e.target.value) ?? "" } }))}
+                        className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                    )}
+                  </Field>
+                  <Field label={t("code.opEnd")}>
+                    {(id) => (
+                      <input id={id} type="datetime-local" value={toInputValue(form.icd9.end)}
+                        onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, end: fromInputValue(e.target.value) ?? "" } }))}
+                        className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                    )}
+                  </Field>
                 </div>
               )}
             </div>
@@ -213,7 +222,6 @@ export function AddCodeModal({
             <Plus size={12} /> {ready.length > 1 ? t("code.addBoth") : t("confirm.addCode")}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

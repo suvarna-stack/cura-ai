@@ -80,3 +80,14 @@ body {
   @apply bg-bg text-text font-sans antialiased;
   color-scheme: light;
 }
+
+/* --------------------------------------------------------------------------
+   Keyboard focus (WCAG 2.4.7) — one visible ring everywhere.
+   Unlayered on purpose: it outranks Tailwind's layered utilities, so the
+   scattered `outline-none` classes lose without editing each one. Themed
+   surfaces set --focus-ring (CasesProviders); admin pages use the fallback.
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--focus-ring, #2563eb);
+  outline-offset: 2px;
+}

@@ -164,16 +164,16 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
         </div>
       </div>
 
-      {/* 3-second success toast after an undo */}
-      {undoneToast && (
-        <div className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-[12px] font-semibold"
-          style={{
-            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-            border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow, color: gl.text,
-          }}>
-          {t("activity.actionUndone")}
-        </div>
-      )}
+      {/* 3-second success toast after an undo — live region stays mounted so
+          screen readers announce the message when it appears */}
+      <div role="status" aria-live="polite"
+        className={undoneToast ? "fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-[12px] font-semibold" : "sr-only"}
+        style={undoneToast ? {
+          background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+          border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow, color: gl.text,
+        } : undefined}>
+        {undoneToast ? t("activity.actionUndone") : null}
+      </div>
     </main>
   );
 }

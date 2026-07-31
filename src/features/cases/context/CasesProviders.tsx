@@ -35,11 +35,19 @@ function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={{ showToast }}>
       {children}
-      {current && (
-        <div className="pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-text shadow-card">
-          {current.message}
-        </div>
-      )}
+      {/* the live region stays mounted (screen readers often miss regions that
+          appear together with their first message); only the text comes and goes */}
+      <div
+        role="status"
+        aria-live="polite"
+        className={
+          current
+            ? 'pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-text shadow-card'
+            : 'sr-only'
+        }
+      >
+        {current?.message}
+      </div>
     </ToastCtx.Provider>
   )
 }
@@ -54,6 +62,9 @@ function ThemeProvider({ children }: { children: ReactNode }) {
           {
             ...theme.bg,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
+            // keyboard focus ring (index.css :focus-visible) — text color always
+            // contrasts with the theme background, so the ring does too
+            '--focus-ring': gl.text,
           } as React.CSSProperties
         }
       >

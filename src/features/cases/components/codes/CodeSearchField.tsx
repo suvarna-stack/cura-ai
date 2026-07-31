@@ -9,6 +9,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { searchIcdCatalog, type IcdCatalogHit } from '../../api/casesService'
 
 export function CodeSearchField({
+  id,
   value,
   system,
   onSelect,
@@ -16,6 +17,8 @@ export function CodeSearchField({
   inputStyle,
   localHits,
 }: {
+  /** Links the surrounding <label htmlFor> to the search input. */
+  id?: string
   value: string
   /** Limit results to ICD-10 or ICD-9 when known from the code type. */
   system?: 'ICD-10' | 'ICD-9'
@@ -130,6 +133,8 @@ export function CodeSearchField({
           style={{ color: gl.muted }}
         />
         <input
+          id={id}
+          aria-label={id ? undefined : (placeholder ?? 'Search code or title…')}
           value={query}
           placeholder={placeholder ?? 'Search code or title…'}
           onChange={(e) => {

@@ -340,6 +340,7 @@ export function AgentPage() {
             <User size={12} style={{ color: gl.accent }} />
           </div>
           <textarea
+            aria-label="Message the AI agent"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -360,6 +361,7 @@ export function AgentPage() {
           <button
             type="button"
             onClick={() => void send()}
+            aria-label="Send message"
             disabled={!input.trim()}
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
             style={

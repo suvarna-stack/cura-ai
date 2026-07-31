@@ -118,11 +118,12 @@ export function AccountsPage() {
       </p>
 
       {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-error/40 bg-error/10 px-4 py-3">
+        <div role="alert" className="mb-4 flex items-start gap-3 rounded-lg border border-error/40 bg-error/10 px-4 py-3">
           <p className="flex-1 text-[12px] font-semibold text-error">{error}</p>
           <button
             type="button"
             title="Dismiss"
+            aria-label="Dismiss error"
             onClick={() => setError(null)}
             className="text-error/70 transition-colors hover:text-error"
           >
@@ -177,6 +178,7 @@ export function AccountsPage() {
                       <button
                         type="button"
                         title="Edit"
+                        aria-label={`Edit ${a.name}`}
                         onClick={() => setEditing(a)}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-text"
                       >
@@ -187,6 +189,7 @@ export function AccountsPage() {
                         title={
                           a.status === 'Active' ? 'Deactivate' : 'Activate'
                         }
+                        aria-label={`${a.status === 'Active' ? 'Deactivate' : 'Activate'} ${a.name}`}
                         onClick={() => setToggling(a)}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-text"
                       >
@@ -199,6 +202,7 @@ export function AccountsPage() {
                       <button
                         type="button"
                         title="Delete"
+                        aria-label={`Delete ${a.name}`}
                         onClick={() => setDeleting(a)}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
                       >

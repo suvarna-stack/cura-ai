@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/hooks/useAuth'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 // Strict role separation (Phase 3): no cross-link to the coder's /cases —
 // admins see admin pages only (the router would bounce it anyway).
@@ -23,6 +24,11 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const drawerRef = useRef<HTMLElement>(null)
+  const drawerKeyDown = useModalA11y(drawerRef, {
+    onClose: () => setMobileOpen(false),
+    active: mobileOpen,
+  })
 
   const handleLogout = () => {
     void logout().finally(() => navigate('/login', { replace: true }))
@@ -79,15 +85,24 @@ export function AdminLayout() {
       </aside>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 md:hidden" role="presentation">
           <div
             className="absolute inset-0 bg-overlay"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute top-0 left-0 h-full w-60 border-r border-border bg-surface">
+          <aside
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            tabIndex={-1}
+            onKeyDown={drawerKeyDown}
+            className="absolute top-0 left-0 h-full w-60 border-r border-border bg-surface"
+          >
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
               className="absolute top-4 right-3 text-muted hover:text-text"
             >
               <X size={18} />
@@ -102,6 +117,7 @@ export function AdminLayout() {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
             className="text-muted hover:text-text"
           >
             <Menu size={18} />

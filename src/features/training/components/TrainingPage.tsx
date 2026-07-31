@@ -392,7 +392,7 @@ export function TrainingPage() {
               addFiles(e.dataTransfer.files)
             }}
             onClick={() => fileInput.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors ${
+            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors focus-within:border-primary focus-within:bg-primary/5 ${
               dragging
                 ? 'border-primary bg-primary/10'
                 : 'border-border hover:border-primary/60 hover:bg-primary/5'
@@ -406,7 +406,7 @@ export function TrainingPage() {
             ) : (
               <CloudUpload size={26} className="mx-auto mb-2 text-primary" />
             )}
-            <p className="text-[13px] font-semibold text-text">
+            <p role="status" className="text-[13px] font-semibold text-text">
               {uploading
                 ? 'Uploading…'
                 : 'Drop PDFs here, or click to browse'}
@@ -414,12 +414,16 @@ export function TrainingPage() {
             <p className="mt-1 text-[11px] text-muted">
               Coding guidelines, grouper handbooks, hospital SOPs — PDF only
             </p>
+            {/* sr-only (not display:none) keeps the input focusable — Tab to it,
+                Enter/Space opens the OS picker; the visual dropzone is decoration */}
             <input
               ref={fileInput}
               type="file"
               accept="application/pdf"
               multiple
-              className="hidden"
+              aria-label="Upload PDF documents"
+              className="sr-only"
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
                 addFiles(e.target.files)
                 e.target.value = ''
@@ -427,7 +431,7 @@ export function TrainingPage() {
             />
           </div>
           {uploadError && (
-            <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+            <p role="alert" className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
               <AlertTriangle size={12} className="mt-[1px] shrink-0" />
               {uploadError}
             </p>

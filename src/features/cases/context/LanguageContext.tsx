@@ -221,6 +221,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "reopen.finishedBy": { en: "Finished by", th: "ทำเสร็จโดย" },
   "reopen.reopenedBy": { en: "Reopened by", th: "เปิดใหม่โดย" },
   "facet.dept":      { en: "Department",   th: "แผนก" },
+  // screen-reader-only names (WCAG pass, 2026-07-31)
+  "a11y.close":     { en: "Close",     th: "ปิด" },
+  "a11y.loading":   { en: "Loading…",  th: "กำลังโหลด…" },
+  "a11y.selectCase": { en: "Select case {vn}", th: "เลือกเคส {vn}" },
   // settings
   "settings.title":         { en: "Settings", th: "การตั้งค่า" },
   "settings.sub":           { en: "Preferences & appearance", th: "การตั้งค่าและธีม" },

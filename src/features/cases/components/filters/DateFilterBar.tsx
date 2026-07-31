@@ -57,6 +57,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
         <div className="flex items-center gap-2">
           <input type="date" value={f.specificDate ?? ""}
             onChange={(e) => f.setSpecificDate(e.target.value || null)}
+            aria-label={t("date.specificDate")}
             className="text-[11px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
           {f.specificDate && (
             <span className="text-[11px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>

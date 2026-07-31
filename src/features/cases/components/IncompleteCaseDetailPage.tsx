@@ -15,6 +15,8 @@ import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
          CODE_TYPE_ICD10_OTHER, CODE_TYPE_ICD10_EXTERNAL } from "./codes/AddCodeModal";
 import { CodeSearchField, systemFromCodeType } from "./codes/CodeSearchField";
+import { Field } from "./codes/Field";
+import { ModalShell } from "../../../components/ui/Modal";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
@@ -114,13 +116,13 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
   const fieldBg = gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const fieldBorder = `1px solid rgba(${gl.accentRgb},0.30)`;
   const focusRing = `1px solid rgba(${gl.accentRgb},0.65)`;
-  const inputStyle: React.CSSProperties = { background: fieldBg, border: fieldBorder, color: gl.text, outline: "none", transition: "border 0.15s" };
+  const inputStyle: React.CSSProperties = { background: fieldBg, border: fieldBorder, color: gl.text, transition: "border 0.15s" };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: gl.isDark ? "rgba(0,0,0,0.60)" : "rgba(0,0,0,0.40)" }} onClick={onClose}>
-      <div className="w-[460px] rounded-2xl overflow-hidden"
-        style={{ background: modalBg, border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,${gl.isDark ? "0.60" : "0.18"})` }}
-        onClick={e => e.stopPropagation()}>
+    <ModalShell onClose={onClose} ariaLabel="Edit Code"
+      overlayClassName=""
+      overlayStyle={{ background: gl.isDark ? "rgba(0,0,0,0.60)" : "rgba(0,0,0,0.40)" }}
+      className="w-[460px] rounded-2xl overflow-hidden"
+      style={{ background: modalBg, border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,${gl.isDark ? "0.60" : "0.18"})` }}>
         <div className="px-5 py-4 flex items-center justify-between"
           style={{ borderBottom: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.06)` }}>
           <div className="flex items-center gap-2.5">
@@ -133,85 +135,94 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
               <p className="text-[11px]" style={{ color: gl.muted }}>Modify code details and type</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:opacity-70 transition-all"
+          <button onClick={onClose} aria-label={t("a11y.close")}
+            className="w-8 h-8 flex items-center justify-center rounded-xl hover:opacity-70 transition-all"
             style={{ background: `rgba(${gl.accentRgb},0.10)`, border: `1px solid rgba(${gl.accentRgb},0.20)`, color: gl.muted }}>
             <X size={14} />
           </button>
         </div>
         <div className="px-5 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>Code Number</label>
-              <CodeSearchField
-                value={form.code}
-                system={systemFromCodeType(form.type)}
-                placeholder="Search ICD code…"
-                inputStyle={inputStyle}
-                localHits={localHits}
-                onSelect={(hit) =>
-                  setForm((f) => ({
-                    ...f,
-                    code: hit.code,
-                    desc: hit.description || f.desc,
-                    type: /icd[- ]?9/i.test(hit.system)
-                      ? (f.type.toLowerCase().includes('comorbid') ? CODE_TYPE_COMORBIDITY : CODE_TYPE_PRIMARY)
-                      : (f.type.toLowerCase().includes('comorbid')
-                          ? CODE_TYPE_ICD10_COMORBIDITY
-                          : CODE_TYPE_ICD10_PRIMARY),
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>Code Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
-                {CODE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
+            <Field label="Code Number">
+              {(id) => (
+                <CodeSearchField
+                  id={id}
+                  value={form.code}
+                  system={systemFromCodeType(form.type)}
+                  placeholder="Search ICD code…"
+                  inputStyle={inputStyle}
+                  localHits={localHits}
+                  onSelect={(hit) =>
+                    setForm((f) => ({
+                      ...f,
+                      code: hit.code,
+                      desc: hit.description || f.desc,
+                      type: /icd[- ]?9/i.test(hit.system)
+                        ? (f.type.toLowerCase().includes('comorbid') ? CODE_TYPE_COMORBIDITY : CODE_TYPE_PRIMARY)
+                        : (f.type.toLowerCase().includes('comorbid')
+                            ? CODE_TYPE_ICD10_COMORBIDITY
+                            : CODE_TYPE_ICD10_PRIMARY),
+                    }))
+                  }
+                />
+              )}
+            </Field>
+            <Field label="Code Type">
+              {(id) => (
+                <select id={id} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
+                  {CODE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
+            </Field>
           </div>
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>Description</label>
-            <textarea rows={4} value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
-              onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
-              className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
-          </div>
+          <Field label="Description">
+            {(id) => (
+              <textarea id={id} rows={4} value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
+                onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
+                className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
+            )}
+          </Field>
           {/* per-code note, like the hospital UI's Note column — internal only */}
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.noteLabel")}</label>
-            <textarea rows={2} value={form.note ?? ""} placeholder={t("code.notePlaceholder")}
-              onChange={e => setForm(f => ({ ...f, note: e.target.value || undefined }))}
-              onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
-              className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
-          </div>
+          <Field label={t("code.noteLabel")}>
+            {(id) => (
+              <textarea id={id} rows={2} value={form.note ?? ""} placeholder={t("code.notePlaceholder")}
+                onChange={e => setForm(f => ({ ...f, note: e.target.value || undefined }))}
+                onFocus={e => (e.target.style.border = focusRing)} onBlur={e => (e.target.style.border = fieldBorder)}
+                className="w-full text-[13px] px-3 py-2.5 rounded-xl resize-none leading-relaxed" style={inputStyle} />
+            )}
+          </Field>
           {/* ICD-9 = procedure → its operation type + time window are editable here too */}
           {isIcd9Type(form.type) && (
-            <div>
-              <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opType")}</label>
-              <select value={form.operation_type ?? OPERATION_TYPES[0]}
-                onChange={e => setForm(f => ({ ...f, operation_type: e.target.value }))}
-                className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
-                {/* a hospital value outside our list still renders + round-trips */}
-                {(OPERATION_TYPES.includes(form.operation_type ?? OPERATION_TYPES[0])
-                  ? OPERATION_TYPES : [form.operation_type as string, ...OPERATION_TYPES])
-                  .map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+            <Field label={t("code.opType")}>
+              {(id) => (
+                <select id={id} value={form.operation_type ?? OPERATION_TYPES[0]}
+                  onChange={e => setForm(f => ({ ...f, operation_type: e.target.value }))}
+                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={inputStyle}>
+                  {/* a hospital value outside our list still renders + round-trips */}
+                  {(OPERATION_TYPES.includes(form.operation_type ?? OPERATION_TYPES[0])
+                    ? OPERATION_TYPES : [form.operation_type as string, ...OPERATION_TYPES])
+                    .map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              )}
+            </Field>
           )}
           {isIcd9Type(form.type) && (
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opStart")}</label>
-                <input type="datetime-local" value={toInputValue(form.operation_start)}
-                  onChange={e => setForm(f => ({ ...f, operation_start: fromInputValue(e.target.value) }))}
-                  className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.opEnd")}</label>
-                <input type="datetime-local" value={toInputValue(form.operation_end)}
-                  onChange={e => setForm(f => ({ ...f, operation_end: fromInputValue(e.target.value) }))}
-                  className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
-              </div>
+              <Field label={t("code.opStart")}>
+                {(id) => (
+                  <input id={id} type="datetime-local" value={toInputValue(form.operation_start)}
+                    onChange={e => setForm(f => ({ ...f, operation_start: fromInputValue(e.target.value) }))}
+                    className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
+                )}
+              </Field>
+              <Field label={t("code.opEnd")}>
+                {(id) => (
+                  <input id={id} type="datetime-local" value={toInputValue(form.operation_end)}
+                    onChange={e => setForm(f => ({ ...f, operation_end: fromInputValue(e.target.value) }))}
+                    className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={inputStyle} />
+                )}
+              </Field>
             </div>
           )}
         </div>
@@ -225,8 +236,7 @@ function EditCodeModal({ entry, onSave, onClose, localHits }: {
             <Check size={13} /> Save Changes
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

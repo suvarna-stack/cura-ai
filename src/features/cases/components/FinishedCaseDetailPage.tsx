@@ -10,6 +10,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { AddCodeModal } from "./codes/AddCodeModal";
+import { ModalShell } from "../../../components/ui/Modal";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
@@ -42,11 +43,11 @@ function HighlightedReport({ text, accent }: { text: string; accent: string }) {
 function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
   const { gl } = useTheme();
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: gl.isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.40)" }} onClick={onClose}>
-      <div className="w-[400px] rounded-2xl overflow-hidden"
-        style={{ background: gl.isDark ? "#1e1218" : "#fff", border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,0.35)` }}
-        onClick={e => e.stopPropagation()}>
+    <ModalShell onClose={onClose} ariaLabel="Re-open for Editing?"
+      overlayClassName=""
+      overlayStyle={{ background: gl.isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.40)" }}
+      className="w-[400px] rounded-2xl overflow-hidden"
+      style={{ background: gl.isDark ? "#1e1218" : "#fff", border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,0.35)` }}>
         <div className="px-5 py-4" style={{ borderBottom: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.06)` }}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -74,8 +75,7 @@ function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
             <RotateCcw size={12} /> Yes, Re-open
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

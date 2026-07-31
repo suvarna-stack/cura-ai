@@ -10,6 +10,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
 import { ConfidencePill } from "./global/ConfidencePill";
+import { ModalShell } from "../../../components/ui/Modal";
 import { Pagination } from "./global/Pagination";
 import { CasePreview } from "./global/CasePreview";
 import { FilterPanel } from "./filters/FilterPanel";
@@ -431,7 +432,7 @@ export function CasesPage({
         {/* API data status — real synced hospital data only, no mock fallback.
             Loading is communicated by the skeletons below, so the banner is error-only. */}
         {error && (
-          <div className="px-4 py-2.5 rounded-xl text-xs font-semibold"
+          <div role="alert" className="px-4 py-2.5 rounded-xl text-xs font-semibold"
             style={{ background: `rgba(${gl.accentRgb},0.08)`, border: `1px solid rgba(${gl.accentRgb},0.20)`, color: gl.accent }}>
             Could not load /api/cases.json — run integration-poc/sync/export_json.py to generate the data.
           </div>
@@ -495,6 +496,7 @@ export function CasesPage({
               style={{ background: gl.inputBg, border: gl.border }}>
               <Search size={12} style={{ color: gl.muted }} />
               <input value={filters.query} onChange={e => filters.setQuery(e.target.value)}
+                aria-label={t("list.search")}
                 placeholder={t("list.search")} className="bg-transparent text-[12px] font-normal outline-none w-full" style={{ color: gl.text }} />
               {filters.query !== "" && (
                 <button onClick={() => filters.setQuery("")} aria-label={t("list.clearSearch")}
@@ -515,7 +517,8 @@ export function CasesPage({
             {/* skeletons cover both the initial cases.json fetch and the manual
                 iMed sync — but NOT the error state, which keeps its banner */}
             {(loading || syncing) ? (
-              <div className="p-3 space-y-2">
+              <div className="p-3 space-y-2" role="status" aria-busy="true">
+                <span className="sr-only">{t("a11y.loading")}</span>
                 {Array.from({ length: 7 }).map((_, i) => <SkeletonRow key={i} />)}
               </div>
             ) : (
@@ -528,8 +531,10 @@ export function CasesPage({
               willChange: "transform",
             }}>
 
-              {/* COMPLETE */}
-              <div style={panelStyle(0)}>
+              {/* COMPLETE — off-screen panels are inert: their buttons and
+                  checkboxes must leave the tab order and the a11y tree, or a
+                  keyboard user could act on rows they cannot see */}
+              <div style={panelStyle(0)} inert={currentIdx !== 0 || undefined}>
                 <div className="p-3 space-y-2">
                   {/* forgot-the-filter guard: empty filtered list ≠ finished queue */}
                   {filters.active && filters.totalComplete === 0 && unfilteredComplete > 0 && (
@@ -615,7 +620,7 @@ export function CasesPage({
               </div>
 
               {/* INCOMPLETE — flat list, same layout as Complete (no group cards) */}
-              <div style={panelStyle(1)}>
+              <div style={panelStyle(1)} inert={currentIdx !== 1 || undefined}>
                 <div className="p-3 space-y-2">
                   {filters.active && filters.totalIncomplete === 0 && unfilteredIncomplete > 0 && (
                     <div className="text-center py-8">
@@ -704,7 +709,7 @@ export function CasesPage({
 
               {/* REOPENED — cases any coder pulled back from Finished; they sit
                   here (out of the queues) until they are approved again */}
-              <div style={panelStyle(2)}>
+              <div style={panelStyle(2)} inert={currentIdx !== 2 || undefined}>
                 <div className="p-3 space-y-2">
                   {reopenRows.length === 0 && (
                     <div className="text-center py-8">
@@ -790,7 +795,7 @@ export function CasesPage({
               </div>
 
               {/* FINISHED */}
-              <div style={panelStyle(3)}>
+              <div style={panelStyle(3)} inert={currentIdx !== 3 || undefined}>
                 <div className="p-3 space-y-2">
                   {visibleFinished.map((c) => (
                     <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:opacity-90"
@@ -856,15 +861,13 @@ export function CasesPage({
 
       {/* approval confirmation dialog — gates every approve action (F14) */}
       {pendingApproval && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-          onClick={() => setPendingApproval(null)}>
-          <div className="w-full max-w-sm rounded-2xl p-5"
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-              border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
-            }}>
+        <ModalShell onClose={() => setPendingApproval(null)} ariaLabel={t("confirm.title")}
+          overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+          className="w-full max-w-sm rounded-2xl p-5"
+          style={{
+            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+            border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
+          }}>
             <div className="flex items-center gap-2.5 mb-2">
               <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
                 style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>
@@ -887,8 +890,7 @@ export function CasesPage({
                 <CheckCircle2 size={12} /> {t("confirm.confirm", { n: pendingApproval.n })}
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </main>
   );

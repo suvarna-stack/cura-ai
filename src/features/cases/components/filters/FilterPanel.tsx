@@ -140,11 +140,13 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                 <input
                   value={childQuery[qk] ?? ""}
                   onChange={(e) => setChildQuery((p) => ({ ...p, [qk]: e.target.value }))}
+                  aria-label={t("facet.ordernameSearch")}
                   placeholder={t("facet.ordernameSearch")}
                   className="bg-transparent text-[10px] font-normal outline-none w-full min-w-0"
                   style={{ color: gl.text }} />
                 {fq !== "" && (
                   <button onClick={() => setChildQuery((p) => ({ ...p, [qk]: "" }))}
+                    aria-label={t("list.clearSearch")}
                     className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
                     <X size={9} />
                   </button>
@@ -228,11 +230,13 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                             <input
                               value={childQuery[o.value] ?? ""}
                               onChange={(e) => setChildQuery((p) => ({ ...p, [o.value]: e.target.value }))}
+                              aria-label={t("facet.ordernameSearch")}
                               placeholder={t("facet.ordernameSearch")}
                               className="bg-transparent text-[10px] font-normal outline-none w-full min-w-0"
                               style={{ color: gl.text }} />
                             {cq !== "" && (
                               <button onClick={() => setChildQuery((p) => ({ ...p, [o.value]: "" }))}
+                                aria-label={t("list.clearSearch")}
                                 className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
                                 <X size={9} />
                               </button>
