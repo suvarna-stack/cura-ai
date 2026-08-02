@@ -55,11 +55,23 @@ class Settings(BaseSettings):
     min_pdf_chars: int = 200                   # below this a PDF counts as scanned
     ingest_batch_size: int = 32                # chunks embedded per progress tick
 
-    # --- Generation (tiny local LLM) ---
+    # --- Generation (local LLM) ---
+    # Backend: "transformers" (in-process, llm_model/llm_device/llm_dtype
+    # below) or "ollama" (external server — GPU-offloaded GGUF, much faster;
+    # ollama_base/ollama_model below).
+    llm_backend: str = "transformers"
+    ollama_base: str = "http://localhost:11434"
+    ollama_model: str = "hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M"
     llm_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
     llm_device: str = "cpu"
+    # Weight dtype: "float32" | "bfloat16" | "float16" | "auto" ("auto" uses
+    # the checkpoint's native dtype). bfloat16 halves RAM and is faster on
+    # modern CPUs — required to fit a 3B model on a 16GB machine.
+    llm_dtype: str = "float32"
     max_new_tokens: int = 512
     temperature: float = 0.3
+    repetition_penalty: float = 1.1            # small models echo without it
+    chat_history_turns: int = 8                # prior turns kept per /chat call
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

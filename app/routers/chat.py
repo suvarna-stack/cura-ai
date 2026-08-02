@@ -59,6 +59,7 @@ def query(req: QueryRequest) -> QueryResponse:
         temperature=req.temperature,
         max_new_tokens=req.max_new_tokens,
         mode=req.mode,
+        history=[t.model_dump() for t in req.history],
     )
     return QueryResponse(
         question=result["question"],

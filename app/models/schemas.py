@@ -46,9 +46,25 @@ class RebuildResponse(BaseModel):
     documents: int
 
 
+class RenameRequest(BaseModel):
+    """Change a document's display filename (source id and index untouched)."""
+    filename: str = Field(..., min_length=1, max_length=255)
+
+
 # --------------------------- Query -------------------------------
+class ChatTurn(BaseModel):
+    """One prior conversation turn, OpenAI-style."""
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=8000)
+
+
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1)
+    history: list[ChatTurn] = Field(
+        default_factory=list, max_length=40,
+        description="Prior turns, oldest first; only the most recent "
+                    "chat_history_turns are fed to the LLM.",
+    )
     mode: Literal["graph", "plain"] | None = Field(
         None, description="Retrieval strategy; default from settings (graph)."
     )

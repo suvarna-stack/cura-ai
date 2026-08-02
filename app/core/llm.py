@@ -1,4 +1,4 @@
-"""Tiny local LLM (Qwen2.5-0.5B-Instruct) via transformers, lazily loaded."""
+"""Local LLM via transformers, lazily loaded (model + dtype from settings)."""
 from __future__ import annotations
 
 import logging
@@ -30,11 +30,18 @@ class LocalLLM:
 
                     name = self._settings.llm_model
                     device = self._settings.llm_device
-                    logger.info("Loading LLM %s on %s ...", name, device)
+                    dtype_name = self._settings.llm_dtype.lower()
+                    dtype = {
+                        "float32": torch.float32,
+                        "bfloat16": torch.bfloat16,
+                        "float16": torch.float16,
+                    }.get(dtype_name, "auto")
+                    logger.info("Loading LLM %s on %s (dtype=%s) ...",
+                                name, device, dtype_name)
                     self._tokenizer = AutoTokenizer.from_pretrained(name)
                     self._model = AutoModelForCausalLM.from_pretrained(
                         name,
-                        dtype=torch.float32,
+                        dtype=dtype,
                     )
                     self._model.to(device)
                     self._model.eval()
@@ -64,6 +71,8 @@ class LocalLLM:
             max_new_tokens=max_new_tokens,
             do_sample=temperature > 0,
             pad_token_id=tokenizer.eos_token_id,
+            # Small models degenerate into echoing the prompt without this.
+            repetition_penalty=settings.repetition_penalty,
         )
         if temperature > 0:
             gen_kwargs.update(temperature=temperature, top_p=0.9)
@@ -76,11 +85,72 @@ class LocalLLM:
         return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
-_llm: LocalLLM | None = None
+class OllamaLLM:
+    """Same .generate() interface, served by a local Ollama server.
+
+    Ollama runs GGUF-quantized models with automatic GPU offload — on a
+    machine with even a small dGPU this is an order of magnitude faster than
+    in-process CPU transformers. The model is pulled/managed by Ollama
+    (`ollama pull <name>`); this class only speaks its /api/chat endpoint.
+    """
+
+    def __init__(self) -> None:
+        self._settings = get_settings()
+
+    def generate(
+        self,
+        messages: list[dict[str, str]],
+        max_new_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        import httpx
+
+        settings = self._settings
+        temperature = settings.temperature if temperature is None else temperature
+        max_new_tokens = settings.max_new_tokens if max_new_tokens is None else max_new_tokens
+
+        try:
+            # Generous timeout: the first call after idle loads the model
+            # into (V)RAM; generation itself is fast.
+            resp = httpx.post(
+                f"{settings.ollama_base}/api/chat",
+                json={
+                    "model": settings.ollama_model,
+                    "messages": messages,
+                    "stream": False,
+                    # Keep the model resident between questions; the default
+                    # 5m idle unload makes every post-idle answer pay a
+                    # ~20s VRAM reload.
+                    "keep_alive": "2h",
+                    "options": {
+                        "num_predict": max_new_tokens,
+                        "temperature": temperature,
+                        "top_p": 0.9,
+                        "repeat_penalty": settings.repetition_penalty,
+                        # Smaller KV cache → more layers fit in VRAM. Our
+                        # prompts (system + 6 chunks + short history) stay
+                        # well under this.
+                        "num_ctx": 3072,
+                    },
+                },
+                timeout=300.0,
+            )
+            resp.raise_for_status()
+        except httpx.ConnectError as exc:
+            raise RuntimeError(
+                f"Ollama server not reachable at {settings.ollama_base} — "
+                "start it (the Ollama app) or set LLM_BACKEND=transformers."
+            ) from exc
+        return resp.json()["message"]["content"].strip()
 
 
-def get_llm() -> LocalLLM:
+_llm: LocalLLM | OllamaLLM | None = None
+
+
+def get_llm() -> LocalLLM | OllamaLLM:
     global _llm
     if _llm is None:
-        _llm = LocalLLM()
+        backend = get_settings().llm_backend.lower()
+        _llm = OllamaLLM() if backend == "ollama" else LocalLLM()
+        logger.info("LLM backend: %s", backend)
     return _llm

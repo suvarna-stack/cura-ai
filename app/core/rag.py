@@ -22,7 +22,11 @@ SYSTEM_PROMPT = (
     "You are MedCode, a careful assistant for medical-coding questions. "
     "Answer ONLY using the provided context. "
     "If the context does not contain the answer, say you don't know. "
-    "Be concise and cite the source name(s) and page(s) in square brackets."
+    "Be concise — at most about 120 words — and cite the source name(s) "
+    "and page(s) in square brackets. "
+    "Always answer in the same language the question was asked in — "
+    "English questions get English answers, Thai questions get Thai answers "
+    "(ตอบเป็นภาษาไทยเมื่อผู้ใช้ถามเป็นภาษาไทย)."
 )
 
 
@@ -134,6 +138,11 @@ def _graph_hits(question: str) -> list[dict[str, Any]]:
     return hits
 
 
+def _is_thai(text: str) -> bool:
+    """True when the text contains Thai script (U+0E00–U+0E7F)."""
+    return any("฀" <= ch <= "๿" for ch in text)
+
+
 def _build_context(hits: list[dict[str, Any]]) -> str:
     blocks = []
     for i, h in enumerate(hits, 1):
@@ -173,8 +182,20 @@ def answer_question(
     temperature: float | None = None,
     max_new_tokens: int | None = None,
     mode: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    mode, hits = retrieve_chunks(question, top_k=top_k, mode=mode)
+    history = history or []
+
+    # Follow-up questions ("what about for children?") are meaningless to the
+    # retriever alone — prepend the previous user turn so the vector query
+    # carries the topic.
+    retrieval_query = question
+    prev_user = next((t["content"] for t in reversed(history)
+                      if t["role"] == "user"), None)
+    if prev_user:
+        retrieval_query = f"{prev_user}\n{question}"
+
+    mode, hits = retrieve_chunks(retrieval_query, top_k=top_k, mode=mode)
 
     if not hits:
         return {
@@ -186,11 +207,22 @@ def answer_question(
         }
 
     context = _build_context(hits)
+    keep = get_settings().chat_history_turns
+    # Small models follow the context's language over a distant system line —
+    # an explicit instruction adjacent to the question is what actually works.
+    # Symmetric on purpose: an English question must not drift into Thai either.
+    lang_note = (
+        "\n\nสำคัญ: ตอบเป็นภาษาไทยเท่านั้น ห้ามตอบเป็นภาษาอังกฤษ "
+        "(IMPORTANT: Answer in Thai ONLY. Do not answer in English.)"
+        if _is_thai(question)
+        else "\n\nIMPORTANT: Answer in English only."
+    )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *history[-keep:],
         {
             "role": "user",
-            "content": f"Context:\n{context}\n\nQuestion: {question}",
+            "content": f"Context:\n{context}\n\nQuestion: {question}{lang_note}",
         },
     ]
 

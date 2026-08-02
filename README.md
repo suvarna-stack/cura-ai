@@ -83,7 +83,7 @@ curl -X POST http://localhost:8000/documents/text \
   -d '{"text":"E11.9 is Type 2 diabetes without complications.","source":"notes"}'
 ```
 
-**Via API** (file upload — `.txt`, `.md`, `.pdf`):
+**Via API** (file upload — `.pdf`, `.csv`, `.txt`, `.md`):
 
 ```bash
 curl -X POST http://localhost:8000/documents/upload \
@@ -116,7 +116,8 @@ Response shape:
 |--------|------|---------|
 | GET  | `/health` | status + indexed document count |
 | POST | `/documents/text` | index a raw text string |
-| POST | `/documents/upload` | index an uploaded txt/md/pdf file |
+| POST | `/documents/upload` | index an uploaded pdf/csv/txt/md file (CSV rows become "Header: value" lines) |
+| PATCH | `/documents/{source}` | rename the display filename (index untouched) |
 | DELETE | `/documents/{source}` | remove all chunks from one source |
 | POST | `/chat` | ask a question (RAG) |
 

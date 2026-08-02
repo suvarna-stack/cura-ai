@@ -64,8 +64,66 @@ def test_upload_rejects_scanned_pdf():
     assert "scanned" in r.json()["detail"].lower()
 
 
+def test_upload_rejects_unsupported_extension():
+    r = client.post(
+        "/documents/upload",
+        files={"file": ("report.docx", b"PK\x03\x04junk", "application/octet-stream")},
+    )
+    assert r.status_code == 400
+    assert "pdf or csv" in r.json()["detail"].lower()
+
+
+def test_upload_rejects_empty_csv():
+    # Happy-path CSV upload isn't tested here: it queues a background ingest
+    # which loads the embedding model (see module docstring).
+    r = client.post(
+        "/documents/upload",
+        files={"file": ("empty.csv", b"\n\n", "text/csv")},
+    )
+    assert r.status_code == 400
+    assert "no data rows" in r.json()["detail"].lower()
+
+
+def test_rename_document():
+    from app.core import registry
+
+    source = "test-rename-doc"
+    registry.upsert(source, filename="old-name.csv", ext=".csv",
+                    size_bytes=10, pages=1, chunks=0, status="indexed")
+    try:
+        r = client.patch(f"/documents/{source}", json={"filename": "new name"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["filename"] == "new name.csv"   # extension preserved
+        assert body["source"] == source             # id untouched
+
+        r = client.patch(f"/documents/{source}", json={"filename": "  "})
+        assert r.status_code == 400
+    finally:
+        registry.remove(source)
+
+
+def test_rename_unknown_document_404():
+    r = client.patch("/documents/does-not-exist", json={"filename": "x.pdf"})
+    assert r.status_code == 404
+
+
 def test_chat_mode_validation():
     r = client.post("/chat", json={"question": "hi", "mode": "banana"})
+    assert r.status_code == 422
+
+
+def test_chat_history_validation():
+    # Bad role → 422; the happy path would load the LLM (not tested here).
+    r = client.post("/chat", json={
+        "question": "hi",
+        "history": [{"role": "system", "content": "x"}],
+    })
+    assert r.status_code == 422
+    r = client.post("/chat", json={
+        "question": "hi",
+        "history": [{"role": "user", "content": ""}],
+    })
     assert r.status_code == 422
 
 
