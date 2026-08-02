@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Layers, CheckCircle2, AlertCircle, Flag } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
@@ -101,6 +102,7 @@ function BarList({
 
 export function AnalyticsPage() {
   const { gl } = useTheme()
+  useDocumentTitle("Analytics")
   const useMock = isAnalyticsMock()
   const [data, setData] = useState<AnalyticsData>(MOCK_ANALYTICS)
   const [loading, setLoading] = useState(!useMock)
@@ -243,7 +245,7 @@ export function AnalyticsPage() {
                   {s.value}
                 </p>
                 <p
-                  className="mt-0.5 text-[11px] font-semibold"
+                  className="mt-0.5 text-[12px] font-semibold"
                   style={{ color: gl.muted }}
                 >
                   {s.label}
@@ -260,7 +262,7 @@ export function AnalyticsPage() {
             <p className="mb-1 text-[15px] font-bold" style={{ color: gl.text }}>
               Cases Over Time
             </p>
-            <p className="mb-4 text-[11px]" style={{ color: gl.muted }}>
+            <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
               New cases per day ·{' '}
               {formatDate(data.casesOverTime[0]?.iso ?? new Date())} –{' '}
               {formatDate(data.casesOverTime.at(-1)?.iso ?? new Date())}
@@ -342,7 +344,7 @@ export function AnalyticsPage() {
               >
                 Cases by Coverage Type
               </p>
-              <p className="mb-4 text-[11px]" style={{ color: gl.muted }}>
+              <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
                 สิทธิการรักษา breakdown
               </p>
               <div className="flex items-center gap-4">
@@ -386,14 +388,14 @@ export function AnalyticsPage() {
                         style={{ background: seg.color }}
                       />
                       <span
-                        className="truncate text-[11px] font-medium"
+                        className="truncate text-[12px] font-medium"
                         style={{ color: gl.muted }}
                         title={seg.label}
                       >
                         {truncate(seg.label, 18)}
                       </span>
                       <span
-                        className="ml-auto shrink-0 text-[11px] font-bold"
+                        className="ml-auto shrink-0 text-[12px] font-bold"
                         style={{ color: gl.text }}
                       >
                         {seg.count}
@@ -415,7 +417,7 @@ export function AnalyticsPage() {
               >
                 Top 10 ICD Codes
               </p>
-              <p className="mb-4 text-[11px]" style={{ color: gl.muted }}>
+              <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
                 Most frequent codes across all cases
               </p>
               <BarList rows={data.topCodes} />

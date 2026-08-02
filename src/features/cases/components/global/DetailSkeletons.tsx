@@ -4,6 +4,7 @@
 // Dashboard's sync SkeletonRow (animate-pulse + theme-aware bar).
 // ============================================================
 import { useTheme } from "../../context/ThemeContext";
+import { useLang } from "../../context/LanguageContext";
 
 const barColor = (isDark: boolean) =>
   isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
@@ -20,6 +21,7 @@ export function SkeletonBar({ className = "" }: { className?: string }) {
 /** Mimics a few report sections: a field-name label + text lines. */
 export function ReportSkeleton() {
   const { gl } = useTheme();
+  const { t } = useLang();
   const bar = barColor(gl.isDark);
   const sections = [
     { label: "w-32", lines: ["w-full", "w-5/6", "w-2/3"] },
@@ -27,7 +29,8 @@ export function ReportSkeleton() {
     { label: "w-28", lines: ["w-11/12", "w-1/2"] },
   ];
   return (
-    <div className="animate-pulse space-y-6">
+    <div className="animate-pulse space-y-6" role="status" aria-busy="true">
+      <span className="sr-only">{t("a11y.loading")}</span>
       {sections.map((s, i) => (
         <div key={i} className="space-y-2.5">
           <div className={`h-2.5 rounded ${s.label}`} style={{ background: bar }} />

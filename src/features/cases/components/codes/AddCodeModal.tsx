@@ -4,72 +4,111 @@
 // side by side, mirroring the AI Suggested Codes panel — the
 // coder picks the box, not a code system from a dropdown.
 // Each side offers the same two roles as before: primary
-// diagnosis and comorbidity.
+// diagnosis and comorbidity. Code number is a catalog search.
 // ============================================================
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import { CodeSearchField } from "./CodeSearchField";
+import { Field } from "./Field";
+import { ModalShell } from "../../../../components/ui/Modal";
+import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../../utils/operationTime";
 
 // canonical stored values — the dropdown shows the translated labels.
 // The code system is part of the type so CodesPanel can file the card in
 // the right box and writeback.py can derive the role.
 export const CODE_TYPE_PRIMARY = "ICD-9 Primary Diagnosis";
-export const CODE_TYPE_COMORBIDITY = "Comorbidities";
+// was the bare legacy "Comorbidities", which the column filter (isIcd9) and the
+// backend both read as ICD-10 — an ICD-9 comorbidity would jump columns and
+// drop its operation time window. Rows saved with the old label keep the
+// legacy ICD-10 treatment on both sides, consistently.
+export const CODE_TYPE_COMORBIDITY = "ICD-9 Comorbidity";
 export const CODE_TYPE_ICD10_PRIMARY = "ICD-10 Primary Diagnosis";
 export const CODE_TYPE_ICD10_COMORBIDITY = "ICD-10 Comorbidity";
+// the hospital dropdown's other two diagnosis kinds (2026-07-30) — the backend
+// reads "…other…" / "…external…" in the label, and the write API's diagnosis
+// types (OTHERS / EXTERNAL_CAUSE_OF_INJURY) have existed all along
+export const CODE_TYPE_ICD10_OTHER = "ICD-10 Other";
+export const CODE_TYPE_ICD10_EXTERNAL = "ICD-10 External Cause";
 
 type SystemKey = "icd10" | "icd9";
+type RoleKey = "primary" | "comorbidity" | "other" | "external";
 
 const SYSTEMS: { key: SystemKey; label: string; placeholder: string; descPlaceholder: string;
-                 primary: string; comorbidity: string }[] = [
-  { key: "icd10", label: "ICD-10", placeholder: "I21.09", descPlaceholder: "Acute myocardial infarction",
-    primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY },
-  { key: "icd9",  label: "ICD-9",  placeholder: "427.31", descPlaceholder: "Atrial fibrillation",
-    primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY },
+                 roles: Partial<Record<RoleKey, string>>; catalog: "ICD-10" | "ICD-9" }[] = [
+  // ICD-10 offers the hospital dropdown's four diagnosis kinds; ICD-9 keeps
+  // two (a procedure's own type is the Operation Type dropdown below)
+  { key: "icd10", label: "ICD-10", placeholder: "Search ICD-10…", descPlaceholder: "Acute myocardial infarction",
+    roles: { primary: CODE_TYPE_ICD10_PRIMARY, comorbidity: CODE_TYPE_ICD10_COMORBIDITY,
+             other: CODE_TYPE_ICD10_OTHER, external: CODE_TYPE_ICD10_EXTERNAL }, catalog: "ICD-10" },
+  { key: "icd9",  label: "ICD-9",  placeholder: "Search ICD-9…", descPlaceholder: "Atrial fibrillation",
+    roles: { primary: CODE_TYPE_PRIMARY, comorbidity: CODE_TYPE_COMORBIDITY }, catalog: "ICD-9" },
 ];
 
 export function AddCodeModal({
-  onAdd, onClose, only,
+  onAdd, onClose, only, icd10PrimaryTaken,
 }: {
-  onAdd: (entry: { code: string; type: string; desc: string }) => void;
+  onAdd: (entry: { code: string; type: string; desc: string;
+                   operation_start?: string; operation_end?: string;
+                   operation_type?: string; note?: string }) => void;
   onClose: () => void;
   /** opened from one box's "+": show only that code system */
   only?: SystemKey;
+  /** the case already has a primary ICD-10 → the guideline allows only one,
+   *  so the ICD-10 box can't offer that role again */
+  icd10PrimaryTaken?: boolean;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
-  // one independent draft per box; the coder fills the one they need
-  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: "primary" | "comorbidity" }>>({
-    icd10: { code: "", desc: "", role: "primary" },
-    icd9:  { code: "", desc: "", role: "primary" },
+  // one independent draft per box; the coder fills the one they need.
+  // ICD-9 = procedure, so its box carries a time window — pre-filled with
+  // "now" (a procedure must have times; the coder corrects them).
+  const [form, setForm] = useState<Record<SystemKey, { code: string; desc: string; role: RoleKey;
+                                                      start: string; end: string; opType: string; note: string }>>(() => {
+    const now = nowOperationTime();
+    return {
+      // primary taken → the ICD-10 box starts (and stays) on comorbidity
+      icd10: { code: "", desc: "", role: icd10PrimaryTaken ? "comorbidity" : "primary",
+               start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
+      icd9:  { code: "", desc: "", role: "primary", start: now, end: now, opType: OPERATION_TYPES[0], note: "" },
+    };
   });
   const boxes = only ? SYSTEMS.filter((s) => s.key === only) : SYSTEMS;
   const filled = (k: SystemKey) => form[k].code.trim() !== "" && form[k].desc.trim() !== "";
   const ready = boxes.filter((s) => filled(s.key));
 
   const fieldStyle: React.CSSProperties = {
-    background: gl.inputBg, border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.text, outline: "none",
+    background: gl.inputBg, border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.text,
   };
 
   const submit = () => {
-    // both boxes may be filled — each becomes its own code
+    // both boxes may be filled — each becomes its own code; only the ICD-9
+    // (procedure) side carries the operation window
     for (const s of ready) {
       const f = form[s.key];
-      onAdd({ code: f.code.trim(), type: f.role === "primary" ? s.primary : s.comorbidity, desc: f.desc.trim() });
+      // belt-and-braces for the one-primary rule (the option is disabled too)
+      const role = s.key === "icd10" && icd10PrimaryTaken && f.role === "primary"
+        ? "comorbidity" : f.role;
+      onAdd({
+        code: f.code.trim(),
+        type: s.roles[role] ?? s.roles.primary!,
+        desc: f.desc.trim(),
+        ...(s.key === "icd9" ? { operation_start: f.start, operation_end: f.end,
+                                 operation_type: f.opType } : {}),
+        ...(f.note.trim() ? { note: f.note.trim() } : {}),
+      });
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-      onClick={onClose}>
-      <div className={`w-full ${only ? "max-w-sm" : "max-w-2xl"} rounded-2xl p-5`}
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-          border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
-        }}>
+    <ModalShell onClose={onClose} ariaLabel={t("confirm.addCode")}
+      overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+      className={`w-full ${only ? "max-w-sm" : "max-w-2xl"} rounded-2xl p-5`}
+      style={{
+        background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+        border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
+      }}>
         <div className="flex items-center gap-2.5 mb-4">
           <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
             style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>
@@ -77,9 +116,10 @@ export function AddCodeModal({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>{t("confirm.addCode")}</h3>
-            <p className="text-[11px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
+            <p className="text-[12px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
           </div>
-          <button onClick={onClose} className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+          <button onClick={onClose} aria-label={t("a11y.close")}
+            className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
             <X size={15} />
           </button>
         </div>
@@ -90,32 +130,95 @@ export function AddCodeModal({
             <div key={s.key} className="flex-1 min-w-0 rounded-xl p-3 space-y-3"
               style={{ background: `rgba(${gl.accentRgb},0.04)`, border: `1px solid rgba(${gl.accentRgb},0.16)` }}>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.label}</span>
-                <span className="text-[10px] font-normal" style={{ color: gl.muted }}>
+                <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: gl.accent }}>{s.label}</span>
+                <span className="text-[12px] font-normal" style={{ color: gl.muted }}>
                   {s.key === "icd10" ? t("code.icd10Box") : t("code.icd9Box")}
                 </span>
               </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.codeLabel")}</label>
-                <input value={form[s.key].code} placeholder={s.placeholder}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], code: e.target.value } }))}
-                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl" style={fieldStyle} />
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.typeLabel")}</label>
-                <select value={form[s.key].role}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as "primary" | "comorbidity" } }))}
-                  className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
-                  <option value="primary">{t("code.type.primary")}</option>
-                  <option value="comorbidity">{t("code.type.comorbidity")}</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[12px] font-semibold block mb-1.5" style={{ color: gl.muted }}>{t("code.descLabel")}</label>
-                <input value={form[s.key].desc} placeholder={s.descPlaceholder}
-                  onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
-                  className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
-              </div>
+              <Field label={t("code.codeLabel")}>
+                {(id) => (
+                  <CodeSearchField
+                    id={id}
+                    value={form[s.key].code}
+                    system={s.catalog}
+                    placeholder={s.placeholder}
+                    inputStyle={fieldStyle}
+                    onSelect={(hit) =>
+                      setForm((f) => ({
+                        ...f,
+                        [s.key]: {
+                          ...f[s.key],
+                          code: hit.code,
+                          desc: hit.description || f[s.key].desc,
+                        },
+                      }))
+                    }
+                  />
+                )}
+              </Field>
+              <Field label={t("code.typeLabel")}>
+                {(id) => (
+                  <select id={id} value={form[s.key].role}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], role: e.target.value as RoleKey } }))}
+                    className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
+                    {(Object.keys(s.roles) as RoleKey[]).map(r => {
+                      const taken = s.key === "icd10" && r === "primary" && !!icd10PrimaryTaken;
+                      return (
+                        <option key={r} value={r} disabled={taken}>
+                          {t(`code.type.${r}`)}{taken ? t("code.primaryTaken") : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </Field>
+              <Field label={t("code.descLabel")}>
+                {(id) => (
+                  <input id={id} value={form[s.key].desc} placeholder={s.descPlaceholder}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], desc: e.target.value } }))}
+                    className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
+                )}
+              </Field>
+              {/* per-code note, like the hospital UI's Note column — but OURS:
+                  saved with the working code list, never sent to the hospital */}
+              <Field label={t("code.noteLabel")}>
+                {(id) => (
+                  <input id={id} value={form[s.key].note} placeholder={t("code.notePlaceholder")}
+                    onChange={e => setForm(f => ({ ...f, [s.key]: { ...f[s.key], note: e.target.value } }))}
+                    className="w-full text-[13px] px-3 py-2.5 rounded-xl" style={fieldStyle} />
+                )}
+              </Field>
+              {/* ICD-9 = procedure → it has an operation type (the hospital
+                  UI's "Type" dropdown) and happened over a time window */}
+              {s.key === "icd9" && (
+                <Field label={t("code.opType")}>
+                  {(id) => (
+                    <select id={id} value={form.icd9.opType}
+                      onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, opType: e.target.value } }))}
+                      className="w-full text-[13px] font-semibold px-3 py-2.5 rounded-xl appearance-none" style={fieldStyle}>
+                      {OPERATION_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  )}
+                </Field>
+              )}
+              {s.key === "icd9" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label={t("code.opStart")}>
+                    {(id) => (
+                      <input id={id} type="datetime-local" value={toInputValue(form.icd9.start)}
+                        onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, start: fromInputValue(e.target.value) ?? "" } }))}
+                        className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                    )}
+                  </Field>
+                  <Field label={t("code.opEnd")}>
+                    {(id) => (
+                      <input id={id} type="datetime-local" value={toInputValue(form.icd9.end)}
+                        onChange={e => setForm(f => ({ ...f, icd9: { ...f.icd9, end: fromInputValue(e.target.value) ?? "" } }))}
+                        className="w-full text-[12px] px-2 py-2.5 rounded-xl" style={fieldStyle} />
+                    )}
+                  </Field>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -132,7 +235,6 @@ export function AddCodeModal({
             <Plus size={12} /> {ready.length > 1 ? t("code.addBoth") : t("confirm.addCode")}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

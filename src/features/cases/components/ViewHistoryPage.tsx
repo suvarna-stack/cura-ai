@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 // ============================================================
 // ViewHistory (Prompt 5) — per-case timeline of everything coders
 // did to a case, from the shared activity log. Entries inside the
@@ -46,6 +47,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
   const { gl } = useTheme();
   const { t } = useLang();
   const { logs, undoLog } = useActivityLog();
+  useDocumentTitle(t("history.title"));
   const [undoneToast, setUndoneToast] = useState(false);
 
   // local (this browser, undoable) + server (every coder, read-only), newest first
@@ -85,7 +87,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
           <h1 className="text-[19px] font-bold" style={{ fontFamily: "'Playfair Display', serif", color: gl.text }}>
             {t("history.title")} — {patientName}
           </h1>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
             {caseId}
           </span>
@@ -133,10 +135,10 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
                         style={{ color: gl.text, opacity: isUndone ? 0.55 : 1, textDecoration: isUndone ? "line-through" : undefined }}>
                         {description}
                       </p>
-                      <p className="text-[11px] mt-0.5 flex items-center gap-1.5" style={{ color: gl.muted }}>
+                      <p className="text-[12px] mt-0.5 flex items-center gap-1.5" style={{ color: gl.muted }}>
                         <span className="font-semibold">{who}</span> · {formatDateTime(row.at)}
                         {server && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                          <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-1.5 py-0.5 rounded-md"
                             style={{ background: `rgba(${gl.accentRgb},0.10)`, color: gl.accent }}
                             title={t("history.serverHint")}>
                             <Server size={9} /> {t("history.server")}
@@ -144,13 +146,13 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
                         )}
                       </p>
                       {isUndone ? (
-                        <span className="inline-block text-[10px] font-semibold mt-1.5 px-2 py-0.5 rounded-md"
+                        <span className="inline-block text-[12px] font-semibold mt-1.5 px-2 py-0.5 rounded-md"
                           style={{ background: gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)", color: gl.muted }}>
                           ↩️ {t("activity.undone")}
                         </span>
                       ) : canUndo && (
                         <button onClick={() => handleUndo(log!.id)}
-                          className="flex items-center gap-1 text-[11px] font-bold mt-1.5 px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+                          className="flex items-center gap-1 text-[12px] font-bold mt-1.5 px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
                           style={{ background: "transparent", color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
                           <Undo2 size={10} /> {t("activity.undo")}
                         </button>
@@ -164,16 +166,16 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
         </div>
       </div>
 
-      {/* 3-second success toast after an undo */}
-      {undoneToast && (
-        <div className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-[12px] font-semibold"
-          style={{
-            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-            border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow, color: gl.text,
-          }}>
-          {t("activity.actionUndone")}
-        </div>
-      )}
+      {/* 3-second success toast after an undo — live region stays mounted so
+          screen readers announce the message when it appears */}
+      <div role="status" aria-live="polite"
+        className={undoneToast ? "fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-[12px] font-semibold" : "sr-only"}
+        style={undoneToast ? {
+          background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+          border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow, color: gl.text,
+        } : undefined}>
+        {undoneToast ? t("activity.actionUndone") : null}
+      </div>
     </main>
   );
 }

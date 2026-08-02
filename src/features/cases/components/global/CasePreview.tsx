@@ -24,7 +24,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   const { gl } = useTheme();
   return (
     <div className="flex items-start gap-2 min-w-0">
-      <span className="w-16 shrink-0 text-[11px] font-bold uppercase tracking-wide pt-[1px]"
+      <span className="w-16 shrink-0 text-[12px] font-bold uppercase tracking-wide pt-[1px]"
         style={{ color: gl.muted, opacity: 0.75 }}>{label}</span>
       <div className="flex-1 min-w-0 space-y-0.5">{children}</div>
     </div>
@@ -48,7 +48,7 @@ export function CasePreview({ c }: { c: RichCase }) {
 
   /** fixed-width chip so every line's text starts at the same x */
   const chip = (text: string, opts?: { principal?: boolean; icon?: typeof Pill; title?: string }, key?: number) => (
-    <span key={key} className="w-[4.5rem] shrink-0 text-[11px] font-bold px-1 py-0.5 rounded-md truncate text-center inline-flex items-center justify-center gap-0.5"
+    <span key={key} className="w-[4.5rem] shrink-0 text-[12px] font-bold px-1 py-0.5 rounded-md truncate text-center inline-flex items-center justify-center gap-0.5"
       title={opts?.title}
       style={opts?.principal
         ? { background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }
@@ -67,7 +67,7 @@ export function CasePreview({ c }: { c: RichCase }) {
           title: `${k.code} · ${k.desc ?? ""} (${k.role.replace(/_/g, " ")})`,
         }, i))}
       {list.length > MAX_CODES && (
-        <span className="text-[11px] font-semibold" style={{ color: gl.muted }}>+{list.length - MAX_CODES}</span>
+        <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>+{list.length - MAX_CODES}</span>
       )}
     </div>
   );

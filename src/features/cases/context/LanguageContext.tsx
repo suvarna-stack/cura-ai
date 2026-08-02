@@ -147,16 +147,58 @@ export const dict: Record<string, { en: string; th: string }> = {
     th: "คุณกำลังจะอนุมัติ {n} รหัสสำหรับ {patientName} เคสนี้จะถูกทำเครื่องหมายว่าเสร็จสมบูรณ์",
   },
   // the code system now comes from which box the coder fills (item 11), so
-  // the role labels are system-neutral
+  // the role labels are system-neutral; other/external complete the hospital
+  // dropdown's four diagnosis kinds (ICD-10 box only, 2026-07-30)
   "code.type.primary":     { en: "Primary Diagnosis",       th: "การวินิจฉัยหลัก" },
+  // one primary ICD-10 per case — suffix shown on the disabled dropdown option
+  "code.primaryTaken":     { en: " — already assigned",     th: " — กำหนดไว้แล้ว" },
   "code.type.comorbidity": { en: "Comorbidity",             th: "โรคร่วม" },
+  "code.type.other":       { en: "Other",                   th: "อื่น ๆ" },
+  "code.type.external":    { en: "External Cause of Injury", th: "สาเหตุภายนอกของการบาดเจ็บ" },
   "code.manualBadge":      { en: "Manually Added",          th: "เพิ่มด้วยตนเอง" },
+  // origin-group sub-headers inside a code column (shown only when a column
+  // holds both coder-entered and hospital/AI codes)
+  "code.groupManual":      { en: "Manually added",          th: "เพิ่มด้วยตนเอง" },
+  "code.groupAuto":        { en: "Suggestions from AI",     th: "ข้อเสนอแนะจาก AI" },
   "code.codeLabel":        { en: "Code",                    th: "รหัส" },
   "code.addHint":          { en: "Fill in either box — or both to add an ICD-10 and an ICD-9 code at once.",
                              th: "กรอกกล่องใดกล่องหนึ่ง หรือทั้งสองกล่องเพื่อเพิ่มรหัส ICD-10 และ ICD-9 พร้อมกัน" },
   "code.addBoth":          { en: "Add both codes",          th: "เพิ่มทั้งสองรหัส" },
   "code.typeLabel":        { en: "Code Type",               th: "ประเภทรหัส" },
   "code.descLabel":        { en: "Description",             th: "คำอธิบาย" },
+  // ICD-9 = procedure, and a procedure happens over a time window (2026-07-30)
+  "code.opStart":          { en: "Operation Start",         th: "เวลาเริ่มหัตถการ" },
+  "code.opEnd":            { en: "Operation End",           th: "เวลาสิ้นสุดหัตถการ" },
+  // …and has a type — the hospital UI's "Type" dropdown on the operation grid
+  "code.opType":           { en: "Operation Type",          th: "ประเภทหัตถการ" },
+  // hospital-style laboratory results table (grouped by panel)
+  "report.labs":           { en: "Laboratory",              th: "ผลตรวจทางห้องปฏิบัติการ" },
+  // per-code note, like the hospital UI's Note column — internal to MedCode AI
+  "code.noteLabel":        { en: "Note (internal)",         th: "หมายเหตุ (ภายในระบบ)" },
+  "code.notePlaceholder":  { en: "Kept in MedCode AI only — not sent to the hospital",
+                             th: "เก็บในระบบ MedCode AI เท่านั้น ไม่ส่งไปโรงพยาบาล" },
+  // hospital vital-sign readings (the strip above CC/PI/PE in the original coder UI)
+  "vitals.title":          { en: "Vital Signs",             th: "สัญญาณชีพ" },
+  // hospital-style panel view of the record (2026-07-31), panel titles copied
+  // from the hospital's own coder screen
+  "hosp.view":        { en: "Hospital view",            th: "มุมมองโรงพยาบาล" },
+  "hosp.viewChrono":  { en: "Chronological",            th: "ตามลำดับเวลา" },
+  "hosp.ccpipe":      { en: "CC, PI, PE",               th: "CC, PI, PE" },
+  "hosp.pastHistory": { en: "Past History",             th: "ประวัติในอดีต" },
+  "hosp.labxray":     { en: "Lab / X-ray",              th: "แลบ / เอกซเรย์" },
+  "hosp.xray":        { en: "X-Ray",                    th: "เอกซเรย์" },
+  "hosp.noXray":      { en: "No X-ray / imaging recorded for this visit", th: "ไม่มีผลเอกซเรย์ในการรับบริการครั้งนี้" },
+  "hosp.noLab":       { en: "No lab results recorded for this visit",     th: "ไม่มีผลแลบในการรับบริการครั้งนี้" },
+  "hosp.diagproc":    { en: "Diagnosis / Procedure",    th: "การวินิจฉัย / หัตถการ" },
+  "hosp.procedures":  { en: "Procedures (หัตถการ)",     th: "หัตถการ" },
+  "hosp.cpoe":        { en: "Order Entry (CPOE)",       th: "รายการสั่งแพทย์ (CPOE)" },
+  "hosp.invfinding":  { en: "Investigations Finding",   th: "ผลการตรวจเพิ่มเติม" },
+  "hosp.mgmt":        { en: "Management / Suggestion",  th: "การรักษา / คำแนะนำ" },
+  "hosp.progress":    { en: "Progress / Other Notes",   th: "บันทึกความคืบหน้า / อื่น ๆ" },
+  "hosp.orderName":   { en: "Order Name",               th: "ชื่อรายการ" },
+  "hosp.qty":         { en: "Qty.",                     th: "จำนวน" },
+  "hosp.empty":       { en: "No entries",               th: "ไม่มีข้อมูล" },
+  "hosp.shownOf":     { en: "showing {shown} of {total} orders", th: "แสดง {shown} จาก {total} รายการ" },
   // case history
   "btn.viewHistory": { en: "View History", th: "ดูประวัติ" },
   "history.title":   { en: "Case History", th: "ประวัติเคส" },
@@ -187,6 +229,13 @@ export const dict: Record<string, { en: string; th: string }> = {
   "reopen.finishedBy": { en: "Finished by", th: "ทำเสร็จโดย" },
   "reopen.reopenedBy": { en: "Reopened by", th: "เปิดใหม่โดย" },
   "facet.dept":      { en: "Department",   th: "แผนก" },
+  // screen-reader-only names (WCAG pass, 2026-07-31)
+  "a11y.close":     { en: "Close",     th: "ปิด" },
+  "a11y.loading":   { en: "Loading…",  th: "กำลังโหลด…" },
+  "a11y.selectCase": { en: "Select case {vn}", th: "เลือกเคส {vn}" },
+  "a11y.results":   { en: "{n} results",  th: "{n} รายการ" },
+  "a11y.skip":      { en: "Skip to main content", th: "ข้ามไปยังเนื้อหาหลัก" },
+  "a11y.caseTabs":  { en: "Case queues", th: "คิวเคส" },
   // settings
   "settings.title":         { en: "Settings", th: "การตั้งค่า" },
   "settings.sub":           { en: "Preferences & appearance", th: "การตั้งค่าและธีม" },

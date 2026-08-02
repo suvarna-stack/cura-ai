@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Bot, User, Send, Sparkles, BookOpen, Brain } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
@@ -253,7 +254,7 @@ export function AgentPage() {
 
                 {m.time !== '' && (
                   <span
-                    className="px-1 text-[11px] font-normal"
+                    className="px-1 text-[12px] font-normal"
                     style={{ color: gl.muted }}
                   >
                     {m.time}
@@ -363,6 +364,7 @@ export function AgentPage() {
             <User size={12} style={{ color: gl.accent }} />
           </div>
           <textarea
+            aria-label="Message the AI agent"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -400,11 +402,11 @@ export function AgentPage() {
           </button>
         </div>
         <p
-          className="mt-2 text-center text-[11px] font-normal"
+          className="mt-2 text-center text-[12px] font-normal"
           style={{ color: gl.muted }}
         >
           <kbd
-            className="rounded-md px-1.5 py-0.5 text-[10px]"
+            className="rounded-md px-1.5 py-0.5 text-[12px]"
             style={{
               background: gl.row,
               border: gl.borderSm,
@@ -415,7 +417,7 @@ export function AgentPage() {
           </kbd>{' '}
           {t('agent.enter')} {' · '}
           <kbd
-            className="rounded-md px-1.5 py-0.5 text-[10px]"
+            className="rounded-md px-1.5 py-0.5 text-[12px]"
             style={{
               background: gl.row,
               border: gl.borderSm,

@@ -13,11 +13,12 @@
 // (21/07/2026): dragging reads as "priority list" at a glance.
 // ============================================================
 import { useState } from "react";
-import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles } from "lucide-react";
+import { Edit3, Trash2, GripVertical, AlertCircle, Plus, Sparkles, Clock, StickyNote } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { CodeCardsSkeleton, SkeletonBar } from "../global/DetailSkeletons";
 import type { StoredCode } from "../../utils/caseLocal";
+import { formatWindow } from "../../utils/operationTime";
 
 /** Which column a code belongs in. Procedure systems (ICD-9, *-PCS) are ICD-9;
  *  everything else (ICD-10, DRG, legacy "Comorbidities") is ICD-10. */
@@ -51,9 +52,17 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
 
   // keep the original positions: the columns are two views of ONE array, and
   // the priority lives in that array
-  const rows = codes
+  const filtered = codes
     .map((entry, index) => ({ entry, index }))
     .filter((r) => (system === "icd9") === isIcd9(r.entry.type));
+  // coder-entered codes group above the imported/AI ones. Reordering writes
+  // the DISPLAY order back into the array (applyReorder), so a drag across
+  // the group line snaps back — the group wins over free ordering. Safe for
+  // approve: manual codes carry role-bearing labels, so putting them first
+  // never steals the positional principal-diagnosis pick from a bare-labeled
+  // hospital/AI code unless the coder explicitly added a Primary Diagnosis.
+  const rows = [...filtered.filter((r) => r.entry.manual), ...filtered.filter((r) => !r.entry.manual)];
+  const manualCount = rows.filter((r) => r.entry.manual).length;
   const scored = rows.filter((r) => !r.entry.missing);
   const avg = scored.length
     ? Math.round(scored.reduce((s, r) => s + r.entry.confidence, 0) / scored.length)
@@ -85,6 +94,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
     endDrag();
   };
 
+  /** small label above each origin group (manual vs hospital/AI) */
+  const groupHeader = (label: string) => (
+    <p className="text-[12px] font-bold uppercase tracking-wide px-1 pb-1"
+      style={{ color: gl.muted, opacity: 0.85 }}>
+      {label}
+    </p>
+  );
+
   /** a thin accent bar marking where the drop would land */
   const dropIndicator = (
     <div className="h-[3px] rounded-full mx-1 my-0.5 transition-all"
@@ -99,6 +116,9 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
     const description = rest.join(" · ").trim();
     const sortable = !!onReorder;
     return (
+      // mouse-only drag-to-reorder is an enhancement; the card's buttons stay
+      // the accessible path (keyboard reordering is a tracked follow-up)
+      // eslint-disable-next-line jsx-a11y/no-static-element-interactions
       <div key={index}
         draggable={sortable && armedPos === pos}
         onDragStart={(e) => {
@@ -119,8 +139,17 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         onMouseUp={() => setArmedPos(null)}      // grip released without dragging
         className="group rounded-lg px-2.5 py-2 transition-all"
         style={{
-          background: entry.missing ? `rgba(${gl.accentRgb},0.06)` : gl.row,
-          border: entry.missing ? `1px solid rgba(${gl.accentRgb},0.20)` : gl.border,
+          // gl.row/gl.border are white-on-white here (the card sits on gl.card),
+          // so code cards get a solider fill + accent-tinted border to separate
+          // from the panel behind them; manual (coder-entered) cards get a
+          // stronger accent tint so the two groups read apart at a glance
+          background: entry.missing
+            ? `rgba(${gl.accentRgb},0.06)`
+            : entry.manual
+              ? `rgba(${gl.accentRgb},${gl.isDark ? 0.16 : 0.10})`
+              : gl.isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.85)",
+          border: `1px solid rgba(${gl.accentRgb},${entry.missing ? 0.20 : entry.manual ? 0.45 : gl.isDark ? 0.35 : 0.30})`,
+          boxShadow: gl.shadowSm,
           opacity: dragPos === pos ? 0.35 : 1,   // ghost of the card in flight
         }}>
         {/* line 1 — the diagnosis, plus the row's controls */}
@@ -128,6 +157,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           {/* priority handle (item 12): position in the column IS the priority —
               drag starts here only, so card text stays selectable */}
           {sortable && (
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- mouse drag handle, see above
             <div onMouseDown={() => setArmedPos(pos)}
               title={t("code.drag")}
               className="w-6 self-stretch flex items-center justify-center shrink-0 rounded-md cursor-grab active:cursor-grabbing transition-all opacity-50 group-hover:opacity-100"
@@ -142,14 +172,16 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
             {onEdit && (
               <button onClick={() => onEdit(index)} title={t("code.edit")}
-                className="w-5 h-5 flex items-center justify-center rounded-md transition-all hover:scale-110"
+                aria-label={`${t("code.edit")} ${entry.code}`}
+                className="w-6 h-6 flex items-center justify-center rounded-md transition-all hover:scale-110"
                 style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>
                 <Edit3 size={10} />
               </button>
             )}
             {onDelete && (
               <button onClick={() => onDelete(index)} title={t("confirm.deleteCode")}
-                className="w-5 h-5 flex items-center justify-center rounded-md transition-all hover:scale-110"
+                aria-label={`${t("confirm.deleteCode")} ${entry.code}`}
+                className="w-6 h-6 flex items-center justify-center rounded-md transition-all hover:scale-110"
                 style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>
                 <Trash2 size={10} />
               </button>
@@ -163,24 +195,44 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             {entry.code}
           </span>
           {!entry.missing && (
-            <span className="text-[10px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
+            <span className="text-[12px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
           )}
-          {entry.manual && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-              style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
-              {t("code.manualBadge")}
+          {/* no per-card "Manually Added" badge — the group header (always shown
+              when manual codes exist) plus the stronger card tint carry origin */}
+          {/* the hospital's operation type ("OR Procedure" …) as a chip, like
+              the Type column on its own coder UI's operation grid */}
+          {system === "icd9" && entry.operation_type && (
+            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+              style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }}>
+              {entry.operation_type}
             </span>
           )}
         </div>
-        {/* line 3 — the code description / role */}
+        {/* line 3 — the operation window (ICD-9 = procedure = has times) */}
+        {system === "icd9" && formatWindow(entry.operation_start, entry.operation_end) && (
+          <p className="text-[12px] font-semibold mt-1 flex items-center gap-1"
+            style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
+            <Clock size={9} style={{ color: gl.accent, flexShrink: 0 }} />
+            {formatWindow(entry.operation_start, entry.operation_end)}
+          </p>
+        )}
+        {/* line 4 — the code description / role */}
         {description && (
-          <p className="text-[11px] font-normal leading-relaxed mt-0.5"
+          <p className="text-[12px] font-normal leading-relaxed mt-0.5"
             style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
             {description}
           </p>
         )}
+        {/* line 5 — the coder's internal note (never sent to the hospital) */}
+        {entry.note && (
+          <p className="text-[12px] font-normal italic mt-0.5 flex items-start gap-1"
+            style={{ color: gl.muted, paddingLeft: sortable ? "1.85rem" : 0 }}>
+            <StickyNote size={9} style={{ color: gl.accent, flexShrink: 0, marginTop: "2px" }} />
+            {entry.note}
+          </p>
+        )}
         {entry.missing && entry.missingMsg && (
-          <p className="text-[11px] font-semibold mt-1 flex items-center gap-1" style={{ color: gl.accent, opacity: 0.65 }}>
+          <p className="text-[12px] font-semibold mt-1 flex items-center gap-1" style={{ color: gl.accent, opacity: 0.65 }}>
             <AlertCircle size={9} /> {entry.missingMsg}
           </p>
         )}
@@ -199,10 +251,10 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         <div className="flex items-center gap-2">
           <Sparkles size={14} style={{ color: gl.accent }} />
           <h2 className="text-[15px] font-bold flex-1" style={{ color: gl.text }}>{LABEL[system]}</h2>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>{rows.length}</span>
         </div>
-        <p className="text-[11px] font-normal mt-0.5" style={{ color: gl.muted }}>
+        <p className="text-[12px] font-normal mt-0.5" style={{ color: gl.muted }}>
           {loading
             ? <SkeletonBar className="h-2.5 w-24" />
             : avg !== null
@@ -223,13 +275,17 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setInsertAt(null);
         }}>
         {loading ? <CodeCardsSkeleton /> : rows.length === 0 ? (
-          <p className="text-[11px] px-1 py-2" style={{ color: gl.muted, opacity: 0.8 }}>
+          <p className="text-[12px] px-1 py-2" style={{ color: gl.muted, opacity: 0.8 }}>
             {t("code.emptyBox", { system: LABEL[system] })}
           </p>
         ) : (
           <>
             {rows.map((r, pos) => (
               <div key={r.index}>
+                {/* group sub-headers, only when the column actually has both kinds */}
+                {manualCount > 0 && pos === 0 && groupHeader(t("code.groupManual"))}
+                {manualCount > 0 && manualCount < rows.length && pos === manualCount &&
+                  groupHeader(t("code.groupAuto"))}
                 {dragPos !== null && insertAt === pos && dropIndicator}
                 {card(r, pos)}
               </div>

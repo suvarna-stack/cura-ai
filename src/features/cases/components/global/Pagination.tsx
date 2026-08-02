@@ -58,7 +58,7 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
   return (
     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 pb-1">
       <button onClick={goPrev} disabled={current <= 1}
-        className="text-[11px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
+        className="text-[12px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
         style={btn}>
         {t("page.prev")}
       </button>
@@ -67,10 +67,10 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
         // numbered buttons — a direct jump to any page
         pageWindow(current, pages).map((p, i) =>
           p === "…" ? (
-            <span key={`gap-${i}`} className="text-[11px] font-medium px-1 select-none" style={{ color: gl.muted }}>…</span>
+            <span key={`gap-${i}`} className="text-[12px] font-medium px-1 select-none" style={{ color: gl.muted }}>…</span>
           ) : (
             <button key={p} onClick={() => go(p)}
-              className="text-[11px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+              className="text-[12px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
               style={{ minWidth: "1.9rem", ...(p === current ? activeBtn : btn) }}>
               {p}
             </button>
@@ -78,14 +78,14 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
         )
       ) : (
         // legacy callers (no onPage): keep the single current/total pill
-        <span className="text-[11px] font-bold px-3 py-1 rounded-lg"
+        <span className="text-[12px] font-bold px-3 py-1 rounded-lg"
           style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
           {current} / {pages}
         </span>
       )}
 
       <button onClick={goNext} disabled={current >= pages}
-        className="text-[11px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
+        className="text-[12px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
         style={btn}>
         {t("page.next")}
       </button>
@@ -93,17 +93,17 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
       {/* jump-to-page — only worth showing once there are enough pages to matter */}
       {onPage && pages > 5 && (
         <div className="flex items-center gap-1 ml-1.5">
-          <span className="text-[11px] font-medium" style={{ color: gl.muted }}>{t("page.goto")}</span>
+          <span className="text-[12px] font-medium" style={{ color: gl.muted }}>{t("page.goto")}</span>
           <input
             value={jump}
             onChange={(e) => setJump(e.target.value.replace(/[^0-9]/g, ""))}
             onKeyDown={(e) => { if (e.key === "Enter") submitJump(); }}
             placeholder={`${current}`}
             aria-label={t("page.goto")}
-            className="text-[11px] font-semibold w-11 px-2 py-1 rounded-lg outline-none text-center"
+            className="text-[12px] font-semibold w-11 px-2 py-1 rounded-lg outline-none text-center"
             style={{ background: gl.inputBg, border: gl.border, color: gl.text }} />
           <button onClick={submitJump}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+            className="text-[12px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
             style={{ border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.accent, background: `rgba(${gl.accentRgb},0.08)` }}>
             {t("page.go")}
           </button>

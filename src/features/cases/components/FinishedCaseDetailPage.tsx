@@ -1,3 +1,4 @@
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState } from "react";
 import {
   FileText, Flag, ArrowLeft, BadgeCheck, Download, Printer,
@@ -7,16 +8,22 @@ import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { AddCodeModal } from "./codes/AddCodeModal";
+import { ModalShell } from "../../../components/ui/Modal";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
 import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
+import { VitalsStrip } from "./global/VitalsStrip";
+import { LabResults } from "./global/LabResults";
+import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { codeTypeFromRole, hasIcd10Primary } from "../utils/aiSuggestions";
 import type { FinishedCase } from "../types/case.types";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
@@ -38,11 +45,11 @@ function HighlightedReport({ text, accent }: { text: string; accent: string }) {
 function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
   const { gl } = useTheme();
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: gl.isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.40)" }} onClick={onClose}>
-      <div className="w-[400px] rounded-2xl overflow-hidden"
-        style={{ background: gl.isDark ? "#1e1218" : "#fff", border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,0.35)` }}
-        onClick={e => e.stopPropagation()}>
+    <ModalShell onClose={onClose} ariaLabel="Re-open for Editing?"
+      overlayClassName=""
+      overlayStyle={{ background: gl.isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.40)" }}
+      className="w-[400px] rounded-2xl overflow-hidden"
+      style={{ background: gl.isDark ? "#1e1218" : "#fff", border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,0.35)` }}>
         <div className="px-5 py-4" style={{ borderBottom: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.06)` }}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -51,7 +58,7 @@ function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
             </div>
             <div>
               <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>Re-open for Editing?</h3>
-              <p className="text-[11px]" style={{ color: gl.muted }}>This will move the case back to Incomplete</p>
+              <p className="text-[12px]" style={{ color: gl.muted }}>This will move the case back to Incomplete</p>
             </div>
           </div>
         </div>
@@ -70,8 +77,7 @@ function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
             <RotateCcw size={12} /> Yes, Re-open
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -86,7 +92,9 @@ export function FinishedCaseDetailPage({
   const { gl } = useTheme();
   const { t } = useLang();
   const { reopen } = useApprovals();
+  useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const [showReopen, setShowReopen] = useState(false);
   // add / delete code dialogs (Prompt 4) — mutations persist to the same
@@ -98,6 +106,8 @@ export function FinishedCaseDetailPage({
   // real report + final codes from the synced iMed data; the status tells
   // "still loading" apart from "fetch failed" so neither shows the wrong text
   const { detail, status } = useCaseDetail(caseData?.id);
+  // hospital-panel vs chronological record view (persisted, shared across pages)
+  const [view, setView] = useReportView();
   if (!caseData) return null;
   const c = caseData;
   const reportText = detail && detail.sections.length > 0
@@ -106,30 +116,39 @@ export function FinishedCaseDetailPage({
         .join("\n\n")
     : null;
   // the coder's saved edits are the finalized codes — server copy first
-  // (live backend = shared truth), then localStorage; they win over the
+  // (live backend = shared truth), then the session cache; they win over the
   // fetched iMed data (same rule as CaseDetail/IncompleteCaseDetail);
   // unresolved "???" rows are never part of the final code set
   const saved = detail?.codeEdits ?? loadCodeEdits(c.id);
   const fullCodes: StoredCode[] = saved
     ?? (detail
       ? detail.codes.map(k => ({
-          code: k.code, type: k.code_system,
+          // role-bearing label (external cause / other included), same as the
+          // open-case pages
+          code: k.code, type: codeTypeFromRole(k.code_system, k.code_role),
           desc: `${k.description ?? k.code}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}`,
           confidence: 100, // imported from iMed = fact
+          // procedure time window + type (ICD-9 rows; the hospital's own record)
+          operation_start: k.operation_start ?? undefined,
+          operation_end: k.operation_end ?? undefined,
+          operation_type: k.operation_type ?? undefined,
         }))
       : []);
   const codes = fullCodes.filter(k => !k.missing);
 
   // mutations write through codeEdits (materialising the iMed list on first
-  // edit) and bump the tick so the derived list re-reads localStorage
+  // edit) and bump the tick so the derived list re-reads the session cache
   const persistCodes = (next: StoredCode[]) => { saveCodeEdits(c.id, next); setCodesTick(v => v + 1); };
 
-  const handleAddCode = (entry: { code: string; type: string; desc: string }) => {
+  const handleAddCode = (entry: { code: string; type: string; desc: string;
+                                  operation_start?: string; operation_end?: string;
+                                  operation_type?: string; note?: string }) => {
     const added: StoredCode = { ...entry, confidence: 100, manual: true };
-    persistCodes([...fullCodes, added]);
+    // prepend: manual codes display grouped on top (see CodesColumn)
+    persistCodes([added, ...fullCodes]);
     setAdding(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",
+      userId: me.userId, userName: me.userName, actionType: "ADD_CODE",
       targetId: c.id, targetType: "code",
       description: `Added code ${entry.code} - ${entry.desc} to ${c.patient}`,
       previousState: { caseId: c.id, code: added },
@@ -143,7 +162,7 @@ export function FinishedCaseDetailPage({
     persistCodes(fullCodes.filter(k => !(k.code === removed.code && k.desc === removed.desc)));
     setDeleting(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "DELETE_CODE",
+      userId: me.userId, userName: me.userName, actionType: "DELETE_CODE",
       targetId: c.id, targetType: "code",
       description: `Deleted code ${removed.code} from ${c.patient}`,
       previousState: { caseId: c.id, code: removed },
@@ -168,7 +187,7 @@ export function FinishedCaseDetailPage({
             setShowReopen(false);
             reopen(c.id);
             const logId = addLog({
-              userId: "sarah.k", userName: "Sarah K.", actionType: "REOPEN_CASE",
+              userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
               targetId: c.id, targetType: "case",
               description: `Reopened case for ${c.patient}`,
               previousState: null,
@@ -179,7 +198,8 @@ export function FinishedCaseDetailPage({
           onClose={() => setShowReopen(false)}
         />
       )}
-      {adding && <AddCodeModal only={adding} onAdd={handleAddCode} onClose={() => setAdding(null)} />}
+      {adding && <AddCodeModal only={adding} icd10PrimaryTaken={hasIcd10Primary(codes)}
+        onAdd={handleAddCode} onClose={() => setAdding(null)} />}
       {deleting && (
         <ConfirmDialog
           icon={Trash2} danger
@@ -249,9 +269,8 @@ export function FinishedCaseDetailPage({
           <div className="px-5 py-4 shrink-0" style={{ borderBottom: gl.borderSm }}>
             <div className="flex items-center gap-2 mb-3">
               <FileText size={15} style={{ color: gl.accent }} />
-              <h2 className="text-[17px] font-bold" style={{ color: gl.text }}>Discharge Report</h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-1"
-                style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
+              <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
+              <ReportViewToggle view={view} onChange={setView} />
             </div>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
             {/* item 16: everyone who worked this case, latest (= responsible) last */}
@@ -261,10 +280,17 @@ export function FinishedCaseDetailPage({
               <span className="text-[12px] font-semibold truncate" style={{ color: gl.text }}>
                 {coders.join(" → ")}
               </span>
-              <span className="text-[10px] font-normal" style={{ color: gl.muted }}>· {c.codedDate}</span>
+              <span className="text-[12px] font-normal" style={{ color: gl.muted }}>· {c.codedDate}</span>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 scroll-thin" style={{ color: gl.text }}>
+            {/* hospital view = the record regrouped into the hospital's own
+                panels; the chronological path below is unchanged */}
+            {view === "hospital" && status !== "loading" && detail ? (
+              <HospitalPanels detail={detail} />
+            ) : (<>
+            {/* hospital vital signs above the note text, like the original coder UI */}
+            {status !== "loading" && <VitalsStrip detail={detail} />}
             {reportText ? (
               <HighlightedReport text={reportText} accent={gl.accent} />
             ) : status === "loading" ? (
@@ -274,7 +300,9 @@ export function FinishedCaseDetailPage({
                 No report sections synced for this case.
               </p>
             )}
+            {status !== "loading" && <LabResults detail={detail} />}
             {status !== "loading" && <ReportOrders detail={detail} />}
+            </>)}
           </div>
         </div>
 

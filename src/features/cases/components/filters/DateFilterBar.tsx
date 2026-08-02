@@ -42,7 +42,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
           const active = f.dateMode === m.mode;
           return (
             <button key={m.mode} onClick={() => f.setDateMode(active ? null : m.mode)}
-              className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap hover:opacity-90 transition-all"
+              className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap hover:opacity-90 transition-all"
               style={active
                 ? { background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff", border: `1px solid rgba(${gl.accentRgb},0.45)` }
                 : { background: gl.inputBg, color: gl.muted, border: gl.borderSm }}>
@@ -57,9 +57,10 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
         <div className="flex items-center gap-2">
           <input type="date" value={f.specificDate ?? ""}
             onChange={(e) => f.setSpecificDate(e.target.value || null)}
-            className="text-[11px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
+            aria-label={t("date.specificDate")}
+            className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
           {f.specificDate && (
-            <span className="text-[11px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>
+            <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>
           )}
         </div>
       )}
@@ -72,11 +73,11 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
             { label: t("date.to"),   value: f.dateTo,   set: f.setDateTo },
           ]).map((r) => (
             <label key={r.label} className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold" style={{ color: gl.muted }}>{r.label}</span>
+              <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>{r.label}</span>
               <input type="date" value={r.value ?? ""} onChange={(e) => r.set(e.target.value || null)}
-                className="text-[11px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
+                className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
               {r.value && (
-                <span className="text-[11px] font-semibold" style={{ color: gl.accent }}>{formatDate(r.value)}</span>
+                <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(r.value)}</span>
               )}
             </label>
           ))}
@@ -95,7 +96,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
             const active = f.quickFilter === c.q;
             return (
               <button key={c.q} onClick={() => f.setQuickFilter(active ? null : c.q)}
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-full hover:opacity-90 transition-all"
+                className="text-[12px] font-semibold px-2.5 py-1 rounded-full hover:opacity-90 transition-all"
                 style={active
                   ? { background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff", border: `1px solid rgba(${gl.accentRgb},0.45)` }
                   : { background: gl.inputBg, color: gl.muted, border: gl.borderSm }}>
@@ -111,7 +112,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
       {/* clear */}
       {f.dateActive && (
         <button onClick={f.clearDateFilter}
-          className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg hover:opacity-80 transition-all"
+          className="flex items-center gap-1 text-[12px] font-semibold px-2 py-1 rounded-lg hover:opacity-80 transition-all"
           style={{ color: gl.accent, background: `rgba(${gl.accentRgb},0.10)` }}>
           <X size={10} /> {t("date.clearFilter")}
         </button>

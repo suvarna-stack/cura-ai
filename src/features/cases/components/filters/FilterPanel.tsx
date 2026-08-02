@@ -38,7 +38,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         </span>
         {f.active && (
           <button onClick={f.clearAll}
-            className="text-[11px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-lg hover:opacity-80 transition-all"
+            className="text-[12px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-lg hover:opacity-80 transition-all"
             style={{ color: gl.accent, background: `rgba(${gl.accentRgb},0.10)` }}>
             <FilterX size={10} /> {t("filter.clearAll")}
           </button>
@@ -49,7 +49,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         <div className="flex flex-wrap gap-1 px-1">
           {f.chips.map((c) => (
             <button key={`${c.key}:${c.value}`} onClick={() => f.toggle(c.key, c.value)}
-              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 hover:opacity-80 transition-all"
+              className="text-[12px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 hover:opacity-80 transition-all"
               style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
               {c.label} <X size={8} />
             </button>
@@ -64,7 +64,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
           <p className="text-[12px] font-bold" style={{ color: gl.accent }}>
             {t("filter.match", { n: f.totalComplete + f.totalIncomplete })}
           </p>
-          <p className="text-[11px] font-medium mt-0.5" style={{ color: gl.muted }}>
+          <p className="text-[12px] font-medium mt-0.5" style={{ color: gl.muted }}>
             {t("filter.breakdown", { c: f.totalComplete, i: f.totalIncomplete })}
           </p>
         </div>
@@ -97,7 +97,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
               <input type="radio" name="sort" checked={f.sortMode === o.mode}
                 onChange={() => f.setSortMode(o.mode)}
                 className="w-3 h-3" style={{ accentColor: gl.accent }} />
-              <span className="text-[11px] font-medium flex-1" style={{ color: gl.text }}>{o.label}</span>
+              <span className="text-[12px] font-medium flex-1" style={{ color: gl.text }}>{o.label}</span>
             </label>
           ))}
         </div>
@@ -130,7 +130,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
           const visible = [...ticked, ...unticked.slice(0, CHILD_CAP)];
           const hidden = unticked.length - Math.min(unticked.length, CHILD_CAP);
           if (facet.options.length === 0) {
-            return <p className="text-[10px] font-normal py-0.5" style={{ color: gl.muted }}>{t("facet.ordernameEmpty")}</p>;
+            return <p className="text-[12px] font-normal py-0.5" style={{ color: gl.muted }}>{t("facet.ordernameEmpty")}</p>;
           }
           return (
             <>
@@ -140,11 +140,13 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                 <input
                   value={childQuery[qk] ?? ""}
                   onChange={(e) => setChildQuery((p) => ({ ...p, [qk]: e.target.value }))}
+                  aria-label={t("facet.ordernameSearch")}
                   placeholder={t("facet.ordernameSearch")}
-                  className="bg-transparent text-[10px] font-normal outline-none w-full min-w-0"
+                  className="bg-transparent text-[12px] font-normal outline-none w-full min-w-0"
                   style={{ color: gl.text }} />
                 {fq !== "" && (
                   <button onClick={() => setChildQuery((p) => ({ ...p, [qk]: "" }))}
+                    aria-label={t("list.clearSearch")}
                     className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
                     <X size={9} />
                   </button>
@@ -154,18 +156,18 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                 <label key={o.value} className="flex items-center gap-2 cursor-pointer py-0.5 hover:opacity-80 transition-all">
                   <input type="checkbox" checked={o.selected} onChange={() => f.toggle(facet.key, o.value)}
                     className="w-3 h-3 rounded" style={{ accentColor: gl.accent }} />
-                  <span className="text-[11px] font-medium flex-1 truncate" style={{ color: gl.text }} title={o.label}>{o.label}</span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                  <span className="text-[12px] font-medium flex-1 truncate" style={{ color: gl.text }} title={o.label}>{o.label}</span>
+                  <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full"
                     style={{ background: gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", color: gl.muted }}>{o.count}</span>
                 </label>
               ))}
               {fq !== "" && unticked.length === 0 && (
-                <p className="text-[10px] font-normal py-0.5" style={{ color: gl.muted }}>
+                <p className="text-[12px] font-normal py-0.5" style={{ color: gl.muted }}>
                   {t("facet.ordernameNoMatch", { q: childQuery[qk] ?? "" })}
                 </p>
               )}
               {hidden > 0 && (
-                <p className="text-[10px] font-medium py-0.5" style={{ color: gl.muted }}>
+                <p className="text-[12px] font-medium py-0.5" style={{ color: gl.muted }}>
                   {t("facet.ordernameMore", { n: hidden })}
                 </p>
               )}
@@ -194,8 +196,8 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                   <label className="flex items-center gap-2 cursor-pointer py-0.5 hover:opacity-80 transition-all">
                     <input type="checkbox" checked={o.selected} onChange={() => f.toggle(facet.key, o.value)}
                       className="w-3 h-3 rounded" style={{ accentColor: gl.accent }} />
-                    <span className="text-[11px] font-medium flex-1 truncate" style={{ color: gl.text }} title={o.label}>{o.label}</span>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                    <span className="text-[12px] font-medium flex-1 truncate" style={{ color: gl.text }} title={o.label}>{o.label}</span>
+                    <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full"
                       style={{ background: gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", color: gl.muted }}>{o.count}</span>
                   </label>
                   {/* second level: ticking an order type opens the studies inside
@@ -213,11 +215,11 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                     return (
                     <div className="ml-4 pl-2 mt-0.5 mb-1 space-y-0.5"
                       style={{ borderLeft: `1px solid rgba(${gl.accentRgb},0.25)` }}>
-                      <p className="text-[9px] font-bold uppercase tracking-wide pb-0.5" style={{ color: gl.accent, opacity: 0.7 }}>
+                      <p className="text-[12px] font-bold uppercase tracking-wide pb-0.5" style={{ color: gl.accent, opacity: 0.7 }}>
                         {t("facet.ordername")}
                       </p>
                       {o.children.length === 0 ? (
-                        <p className="text-[10px] font-normal" style={{ color: gl.muted }}>{t("facet.ordernameEmpty")}</p>
+                        <p className="text-[12px] font-normal" style={{ color: gl.muted }}>{t("facet.ordernameEmpty")}</p>
                       ) : (
                         <>
                           {/* search over the full study list — the cap below only
@@ -228,11 +230,13 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                             <input
                               value={childQuery[o.value] ?? ""}
                               onChange={(e) => setChildQuery((p) => ({ ...p, [o.value]: e.target.value }))}
+                              aria-label={t("facet.ordernameSearch")}
                               placeholder={t("facet.ordernameSearch")}
-                              className="bg-transparent text-[10px] font-normal outline-none w-full min-w-0"
+                              className="bg-transparent text-[12px] font-normal outline-none w-full min-w-0"
                               style={{ color: gl.text }} />
                             {cq !== "" && (
                               <button onClick={() => setChildQuery((p) => ({ ...p, [o.value]: "" }))}
+                                aria-label={t("list.clearSearch")}
                                 className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
                                 <X size={9} />
                               </button>
@@ -242,17 +246,17 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                             <label key={k.value} className="flex items-center gap-2 cursor-pointer py-0.5 hover:opacity-80 transition-all">
                               <input type="checkbox" checked={k.selected} onChange={() => f.toggle("ordername", k.value)}
                                 className="w-2.5 h-2.5 rounded" style={{ accentColor: gl.accent }} />
-                              <span className="text-[11px] font-normal flex-1 truncate" style={{ color: gl.text }} title={k.label}>{k.label}</span>
-                              <span className="text-[10px] font-medium" style={{ color: gl.muted }}>{k.count}</span>
+                              <span className="text-[12px] font-normal flex-1 truncate" style={{ color: gl.text }} title={k.label}>{k.label}</span>
+                              <span className="text-[12px] font-medium" style={{ color: gl.muted }}>{k.count}</span>
                             </label>
                           ))}
                           {cq !== "" && unticked.length === 0 && (
-                            <p className="text-[10px] font-normal py-0.5" style={{ color: gl.muted }}>
+                            <p className="text-[12px] font-normal py-0.5" style={{ color: gl.muted }}>
                               {t("facet.ordernameNoMatch", { q: childQuery[o.value] ?? "" })}
                             </p>
                           )}
                           {hidden > 0 && (
-                            <p className="text-[10px] font-medium py-0.5" style={{ color: gl.muted }}>
+                            <p className="text-[12px] font-medium py-0.5" style={{ color: gl.muted }}>
                               {t("facet.ordernameMore", { n: hidden })}
                             </p>
                           )}
@@ -274,7 +278,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                 <div key={ef.key} className="mt-1.5 pt-1 space-y-0.5" style={{ borderTop: gl.borderSm }}>
                   <button onClick={() => setOpen((o) => ({ ...o, [ef.key]: !sectionOpen }))}
                     className="w-full flex items-center gap-2 py-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wide flex-1 text-left"
+                    <span className="text-[12px] font-bold uppercase tracking-wide flex-1 text-left"
                       style={{ color: gl.accent, opacity: 0.7 }}>
                       {t(`facet.${ef.key}`)}
                     </span>

@@ -35,11 +35,19 @@ function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={{ showToast }}>
       {children}
-      {current && (
-        <div className="pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-text shadow-card">
-          {current.message}
-        </div>
-      )}
+      {/* the live region stays mounted (screen readers often miss regions that
+          appear together with their first message); only the text comes and goes */}
+      <div
+        role="status"
+        aria-live="polite"
+        className={
+          current
+            ? 'pointer-events-none fixed right-4 bottom-4 z-50 max-w-sm rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-text shadow-card'
+            : 'sr-only'
+        }
+      >
+        {current?.message}
+      </div>
     </ToastCtx.Provider>
   )
 }
@@ -49,11 +57,17 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   return (
     <ThemeCtx.Provider value={{ themeId, setThemeId, gl }}>
       <div
-        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+        // h-dvh, not h-full: nothing above (#root/body/html) carries a height,
+        // so h-full collapsed to content height and every internal scroll area
+        // (report panel, code columns' pinned "+ Add code" foot) stopped working
+        className="flex h-dvh min-h-0 w-full flex-col overflow-hidden"
         style={
           {
             ...theme.bg,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
+            // keyboard focus ring (index.css :focus-visible) — text color always
+            // contrasts with the theme background, so the ring does too
+            '--focus-ring': gl.text,
           } as React.CSSProperties
         }
       >

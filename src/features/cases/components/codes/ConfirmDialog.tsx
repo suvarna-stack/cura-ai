@@ -6,6 +6,7 @@
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import { ModalShell } from "../../../../components/ui/Modal";
 
 export function ConfirmDialog({
   icon: Icon, title, body, confirmLabel, danger = false, onConfirm, onClose,
@@ -24,15 +25,13 @@ export function ConfirmDialog({
   const tint = danger ? "239,68,68" : gl.accentRgb; // #ef4444 for destructive
   const tintColor = danger ? "#ef4444" : gl.accent;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-      onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl p-5"
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-          border: `1px solid rgba(${tint},0.25)`, boxShadow: gl.shadow,
-        }}>
+    <ModalShell onClose={onClose} ariaLabel={title}
+      overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+      className="w-full max-w-sm rounded-2xl p-5"
+      style={{
+        background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+        border: `1px solid rgba(${tint},0.25)`, boxShadow: gl.shadow,
+      }}>
         <div className="flex items-center gap-2.5 mb-2">
           <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
             style={{ background: `rgba(${tint},0.15)`, color: tintColor }}>
@@ -55,7 +54,6 @@ export function ConfirmDialog({
             <Icon size={12} /> {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

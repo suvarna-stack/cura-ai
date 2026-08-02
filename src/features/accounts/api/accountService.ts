@@ -11,6 +11,20 @@ import type { Account, CreateAccountInput } from '../types/account.types'
  * {id:string, name, status 'Active'|'Inactive'} here in one place.
  */
 
+/**
+ * The server's {"error": "..."} text, else the caller's fallback. The backend
+ * writes these for humans ("an account with this email already exists", "this
+ * account has coding history and cannot be deleted — deactivate it instead"),
+ * so they go straight to the UI.
+ */
+export function extractApiError(err: unknown, fallback: string): string {
+  if (typeof err === 'object' && err !== null && 'response' in err) {
+    const res = (err as { response?: { data?: { error?: string } } }).response
+    if (res?.data?.error) return res.data.error
+  }
+  return fallback
+}
+
 interface ServerAccount {
   id: number
   fullName: string | null

@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BrainCircuit,
@@ -163,6 +164,7 @@ function RenameDocModal({
 }
 
 export function TrainingPage() {
+  useDocumentTitle("AI Training")
   const [docs, setDocs] = useState<KbDoc[]>([])
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
   const [ragError, setRagError] = useState<string | null>(null)
@@ -457,6 +459,9 @@ export function TrainingPage() {
           <h2 className="mb-3 text-[14px] font-bold text-text">
             Knowledge base
           </h2>
+          {/* click/drag on the zone is a mouse convenience; the sr-only file
+              input inside is the keyboard/screen-reader path */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
           <div
             onDragOver={(e) => {
               e.preventDefault()
@@ -469,7 +474,7 @@ export function TrainingPage() {
               addFiles(e.dataTransfer.files)
             }}
             onClick={() => fileInput.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors ${
+            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors focus-within:border-primary focus-within:bg-primary/5 ${
               dragging
                 ? 'border-primary bg-primary/10'
                 : 'border-border hover:border-primary/60 hover:bg-primary/5'
@@ -483,7 +488,7 @@ export function TrainingPage() {
             ) : (
               <CloudUpload size={26} className="mx-auto mb-2 text-primary" />
             )}
-            <p className="text-[13px] font-semibold text-text">
+            <p role="status" className="text-[13px] font-semibold text-text">
               {uploading
                 ? 'Uploading…'
                 : 'Drop PDFs or CSVs here, or click to browse'}
@@ -492,12 +497,16 @@ export function TrainingPage() {
               Coding guidelines, grouper handbooks, hospital SOPs, code lists —
               PDF or CSV
             </p>
+            {/* sr-only (not display:none) keeps the input focusable — Tab to it,
+                Enter/Space opens the OS picker; the visual dropzone is decoration */}
             <input
               ref={fileInput}
               type="file"
               accept="application/pdf,text/csv,.csv"
               multiple
-              className="hidden"
+              aria-label="Upload PDF documents"
+              className="sr-only"
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
                 addFiles(e.target.files)
                 e.target.value = ''
@@ -505,7 +514,7 @@ export function TrainingPage() {
             />
           </div>
           {uploadError && (
-            <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+            <p role="alert" className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-error">
               <AlertTriangle size={12} className="mt-[1px] shrink-0" />
               {uploadError}
             </p>
@@ -513,15 +522,18 @@ export function TrainingPage() {
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left">
+              <caption className="sr-only">Knowledge-base documents</caption>
               <thead>
-                <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
-                  {['Document', 'Size', 'Pages', 'Chunks', 'Status', ''].map(
+                <tr className="border-b border-border text-[12px] tracking-wide text-muted uppercase">
+                  {['Document', 'Size', 'Pages', 'Chunks', 'Status', 'Actions'].map(
                     (h, i) => (
                       <th
                         key={i}
+                        scope="col"
                         className="px-2 py-2.5 font-semibold whitespace-nowrap"
                       >
-                        {h}
+                        {/* the actions column header is visually blank by design */}
+                        {h === 'Actions' ? <span className="sr-only">{h}</span> : h}
                       </th>
                     ),
                   )}
@@ -563,7 +575,7 @@ export function TrainingPage() {
                           >
                             {d.name}
                           </p>
-                          <p className="text-[11px] text-muted">
+                          <p className="text-[12px] text-muted">
                             {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
                           </p>
                         </div>
@@ -612,7 +624,7 @@ export function TrainingPage() {
           <h2 className="mb-1 flex items-center gap-2 text-[14px] font-bold text-text">
             <BrainCircuit size={15} className="text-primary" /> Train
           </h2>
-          <p className="mb-4 text-[11px] text-muted">
+          <p className="mb-4 text-[12px] text-muted">
             Re-embeds every document and rebuilds the vector index the coding
             AI queries. Uploads already index themselves — retrain after
             removing documents or changing models.
@@ -635,13 +647,13 @@ export function TrainingPage() {
             )}
           </Button>
           {busy && !training && (
-            <p className="mt-2 text-[11px] text-muted">
+            <p className="mt-2 text-[12px] text-muted">
               Waiting for uploads to finish ingesting…
             </p>
           )}
 
           <div className="mt-4 border-t border-border pt-4">
-            <p className="mb-2 text-[11px] text-muted">
+            <p className="mb-2 text-[12px] text-muted">
               Extract ICD codes + titles from uploaded documents into{' '}
               <code>icd_codes</code>. Existing descriptions are never
               overwritten.
@@ -664,12 +676,12 @@ export function TrainingPage() {
               )}
             </Button>
             {!docs.length && (
-              <p className="mt-2 text-[11px] text-muted">
+              <p className="mt-2 text-[12px] text-muted">
                 Upload at least one PDF first.
               </p>
             )}
             {codeSync && (
-              <p className="mt-2 text-[11px] font-semibold text-success">
+              <p className="mt-2 text-[12px] font-semibold text-success">
                 {codeSync.extracted.toLocaleString()} codes found —{' '}
                 {codeSync.added.toLocaleString()} added,{' '}
                 {codeSync.descriptionsFilled.toLocaleString()} descriptions
@@ -677,7 +689,7 @@ export function TrainingPage() {
               </p>
             )}
             {codeSyncError && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-error">
+              <p className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-error">
                 <AlertTriangle size={12} className="mt-[1px] shrink-0" />
                 {codeSyncError}
               </p>
@@ -703,7 +715,7 @@ export function TrainingPage() {
           )}
 
           {lastRun && !training && (
-            <p className="mt-3 text-[11px] text-muted">
+            <p className="mt-3 text-[12px] text-muted">
               Last run {fmtDate(lastRun.finishedAt)} — {lastRun.docCount} docs,{' '}
               {lastRun.chunkCount.toLocaleString()} chunks in{' '}
               {(lastRun.durationMs / 1000).toFixed(1)}s.
@@ -716,7 +728,7 @@ export function TrainingPage() {
         <h2 className="mb-1 flex items-center gap-2 text-[14px] font-bold text-text">
           <Search size={15} className="text-primary" /> Test retrieval
         </h2>
-        <p className="mb-4 text-[11px] text-muted">
+        <p className="mb-4 text-[12px] text-muted">
           Ask what a coder would ask and see which chunks the index hands the
           AI. Optionally generate a full AI answer from those chunks.
         </p>
@@ -745,7 +757,7 @@ export function TrainingPage() {
           </Button>
         </form>
         {!hasIndex && (
-          <p className="mt-2 text-[11px] text-muted">
+          <p className="mt-2 text-[12px] text-muted">
             Upload and index at least one document before testing retrieval.
           </p>
         )}
@@ -781,7 +793,7 @@ export function TrainingPage() {
                         {h.via}
                       </span>
                     </p>
-                    <span className="text-[11px] font-bold whitespace-nowrap text-primary">
+                    <span className="text-[12px] font-bold whitespace-nowrap text-primary">
                       {h.score.toFixed(2)}
                     </span>
                   </div>

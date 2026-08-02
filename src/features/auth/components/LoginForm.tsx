@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -17,6 +18,7 @@ export function LoginForm() {
   const navigate = useNavigate()
   const { user, ready, login } = useAuth()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  useDocumentTitle("Sign in")
 
   const {
     register,
@@ -54,7 +56,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
+    <main className="flex min-h-screen items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-sm">
         {/* brand */}
         <div className="mb-8 flex flex-col items-center gap-2">
@@ -75,6 +77,7 @@ export function LoginForm() {
             type="email"
             label="Email"
             autoFocus
+            autoComplete="email"
             placeholder="you@hospital.th"
             error={errors.email?.message}
             {...register('email', {
@@ -86,6 +89,7 @@ export function LoginForm() {
             id="password"
             type="password"
             label="Password"
+            autoComplete="current-password"
             placeholder="••••••••••••"
             error={errors.password?.message}
             {...register('password', {
@@ -94,7 +98,7 @@ export function LoginForm() {
           />
 
           {submitError && (
-            <p className="text-[12px] font-semibold text-error">
+            <p role="alert" className="text-[12px] font-semibold text-error">
               {submitError}
             </p>
           )}
@@ -110,7 +114,7 @@ export function LoginForm() {
           onClick={fillDemoCredentials}
           className="mt-6 w-full rounded-lg border border-dashed border-border bg-bg p-3 text-left transition-colors hover:border-primary"
         >
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+          <p className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-muted">
             Demo admin — click to fill
           </p>
           <p className="text-[12px] text-text">
@@ -123,6 +127,6 @@ export function LoginForm() {
           </p>
         </button>
       </Card>
-    </div>
+    </main>
   )
 }

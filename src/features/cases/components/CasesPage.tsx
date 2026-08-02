@@ -7,15 +7,18 @@ import { useTheme } from "../context/ThemeContext";
 import { useSync } from "../context/SyncContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
 import { ConfidencePill } from "./global/ConfidencePill";
+import { ModalShell } from "../../../components/ui/Modal";
 import { Pagination } from "./global/Pagination";
 import { CasePreview } from "./global/CasePreview";
 import { FilterPanel } from "./filters/FilterPanel";
 import { DateFilterBar } from "./filters/DateFilterBar";
 import { formatDate } from "../utils/formatDate";
 import { useCases } from "../hooks/useCases";
+import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import type { RichCase } from "../hooks/useCases";
 import { useCaseFilters } from "../hooks/useCaseFilters";
 import {
@@ -52,7 +55,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
   const { gl } = useTheme();
   const { t } = useLang();
   // labels bold, values regular; sizes +1 across the row (requests 22/07/2026)
-  const label = "text-[11px] font-bold uppercase tracking-wide";
+  const label = "text-[12px] font-bold uppercase tracking-wide";
   return (
     <>
       <div className="flex items-center gap-1.5 mb-1">
@@ -64,7 +67,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
       <p className="text-[14px] font-semibold truncate" style={{ color: hn ? gl.text : gl.muted }}
         title={hn ? `HN ${hn}` : t("ident.hnMissing")}>
         <span className="text-[12px] font-bold opacity-70">HN </span>{hn ?? "—"}
-        {!hn && <span className="text-[11px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
+        {!hn && <span className="text-[12px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
       </p>
       {(coverage || date) && (
         <div className="flex items-center gap-x-2 flex-wrap mt-1">
@@ -74,7 +77,7 @@ function CaseIdent({ vn, hn, coverage, date, badge }: {
               <span className="text-[12px] font-medium" style={{ color: gl.text }}>{coverage}</span>
             </span>
           )}
-          {coverage && date && <span className="text-[10px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+          {coverage && date && <span className="text-[12px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
           {date && (
             <span className="flex items-center gap-1">
               <span className={label} style={{ color: gl.muted, opacity: 0.75 }}>{t("meta.date")}</span>
@@ -100,8 +103,8 @@ function CaseMeta({ c }: { c: RichCase }) {
     <div className="flex items-center gap-x-2 flex-wrap">
       {items.map((item, i) => (
         <span key={item.label} className="flex items-center gap-1.5" title={item.title}>
-          {i > 0 && <span className="text-[10px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
-          <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{item.label}</span>
+          {i > 0 && <span className="text-[12px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+          <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{item.label}</span>
           <span className="text-[12px] font-medium" style={{ color: gl.text }}>{item.value}</span>
         </span>
       ))}
@@ -150,8 +153,9 @@ export function CasesPage({
   const { gl } = useTheme();
   const { syncing, syncVersion } = useSync();
   const { t } = useLang();
+  useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
-  // shared with the detail pages via ApprovalsProvider (localStorage-persisted)
+  // shared with the detail pages via ApprovalsProvider (in-memory + server)
   const { approvedIds, reopenedIds, casesVersion, approve, reopen, pruneReopened } = useApprovals();
   // casesVersion bumps on reopen; syncVersion bumps after iMed sync → silent refetch
   const { completeCases, incompleteGroups, finishedCases, loading, error } = useCases(
@@ -172,6 +176,7 @@ export function CasesPage({
   // route every approve trigger through a confirmation dialog. `pendingApproval`
   // holds the ids (for the activity log) + the action to run on confirm.
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const [pendingApproval, setPendingApproval] = useState<{ n: number; ids: string[]; run: () => void } | null>(null);
   const askApprove = (ids: string[], run: () => void) => { if (ids.length > 0) setPendingApproval({ n: ids.length, ids, run }); };
@@ -185,7 +190,7 @@ export function CasesPage({
       ? `Approved case for ${patient}`
       : `Approved ${ids.length} case(s)`;
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.",
+      userId: me.userId, userName: me.userName,
       actionType: ids.length > 1 ? "APPROVE_ALL" : "APPROVE_CASE",
       targetId: ids.length === 1 ? ids[0] : "bulk", targetType: "case",
       description, previousState: { caseIds: ids },
@@ -200,7 +205,7 @@ export function CasesPage({
     () => new Set(finishedCases.map(f => f.id)),
     [finishedCases]);
   // reopened-awaiting-re-approval cases (Reopen tab): the server flag
-  // (live mode) ∪ the persisted local set, minus locally re-approved ids.
+  // (live mode) ∪ this session's local set, minus locally re-approved ids.
   // These leave the queues too — a reopened case lives ONLY in the Reopen tab.
   const reopenedEffective = useMemo(() => {
     const s = new Set<string>();
@@ -220,7 +225,7 @@ export function CasesPage({
     [incompleteGroups, approvedIds, finishedApiIds, reopenedEffective]);
 
   // live mode: a fresh payload that still reports a case as finished wins over
-  // a stale localStorage reopen (re-approved elsewhere / failed POST); no-op in
+  // a stale in-memory reopen (re-approved elsewhere / failed POST); no-op in
   // static mode and for in-flight reopens (see ApprovalsProvider)
   useEffect(() => {
     if (!loading && !error) pruneReopened(finishedCases.map(f => f.id));
@@ -268,7 +273,7 @@ export function CasesPage({
       finishedBy: list.length > 1 ? list[list.length - 2] : list[0] ?? null,
       reopenedBy: list[list.length - 1] ?? null,
     };
-    return { finishedBy: list[list.length - 1] ?? "Sarah K.", reopenedBy: "Sarah K." };
+    return { finishedBy: list[list.length - 1] ?? me.userName, reopenedBy: me.userName };
   };
 
   // approved cases surface in Finished (with reopen); API-provided finished cases follow
@@ -278,9 +283,9 @@ export function CasesPage({
       const c = allById.get(id);
       // approving here makes the logged-in coder the latest editor (item 17),
       // appended to whoever worked the case before (item 16)
-      const coders = [...(c?.coders ?? []).filter(n => n !== "Sarah K."), "Sarah K."];
+      const coders = [...(c?.coders ?? []).filter(n => n !== me.userName), me.userName];
       return { id, patient: c?.patient ?? id, vn: c?.vn ?? id, hn: c?.hn ?? null,
-               codedDate: today, coder: "Sarah K.", coders,
+               codedDate: today, coder: me.userName, coders,
                drg: c?.codes?.[0]?.code ?? "—", created_at: c?.created_at,
                // facet fields from the source case so the sidebar filters apply
                dept: c?.dept, group: c?.group, severity: c?.severity, coverage: c?.coverage,
@@ -288,8 +293,8 @@ export function CasesPage({
                encountertype: c?.encountertype, orders: c?.orders, revenue_impact: c?.revenue_impact };
     });
     // any coder may reopen any case, so every row gets the Reopen button.
-    // Rows in reopenedIds left Finished for the Reopen tab (persisted — in
-    // static mode this is what keeps a baseline case reopened across reloads).
+    // Rows in reopenedIds left Finished for the Reopen tab (session-local
+    // until the server's refetched payload flags the case as reopened).
     // An API-finished row that is ALSO in approvedIds was reopened and then
     // re-approved in this browser — the logged-in coder finished it last, so
     // THEY become the responsible (final) coder, not the original approver.
@@ -299,10 +304,10 @@ export function CasesPage({
       .filter(f => !reopenedIds.has(f.id))
       .map(f => {
         if (!approvedIds.has(f.id)) return f;
-        const coders = [...(f.coders ?? (f.coder ? [f.coder] : [])).filter(n => n !== "Sarah K."), "Sarah K."];
-        return { ...f, coder: "Sarah K.", coders, codedDate: today };
+        const coders = [...(f.coders ?? (f.coder ? [f.coder] : [])).filter(n => n !== me.userName), me.userName];
+        return { ...f, coder: me.userName, coders, codedDate: today };
       })];
-  }, [approvedIds, allById, finishedCases, finishedApiIds, reopenedIds]);
+  }, [approvedIds, allById, finishedCases, finishedApiIds, reopenedIds, me.userName]);
 
   // Finished and Reopened rows live outside the hook's lists, but the Coder
   // facet (item 6) only has values there — so they are fed in as facet pool.
@@ -425,13 +430,15 @@ export function CasesPage({
 
   return (
     <main className="flex-1 flex flex-col overflow-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
+      {/* the page's name for screen readers — visually the tabs are the title */}
+      <h1 className="sr-only">{t("nav.dashboard")}</h1>
 
       <div className="p-5 space-y-4">
 
         {/* API data status — real synced hospital data only, no mock fallback.
             Loading is communicated by the skeletons below, so the banner is error-only. */}
         {error && (
-          <div className="px-4 py-2.5 rounded-xl text-xs font-semibold"
+          <div role="alert" className="px-4 py-2.5 rounded-xl text-xs font-semibold"
             style={{ background: `rgba(${gl.accentRgb},0.08)`, border: `1px solid rgba(${gl.accentRgb},0.20)`, color: gl.accent }}>
             Could not load /api/cases.json — run integration-poc/sync/export_json.py to generate the data.
           </div>
@@ -450,10 +457,28 @@ export function CasesPage({
 
           <div className="flex-1 min-w-0">
           <div className="flex items-end gap-2.5">
+            <div role="tablist" aria-label={t("a11y.caseTabs")} className="flex items-end gap-2.5">
             {tabs.map((t) => {
               const active = tab === t.id;
               return (
                 <button key={t.id} onClick={() => switchTab(t.id)}
+                  id={`cases-tab-${t.id}`}
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={`cases-panel-${t.id}`}
+                  tabIndex={active ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+                    e.preventDefault();
+                    const cur = tabs.findIndex((x) => x.id === tab);
+                    const next =
+                      e.key === "Home" ? 0 :
+                      e.key === "End" ? tabs.length - 1 :
+                      e.key === "ArrowRight" ? (cur + 1) % tabs.length :
+                      (cur - 1 + tabs.length) % tabs.length;
+                    switchTab(tabs[next].id);
+                    document.getElementById(`cases-tab-${tabs[next].id}`)?.focus();
+                  }}
                   className="flex items-center gap-1.5 px-4 py-2 transition-all duration-200"
                   style={{
                     borderRadius: "10px 10px 0 0",
@@ -472,7 +497,7 @@ export function CasesPage({
                 >
                   <t.icon size={11} style={{ color: active ? gl.accent : gl.muted }} />
                   <span className="text-[13px] font-semibold">{t.label}</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full"
                     style={active
                       ? { background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff" }
                       : { background: gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)", color: gl.muted }}>
@@ -486,15 +511,17 @@ export function CasesPage({
                       : t.count}
                   </span>
                   {/* date-filter indicator (Prompt 3): the counts are a dated view */}
-                  {filters.dateActive && <span className="text-[10px]">📅</span>}
+                  {filters.dateActive && <span className="text-[12px]">📅</span>}
                 </button>
               );
             })}
+            </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2 px-3 py-2 mb-1 rounded-xl w-72"
               style={{ background: gl.inputBg, border: gl.border }}>
               <Search size={12} style={{ color: gl.muted }} />
               <input value={filters.query} onChange={e => filters.setQuery(e.target.value)}
+                aria-label={t("list.search")}
                 placeholder={t("list.search")} className="bg-transparent text-[12px] font-normal outline-none w-full" style={{ color: gl.text }} />
               {filters.query !== "" && (
                 <button onClick={() => filters.setQuery("")} aria-label={t("list.clearSearch")}
@@ -515,7 +542,8 @@ export function CasesPage({
             {/* skeletons cover both the initial cases.json fetch and the manual
                 iMed sync — but NOT the error state, which keeps its banner */}
             {(loading || syncing) ? (
-              <div className="p-3 space-y-2">
+              <div className="p-3 space-y-2" role="status" aria-busy="true">
+                <span className="sr-only">{t("a11y.loading")}</span>
                 {Array.from({ length: 7 }).map((_, i) => <SkeletonRow key={i} />)}
               </div>
             ) : (
@@ -528,8 +556,11 @@ export function CasesPage({
               willChange: "transform",
             }}>
 
-              {/* COMPLETE */}
-              <div style={panelStyle(0)}>
+              {/* COMPLETE — off-screen panels are inert: their buttons and
+                  checkboxes must leave the tab order and the a11y tree, or a
+                  keyboard user could act on rows they cannot see */}
+              <div style={panelStyle(0)} inert={currentIdx !== 0 || undefined}
+                role="tabpanel" id="cases-panel-complete" aria-labelledby="cases-tab-complete">
                 <div className="p-3 space-y-2">
                   {/* forgot-the-filter guard: empty filtered list ≠ finished queue */}
                   {filters.active && filters.totalComplete === 0 && unfilteredComplete > 0 && (
@@ -579,6 +610,7 @@ export function CasesPage({
                           boxShadow: gl.shadowSm,
                         }}>
                         <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)}
+                          aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                           className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
                         {/* col 1 — identity: VN, HN */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
@@ -615,7 +647,8 @@ export function CasesPage({
               </div>
 
               {/* INCOMPLETE — flat list, same layout as Complete (no group cards) */}
-              <div style={panelStyle(1)}>
+              <div style={panelStyle(1)} inert={currentIdx !== 1 || undefined}
+                role="tabpanel" id="cases-panel-incomplete" aria-labelledby="cases-tab-incomplete">
                 <div className="p-3 space-y-2">
                   {filters.active && filters.totalIncomplete === 0 && unfilteredIncomplete > 0 && (
                     <div className="text-center py-8">
@@ -663,6 +696,7 @@ export function CasesPage({
                       }}>
                       <input type="checkbox" checked={selectedIncomplete.has(c.id)}
                         onChange={() => toggleSelectIncomplete(c.id)}
+                        aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                         className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
                       <div className="w-60 shrink-0 min-w-0 self-center">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
@@ -674,7 +708,7 @@ export function CasesPage({
                             : t("missing.count", { n: missingDocs.length });
                           return (
                             <span title={c.missing}
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
+                              className="text-[12px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
                               style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
                               <AlertCircle size={8} /> {label}
                             </span>
@@ -704,7 +738,8 @@ export function CasesPage({
 
               {/* REOPENED — cases any coder pulled back from Finished; they sit
                   here (out of the queues) until they are approved again */}
-              <div style={panelStyle(2)}>
+              <div style={panelStyle(2)} inert={currentIdx !== 2 || undefined}
+                role="tabpanel" id="cases-panel-reopen" aria-labelledby="cases-tab-reopen">
                 <div className="p-3 space-y-2">
                   {reopenRows.length === 0 && (
                     <div className="text-center py-8">
@@ -738,7 +773,7 @@ export function CasesPage({
                             column, same trade-off as the Finished rows) */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
                           <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
+                            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
                               style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                               <RotateCcw size={8} /> {t("tab.reopen")}
                             </span>
@@ -752,15 +787,15 @@ export function CasesPage({
                               {who.finishedBy && (
                                 <span className="flex items-center gap-1">
                                   <Flag size={9} style={{ color: gl.muted, opacity: 0.75 }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.finishedBy")}</span>
+                                  <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.finishedBy")}</span>
                                   <span className="text-[12px] font-semibold" style={{ color: gl.text }}>{who.finishedBy}</span>
                                 </span>
                               )}
                               {who.reopenedBy && (
                                 <span className="flex items-center gap-1">
-                                  {who.finishedBy && <span className="text-[10px] mr-1" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+                                  {who.finishedBy && <span className="text-[12px] mr-1" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
                                   <RotateCcw size={9} style={{ color: gl.accent, opacity: 0.85 }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.reopenedBy")}</span>
+                                  <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: gl.muted, opacity: 0.75 }}>{t("reopen.reopenedBy")}</span>
                                   <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{who.reopenedBy}</span>
                                 </span>
                               )}
@@ -790,15 +825,19 @@ export function CasesPage({
               </div>
 
               {/* FINISHED */}
-              <div style={panelStyle(3)}>
+              <div style={panelStyle(3)} inert={currentIdx !== 3 || undefined}
+                role="tabpanel" id="cases-panel-finished" aria-labelledby="cases-tab-finished">
                 <div className="p-3 space-y-2">
                   {visibleFinished.map((c) => (
+                    // whole-row click is a mouse convenience; the View button below
+                    // is the keyboard/screen-reader path to the same action
+                    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
                     <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:opacity-90"
                       style={{ background: gl.row, backdropFilter: gl.blur16, border: gl.border, boxShadow: gl.shadowSm }}
                       onClick={() => openFinishedCase(c)}>
                       <div className="flex-1 min-w-0">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                          <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
                             style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                             <Flag size={8} /> {t("tab.finished")}
                           </span>
@@ -828,7 +867,7 @@ export function CasesPage({
                           e.stopPropagation();
                           reopen(c.id);
                           const logId = addLog({
-                            userId: "sarah.k", userName: "Sarah K.", actionType: "REOPEN_CASE",
+                            userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
                             targetId: c.id, targetType: "case",
                             description: `Reopened case for ${c.patient}`, previousState: null,
                           });
@@ -856,15 +895,13 @@ export function CasesPage({
 
       {/* approval confirmation dialog — gates every approve action (F14) */}
       {pendingApproval && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-          onClick={() => setPendingApproval(null)}>
-          <div className="w-full max-w-sm rounded-2xl p-5"
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-              border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
-            }}>
+        <ModalShell onClose={() => setPendingApproval(null)} ariaLabel={t("confirm.title")}
+          overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+          className="w-full max-w-sm rounded-2xl p-5"
+          style={{
+            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+            border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
+          }}>
             <div className="flex items-center gap-2.5 mb-2">
               <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
                 style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>
@@ -887,8 +924,7 @@ export function CasesPage({
                 <CheckCircle2 size={12} /> {t("confirm.confirm", { n: pendingApproval.n })}
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </main>
   );

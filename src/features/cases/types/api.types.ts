@@ -73,7 +73,7 @@ export interface ApiFinishedCase {
   codedDate: string;
   /** Responsible coder = the LATEST person to touch the case (= coders.at(-1)),
    *  which is not necessarily whoever approved it first. */
-  coder: string;           // display name (e.g. "Sarah K.")
+  coder: string;           // display name of the responsible coder (e.g. "Austin")
   coders?: string[];       // everyone who worked it, most recent last
   /** Raw workflow id behind `coder` ("demo.coder" = run_demo baseline,
    *  "web.coder" = approved through this UI). The Settings demo tools use it
@@ -131,6 +131,8 @@ export interface ApiStoredCode {
   confidence: number;
   missing?: boolean;     // unresolved "???" placeholder row
   missingMsg?: string;
+  /** internal coder note — round-trips verbatim, never reaches the hospital */
+  note?: string;
 }
 
 /** GET /api/cases/{id} — full case detail. */
@@ -138,7 +140,13 @@ export interface ApiCaseDetail {
   case: Record<string, string | null>;
   coverage: Record<string, string | null> | null; // REF: full coverage_types row (doc B4)
   sections: { documenttype: string; fieldname: string; value: string | null; recorddatetime: string | null }[];
-  codes: { code: string; code_system: string; description: string | null; code_role: string; source: string }[];
+  codes: { code: string; code_system: string; description: string | null; code_role: string; source: string;
+           /** procedure time window — ICD-9 rows only, null on ICD-10 */
+           operation_start: string | null; operation_end: string | null;
+           /** the hospital's operation type, extract vocabulary verbatim
+            *  ("OR Procedure" / "NON OR Procedure" / "OTH" / …) — ICD-9 rows
+            *  only, null on ICD-10 */
+           operation_type: string | null }[];
   orders: {
     order_category: string;
     imed_source: string;
@@ -146,14 +154,21 @@ export interface ApiCaseDetail {
     ordered_at: string | null;
     /** the exact iMed source row — dosage, quantity, result value, unit,
      *  procedure times… Keys differ per imed_source, so the UI renders
-     *  whatever is present. Capped at 150 orders; see orderCounts. */
-    detail?: Record<string, string | null>;
+     *  whatever is present. Null when sync stored no source row. The array
+     *  is capped at 50 rows per category; see orderCounts for true totals. */
+    detail?: Record<string, string | null> | null;
   }[];
   /** true per-category order totals, even when `orders` is truncated */
   orderCounts?: Record<string, number>;
+  /** Hospital vital-sign readings (the strip above CC/PI/PE in the original
+   *  coder UI), chronological. Every value is raw hospital text or null.
+   *  Optional so the static JSON export stays valid. */
+  vitals?: { measured_at: string | null; temperature: string | null;
+             systolic: string | null; diastolic: string | null;
+             heart_rate: string | null; oxygen_saturation: string | null;
+             weight: string | null; height: string | null }[];
   history?: ApiCaseHistoryEntry[];
   // Present only when served by the live server (server/app.py), which echoes
   // the coder's saved working state; absent in the static JSON export.
   codeEdits?: ApiStoredCode[] | null;
-  reportDraft?: string | null;
 }

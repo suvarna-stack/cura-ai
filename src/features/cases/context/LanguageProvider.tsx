@@ -3,13 +3,18 @@
 // The dictionary, context object, and useLang hook live in
 // LanguageContext.tsx (kept component-free for fast refresh).
 // ============================================================
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LanguageCtx, dict } from "./LanguageContext";
 import type { Lang } from "./LanguageContext";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() =>
     (localStorage.getItem("lang") as Lang) === "th" ? "th" : "en");
+
+  // keep <html lang> honest so screen readers pick the right voice (WCAG 3.1.1)
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const setLang = (l: Lang) => {
     localStorage.setItem("lang", l);
