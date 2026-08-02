@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * UI working-state tables: case_code_edits (payload JSONB) and
- * case_report_drafts. SQL from server/app.py (each method cites its line).
- * payload is read ::text so the service re-parses it exactly like Flask's
- * json.loads, and written via setString (stringtype=unspecified coerces it
- * into JSONB, like psycopg2).
+ * UI working-state table: case_code_edits (payload JSONB). SQL from
+ * server/app.py (each method cites its line). payload is read ::text so the
+ * service re-parses it exactly like Flask's json.loads, and written via
+ * setString (stringtype=unspecified coerces it into JSONB, like psycopg2).
+ * (case_report_drafts was dropped 2026-08-02 — the report is read-only.)
  */
 @Repository
 public class WorkingStateRepository {
@@ -32,27 +32,12 @@ public class WorkingStateRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    // app.py:199 load_working_state() — saved report draft, or null
-    public String loadDraft(String caseId) {
-        List<String> rows = jdbc.queryForList(
-                "SELECT draft FROM case_report_drafts WHERE case_id=?", String.class, caseId);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
     // app.py:266 put_codes() upsert
     public void upsertEdits(String caseId, String payloadJson, String now) {
         jdbc.update("""
                 INSERT INTO case_code_edits (case_id, payload, updated_at) VALUES (?,?,?)
                 ON CONFLICT (case_id) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at""",
                 caseId, payloadJson, now);
-    }
-
-    // app.py:287 put_draft() upsert
-    public void upsertDraft(String caseId, String draft, String now) {
-        jdbc.update("""
-                INSERT INTO case_report_drafts (case_id, draft, updated_at) VALUES (?,?,?)
-                ON CONFLICT (case_id) DO UPDATE SET draft=excluded.draft, updated_at=excluded.updated_at""",
-                caseId, draft, now);
     }
 
     /** case_id → average of code `confidence` fields in the saved edits payload. */

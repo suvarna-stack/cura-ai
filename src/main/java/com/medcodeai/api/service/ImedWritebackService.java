@@ -62,19 +62,15 @@ public class ImedWritebackService {
 
     // ---- approve ------------------------------------------------------------
 
-    /** Applies the diff and coding status; returns hospital code writes made. */
+    /** Applies the code diff; returns hospital code writes made. (The old
+     *  coding-status extension was withdrawn 2026-08-02 — the hospital's real
+     *  contract has no coding-status concept, so approve sends codes +
+     *  discharge only.) */
     public int approveCase(String tn, String encountertype, List<TargetCode> targets,
             String coder, String now) {
         int writes = 0;
         writes += diffKind(tn, "icd10", liveRows(tn, "icd10"), targets, encountertype, coder, now);
         writes += diffKind(tn, "icd9", liveRows(tn, "icd9"), targets, encountertype, coder, now);
-
-        Map<String, Object> status = new LinkedHashMap<>();
-        status.put("request_id", rid(tn));
-        status.put("coding_status", "approved");
-        status.put("finalized_at", now);
-        status.put("updated_by", coder);
-        imed.putCodingStatus(tn, status);
         return writes;
     }
 
@@ -194,7 +190,6 @@ public class ImedWritebackService {
             }
         }
 
-        imed.deleteCodingStatus(tn);
         ops.clearCase(tn);
     }
 

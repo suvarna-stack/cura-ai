@@ -32,6 +32,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/admin/**", "/api/auth/me", "/api/auth/logout",
                         "/api/cases/**", "/api/cases", "/api/sync", "/api/demo/reset",
-                        "/api/icd-codes", "/api/icd-codes/**");
+                        "/api/demo/snapshot", "/api/icd-codes", "/api/icd-codes/**");
     }
 }

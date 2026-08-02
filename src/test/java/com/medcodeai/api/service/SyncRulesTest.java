@@ -66,24 +66,29 @@ class SyncRulesTest {
 
     @Test
     void missingSectionsOpdRule() {
-        // OPD (enc "0") with all three section groups + a primary dx → complete
+        // OPD (enc "0") with all three section groups → complete. Whether the
+        // case is coded yet is deliberately NOT part of completeness — that's
+        // the work the product does on complete-but-uncoded charts.
         Set<String> full = Set.of("Chief Complaint", "Physical Examination", "Assessment");
-        assertTrue(SyncRules.missingSections("0", full, Set.of(), true).isEmpty());
-        // no primary dx → missing primary_diagnosis
-        assertEquals(List.of("primary_diagnosis"),
-                SyncRules.missingSections("0", full, Set.of(), false));
-        // nothing present → all three groups + primary, in source order
-        assertEquals(List.of("chief", "exam", "assessment", "primary_diagnosis"),
-                SyncRules.missingSections("0", Set.of(), Set.of(), false));
+        assertTrue(SyncRules.missingSections("0", full, Set.of()).isEmpty());
+        // any accepted section of a group satisfies it
+        assertTrue(SyncRules.missingSections("0",
+                Set.of("Subjective", "Objective", "Present Illness"), Set.of()).isEmpty());
+        // nothing present → all three groups, in source order
+        assertEquals(List.of("chief", "exam", "assessment"),
+                SyncRules.missingSections("0", Set.of(), Set.of()));
+        // one gap reports just that group
+        assertEquals(List.of("exam"),
+                SyncRules.missingSections("0", Set.of("Chief Complaint", "Assessment"), Set.of()));
     }
 
     @Test
     void missingSectionsIpdRule() {
-        // IPD (enc "1") needs admission note + clinical summary doctypes + primary dx
+        // IPD (enc "1") needs admission note + clinical summary doctypes
         Set<String> docs = Set.of("Admission Note", "Clinical Summary");
-        assertTrue(SyncRules.missingSections("1", Set.of(), docs, true).isEmpty());
-        assertEquals(List.of("admission_note", "discharge_summary", "primary_diagnosis"),
-                SyncRules.missingSections("1", Set.of(), Set.of(), false));
+        assertTrue(SyncRules.missingSections("1", Set.of(), docs).isEmpty());
+        assertEquals(List.of("admission_note", "discharge_summary"),
+                SyncRules.missingSections("1", Set.of(), Set.of()));
     }
 
     @Test

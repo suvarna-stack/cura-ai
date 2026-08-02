@@ -169,13 +169,13 @@ class CasesApiIntegrationTest {
 
     @Test
     void caseDetailKnownIdIncludesWorkingState() throws Exception {
-        // codeEdits/reportDraft are always present, JSON null when unset —
-        // check key presence directly rather than via jsonPath().exists()
+        // codeEdits is always present, JSON null when unset — check key
+        // presence directly rather than via jsonPath().exists()
         // (which treats a null leaf as absent).
         JsonNode detail = getJson("/api/cases/" + KNOWN_CASE_ID);
         assertTrue(KNOWN_CASE_ID.equals(detail.get("case").get("case_id").asString()));
         assertTrue(detail.has("codeEdits"));
-        assertTrue(detail.has("reportDraft"));
+        assertTrue(!detail.has("reportDraft"), "report drafts were removed 2026-08-02");
         // history is always present — an array, empty when the case has no
         // coder actions yet (the frontend's ViewHistoryPage reads it)
         assertTrue(detail.has("history"));
@@ -249,18 +249,6 @@ class CasesApiIntegrationTest {
         assertTrue(List.of("approved_single", "approved_group", "approved_all", "reopened", "code_assigned")
                         .contains(h0.get("action").asString()),
                 "history action should be a known coder action, got " + h0.get("action").asString());
-    }
-
-    @Test
-    void putDraftThenReadBackReflectsIt() throws Exception {
-        mvc.perform(put("/api/cases/{id}/draft", KNOWN_CASE_ID).header("Authorization", auth())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"text\":\"integration test draft\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(true));
-
-        mvc.perform(get("/api/cases/{id}", KNOWN_CASE_ID).header("Authorization", auth()))
-                .andExpect(jsonPath("$.reportDraft").value("integration test draft"));
     }
 
     @Test

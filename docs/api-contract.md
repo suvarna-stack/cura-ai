@@ -167,7 +167,6 @@ real values here when the extract has them).
                   "at": "2026-07-20 09:00:00",
                   "detail": { "by": "demo.coder", "codes": 1 } }, ... ],  // coder audit trail, oldest first
   "codeEdits": <CodeEdit[] | null>,   // last PUT …/codes payload, echoed verbatim
-  "reportDraft": <string | null>      // last PUT …/draft text (feature deprecated)
 }
 ```
 
@@ -222,10 +221,6 @@ row at approve and sent to iMed as `fix_operation_type_id` when present
 Responses: `{"ok": true}` · `400` (not an array) · `404` (unknown case).
 Working state never invalidates the dashboard cache and survives reopen.
 
-### PUT /api/cases/{caseId}/draft — save the report draft (deprecated feature)
-
-Request `{"text": "…"}` → `{"ok": true}` · `400` / `404` as above.
-
 ### POST /api/cases/approve
 
 Request `{"ids": ["<case_id>", …]}`. The acting coder is the **logged-in
@@ -252,20 +247,37 @@ live state). `stats.mcai_code_rows` = hospital code writes made by the diff
 
 No meaningful request body (a `coder` field is ignored; the actor is the
 logged-in account). Reverses an approve on both sides; the coder's saved
-edits/draft are KEPT. Response `{"ok": true}` · `404` unknown case. Same
+edits are KEPT. Response `{"ok": true}` · `404` unknown case. Same
 500-then-retry semantics as approve.
+
+### POST /api/demo/snapshot
+
+No request body. Freezes the CURRENT state of both databases as the demo
+baseline: every medcode table is copied into the `demo_baseline` schema
+(replacing any previous baseline), and imed-mock-api is told to snapshot the
+hospital DB the same way (`imed_baseline` schema, its mock-only
+`POST /api/demo/snapshot`). Run once when both sides look exactly how the
+demo should start. Response
+`{"ok": true, "medcodeTables": {<table>: <rowCount>…}, "imedTables": {…}}`.
 
 ### POST /api/demo/reset
 
-Request `{"baselineCoder": "demo.coder"}` (optional). Restores the demo
-baseline: reopens every non-baseline approval and re-finalizes baseline cases
-a visitor touched. Response
-`{"ok": true, "reopened": <int>, "restoredBaseline": <int>}`.
+No meaningful request body (legacy `baselineCoder` is ignored). Restores BOTH
+databases to the snapshotted demo baseline: truncates + refills every
+baselined medcode table from `demo_baseline` (accounts created after the
+snapshot are removed along with their sessions — the operator's own session
+survives; serial sequences re-aligned), invalidates the cases cache, then
+tells imed-mock-api to restore the hospital DB (undoing every write-back
+since the snapshot). Two-phase like approve: our side commits first, so a
+hospital-side failure 500s with medcode already reset — re-running heals.
+Response `{"ok": true, "medcodeTables": {…}, "imedTables": {…}}` ·
+`409` if no snapshot was ever taken.
 
-Gated by `DEMO_TOOLS_ENABLED` (default `true` locally, forced `false` in
-containers): when disabled this endpoint returns `404 {"error": "not found"}`,
-as if it didn't exist. It's a destructive bulk write (and, like the rest of the
-case surface, requires a token), so production ships with it off.
+Both demo endpoints are gated by `DEMO_TOOLS_ENABLED` (default `true` locally,
+forced `false` in containers): when disabled they return
+`404 {"error": "not found"}`, as if they didn't exist. They are destructive
+bulk writes (and, like the rest of the case surface, require a token), so
+production ships with them off.
 
 ### POST /api/sync — pull case data from the hospital
 
@@ -275,7 +287,7 @@ it into medcode. **Non-destructive** (safe to re-run) — per case:
 - **new** (unknown to medcode) → full import;
 - **open** → hospital-sourced data refreshed (the `cases` clinical columns,
   sections, orders, and `imported_from_imed` codes are replaced), while coder
-  work is KEPT — `coder_assigned` codes, saved `codeEdits`/`reportDraft`,
+  work is KEPT — `coder_assigned` codes, saved `codeEdits`,
   `case_status`, and existing history are never touched (a `case_synced`
   history row is only appended);
 - **already finalized** (`case_status` not `open`) → **skipped**, left intact,

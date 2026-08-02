@@ -110,13 +110,13 @@ public class CasesReadController {
         return cache.get(views::buildCasesPayload);
     }
 
-    // app.py:241 — detail + codeEdits/reportDraft, ALWAYS present (null when
-    // unset): the working state belongs to the detail payload even when empty
+    // app.py:241 — detail + codeEdits, ALWAYS present (null when unset): the
+    // working state belongs to the detail payload even when empty
     @GetMapping("/api/cases/{caseId}")
     @Operation(summary = "Case detail",
             description = "Serves ALL cases, IPD included (unlike the OPD-only dashboard), so "
                     + "`hn`-type fields carry real values here when the extract has them. "
-                    + "`codeEdits` / `reportDraft` are the coder's saved working state and are "
+                    + "`codeEdits` is the coder's saved working state and is "
                     + "always present, `null` when unset.\n\n"
                     + "Example below is trimmed; datetimes are raw hospital text — treat as "
                     + "opaque display strings.")
@@ -171,8 +171,7 @@ public class CasesReadController {
                           "ordered_at": "2026-04-01 07:10:00"
                         }
                       ],
-                      "codeEdits": null,
-                      "reportDraft": null
+                      "codeEdits": null
                     }
                     """)))
     @ApiResponse(responseCode = "404", description = "Unknown case",
@@ -185,7 +184,6 @@ public class CasesReadController {
         }
         WorkingStateService.WorkingState ws = workingState.load(caseId);
         detail.put("codeEdits", ws.edits());
-        detail.put("reportDraft", ws.draft());
         return detail;
     }
 }

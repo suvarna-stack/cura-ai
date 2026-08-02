@@ -5,7 +5,6 @@ import com.medcodeai.api.repo.WorkingStateRepository;
 import com.medcodeai.api.service.ApprovalService;
 import com.medcodeai.api.service.AuthService;
 import com.medcodeai.api.service.CaseSuggestService;
-import com.medcodeai.api.service.Py;
 import com.medcodeai.api.service.WriteGate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -56,14 +55,18 @@ public class CasesWriteController {
     private final boolean demoToolsEnabled =
             !"false".equalsIgnoreCase(System.getenv().getOrDefault("DEMO_TOOLS_ENABLED", "true").strip());
 
+    private final com.medcodeai.api.service.DemoBaselineService demoBaseline;
+
     public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState,
                                 WriteGate writeGate, ApprovalService approvals,
-                                CaseSuggestService suggest) {
+                                CaseSuggestService suggest,
+                                com.medcodeai.api.service.DemoBaselineService demoBaseline) {
         this.cases = cases;
         this.workingState = workingState;
         this.writeGate = writeGate;
         this.approvals = approvals;
         this.suggest = suggest;
+        this.demoBaseline = demoBaseline;
     }
 
     // app.py:299 approve() — {ids} -> finalize + iMed write-back. The coder
@@ -139,14 +142,37 @@ public class CasesWriteController {
         return approvals.reopen(caseId, principal(request).email());
     }
 
-    // app.py:379 demo_reset() — Settings demo tools bulk reset
-    @PostMapping("/api/demo/reset")
-    @Operation(summary = "Restore the demo baseline",
-            description = "Reopens every non-baseline approval and re-finalizes baseline cases a "
-                    + "visitor touched. `baselineCoder` defaults to `demo.coder`. "
-                    + "**Bulk write — it discards visitors' approvals.**")
+    // Settings demo tools: freeze the demo-start state of BOTH databases
+    @PostMapping("/api/demo/snapshot")
+    @Operation(summary = "Freeze the current state of both databases as the demo baseline",
+            description = "Copies every medcode table into the `demo_baseline` schema and tells "
+                    + "imed-mock-api to snapshot the hospital DB the same way (`imed_baseline`). "
+                    + "Run once when both sides look exactly how the demo should start; "
+                    + "`POST /api/demo/reset` then restores this state on demand.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
-            examples = @ExampleObject(value = "{\"ok\": true, \"reopened\": 3, \"restoredBaseline\": 2}")))
+            examples = @ExampleObject(value = "{\"ok\": true, \"medcodeTables\": {\"users\": 4},"
+                    + " \"imedTables\": {\"medhack_patient\": 21}}")))
+    @ApiResponse(responseCode = "404", description = "Disabled (DEMO_TOOLS_ENABLED=false)",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
+    public Map<String, Object> demoSnapshot() {
+        if (!demoToolsEnabled) {
+            throw new ApiExceptionHandler.NotFoundException(); // disabled in this environment
+        }
+        return demoBaseline.snapshot();
+    }
+
+    // Settings demo tools bulk reset — restore the snapshotted demo baseline
+    @PostMapping("/api/demo/reset")
+    @Operation(summary = "Restore both databases to the demo baseline",
+            description = "Truncates + refills every baselined medcode table from the "
+                    + "`demo_baseline` schema (accounts created after the snapshot are removed, "
+                    + "the operator's session survives), re-aligns sequences, then tells "
+                    + "imed-mock-api to restore the hospital DB (undoing all write-backs). "
+                    + "**Bulk write — it discards everything done since the snapshot.**")
+    @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
+            examples = @ExampleObject(value = "{\"ok\": true, \"medcodeTables\": {\"cases\": 0},"
+                    + " \"imedTables\": {\"medhack_patient\": 21}}")))
     @ApiResponse(responseCode = "404", description = "Disabled (DEMO_TOOLS_ENABLED=false)",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
@@ -154,15 +180,12 @@ public class CasesWriteController {
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(type = "object"),
-                            examples = @ExampleObject(value = "{\"baselineCoder\": \"demo.coder\"}")))
+                            examples = @ExampleObject(value = "{}")))
             @RequestBody(required = false) byte[] body) {
         if (!demoToolsEnabled) {
             throw new ApiExceptionHandler.NotFoundException(); // disabled in this environment
         }
-        Object parsed = parseSilent(body);
-        Map<?, ?> b = parsed instanceof Map<?, ?> m ? m : Map.of();
-        String baselineCoder = Py.or_(b.get("baselineCoder") instanceof String s ? s : null, "demo.coder");
-        return approvals.demoReset(baselineCoder);
+        return demoBaseline.reset();
     }
 
     // app.py:255 put_codes() — body is a bare StoredCode[] array
@@ -209,38 +232,9 @@ public class CasesWriteController {
         return ok();
     }
 
-    // app.py:276 put_draft() — DEPRECATED (Edit Report removed 15 Jul 2026) but kept
-    @PutMapping("/api/cases/{caseId}/draft")
-    @Operation(summary = "Save the report draft", deprecated = true,
-            description = "**Deprecated** — the Edit Report feature was removed on 15 Jul 2026. "
-                    + "The endpoint is kept so old clients don't break.")
-    @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
-            examples = @ExampleObject(value = OK_EXAMPLE)))
-    @ApiResponse(responseCode = "400", description = "Body is not `{\"text\": \"…\"}`",
-            content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(value = "{\"error\": \"expected {\\\"text\\\": \\\"...\\\"}\"}")))
-    @ApiResponse(responseCode = "404", description = "Unknown case",
-            content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
-    public Map<String, Object> putDraft(@PathVariable String caseId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(type = "object"),
-                            examples = @ExampleObject(value = "{\"text\": \"Draft report text\"}")))
-            @RequestBody(required = false) byte[] body) {
-        Object parsed = parseSilent(body);
-        if (!(parsed instanceof Map<?, ?> m) || !(m.get("text") instanceof String text)) {
-            throw new ApiExceptionHandler.BadRequestException("expected {\"text\": \"...\"}");
-        }
-        writeGate.locked(() -> {
-            if (!cases.caseExists(caseId)) {
-                throw new ApiExceptionHandler.NotFoundException();
-            }
-            workingState.upsertDraft(caseId, text, nowStr());
-            return null;
-        });
-        return ok();
-    }
+    // PUT /api/cases/{caseId}/draft was REMOVED 2026-08-02: the report is the
+    // hospital's clinical record and is read-only in the app (the Edit Report
+    // feature died 15 Jul 2026; no client has called this since).
 
     @PostMapping("/api/cases/{caseId}/suggest-codes")
     @Operation(summary = "Suggest ICD-9 / ICD-10 codes via RAG",

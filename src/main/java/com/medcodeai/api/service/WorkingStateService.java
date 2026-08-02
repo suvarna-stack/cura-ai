@@ -7,8 +7,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class WorkingStateService {
 
-    /** codeEdits (parsed JSON or null) + reportDraft (string or null). */
-    public record WorkingState(Object edits, String draft) {}
+    /** codeEdits (parsed JSON or null). Report drafts are gone — the report
+     *  is the hospital's record, read-only since 2026-08-02. */
+    public record WorkingState(Object edits) {}
 
     private final WorkingStateRepository repo;
     private final JsonMapper json = new JsonMapper();
@@ -29,6 +30,6 @@ public class WorkingStateService {
                 edits = null;
             }
         }
-        return new WorkingState(edits, repo.loadDraft(caseId));
+        return new WorkingState(edits);
     }
 }

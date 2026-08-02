@@ -138,8 +138,6 @@ export interface CaseDetail {
   history: CaseHistoryEntry[];
   /** last PUT …/codes payload, echoed verbatim; null when never saved */
   codeEdits: CodeEdit[] | null;
-  /** last PUT …/draft text (feature deprecated); null when never saved */
-  reportDraft: string | null;
 }
 
 /** One row of this case's coder audit trail (medcodeai `coding_history`) — what
@@ -301,11 +299,16 @@ export interface ApproveResponse {
   };
 }
 
-/** POST /api/demo/reset — request {baselineCoder?: string} */
-export interface DemoResetResponse {
+/**
+ * POST /api/demo/snapshot and POST /api/demo/reset — no request body.
+ * snapshot freezes the current state of both DBs as the demo baseline;
+ * reset restores it (409 before the first snapshot). Values are per-table
+ * row counts after the operation.
+ */
+export interface DemoBaselineResponse {
   ok: true;
-  reopened: number;
-  restoredBaseline: number;
+  medcodeTables: Record<string, number>;
+  imedTables: Record<string, number>;
 }
 
 /**

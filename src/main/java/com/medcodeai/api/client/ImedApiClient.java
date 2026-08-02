@@ -17,13 +17,12 @@ import java.util.Map;
  * in production — same contract, base-URL + token swap only). Two directions:
  *
  * WRITE (approve/reopen) — the hospital's REAL contract ("iMed Diagnosis and
- * Medical Discharge API" + our proposed coding-status extension), Bearer-
- * authenticated (IMED_API_TOKEN), request_id-deduped on their side:
+ * Medical Discharge API"), Bearer-authenticated (IMED_API_TOKEN),
+ * request_id-deduped on their side (the invented coding-status extension was
+ * withdrawn 2026-08-02):
  *   POST   /api/v1/diagnosis                          — create dx/px + discharge
  *   PUT    /api/v1/diagnosis/{visit_id}               — edit rows by object_id
  *   DELETE /api/v1/diagnosis/{visit_id}/icd10|icd9/{id} — cancel one row
- *   PUT    /api/v1/coding-status/{visit_id}           — set coding status
- *   DELETE /api/v1/coding-status/{visit_id}           — clear it (reopen)
  *
  * READ / sync (inbound) — pull the hospital's case data for SyncService, one
  * method per read endpoint of imed-mock-api's ImedCasesReadController. Rows
@@ -98,25 +97,6 @@ public class ImedApiClient {
         }
     }
 
-    public void putCodingStatus(String visitId, Map<String, Object> body) {
-        try {
-            http.put().uri("/api/v1/coding-status/{v}", visitId)
-                    .contentType(MediaType.APPLICATION_JSON).body(body)
-                    .retrieve().toBodilessEntity();
-        } catch (ResourceAccessException e) {
-            throw unreachable(e);
-        }
-    }
-
-    public void deleteCodingStatus(String visitId) {
-        try {
-            http.delete().uri("/api/v1/coding-status/{v}", visitId)
-                    .retrieve().toBodilessEntity();
-        } catch (ResourceAccessException e) {
-            throw unreachable(e);
-        }
-    }
-
     // ---- read direction (sync) — GET /api/cases and the per-visit tables ----
 
     /** GET /api/cases — all hospital visits (medhack_patient). */
@@ -168,6 +148,26 @@ public class ImedApiClient {
 
     public List<Map<String, Object>> icd9Codes() {
         return getRows("/api/icd9-codes");
+    }
+
+    // ---- demo tooling (mock-only endpoints, not the hospital contract) ----
+
+    /** POST /api/demo/snapshot — freeze the hospital DB as the demo baseline. */
+    public Map<String, Object> demoSnapshot() {
+        try {
+            return http.post().uri("/api/demo/snapshot").retrieve().body(ENVELOPE);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** POST /api/demo/reset — restore the hospital DB to the demo baseline. */
+    public Map<String, Object> demoReset() {
+        try {
+            return http.post().uri("/api/demo/reset").retrieve().body(ENVELOPE);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
     }
 
     /** GET a row-list endpoint; a null body degrades to an empty list. */

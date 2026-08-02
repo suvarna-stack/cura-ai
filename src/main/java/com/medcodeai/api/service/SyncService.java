@@ -196,7 +196,7 @@ public class SyncService {
                 comorbidities++;
             }
         }
-        List<String> missing = SyncRules.missingSections(enc, haveFields, docTypes, primary != null);
+        List<String> missing = SyncRules.missingSections(enc, haveFields, docTypes);
         String completeness = missing.isEmpty() ? "complete" : "incomplete";
         String missingDetail = missing.isEmpty() ? null : String.join(",", missing);
         String group = SyncRules.diseaseGroup(primary == null ? null : str(primary.get("icd")));

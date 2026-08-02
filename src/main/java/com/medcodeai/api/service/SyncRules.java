@@ -122,11 +122,15 @@ public final class SyncRules {
     /**
      * sync.py:158 completeness (F03) [POC]. Returns the missing[] labels in the
      * source's order; empty means complete. IPD (enc "1") uses the discharge-audit
-     * rule (admission note + clinical summary + principal dx); OPD needs one section
-     * of each required group + a principal dx.
+     * rule (admission note + clinical summary); OPD needs one section of each
+     * required group. Completeness is about the DOCUMENTATION only — whether the
+     * chart holds everything a coder (or the AI suggester) needs. Whether a
+     * diagnosis has been coded yet is the work this product does, so it is
+     * deliberately NOT part of the rule (changed 2026-08-02; previously a
+     * missing principal dx made every uncoded case "incomplete").
      */
     public static List<String> missingSections(String enc, Set<String> fieldnames,
-                                                Set<String> documenttypes, boolean hasPrimary) {
+                                                Set<String> documenttypes) {
         java.util.ArrayList<String> missing = new java.util.ArrayList<>();
         if ("1".equals(enc)) {
             if (!documenttypes.contains("Admission Note")) {
@@ -135,17 +139,11 @@ public final class SyncRules {
             if (!documenttypes.contains("Clinical Summary")) {
                 missing.add("discharge_summary");
             }
-            if (!hasPrimary) {
-                missing.add("primary_diagnosis");
-            }
         } else {
             for (Map.Entry<String, Set<String>> e : REQUIRED_SECTIONS.entrySet()) {
                 if (java.util.Collections.disjoint(fieldnames, e.getValue())) {
                     missing.add(e.getKey());
                 }
-            }
-            if (!hasPrimary) {
-                missing.add("primary_diagnosis");
             }
         }
         return missing;
