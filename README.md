@@ -55,6 +55,8 @@ non-uniform in the source; parsing is the consumer's job).
 | `GET /api/cases/{tn}/bed-management` | MedHack_BedManagement |
 | `GET /api/cases/{tn}/billing-items` | MedHack_BillingItem |
 | `GET /api/cases/{tn}/coding-status` | MedHack_CaseCodingStatus (what MedCode AI wrote back; 404 while uncoded) |
+| `GET /api/icd10-codes` | imed.icd_10 — ICD-10 reference catalog (code master, not per-case) |
+| `GET /api/icd9-codes` | imed.icd_9 — ICD-9 procedure reference catalog (not per-case) |
 
 `{tn}` is the transaction number (visit number). Unknown `{tn}` → `404
 {"error":"not found"}`; a known case with no rows in a table → `[]`.

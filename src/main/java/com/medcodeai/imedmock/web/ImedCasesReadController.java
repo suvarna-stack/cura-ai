@@ -103,6 +103,22 @@ public class ImedCasesReadController {
         return repo.billingItems(tn);
     }
 
+    // ---- reference catalogs (code master, not per-case) --------------------
+
+    @GetMapping("/api/icd10-codes")
+    @Operation(summary = "ICD-10 reference catalog — imed.icd_10",
+            description = "The hospital's ICD-10 code master; MedCode AI mirrors it during sync")
+    public List<Map<String, Object>> icd10Codes() {
+        return repo.icd10Catalog();
+    }
+
+    @GetMapping("/api/icd9-codes")
+    @Operation(summary = "ICD-9 reference catalog — imed.icd_9",
+            description = "The hospital's ICD-9 procedure code master; MedCode AI mirrors it during sync")
+    public List<Map<String, Object>> icd9Codes() {
+        return repo.icd9Catalog();
+    }
+
     /** The coding/audit status MedCode AI wrote back; 404 while uncoded. */
     @GetMapping("/api/cases/{tn}/coding-status")
     @Operation(summary = "Coding status — MedHack_CaseCodingStatus",

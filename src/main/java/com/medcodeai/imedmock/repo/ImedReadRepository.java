@@ -94,6 +94,16 @@ public class ImedReadRepository {
         return byTn("medhack_billingitem", tn);
     }
 
+    // ICD reference catalogs (code master, not per-case) — MedCode AI pulls
+    // these during sync to keep its own icd_10/icd_9 tables aligned.
+    public List<Map<String, Object>> icd10Catalog() {
+        return jdbc.query("SELECT * FROM imed.icd_10 ORDER BY code", ROW);
+    }
+
+    public List<Map<String, Object>> icd9Catalog() {
+        return jdbc.query("SELECT * FROM imed.icd_9 ORDER BY code", ROW);
+    }
+
     /** The A11 row MedCode AI wrote back, or null when the case is uncoded. */
     public Map<String, Object> codingStatus(String tn) {
         List<Map<String, Object>> r = jdbc.query(

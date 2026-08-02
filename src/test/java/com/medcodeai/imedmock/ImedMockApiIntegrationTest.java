@@ -76,6 +76,16 @@ class ImedMockApiIntegrationTest {
     }
 
     @Test
+    void icdCatalogsServeReferenceRows() throws Exception {
+        JsonNode ten = getJson("/api/icd10-codes");
+        JsonNode nine = getJson("/api/icd9-codes");
+        assertTrue(ten.isArray() && ten.size() > 0, "ICD-10 catalog seeded at bootstrap");
+        assertTrue(nine.isArray() && nine.size() > 0, "ICD-9 catalog seeded at bootstrap");
+        assertTrue(ten.get(0).has("code") && ten.get(0).has("description"));
+        assertTrue(nine.get(0).has("code") && nine.get(0).has("description"));
+    }
+
+    @Test
     void unknownCaseIs404() throws Exception {
         mvc.perform(get("/api/cases/does-not-exist/medical-records")).andExpect(status().isNotFound());
         mvc.perform(get("/api/cases/does-not-exist/coding-status")).andExpect(status().isNotFound());
@@ -276,6 +286,7 @@ class ImedMockApiIntegrationTest {
                 "/api/cases/{tn}/orders/labs", "/api/cases/{tn}/vital-signs",
                 "/api/cases/{tn}/bed-management", "/api/cases/{tn}/billing-items",
                 "/api/cases/{tn}/coding-status",
+                "/api/icd10-codes", "/api/icd9-codes",
                 "/api/v1/diagnosis", "/api/v1/diagnosis/{visit_id}",
                 "/api/v1/diagnosis/{visit_id}/icd10/{diagnosis_icd10_id}",
                 "/api/v1/diagnosis/{visit_id}/icd9/{diagnosis_icd9_id}",
