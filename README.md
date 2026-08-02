@@ -7,8 +7,9 @@ extract data. Two audiences:
 1. **Hospital clients** — the READ endpoints are the integration spec for the
    extract data ("give us APIs like this"); the WRITE endpoints under
    `/api/v1` mock the hospital's OWN contract back at them — the "iMed
-   Diagnosis and Medical Discharge API" PDF (rev 1, 24 Jul 2026) — plus our
-   proposed coding-status extension.
+   Diagnosis and Medical Discharge API" PDF (rev 1, 24 Jul 2026). (The
+   invented coding-status extension was withdrawn 2026-08-02 — the mock now
+   mirrors the PDF exactly.)
 2. **medcode-api** — calls the `/api/v1` write endpoints on approve/reopen,
    exactly as it will call the hospital's real API later. Swapping this mock
    for the real thing is a base-URL + token change (`IMED_API_BASE` /
@@ -54,9 +55,10 @@ non-uniform in the source; parsing is the consumer's job).
 | `GET /api/cases/{tn}/vital-signs` | MedHack_VitalSign |
 | `GET /api/cases/{tn}/bed-management` | MedHack_BedManagement |
 | `GET /api/cases/{tn}/billing-items` | MedHack_BillingItem |
-| `GET /api/cases/{tn}/coding-status` | MedHack_CaseCodingStatus (what MedCode AI wrote back; 404 while uncoded) |
 | `GET /api/icd10-codes` | imed.icd_10 — ICD-10 reference catalog (code master, not per-case) |
 | `GET /api/icd9-codes` | imed.icd_9 — ICD-9 procedure reference catalog (not per-case) |
+| `POST /api/demo/snapshot` | mock-only demo tooling: freeze every imed.* table into the `imed_baseline` schema |
+| `POST /api/demo/reset` | mock-only demo tooling: truncate + restore every imed.* table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
 
 `{tn}` is the transaction number (visit number). Unknown `{tn}` → `404
 {"error":"not found"}`; a known case with no rows in a table → `[]`.
@@ -78,8 +80,6 @@ response instead of re-executing.
 | `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`; only provided fields change |
 | `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis — iMed's cancel flow: flagged `is_cancelled`, never hard-deleted, gone from reads. Idempotent |
 | `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |
-| `PUT /api/v1/coding-status/{visit_id}` | **Our proposed extension**: upsert the case's coding status (approve). Idempotent |
-| `DELETE /api/v1/coding-status/{visit_id}` | Clear it (reopen). Idempotent |
 
 Errors, verbatim from the PDF: `400 {"status":"STATUS_BUSINESS_ERROR",
 "message":"invalid_request","message_th":…}` (the mock adds a `detail` key as
@@ -189,8 +189,8 @@ Consequences, all of them ordinary once you know:
 (`@SpringBootTest` + MockMvc, no test containers, no mocks): read endpoints,
 Bearer auth (401s), the full `/api/v1/diagnosis` life cycle (POST → visible in
 reads → PUT edit → DELETE cancel → gone from reads, idempotent), the 409
-duplicate rule, `request_id` replay semantics, the coding-status round trip,
-and the published contract itself — that `/v3/api-docs` covers every endpoint
+duplicate rule, `request_id` replay semantics, the demo snapshot/reset round
+trip, and the published contract itself — that `/v3/api-docs` covers every endpoint
 with the PDF's exact field names, so the spec cannot silently drift from the
 code. The write tests self-reset via the cancel flow, so re-runs are stable.
 

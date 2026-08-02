@@ -34,7 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ImedMockApiIntegrationTest {
 
-    private static final String KNOWN_TN = "87026040104025824801";
+    // C1-pneumonia-cxr from demo-data/generate_demo_cases.py (has diagnoses,
+    // labs, vitals — the richest case in the curated 21-case demo dataset)
+    private static final String KNOWN_TN = "87026072413210500101";
     /** ApiV1AuthInterceptor's default when IMED_API_TOKEN is unset. */
     private static final String AUTH = "Bearer imed-mock-token";
 
@@ -85,10 +87,29 @@ class ImedMockApiIntegrationTest {
         assertTrue(nine.get(0).has("code") && nine.get(0).has("description"));
     }
 
+    // ---- demo baseline (mock-only tooling) ----------------------------------
+
+    @Test
+    void demoSnapshotAndResetRestoreHospitalState() throws Exception {
+        mvc.perform(post("/api/demo/snapshot")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true));
+        int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
+
+        // a write-back lands...
+        postDiagnosis(rid(), "Z00.0", "General medical examination", "89.7",
+                "General physical examination");
+        assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+
+        // ...and reset restores the snapshotted hospital state
+        mvc.perform(post("/api/demo/reset")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true));
+        assertEquals(diagsBefore, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+    }
+
     @Test
     void unknownCaseIs404() throws Exception {
         mvc.perform(get("/api/cases/does-not-exist/medical-records")).andExpect(status().isNotFound());
-        mvc.perform(get("/api/cases/does-not-exist/coding-status")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/cases/does-not-exist/diagnoses")).andExpect(status().isNotFound());
     }
 
     // ---- /api/v1 auth -------------------------------------------------------
@@ -98,7 +119,7 @@ class ImedMockApiIntegrationTest {
         mvc.perform(post("/api/v1/diagnosis").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("unauthorized"));
-        mvc.perform(put("/api/v1/coding-status/{v}", KNOWN_TN)
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN)
                 .header("Authorization", "Bearer wrong-token")
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
@@ -243,36 +264,6 @@ class ImedMockApiIntegrationTest {
         }
     }
 
-    // ---- /api/v1/coding-status ----------------------------------------------
-
-    @Test
-    void codingStatusRoundTrip() throws Exception {
-        // self-reset: DELETE is idempotent, so start from the uncoded state
-        mvc.perform(delete("/api/v1/coding-status/{v}", KNOWN_TN).header("Authorization", AUTH))
-                .andExpect(status().isOk());
-        mvc.perform(get("/api/cases/{tn}/coding-status", KNOWN_TN)).andExpect(status().isNotFound());
-
-        mvc.perform(put("/api/v1/coding-status/{v}", KNOWN_TN).header("Authorization", AUTH)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","coding_status":"approved",
-                         "finalized_at":"2026-07-24 12:00:00","updated_by":"web.coder"}"""
-                        .formatted(rid())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("STATUS_SUCCESS"))
-                .andExpect(jsonPath("$.result.coding_status").value("approved"));
-
-        mvc.perform(get("/api/cases/{tn}/coding-status", KNOWN_TN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.coding_status").value("approved"))
-                .andExpect(jsonPath("$.updated_by").value("web.coder"));
-
-        mvc.perform(delete("/api/v1/coding-status/{v}", KNOWN_TN).header("Authorization", AUTH))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.cleared").value(true));
-        mvc.perform(get("/api/cases/{tn}/coding-status", KNOWN_TN)).andExpect(status().isNotFound());
-    }
-
     // ---- published contract -------------------------------------------------
 
     /** The published contract: generated from the code, so it cannot drift. */
@@ -285,17 +276,20 @@ class ImedMockApiIntegrationTest {
                 "/api/cases/{tn}/procedures", "/api/cases/{tn}/orders/drugs",
                 "/api/cases/{tn}/orders/labs", "/api/cases/{tn}/vital-signs",
                 "/api/cases/{tn}/bed-management", "/api/cases/{tn}/billing-items",
-                "/api/cases/{tn}/coding-status",
                 "/api/icd10-codes", "/api/icd9-codes",
+                "/api/demo/snapshot", "/api/demo/reset",
                 "/api/v1/diagnosis", "/api/v1/diagnosis/{visit_id}",
                 "/api/v1/diagnosis/{visit_id}/icd10/{diagnosis_icd10_id}",
-                "/api/v1/diagnosis/{visit_id}/icd9/{diagnosis_icd9_id}",
-                "/api/v1/coding-status/{visit_id}"}) {
+                "/api/v1/diagnosis/{visit_id}/icd9/{diagnosis_icd9_id}"}) {
             assertTrue(paths.has(p), "OpenAPI document is missing " + p);
         }
-        // the old invented write-back is gone
+        // superseded/withdrawn surfaces must not be published
         assertTrue(paths.get("/api/cases/{tn}/coding-result") == null,
                 "superseded coding-result endpoint must not be published");
+        assertTrue(paths.get("/api/v1/coding-status/{visit_id}") == null,
+                "withdrawn coding-status extension must not be published");
+        assertTrue(paths.get("/api/cases/{tn}/coding-status") == null,
+                "withdrawn coding-status read must not be published");
         // the write body is a real schema with the hospital's exact field names
         assertEquals("#/components/schemas/DiagnosisRequest",
                 paths.get("/api/v1/diagnosis").get("post")

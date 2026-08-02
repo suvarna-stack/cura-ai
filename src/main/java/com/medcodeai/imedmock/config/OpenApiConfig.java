@@ -13,8 +13,8 @@ import org.springframework.context.annotation.Configuration;
  * generated from the running code rather than maintained by hand — the README
  * table can drift, /v3/api-docs.yaml cannot. Hand that YAML to the hospital's
  * integrators; it is the contract their production API must satisfy (for the
- * /api/v1 write surface it mirrors THEIR own PDF back at them, plus our
- * proposed coding-status extension).
+ * /api/v1 write surface it mirrors THEIR own PDF back at them exactly —
+ * the invented coding-status extension was withdrawn 2026-08-02).
  */
 @Configuration
 @SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer",
@@ -36,8 +36,6 @@ import org.springframework.context.annotation.Configuration;
         transaction (ids generated and returned), PUT edits by object_id, \
         DELETE cancels a single row via the cancel flow. Bearer auth, \
         request_id dedup, {request_id, status, result} envelopes, \
-        409 DIAGNOSIS_CODE_ALREADY_EXIST. PUT/DELETE \
-        /api/v1/coding-status/{visit_id} is OUR proposed extension, to be \
-        backed by a new hospital-side table."""))
+        409 DIAGNOSIS_CODE_ALREADY_EXIST."""))
 public class OpenApiConfig {
 }

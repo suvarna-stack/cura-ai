@@ -103,11 +103,4 @@ public class ImedReadRepository {
     public List<Map<String, Object>> icd9Catalog() {
         return jdbc.query("SELECT * FROM imed.icd_9 ORDER BY code", ROW);
     }
-
-    /** The A11 row MedCode AI wrote back, or null when the case is uncoded. */
-    public Map<String, Object> codingStatus(String tn) {
-        List<Map<String, Object>> r = jdbc.query(
-                "SELECT * FROM imed.medhack_casecodingstatus WHERE transactionnumber = ?", ROW, tn);
-        return r.isEmpty() ? null : r.get(0);
-    }
 }

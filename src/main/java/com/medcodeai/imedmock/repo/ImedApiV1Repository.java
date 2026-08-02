@@ -180,17 +180,4 @@ public class ImedApiV1Repository {
             String dischargeInstruction, String isFollowUp, String isFrom) {
     }
 
-    // ---- coding status (our proposed table, kept from the first mock) -------
-
-    public void upsertCodingStatus(String tn, String codingStatus, String finalizedAt, String updatedBy) {
-        jdbc.update("DELETE FROM imed.medhack_casecodingstatus WHERE transactionnumber = ?", tn);
-        jdbc.update("""
-                INSERT INTO imed.medhack_casecodingstatus
-                (transactionnumber, coding_status, audit_status, finalized_at, updated_by)
-                VALUES (?,?,?,?,?)""", tn, codingStatus, null, finalizedAt, updatedBy);
-    }
-
-    public void deleteCodingStatus(String tn) {
-        jdbc.update("DELETE FROM imed.medhack_casecodingstatus WHERE transactionnumber = ?", tn);
-    }
 }

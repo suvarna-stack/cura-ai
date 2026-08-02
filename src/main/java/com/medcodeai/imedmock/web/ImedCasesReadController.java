@@ -119,19 +119,6 @@ public class ImedCasesReadController {
         return repo.icd9Catalog();
     }
 
-    /** The coding/audit status MedCode AI wrote back; 404 while uncoded. */
-    @GetMapping("/api/cases/{tn}/coding-status")
-    @Operation(summary = "Coding status — MedHack_CaseCodingStatus",
-            description = "What MedCode AI wrote back; 404 while the case is uncoded")
-    public Map<String, Object> codingStatus(@PathVariable String tn) {
-        requireCase(tn);
-        Map<String, Object> row = repo.codingStatus(tn);
-        if (row == null) {
-            throw new ApiExceptionHandler.NotFoundException();
-        }
-        return row;
-    }
-
     private void requireCase(String tn) {
         if (!repo.caseExists(tn)) {
             throw new ApiExceptionHandler.NotFoundException();
