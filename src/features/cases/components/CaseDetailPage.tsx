@@ -317,6 +317,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
       previousState: { caseIds: [c.id] },
     });
     showToast(`Approved ${codes.length} code(s) for ${c.patient}`, logId);
+    onBack(); // the case leaves this list on approval — return to the dashboard
   };
 
   // real report content from the synced iMed data (feedback item 6), synced into the
@@ -499,9 +500,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
               <FileText size={15} style={{ color: gl.accent }} />
               <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
               <ReportViewToggle view={view} onChange={setView} />
-              {/* item 9: Edit Report removed — the record is read-only here */}
-              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
+              {/* item 9: Edit Report removed — the record is read-only here (badge removed 2026-08-02) */}
             </div>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
           </div>

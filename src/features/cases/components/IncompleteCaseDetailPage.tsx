@@ -315,6 +315,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       previousState: { caseIds: [c.id] },
     });
     showToast(`Approved ${n} code(s) for ${c.patient}`, logId);
+    onBack(); // the case leaves this list on approval — return to the dashboard
   };
 
   // real report + codes from the synced iMed data, synced into the editable state
@@ -521,8 +522,6 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             {/* item 9: Edit Report removed */}
             <div className="flex items-center gap-2">
               <ReportViewToggle view={view} onChange={setView} />
-              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
           </div>
           <div className="px-5 py-3 shrink-0" style={{ borderBottom: gl.borderSm }}>

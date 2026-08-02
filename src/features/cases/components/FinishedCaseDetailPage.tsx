@@ -269,8 +269,6 @@ export function FinishedCaseDetailPage({
               <FileText size={15} style={{ color: gl.accent }} />
               <h2 className="text-[17px] font-bold flex-1" style={{ color: gl.text }}>Discharge Report</h2>
               <ReportViewToggle view={view} onChange={setView} />
-              <span className="text-[12px] font-bold px-2 py-0.5 rounded-full ml-1"
-                style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent }}>Read-only</span>
             </div>
             <ReportHeader detail={detail} caseId={c.id} dept={c.dept} />
             {/* item 16: everyone who worked this case, latest (= responsible) last */}

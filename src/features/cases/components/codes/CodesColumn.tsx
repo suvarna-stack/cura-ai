@@ -197,12 +197,8 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           {!entry.missing && (
             <span className="text-[12px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
           )}
-          {entry.manual && (
-            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded-full"
-              style={{ background: `rgba(${gl.accentRgb},0.08)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
-              {t("code.manualBadge")}
-            </span>
-          )}
+          {/* no per-card "Manually Added" badge — the group header (always shown
+              when manual codes exist) plus the stronger card tint carry origin */}
           {/* the hospital's operation type ("OR Procedure" …) as a chip, like
               the Type column on its own coder UI's operation grid */}
           {system === "icd9" && entry.operation_type && (
