@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BrainCircuit,
   CloudUpload,
+  FileSpreadsheet,
   FileText,
+  Pencil,
   Trash2,
   Play,
   Database,
@@ -17,12 +19,13 @@ import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
-import { ConfirmModal } from '../../../components/ui/Modal'
+import { ConfirmModal, Modal } from '../../../components/ui/Modal'
 import {
   apiErrorMessage,
   fetchKnowledgeDocs,
   fetchKnowledgeStats,
   removeKnowledgeDoc,
+  renameKnowledgeDoc,
   startTrainingRun,
   syncCodesToSystem,
   testChat,
@@ -94,6 +97,71 @@ function StatusPill({ doc }: { doc: KbDoc }) {
   )
 }
 
+function RenameDocModal({
+  doc,
+  onRenamed,
+  onClose,
+}: {
+  doc: KbDoc
+  onRenamed: () => Promise<unknown> | void
+  onClose: () => void
+}) {
+  const [name, setName] = useState(doc.name)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const canSave = name.trim() !== '' && name.trim() !== doc.name && !saving
+
+  const save = () => {
+    if (!canSave) return
+    setSaving(true)
+    setError(null)
+    void (async () => {
+      try {
+        await renameKnowledgeDoc(doc.id, name.trim())
+        await onRenamed()
+        onClose()
+      } catch (err) {
+        setError(apiErrorMessage(err, 'Could not rename the document.'))
+        setSaving(false)
+      }
+    })()
+  }
+
+  return (
+    <Modal title="Rename document" onClose={onClose}>
+      <div className="space-y-4">
+        <Input
+          label="File name"
+          value={name}
+          autoFocus
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+          }}
+        />
+        <p className="text-[11px] text-muted">
+          Display name only — the indexed chunks are untouched. The file
+          extension is kept automatically.
+        </p>
+        {error && (
+          <p className="flex items-start gap-1.5 text-[11px] font-semibold text-error">
+            <AlertTriangle size={12} className="mt-[1px] shrink-0" />
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={!canSave} onClick={save}>
+            {saving ? 'Renaming…' : 'Rename'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export function TrainingPage() {
   const [docs, setDocs] = useState<KbDoc[]>([])
   const [stats, setStats] = useState<KnowledgeStats | null>(null)
@@ -104,6 +172,7 @@ export function TrainingPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<KbDoc | null>(null)
+  const [renaming, setRenaming] = useState<KbDoc | null>(null)
 
   const [training, setTraining] = useState(false)
   const [log, setLog] = useState<string[]>([])
@@ -225,12 +294,20 @@ export function TrainingPage() {
   const addFiles = (files: FileList | null) => {
     if (!files?.length || uploading) return
     const fileList = Array.from(files)
-    const nonPdf = fileList.find(
-      (f) =>
-        f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf'),
-    )
-    if (nonPdf) {
-      setUploadError(`"${nonPdf.name}" is not a PDF — only PDFs are accepted.`)
+    const isAccepted = (f: File) => {
+      const name = f.name.toLowerCase()
+      return (
+        f.type === 'application/pdf' ||
+        f.type === 'text/csv' ||
+        name.endsWith('.pdf') ||
+        name.endsWith('.csv')
+      )
+    }
+    const rejected = fileList.find((f) => !isAccepted(f))
+    if (rejected) {
+      setUploadError(
+        `"${rejected.name}" is not a PDF or CSV — only PDF and CSV files are accepted.`,
+      )
       return
     }
     setUploadError(null)
@@ -409,15 +486,16 @@ export function TrainingPage() {
             <p className="text-[13px] font-semibold text-text">
               {uploading
                 ? 'Uploading…'
-                : 'Drop PDFs here, or click to browse'}
+                : 'Drop PDFs or CSVs here, or click to browse'}
             </p>
             <p className="mt-1 text-[11px] text-muted">
-              Coding guidelines, grouper handbooks, hospital SOPs — PDF only
+              Coding guidelines, grouper handbooks, hospital SOPs, code lists —
+              PDF or CSV
             </p>
             <input
               ref={fileInput}
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,text/csv,.csv"
               multiple
               className="hidden"
               onChange={(e) => {
@@ -467,10 +545,17 @@ export function TrainingPage() {
                   >
                     <td className="px-2 py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
-                        <FileText
-                          size={13}
-                          className="shrink-0 text-muted"
-                        />
+                        {d.name.toLowerCase().endsWith('.csv') ? (
+                          <FileSpreadsheet
+                            size={13}
+                            className="shrink-0 text-muted"
+                          />
+                        ) : (
+                          <FileText
+                            size={13}
+                            className="shrink-0 text-muted"
+                          />
+                        )}
                         <div className="min-w-0">
                           <p
                             className="max-w-[19rem] truncate text-[13px] font-semibold text-text"
@@ -497,14 +582,24 @@ export function TrainingPage() {
                       <StatusPill doc={d} />
                     </td>
                     <td className="px-2 py-2.5">
-                      <button
-                        type="button"
-                        title="Remove from knowledge base"
-                        onClick={() => setDeleting(d)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          title="Rename document"
+                          onClick={() => setRenaming(d)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Remove from knowledge base"
+                          onClick={() => setDeleting(d)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -754,6 +849,14 @@ export function TrainingPage() {
             })()
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+
+      {renaming && (
+        <RenameDocModal
+          doc={renaming}
+          onRenamed={refresh}
+          onClose={() => setRenaming(null)}
         />
       )}
     </>

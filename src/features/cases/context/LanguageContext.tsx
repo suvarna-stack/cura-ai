@@ -196,6 +196,28 @@ export const dict: Record<string, { en: string; th: string }> = {
   "settings.languageSub":   { en: "Interface language", th: "ภาษาของหน้าจอ" },
   "settings.account":       { en: "Account", th: "บัญชีผู้ใช้" },
   "settings.accountSub":    { en: "Your profile information", th: "ข้อมูลโปรไฟล์ของคุณ" },
+  // AI agent page
+  "agent.subtitle.learn": { en: "Suggest & Learn · grounded in your coding references", th: "แนะนำรหัส · อ้างอิงจากคลังความรู้การให้รหัสของคุณ" },
+  "agent.subtitle.dict":  { en: "Code Dictionary · ICD reference", th: "พจนานุกรมรหัส · อ้างอิง ICD" },
+  "agent.tab.learn":      { en: "🧠 Suggest & Learn", th: "🧠 แนะนำรหัส" },
+  "agent.tab.dict":       { en: "📖 Code Dictionary", th: "📖 พจนานุกรมรหัส" },
+  "agent.hint.learn":     { en: "Describe a patient's condition and the agent suggests codes grounded in your uploaded coding references.", th: "อธิบายอาการของผู้ป่วย แล้ว AI จะแนะนำรหัสโดยอ้างอิงจากเอกสารการให้รหัสที่อัปโหลดไว้" },
+  "agent.hint.dict":      { en: "Look up definitions, check code correctness, and validate primary/comorbidity sequences.", th: "ค้นหาความหมาย ตรวจสอบความถูกต้องของรหัส และตรวจสอบลำดับรหัสหลัก/โรคร่วม" },
+  "agent.welcome.learn":  { en: "Hi! I answer from your hospital's coding references (in English or Thai). Describe the patient's condition and I'll suggest codes.", th: "สวัสดีค่ะ! ฉันตอบจากเอกสารอ้างอิงการให้รหัสของโรงพยาบาล (ภาษาไทยหรืออังกฤษก็ได้) อธิบายอาการของผู้ป่วยแล้วฉันจะแนะนำรหัสให้" },
+  "agent.welcome.dict":   { en: "Ask me anything about ICD codes — I can check correctness, explain definitions, and validate code sequences.", th: "ถามอะไรก็ได้เกี่ยวกับรหัส ICD — ฉันตรวจสอบความถูกต้อง อธิบายความหมาย และตรวจสอบลำดับรหัสได้" },
+  "agent.placeholder.learn": { en: "Describe the patient's condition for code suggestions…", th: "อธิบายอาการของผู้ป่วยเพื่อรับคำแนะนำรหัส…" },
+  "agent.placeholder.dict":  { en: "Ask about an ICD code, definition, or sequence…", th: "ถามเกี่ยวกับรหัส ICD ความหมาย หรือลำดับรหัส…" },
+  "agent.thinking":       { en: "Thinking — the local model can take a minute…", th: "กำลังคิด — โมเดลในเครื่องอาจใช้เวลาสักครู่…" },
+  "agent.error":          { en: "Sorry — the agent is unavailable right now.", th: "ขออภัย — ขณะนี้ AI ผู้ช่วยไม่พร้อมใช้งาน" },
+  "agent.sources":        { en: "Sources", th: "แหล่งอ้างอิง" },
+  "agent.enter":          { en: "to send", th: "เพื่อส่ง" },
+  "agent.shiftEnter":     { en: "for new line", th: "ขึ้นบรรทัดใหม่" },
+  "agent.chip.learn.0":   { en: "Patient has chest pain and ST elevation on ECG. What ICD codes apply?", th: "ผู้ป่วยเจ็บหน้าอกและพบ ST elevation ใน ECG ควรใช้รหัส ICD อะไร?" },
+  "agent.chip.learn.1":   { en: "Diabetic patient with acute kidney injury. Suggest primary and comorbidity codes.", th: "ผู้ป่วยเบาหวานมีไตวายเฉียบพลัน แนะนำรหัสหลักและโรคร่วม" },
+  "agent.chip.learn.2":   { en: "Post-op fever after appendectomy. Chief complaint: abdominal pain.", th: "มีไข้หลังผ่าตัดไส้ติ่ง อาการสำคัญ: ปวดท้อง" },
+  "agent.chip.dict.0":    { en: "What does code A09 cover?", th: "รหัส A09 ครอบคลุมอะไรบ้าง?" },
+  "agent.chip.dict.1":    { en: "What's the difference between principal diagnosis and comorbidity?", th: "การวินิจฉัยหลักกับโรคร่วมต่างกันอย่างไร?" },
+  "agent.chip.dict.2":    { en: "When should an external cause code be added?", th: "ควรเพิ่มรหัสสาเหตุภายนอกเมื่อใด?" },
 };
 
 type LanguageCtxValue = {

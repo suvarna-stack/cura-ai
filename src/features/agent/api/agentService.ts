@@ -1,46 +1,60 @@
-import type {
-  AgentSeedExample,
-  ChatMode,
-} from '../types/agent.types'
-import {
-  CHIPS,
-  MOCK_SEED_EXAMPLE,
-  REPLIES,
-} from '../types/agent.types'
+import { apiClient } from '../../../lib/axios'
+import type { AgentChatTurn } from '../types/agent.types'
 
 /**
- * Toggle mock responses until the real agent API is ready.
+ * The coder AI Agent — POST /api/agent/chat (any authenticated role).
+ * A RAG-grounded local LLM: answers cite the uploaded coding references and
+ * follow the question's language (English or Thai). The server is stateless;
+ * we re-send the visible conversation as `history` on every call.
+ *
+ * Latency: the model runs on CPU — answers take tens of seconds, and the
+ * very first question after a server restart can take minutes while the
+ * model loads. No timeout here on purpose; the page shows a thinking state.
  */
-const USE_MOCK = true
 
-/**
- * Placeholder agent API — wire to shared apiClient when ready.
- */
-export async function fetchAgentSeedExample(): Promise<AgentSeedExample | null> {
-  if (USE_MOCK) {
-    return { ...MOCK_SEED_EXAMPLE }
-  }
-  // TODO: const { data } = await apiClient.get<AgentSeedExample>('/agent/seed')
-  return null
+interface AgentChatResponse {
+  question: string
+  answer: string
+  mode: string
+  contexts: {
+    text: string
+    source: string
+    score: number
+    via: string
+    metadata: Record<string, unknown>
+  }[]
+}
+
+export interface AgentReply {
+  answer: string
+  /** deduplicated "source p.N" labels, best hits first */
+  sources: string[]
 }
 
 export async function sendAgentMessage(
-  mode: ChatMode,
-  text: string,
-  replyIdx: number,
-): Promise<{ reply: string; nextReplyIdx: number }> {
-  if (USE_MOCK) {
-    const chipIdx = CHIPS[mode].indexOf(text)
-    const reply =
-      REPLIES[mode][chipIdx >= 0 ? chipIdx : replyIdx % REPLIES[mode].length]
-    return {
-      reply,
-      nextReplyIdx: chipIdx < 0 ? replyIdx + 1 : replyIdx,
-    }
+  question: string,
+  history: AgentChatTurn[],
+): Promise<AgentReply> {
+  const { data } = await apiClient.post<AgentChatResponse>('/agent/chat', {
+    question,
+    history,
+  })
+  const sources: string[] = []
+  for (const c of data.contexts) {
+    const page = c.metadata?.page
+    const label =
+      typeof page === 'number' ? `${c.source} p.${page}` : c.source
+    if (!sources.includes(label)) sources.push(label)
   }
-  // TODO: const { data } = await apiClient.post('/agent/chat', { mode, text })
-  void mode
-  void text
-  void replyIdx
-  throw new Error('sendAgentMessage is not implemented')
+  return { answer: data.answer, sources }
+}
+
+/** Human-readable message from an Axios error (the API's {"error": ...}). */
+export function agentErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === 'object' && err !== null && 'response' in err) {
+    const data = (err as { response?: { data?: { error?: string } } }).response
+      ?.data
+    if (data?.error) return data.error
+  }
+  return fallback
 }

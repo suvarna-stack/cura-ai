@@ -100,7 +100,7 @@ export async function fetchKnowledgeStats(): Promise<KnowledgeStats> {
   }
 }
 
-/** Upload PDFs one by one; the RAG service ingests each in the background. */
+/** Upload files (PDF/CSV) one by one; the RAG service ingests each in the background. */
 export async function uploadKnowledgeDocs(files: File[]): Promise<void> {
   for (const file of files) {
     const form = new FormData()
@@ -111,6 +111,19 @@ export async function uploadKnowledgeDocs(files: File[]): Promise<void> {
 
 export async function removeKnowledgeDoc(id: string): Promise<void> {
   await apiClient.delete(`/admin/knowledge/docs/${encodeURIComponent(id)}`)
+}
+
+/** Rename a document's display filename; the index is untouched (no re-embed).
+ *  The RAG side preserves the file extension, appending it when missing. */
+export async function renameKnowledgeDoc(
+  id: string,
+  filename: string,
+): Promise<KbDoc> {
+  const { data } = await apiClient.patch<RagDocument>(
+    `/admin/knowledge/docs/${encodeURIComponent(id)}`,
+    { filename },
+  )
+  return toKbDoc(data)
 }
 
 /** Kick off a full index rebuild; poll fetchKnowledgeDocs() for progress. */

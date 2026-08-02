@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Bot, User, Send, Sparkles, BookOpen, Brain } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
-import {
-  fetchAgentSeedExample,
-  sendAgentMessage,
-} from '../api/agentService'
+import { useLang } from '../../cases/context/LanguageContext'
+import { agentErrorMessage, sendAgentMessage } from '../api/agentService'
 import type {
+  AgentChatTurn,
   AgentMessage,
-  AgentSeedExample,
   ChatMode,
 } from '../types/agent.types'
-import { CHIPS, WELCOME } from '../types/agent.types'
+import { CHIP_KEYS } from '../types/agent.types'
 
 let uid = 1
 const now = () =>
@@ -18,8 +16,8 @@ const now = () =>
 const msg = (
   role: AgentMessage['role'],
   text: string,
-  learned = false,
-): AgentMessage => ({ id: uid++, role, text, learned, time: now() })
+  sources?: string[],
+): AgentMessage => ({ id: uid++, role, text, sources, time: now() })
 
 function RichText({ text }: { text: string }) {
   const parts = text.split(/\*\*(.+?)\*\*/g)
@@ -38,86 +36,63 @@ function RichText({ text }: { text: string }) {
 
 export function AgentPage() {
   const { gl } = useTheme()
+  const { t } = useLang()
   const [mode, setMode] = useState<ChatMode>('learn')
   const [convo, setConvo] = useState<AgentMessage[]>([])
   const [input, setInput] = useState('')
-  const [replyIdx, setReplyIdx] = useState(0)
-  const [seed, setSeed] = useState<AgentSeedExample | null>(null)
+  const [pending, setPending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    void fetchAgentSeedExample()
-      .then((s) => {
-        if (!cancelled) setSeed(s)
-      })
-      .catch(() => {
-        if (!cancelled) setSeed(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const headerMsgs = useMemo<AgentMessage[]>(() => {
-    const msgs: AgentMessage[] = [
-      { id: -1, role: 'agent', text: WELCOME[mode], time: '' },
-    ]
-    if (seed) {
-      msgs.push({
-        id: -2,
-        role: 'agent',
-        time: '',
-        text: `For example, a recent case: **CC:** ${seed.cc} | **PI:** ${seed.pi} — was coded as **${seed.code}** (${seed.role.replace(/_/g, ' ')}). Would you like to discuss this coding decision?`,
-      })
-    }
-    return msgs
-  }, [mode, seed])
+  const headerMsgs = useMemo<AgentMessage[]>(
+    () => [{ id: -1, role: 'agent', text: t(`agent.welcome.${mode}`), time: '' }],
+    [mode, t],
+  )
 
   const messages = [...headerMsgs, ...convo]
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [convo.length, mode])
+  }, [convo.length, pending, mode])
 
   function switchMode(next: ChatMode) {
-    if (next === mode) return
+    if (next === mode || pending) return
     setMode(next)
     setConvo([])
-    setReplyIdx(0)
   }
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
-    if (!text) return
+    if (!text || pending) return
+    // The visible conversation IS the history — map to API roles.
+    const history: AgentChatTurn[] = convo.map((m) => ({
+      role: m.role === 'coder' ? 'user' : 'assistant',
+      content: m.text,
+    }))
     setInput('')
+    setPending(true)
     setConvo((prev) => [...prev, msg('coder', text)])
     try {
-      const { reply, nextReplyIdx } = await sendAgentMessage(
-        mode,
-        text,
-        replyIdx,
-      )
-      setReplyIdx(nextReplyIdx)
+      const { answer, sources } = await sendAgentMessage(text, history)
+      setConvo((prev) => [...prev, msg('agent', answer, sources)])
+    } catch (err) {
       setConvo((prev) => [
         ...prev,
-        msg('agent', reply, mode === 'learn'),
+        msg('agent', agentErrorMessage(err, t('agent.error'))),
       ])
-    } catch {
-      setConvo((prev) => [
-        ...prev,
-        msg('agent', 'Sorry — the agent is unavailable right now.'),
-      ])
+    } finally {
+      setPending(false)
     }
   }
 
   const modeTabs: { id: ChatMode; label: string; icon: typeof Brain }[] = [
-    { id: 'learn', label: '🧠 Suggest & Learn', icon: Brain },
-    { id: 'dict', label: '📖 Code Dictionary', icon: BookOpen },
+    { id: 'learn', label: t('agent.tab.learn'), icon: Brain },
+    { id: 'dict', label: t('agent.tab.dict'), icon: BookOpen },
   ]
 
   return (
-    <main className="flex flex-1 flex-col overflow-hidden">
+    // The shell locks itself to the viewport on this route (CasesLayout), so
+    // the messages list below is the only thing that scrolls.
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header
         className="flex shrink-0 items-center gap-3 px-6 py-4"
         style={{
@@ -153,9 +128,7 @@ export function AgentPage() {
               style={{ background: gl.success }}
             />
             <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
-              {mode === 'learn'
-                ? 'Suggest & Learn · trained on approved cases'
-                : 'Code Dictionary · ICD-9 reference'}
+              {t(`agent.subtitle.${mode}`)}
             </p>
           </div>
         </div>
@@ -191,7 +164,7 @@ export function AgentPage() {
       </div>
 
       <div
-        className="flex-1 space-y-5 overflow-y-auto px-6 py-6"
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6"
         style={{ scrollbarWidth: 'none' } as CSSProperties}
       >
         <div
@@ -208,9 +181,7 @@ export function AgentPage() {
             style={{ color: gl.accent }}
           />
           <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
-            {mode === 'learn'
-              ? "Describe a patient's condition and the agent suggests ICD-9 codes learned from your hospital's approved cases."
-              : 'Look up definitions, check code correctness, and validate primary/comorbidity sequences.'}
+            {t(`agent.hint.${mode}`)}
           </p>
         </div>
 
@@ -247,7 +218,7 @@ export function AgentPage() {
                 className={`flex max-w-[68%] flex-col gap-1.5 ${isAgent ? '' : 'items-end'}`}
               >
                 <div
-                  className="px-4 py-3 text-[13px] leading-relaxed"
+                  className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap"
                   style={
                     isAgent
                       ? {
@@ -270,16 +241,13 @@ export function AgentPage() {
                   <RichText text={m.text} />
                 </div>
 
-                {m.learned && (
+                {m.sources && m.sources.length > 0 && (
                   <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-                    style={{
-                      color: gl.accent,
-                      border: `1px solid rgba(${gl.accentRgb},0.35)`,
-                      background: `rgba(${gl.accentRgb},0.06)`,
-                    }}
+                    className="max-w-full truncate px-1 text-[10px] font-medium"
+                    style={{ color: gl.muted }}
+                    title={m.sources.join(' · ')}
                   >
-                    📚 AI learned this case
+                    {t('agent.sources')}: {m.sources.join(' · ')}
                   </span>
                 )}
 
@@ -295,29 +263,84 @@ export function AgentPage() {
             </div>
           )
         })}
+
+        {pending && (
+          <div className="flex gap-3">
+            <div
+              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+              style={{
+                background: gl.card,
+                backdropFilter: gl.blur16,
+                border: gl.border,
+              }}
+            >
+              <Bot size={14} style={{ color: gl.accent }} />
+            </div>
+            <div
+              className="flex items-center gap-2 px-4 py-3 text-[12px]"
+              style={{
+                background: gl.card,
+                backdropFilter: gl.blur20,
+                border: gl.border,
+                borderRadius: '4px 18px 18px 18px',
+                color: gl.muted,
+                boxShadow: gl.shadowSm,
+              }}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="flex gap-1" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-1.5 w-1.5 animate-bounce rounded-full"
+                    style={{
+                      background: gl.accent,
+                      animationDelay: `${i * 0.18}s`,
+                    }}
+                  />
+                ))}
+              </span>
+              {t('agent.thinking')}
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
       <div
-        className="flex shrink-0 gap-2 overflow-x-auto px-6 pb-2"
+        className="shrink-0"
+        style={{
+          background: gl.headerBg,
+          backdropFilter: gl.blur20,
+          WebkitBackdropFilter: gl.blur20,
+          borderTop: gl.borderSm,
+        }}
+      >
+      <div
+        className="flex shrink-0 gap-2 overflow-x-auto px-6 pt-3 pb-2"
         style={{ scrollbarWidth: 'none' } as CSSProperties}
       >
-        {CHIPS[mode].map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => void send(p)}
-            className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all hover:opacity-80"
-            style={{
-              background: gl.row,
-              backdropFilter: gl.blur16,
-              border: gl.borderSm,
-              color: gl.muted,
-            }}
-          >
-            {p.length > 64 ? p.slice(0, 61) + '…' : p}
-          </button>
-        ))}
+        {CHIP_KEYS[mode].map((key) => {
+          const p = t(key)
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={pending}
+              onClick={() => void send(p)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all hover:opacity-80 disabled:opacity-50"
+              style={{
+                background: gl.row,
+                backdropFilter: gl.blur16,
+                border: gl.borderSm,
+                color: gl.muted,
+              }}
+            >
+              {p.length > 64 ? p.slice(0, 61) + '…' : p}
+            </button>
+          )
+        })}
       </div>
 
       <div className="shrink-0 px-6 pt-2 pb-6">
@@ -348,11 +371,7 @@ export function AgentPage() {
                 void send()
               }
             }}
-            placeholder={
-              mode === 'learn'
-                ? "Describe the patient's condition for ICD-9 suggestions…"
-                : 'Ask about an ICD-9 code, definition, or sequence…'
-            }
+            placeholder={t(`agent.placeholder.${mode}`)}
             rows={2}
             className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none"
             style={{ color: gl.text }}
@@ -360,10 +379,10 @@ export function AgentPage() {
           <button
             type="button"
             onClick={() => void send()}
-            disabled={!input.trim()}
+            disabled={!input.trim() || pending}
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
             style={
-              input.trim()
+              input.trim() && !pending
                 ? {
                     background: gl.accentGrad,
                     color: gl.isDark ? '#1a0a00' : '#fff',
@@ -394,7 +413,7 @@ export function AgentPage() {
           >
             Enter
           </kbd>{' '}
-          to send {' · '}
+          {t('agent.enter')} {' · '}
           <kbd
             className="rounded-md px-1.5 py-0.5 text-[10px]"
             style={{
@@ -405,8 +424,9 @@ export function AgentPage() {
           >
             Shift + Enter
           </kbd>{' '}
-          for new line
+          {t('agent.shiftEnter')}
         </p>
+      </div>
       </div>
     </main>
   )

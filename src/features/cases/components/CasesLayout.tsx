@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   BarChart2,
@@ -27,13 +27,23 @@ function CoderShell() {
   const { syncing, lastSync, runSync } = useSync()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { pathname } = useLocation()
+  // The agent page is a chat: lock the shell to the viewport so only its
+  // message list scrolls. Every other page keeps normal document scrolling.
+  const chatShell = pathname.startsWith('/agent')
 
   const handleLogout = () => {
     void logout().finally(() => navigate('/login', { replace: true }))
   }
 
   return (
-    <>
+    <div
+      className={
+        chatShell
+          ? 'flex h-dvh flex-col overflow-hidden'
+          : 'flex min-h-dvh flex-col'
+      }
+    >
       <header
         className="sticky top-0 z-20 flex shrink-0 items-center gap-1 px-5 py-2.5"
         style={{
@@ -117,7 +127,7 @@ function CoderShell() {
       <div className="flex min-h-0 flex-1">
         <Outlet />
       </div>
-    </>
+    </div>
   )
 }
 
