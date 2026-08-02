@@ -333,6 +333,9 @@ export interface SyncResponse {
     chunks: number;
     vitals: number;
     coverageTypes: number;
+    /** ICD catalog rows pulled from the hospital's code master (inserted +
+     *  blank descriptions filled; existing descriptions never overwritten) */
+    catalogCodes: number;
   };
 }
 

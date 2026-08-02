@@ -291,8 +291,14 @@ it briefly blocks approve/reopen. Response:
   "skippedApproved": ["<case_id>", …],   // finalized, left untouched
   "failed": [ { "caseId": "<case_id>", "error": "<message>" }, … ],
   "stats": { "cases": 0, "sections": 0, "codes": 0, "orders": 0,
-             "chunks": 0, "vitals": 0, "coverageTypes": 0 } }
+             "chunks": 0, "vitals": 0, "coverageTypes": 0, "catalogCodes": 0 } }
 ```
+
+Before the per-case loop, sync also mirrors the hospital's ICD reference
+catalogs (`GET /api/icd10-codes` / `GET /api/icd9-codes` on the iMed API) into
+this database's `icd_10`/`icd_9` tables — insert new codes, fill blank
+descriptions, never overwrite an existing description. `stats.catalogCodes`
+counts the rows that changed.
 
 Note: the hospital's list endpoint has no "changed since" filter, so the fetch
 pulls the full list; only the writes are selective. `document_chunks` is

@@ -2,6 +2,7 @@ package com.medcodeai.api.service;
 
 import com.medcodeai.api.client.ImedApiClient;
 import com.medcodeai.api.repo.CodingRepository;
+import com.medcodeai.api.repo.IcdCatalogRepository;
 import com.medcodeai.api.repo.SyncRepository;
 import com.medcodeai.api.web.ApiExceptionHandler;
 import org.springframework.stereotype.Service;
@@ -45,16 +46,19 @@ public class SyncService {
     private final ImedApiClient imed;
     private final SyncRepository sync;
     private final CodingRepository coding;
+    private final IcdCatalogRepository catalog;
     private final WriteGate writeGate;
     private final CasesCache cache;
     private final TransactionTemplate tx;
     private final JsonMapper json = new JsonMapper();
 
     public SyncService(ImedApiClient imed, SyncRepository sync, CodingRepository coding,
-                       WriteGate writeGate, CasesCache cache, PlatformTransactionManager txManager) {
+                       IcdCatalogRepository catalog, WriteGate writeGate, CasesCache cache,
+                       PlatformTransactionManager txManager) {
         this.imed = imed;
         this.sync = sync;
         this.coding = coding;
+        this.catalog = catalog;
         this.writeGate = writeGate;
         this.cache = cache;
         this.tx = new TransactionTemplate(txManager);
@@ -92,6 +96,15 @@ public class SyncService {
             // REF (doc B4): coverage reference from the hospital's own codes, first
             tx.execute(s -> {
                 loadCoverageTypes(patients, stats);
+                return null;
+            });
+
+            // REF: the hospital's ICD code master → our icd_10/icd_9 catalogs,
+            // before the per-case loop so imported codes land on catalog rows
+            List<Map<String, Object>> icd10 = imed.icd10Codes();   // hospital reads, outside the tx
+            List<Map<String, Object>> icd9 = imed.icd9Codes();
+            tx.execute(s -> {
+                loadIcdCatalogs(icd10, icd9, stats);
                 return null;
             });
 
@@ -314,6 +327,46 @@ public class SyncService {
         bump(stats, "orders");
     }
 
+    /**
+     * The hospital's ICD reference catalogs → our icd_10/icd_9. Same
+     * non-destructive posture as the knowledge-document code sync: insert new
+     * codes, fill blank descriptions, NEVER overwrite an existing description
+     * (typically better free text from real case data or the coder).
+     */
+    private void loadIcdCatalogs(List<Map<String, Object>> icd10, List<Map<String, Object>> icd9,
+                                 Map<String, Integer> stats) {
+        Map<String, String> existing = catalog.existingDescriptions();
+        List<Object[]> toInsert = new ArrayList<>();
+        List<Object[]> toFill = new ArrayList<>();
+        collectCatalogRows(icd10, "ICD-10", existing, toInsert, toFill);
+        collectCatalogRows(icd9, "ICD-9", existing, toInsert, toFill);
+        if (!toInsert.isEmpty()) {
+            catalog.insertCodes(toInsert);
+        }
+        if (!toFill.isEmpty()) {
+            catalog.fillDescriptions(toFill);
+        }
+        stats.put("catalogCodes", toInsert.size() + toFill.size());
+    }
+
+    private static void collectCatalogRows(List<Map<String, Object>> rows, String system,
+                                           Map<String, String> existing,
+                                           List<Object[]> toInsert, List<Object[]> toFill) {
+        for (Map<String, Object> r : rows) {
+            String code = trimOrNull(str(r.get("code")));
+            if (code == null) {
+                continue;
+            }
+            String description = trimOrNull(str(r.get("description")));
+            String current = existing.get(code + "|" + system);
+            if (current == null) {
+                toInsert.add(new Object[]{code, system, description});
+            } else if (current.isBlank() && description != null) {
+                toFill.add(new Object[]{description, code, system});
+            }
+        }
+    }
+
     // sync.py:111 load_coverage_types() — distinct hospital coverage codes → reference rows
     private void loadCoverageTypes(List<Map<String, Object>> patients, Map<String, Integer> stats) {
         Set<String> seen = new HashSet<>();
@@ -331,7 +384,8 @@ public class SyncService {
 
     private static Map<String, Integer> newStats() {
         Map<String, Integer> s = new LinkedHashMap<>();
-        for (String k : List.of("cases", "sections", "codes", "orders", "chunks", "vitals", "coverageTypes")) {
+        for (String k : List.of("cases", "sections", "codes", "orders", "chunks", "vitals",
+                "coverageTypes", "catalogCodes")) {
             s.put(k, 0);
         }
         return s;

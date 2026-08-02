@@ -160,6 +160,16 @@ public class ImedApiClient {
         return getRows("/api/cases/{tn}/billing-items", tn);
     }
 
+    // ---- reference catalogs — the hospital's ICD code master tables ----
+
+    public List<Map<String, Object>> icd10Codes() {
+        return getRows("/api/icd10-codes");
+    }
+
+    public List<Map<String, Object>> icd9Codes() {
+        return getRows("/api/icd9-codes");
+    }
+
     /** GET a row-list endpoint; a null body degrades to an empty list. */
     private List<Map<String, Object>> getRows(String uri, Object... uriVars) {
         try {
