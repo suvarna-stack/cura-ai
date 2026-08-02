@@ -60,7 +60,8 @@ class OpenApiDocsTest {
             "/api/admin/knowledge/train",
             "/api/admin/knowledge/sync-codes",
             "/api/admin/knowledge/retrieve",
-            "/api/admin/knowledge/chat");
+            "/api/admin/knowledge/chat",
+            "/api/agent/chat");
 
     @Autowired
     private MockMvc mvc;

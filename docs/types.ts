@@ -489,3 +489,46 @@ export interface DashboardStats {
   totalCases: number;
   systemStatus: "operational";
 }
+
+// ---------- AI agent chat ----------
+//
+// POST /api/agent/chat — the coder app's AI Agent page. Any valid token
+// (either role). A thin proxy to the RAG service's /chat: retrieval-grounded
+// answer from the local LLM, citing sources; the answer follows the
+// question's language (English or Thai). The conversation lives in the
+// browser — send prior turns back as `history` on every call; the server is
+// stateless. Slow on CPU: expect tens of seconds per answer, and minutes on
+// the very first call while the model loads. Response passes through from
+// the RAG service verbatim (snake_case).
+
+export interface AgentChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** POST /api/agent/chat — request. */
+export interface AgentChatRequest {
+  question: string;
+  /** prior turns, oldest first; server keeps the most recent 40 */
+  history?: AgentChatTurn[];
+  /** 16–512; default 256 (kept low for interactive latency) */
+  max_new_tokens?: number;
+}
+
+/** POST /api/agent/chat — response (RAG pass-through, snake_case). */
+export interface AgentChatResponse {
+  question: string;
+  answer: string;
+  /** retrieval strategy used: "graph" | "plain" */
+  mode: string;
+  /** the chunks the answer was grounded in */
+  contexts: {
+    text: string;
+    /** document source id (e.g. "icd9") */
+    source: string;
+    score: number;
+    /** why this chunk was retrieved (graph explanation or "vector match") */
+    via: string;
+    metadata: Record<string, unknown>;
+  }[];
+}

@@ -27,8 +27,11 @@ import java.util.Map;
  * accepted with 202 and processed in the background; progress is polled via
  * documents().
  *
- * The read timeout is generous because /chat runs a local LLM on CPU and
- * ingestion endpoints may block on model loading the first time.
+ * The read timeout is generous because /chat runs a local LLM on CPU (a 3B
+ * model generates ~2-4 tok/s) and ingestion endpoints may block on model
+ * loading the first time. A first-ever /chat additionally downloads the model
+ * weights — if that outruns even this timeout, the download continues
+ * server-side and a retry succeeds.
  */
 @Component
 public class RagApiClient {
@@ -53,7 +56,7 @@ public class RagApiClient {
                 HttpClient.newBuilder()
                         .version(HttpClient.Version.HTTP_1_1)
                         .connectTimeout(Duration.ofSeconds(2)).build());
-        factory.setReadTimeout(Duration.ofSeconds(180));
+        factory.setReadTimeout(Duration.ofSeconds(600));
         this.http = RestClient.builder().baseUrl(base).requestFactory(factory).build();
     }
 
@@ -99,6 +102,17 @@ public class RagApiClient {
     public Map<String, Object> deleteDocument(String source) {
         try {
             return http.delete().uri("/documents/{source}", source).retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** PATCH /documents/{source} — rename the display filename (index untouched). */
+    public Map<String, Object> renameDocument(String source, String filename) {
+        try {
+            return http.patch().uri("/documents/{source}", source)
+                    .contentType(MediaType.APPLICATION_JSON).body(Map.of("filename", filename))
+                    .retrieve().body(OBJECT);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }

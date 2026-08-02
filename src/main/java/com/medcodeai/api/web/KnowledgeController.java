@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,10 +69,10 @@ public class KnowledgeController {
     }
 
     @PostMapping("/api/admin/knowledge/docs")
-    @Operation(summary = "Upload a knowledge document (PDF)",
+    @Operation(summary = "Upload a knowledge document (PDF or CSV)",
             description = "Multipart `file`. Accepted immediately; chunking + embedding run in "
                     + "the background on the RAG service — poll the docs list for progress. "
-                    + "Scanned/image-only PDFs are rejected with 400.")
+                    + "Scanned/image-only PDFs and empty CSVs are rejected with 400.")
     public Map<String, Object> upload(@RequestParam("file") MultipartFile file) {
         String filename = file.getOriginalFilename();
         byte[] bytes;
@@ -87,9 +88,24 @@ public class KnowledgeController {
     @DeleteMapping("/api/admin/knowledge/docs/{source}")
     @Operation(summary = "Remove a knowledge document",
             description = "Deletes the document's chunks from the vector store and knowledge "
-                    + "graph, and its saved PDF from the RAG service.")
+                    + "graph, and its saved file from the RAG service.")
     public Map<String, Object> deleteDoc(@PathVariable String source) {
         return forward(() -> rag.deleteDocument(source));
+    }
+
+    @PatchMapping("/api/admin/knowledge/docs/{source}")
+    @Operation(summary = "Rename a knowledge document",
+            description = "`{\"filename\": \"...\"}`. Display-only: the source id, saved file "
+                    + "and index entries are untouched, so no re-embedding happens. The file "
+                    + "extension is preserved (appended when missing from the new name).")
+    public Map<String, Object> renameDoc(@PathVariable String source,
+                                         @RequestBody(required = false) byte[] body) {
+        Map<?, ?> in = parseObject(body);
+        Object filename = in.get("filename");
+        if (!(filename instanceof String f) || f.isBlank()) {
+            throw new ApiExceptionHandler.BadRequestException("filename is required");
+        }
+        return forward(() -> rag.renameDocument(source, f.trim()));
     }
 
     @PostMapping("/api/admin/knowledge/train")

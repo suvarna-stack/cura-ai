@@ -498,8 +498,9 @@ routes answer `500` with a "RAG API not reachable" message.
 |---|---|---|
 | `GET /api/admin/knowledge/docs` | `GET /documents` | every document with live `status` (`queued`\|`processing`\|`indexed`\|`failed`) + 0-100 `progress`; the page polls this while anything ingests |
 | `GET /api/admin/knowledge/stats` | `GET /stats` | `documents_indexed`, `chunks_in_index`, `embed_model`, `llm_model`, `retrieval_mode`, `graph` |
-| `POST /api/admin/knowledge/docs` | `POST /documents/upload` | multipart `file` (PDF, ≤100MB); accepted immediately, ingests in background |
+| `POST /api/admin/knowledge/docs` | `POST /documents/upload` | multipart `file` (PDF or CSV, ≤100MB); accepted immediately, ingests in background. Scanned PDFs / empty CSVs / other file types → `400` |
 | `DELETE /api/admin/knowledge/docs/{source}` | `DELETE /documents/{source}` | removes chunks from vector store + graph |
+| `PATCH /api/admin/knowledge/docs/{source}` | `PATCH /documents/{source}` | `{"filename": "..."}` — renames the display filename only (source id + index untouched, no re-embed); the file extension is preserved, appended when the new name lacks it. Unknown source → `400` |
 | `POST /api/admin/knowledge/train` | `POST /documents/rebuild` | wipes + re-ingests everything; `{"status": "rebuilding", "documents": n}` |
 | `POST /api/admin/knowledge/retrieve` | `POST /retrieve` | `{"question": "..."}` (+ optional `mode`, `top_k`) → matching chunks, no LLM (fast) |
 | `POST /api/admin/knowledge/chat` | `POST /chat` | same body (+ optional `max_new_tokens`, `temperature`) → full LLM answer (slow on CPU) |
@@ -518,6 +519,40 @@ camelCase:
 It only ever **adds** codes and **fills blank** descriptions — an existing
 description is never overwritten, so re-running is safe and a coding manual
 can't clobber titles that came from the hospital.
+
+### /api/agent/chat — coder AI Agent chat
+
+`POST /api/agent/chat` — the cases app's Agent page. **Any valid token**
+(either role), unlike the admin-only knowledge surface. A thin proxy to the
+RAG service's `/chat`:
+
+```jsonc
+// request
+{
+  "question": "Patient has chest pain and ST elevation, what ICD-9 code?",
+  "history": [                       // optional; prior turns, oldest first
+    { "role": "user", "content": "..." },
+    { "role": "assistant", "content": "..." }
+  ],
+  "max_new_tokens": 256              // optional, 16-512, default 256
+}
+// response — RAG pass-through (snake_case)
+{ "question": "...", "answer": "...", "mode": "graph",
+  "contexts": [ { "text": "...", "source": "icd9", "score": 0.61,
+                  "via": "vector match", "metadata": {} } ] }
+```
+
+The server is stateless — the browser owns the conversation and re-sends it
+as `history` each call (the proxy keeps the most recent 40 well-formed turns,
+dropping malformed entries silently). Answers follow the question's language
+(English or Thai — the RAG system prompt enforces it; embeddings are
+multilingual so Thai retrieval works against English documents). Blank or
+missing `question` → `400`. Like the knowledge routes, RAG-side 4xx becomes
+`400 {"error": ...}` and an unreachable RAG service is a `500`.
+
+Latency: the answer comes from a local CPU LLM — tens of seconds normally,
+minutes on the first-ever call while the model downloads and loads. Frontends
+should show a progress/typing state and must not retry on a slow response.
 
 ## Downstream: the hospital iMed API
 
