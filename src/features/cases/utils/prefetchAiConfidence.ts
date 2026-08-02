@@ -8,26 +8,18 @@ import {
   suggestedToStored,
 } from './aiSuggestions'
 
-const confKey = (id: string) => `aiConfidence:${id}`
+// session-scoped cache — never persisted, so a wiped/reseeded DB can't
+// surface confidence pills computed against old data
+const confCache = new Map<string, number>()
 
 /** Lightweight cached avg (set by list prefetch without opening detail). */
 export function loadCachedAiConfidence(caseId: string): number | null {
-  try {
-    const raw = localStorage.getItem(confKey(caseId))
-    if (raw == null) return null
-    const n = Number(raw)
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
-  } catch {
-    return null
-  }
+  const n = confCache.get(caseId)
+  return n != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null
 }
 
 export function saveCachedAiConfidence(caseId: string, avg: number) {
-  try {
-    localStorage.setItem(confKey(caseId), String(Math.round(avg)))
-  } catch {
-    /* private mode */
-  }
+  confCache.set(caseId, Math.round(avg))
 }
 
 /** Best available AI confidence for the list pill. */

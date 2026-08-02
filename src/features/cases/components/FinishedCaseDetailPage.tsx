@@ -8,6 +8,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { AddCodeModal } from "./codes/AddCodeModal";
@@ -93,6 +94,7 @@ export function FinishedCaseDetailPage({
   const { reopen } = useApprovals();
   useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const [showReopen, setShowReopen] = useState(false);
   // add / delete code dialogs (Prompt 4) — mutations persist to the same
@@ -114,7 +116,7 @@ export function FinishedCaseDetailPage({
         .join("\n\n")
     : null;
   // the coder's saved edits are the finalized codes — server copy first
-  // (live backend = shared truth), then localStorage; they win over the
+  // (live backend = shared truth), then the session cache; they win over the
   // fetched iMed data (same rule as CaseDetail/IncompleteCaseDetail);
   // unresolved "???" rows are never part of the final code set
   const saved = detail?.codeEdits ?? loadCodeEdits(c.id);
@@ -135,7 +137,7 @@ export function FinishedCaseDetailPage({
   const codes = fullCodes.filter(k => !k.missing);
 
   // mutations write through codeEdits (materialising the iMed list on first
-  // edit) and bump the tick so the derived list re-reads localStorage
+  // edit) and bump the tick so the derived list re-reads the session cache
   const persistCodes = (next: StoredCode[]) => { saveCodeEdits(c.id, next); setCodesTick(v => v + 1); };
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
@@ -146,7 +148,7 @@ export function FinishedCaseDetailPage({
     persistCodes([added, ...fullCodes]);
     setAdding(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",
+      userId: me.userId, userName: me.userName, actionType: "ADD_CODE",
       targetId: c.id, targetType: "code",
       description: `Added code ${entry.code} - ${entry.desc} to ${c.patient}`,
       previousState: { caseId: c.id, code: added },
@@ -160,7 +162,7 @@ export function FinishedCaseDetailPage({
     persistCodes(fullCodes.filter(k => !(k.code === removed.code && k.desc === removed.desc)));
     setDeleting(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "DELETE_CODE",
+      userId: me.userId, userName: me.userName, actionType: "DELETE_CODE",
       targetId: c.id, targetType: "code",
       description: `Deleted code ${removed.code} from ${c.patient}`,
       previousState: { caseId: c.id, code: removed },
@@ -185,7 +187,7 @@ export function FinishedCaseDetailPage({
             setShowReopen(false);
             reopen(c.id);
             const logId = addLog({
-              userId: "sarah.k", userName: "Sarah K.", actionType: "REOPEN_CASE",
+              userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
               targetId: c.id, targetType: "case",
               description: `Reopened case for ${c.patient}`,
               previousState: null,

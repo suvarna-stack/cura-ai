@@ -187,6 +187,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   "hosp.pastHistory": { en: "Past History",             th: "ประวัติในอดีต" },
   "hosp.labxray":     { en: "Lab / X-ray",              th: "แลบ / เอกซเรย์" },
   "hosp.xray":        { en: "X-Ray",                    th: "เอกซเรย์" },
+  "hosp.noXray":      { en: "No X-ray / imaging recorded for this visit", th: "ไม่มีผลเอกซเรย์ในการรับบริการครั้งนี้" },
+  "hosp.noLab":       { en: "No lab results recorded for this visit",     th: "ไม่มีผลแลบในการรับบริการครั้งนี้" },
   "hosp.diagproc":    { en: "Diagnosis / Procedure",    th: "การวินิจฉัย / หัตถการ" },
   "hosp.procedures":  { en: "Procedures (หัตถการ)",     th: "หัตถการ" },
   "hosp.cpoe":        { en: "Order Entry (CPOE)",       th: "รายการสั่งแพทย์ (CPOE)" },

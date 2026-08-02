@@ -14,8 +14,8 @@ import { useLang } from '../../cases/context/LanguageContext'
 import type { Lang } from '../../cases/context/LanguageContext'
 import { GlassCard } from '../../cases/components/global/GlassCard'
 import type { ThemeId } from '../../cases/types/theme.types'
+import { useApprovals } from '../../cases/context/ApprovalsContext'
 import {
-  fetchApprovedCaseIds,
   fetchCoderProfile,
   resetDemoApprovals,
 } from '../api/settingsService'
@@ -47,7 +47,8 @@ export function SettingsPage() {
   useDocumentTitle(t("settings.title"))
 
   const [profile, setProfile] = useState<CoderProfile>(EMPTY_PROFILE)
-  const [approvedIds, setApprovedIds] = useState<string[]>([])
+  // this session's optimistic approvals (in-memory; the server holds the truth)
+  const { approvedIds } = useApprovals()
   const [resetProgress, setResetProgress] = useState<number | null>(null)
   const resetting = resetProgress !== null
 
@@ -55,14 +56,8 @@ export function SettingsPage() {
     let cancelled = false
     void (async () => {
       try {
-        const [nextProfile, ids] = await Promise.all([
-          fetchCoderProfile(),
-          fetchApprovedCaseIds(),
-        ])
-        if (!cancelled) {
-          setProfile(nextProfile)
-          setApprovedIds(ids)
-        }
+        const nextProfile = await fetchCoderProfile()
+        if (!cancelled) setProfile(nextProfile)
       } catch {
         // keep mock / empty
       }
@@ -72,7 +67,7 @@ export function SettingsPage() {
     }
   }, [])
 
-  const approvedCount = approvedIds.length
+  const approvedCount = approvedIds.size
 
   const accountRows = [
     { label: 'Full name', value: profile.fullName },

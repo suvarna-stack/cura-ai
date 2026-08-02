@@ -1,7 +1,7 @@
 // ============================================================
 // Activity Log context — shared audit trail of coder actions.
-// POC: entries persist in localStorage ("audit_activity_logs");
-// the real backend will serve these from a coding_history table.
+// Entries live in memory for the session (nothing persisted in the
+// browser); the real backend will serve these from coding_history.
 // The provider component lives in ActivityLogProvider.tsx.
 // ============================================================
 import { createContext, useContext } from "react";

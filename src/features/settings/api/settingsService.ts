@@ -19,23 +19,12 @@ export async function fetchCoderProfile(): Promise<CoderProfile> {
   }
 }
 
-/** Locally-approved case ids (demo tooling reads the optimistic set). */
-export async function fetchApprovedCaseIds(): Promise<string[]> {
-  try {
-    return JSON.parse(localStorage.getItem('approvedCases') ?? '[]') as string[]
-  } catch {
-    return []
-  }
-}
-
 /**
  * Reset demo approvals — server-side POST /api/demo/reset (restores the demo
- * baseline; 404 when DEMO_TOOLS_ENABLED is off), then clears the local
- * optimistic sets and reloads so the UI refetches the reset payload.
+ * baseline; 404 when DEMO_TOOLS_ENABLED is off), then reloads so the UI
+ * refetches the reset payload (case state is in-memory + server only).
  */
 export async function resetDemoApprovals(): Promise<void> {
   await apiClient.post('/demo/reset', {})
-  localStorage.removeItem('approvedCases')
-  localStorage.removeItem('reopenedCases')
   window.location.reload()
 }

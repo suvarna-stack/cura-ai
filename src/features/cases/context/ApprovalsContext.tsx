@@ -9,8 +9,8 @@ import { createContext, useContext } from "react";
 type ApprovalsCtxValue = {
   approvedIds: Set<string>;
   /** Cases reopened but not yet re-approved — they live in the Dashboard's
-      Reopen tab. Persisted (localStorage["reopenedCases"]) so a reopen
-      survives reload even without a live server; re-approving removes the id. */
+      Reopen tab. In-memory only (the server's reopened flag takes over after
+      the refetch); re-approving removes the id. */
   reopenedIds: Set<string>;
   /** bumped when the server confirms a reopen — pass to useCases(casesVersion)
       to trigger a silent refetch of the case lists */

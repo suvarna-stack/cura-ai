@@ -7,6 +7,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useSync } from "../context/SyncContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
 import { ConfidencePill } from "./global/ConfidencePill";
@@ -154,7 +155,7 @@ export function CasesPage({
   const { t } = useLang();
   useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
-  // shared with the detail pages via ApprovalsProvider (localStorage-persisted)
+  // shared with the detail pages via ApprovalsProvider (in-memory + server)
   const { approvedIds, reopenedIds, casesVersion, approve, reopen, pruneReopened } = useApprovals();
   // casesVersion bumps on reopen; syncVersion bumps after iMed sync → silent refetch
   const { completeCases, incompleteGroups, finishedCases, loading, error } = useCases(
@@ -175,6 +176,7 @@ export function CasesPage({
   // route every approve trigger through a confirmation dialog. `pendingApproval`
   // holds the ids (for the activity log) + the action to run on confirm.
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const [pendingApproval, setPendingApproval] = useState<{ n: number; ids: string[]; run: () => void } | null>(null);
   const askApprove = (ids: string[], run: () => void) => { if (ids.length > 0) setPendingApproval({ n: ids.length, ids, run }); };
@@ -188,7 +190,7 @@ export function CasesPage({
       ? `Approved case for ${patient}`
       : `Approved ${ids.length} case(s)`;
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.",
+      userId: me.userId, userName: me.userName,
       actionType: ids.length > 1 ? "APPROVE_ALL" : "APPROVE_CASE",
       targetId: ids.length === 1 ? ids[0] : "bulk", targetType: "case",
       description, previousState: { caseIds: ids },
@@ -203,7 +205,7 @@ export function CasesPage({
     () => new Set(finishedCases.map(f => f.id)),
     [finishedCases]);
   // reopened-awaiting-re-approval cases (Reopen tab): the server flag
-  // (live mode) ∪ the persisted local set, minus locally re-approved ids.
+  // (live mode) ∪ this session's local set, minus locally re-approved ids.
   // These leave the queues too — a reopened case lives ONLY in the Reopen tab.
   const reopenedEffective = useMemo(() => {
     const s = new Set<string>();
@@ -223,7 +225,7 @@ export function CasesPage({
     [incompleteGroups, approvedIds, finishedApiIds, reopenedEffective]);
 
   // live mode: a fresh payload that still reports a case as finished wins over
-  // a stale localStorage reopen (re-approved elsewhere / failed POST); no-op in
+  // a stale in-memory reopen (re-approved elsewhere / failed POST); no-op in
   // static mode and for in-flight reopens (see ApprovalsProvider)
   useEffect(() => {
     if (!loading && !error) pruneReopened(finishedCases.map(f => f.id));
@@ -271,7 +273,7 @@ export function CasesPage({
       finishedBy: list.length > 1 ? list[list.length - 2] : list[0] ?? null,
       reopenedBy: list[list.length - 1] ?? null,
     };
-    return { finishedBy: list[list.length - 1] ?? "Sarah K.", reopenedBy: "Sarah K." };
+    return { finishedBy: list[list.length - 1] ?? me.userName, reopenedBy: me.userName };
   };
 
   // approved cases surface in Finished (with reopen); API-provided finished cases follow
@@ -281,9 +283,9 @@ export function CasesPage({
       const c = allById.get(id);
       // approving here makes the logged-in coder the latest editor (item 17),
       // appended to whoever worked the case before (item 16)
-      const coders = [...(c?.coders ?? []).filter(n => n !== "Sarah K."), "Sarah K."];
+      const coders = [...(c?.coders ?? []).filter(n => n !== me.userName), me.userName];
       return { id, patient: c?.patient ?? id, vn: c?.vn ?? id, hn: c?.hn ?? null,
-               codedDate: today, coder: "Sarah K.", coders,
+               codedDate: today, coder: me.userName, coders,
                drg: c?.codes?.[0]?.code ?? "—", created_at: c?.created_at,
                // facet fields from the source case so the sidebar filters apply
                dept: c?.dept, group: c?.group, severity: c?.severity, coverage: c?.coverage,
@@ -291,8 +293,8 @@ export function CasesPage({
                encountertype: c?.encountertype, orders: c?.orders, revenue_impact: c?.revenue_impact };
     });
     // any coder may reopen any case, so every row gets the Reopen button.
-    // Rows in reopenedIds left Finished for the Reopen tab (persisted — in
-    // static mode this is what keeps a baseline case reopened across reloads).
+    // Rows in reopenedIds left Finished for the Reopen tab (session-local
+    // until the server's refetched payload flags the case as reopened).
     // An API-finished row that is ALSO in approvedIds was reopened and then
     // re-approved in this browser — the logged-in coder finished it last, so
     // THEY become the responsible (final) coder, not the original approver.
@@ -302,10 +304,10 @@ export function CasesPage({
       .filter(f => !reopenedIds.has(f.id))
       .map(f => {
         if (!approvedIds.has(f.id)) return f;
-        const coders = [...(f.coders ?? (f.coder ? [f.coder] : [])).filter(n => n !== "Sarah K."), "Sarah K."];
-        return { ...f, coder: "Sarah K.", coders, codedDate: today };
+        const coders = [...(f.coders ?? (f.coder ? [f.coder] : [])).filter(n => n !== me.userName), me.userName];
+        return { ...f, coder: me.userName, coders, codedDate: today };
       })];
-  }, [approvedIds, allById, finishedCases, finishedApiIds, reopenedIds]);
+  }, [approvedIds, allById, finishedCases, finishedApiIds, reopenedIds, me.userName]);
 
   // Finished and Reopened rows live outside the hook's lists, but the Coder
   // facet (item 6) only has values there — so they are fed in as facet pool.
@@ -865,7 +867,7 @@ export function CasesPage({
                           e.stopPropagation();
                           reopen(c.id);
                           const logId = addLog({
-                            userId: "sarah.k", userName: "Sarah K.", actionType: "REOPEN_CASE",
+                            userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
                             targetId: c.id, targetType: "case",
                             description: `Reopened case for ${c.patient}`, previousState: null,
                           });

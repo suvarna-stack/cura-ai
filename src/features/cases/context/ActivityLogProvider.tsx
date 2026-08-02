@@ -1,19 +1,18 @@
 // ============================================================
 // ActivityLogProvider — component half of the activity-log context.
-// POC: logs live in localStorage ("audit_activity_logs"); undo is
-// allowed within UNDO_WINDOW_MS and best-effort restores the snapshot
-// stored in previousState (code edits via caseLocal, approvals via
-// localStorage["approvedCases"] + an "approvals:changed" event that
+// Logs live in memory for the session only (nothing persisted in the
+// browser — a reload starts clean, so the log can never show actions
+// from before a DB wipe). Undo is allowed within UNDO_WINDOW_MS and
+// best-effort restores the snapshot stored in previousState (code
+// edits via caseLocal, approvals via the "approvals:undo" event that
 // ApprovalsProvider listens for).
 // ============================================================
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityLogCtx } from "./ActivityLogContext";
 import type { NewActivityLog } from "./ActivityLogContext";
 import type { ActivityLog } from "../types/activityLog.types";
 import { UNDO_WINDOW_MS } from "../types/activityLog.types";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
-
-const STORAGE_KEY = "audit_activity_logs";
 
 // previousState shapes written by the pages (see IncompleteCaseDetail etc.):
 //  ADD_CODE     { caseId, code }              → undo removes the code again
@@ -25,30 +24,6 @@ type EditSnapshot = { caseId: string; before: StoredCode; after: StoredCode };
 type ApproveSnapshot = { caseIds: string[] };
 
 const uid = () => `log_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-
-/** 6 realistic starter entries (Thai patients, real ICD codes from the synced data)
- *  so the drawer / history pages aren't empty on first run. Timestamps span the last
- *  ~2 days: the recent ones fall inside the undo window, the oldest deliberately don't. */
-function seedLogs(): ActivityLog[] {
-  const ago = (mins: number) => new Date(Date.now() - mins * 60 * 1000).toISOString();
-  const base = { userId: "sarah.k", userName: "Sarah K.", isUndone: false as const };
-  return [
-    { ...base, id: uid() + "_s1", actionType: "APPROVE_CASE", targetId: "86826041006143381201", targetType: "case",
-      description: "Approved 2 code(s) for Pornpan Siriporn", previousState: { caseIds: ["86826041006143381201"] }, timestamp: ago(38) },
-    { ...base, id: uid() + "_s2", actionType: "ADD_CODE", targetId: "86826041006165662201", targetType: "code",
-      description: "Added code 427.31 - Atrial fibrillation to Saowalak Ruangrit", previousState: null, timestamp: ago(95) },
-    { ...base, id: uid() + "_s3", actionType: "DELETE_CODE", targetId: "86826041006173971901", targetType: "code",
-      description: "Deleted code E78.9 from Kanchana Boonsri",
-      previousState: { caseId: "86826041006173971901", code: { code: "E78.9", type: "ICD-10", desc: "Disorder of lipoprotein metabolism, unspecified", confidence: 100 } },
-      timestamp: ago(60 * 5) },
-    { ...base, id: uid() + "_s4", userId: "naret.p", userName: "Naret P.", actionType: "EDIT_CODE", targetId: "86826041008545561001", targetType: "code",
-      description: "Edited code 250.00 → 250.01 for Preecha Wongsawat", previousState: null, timestamp: ago(60 * 9) },
-    { ...base, id: uid() + "_s5", actionType: "REOPEN_CASE", targetId: "86826041005200378701", targetType: "case",
-      description: "Reopened case for Theerayut Maneerat", previousState: null, timestamp: ago(60 * 26) },
-    { ...base, id: uid() + "_s6", userId: "panitda.w", userName: "Panitda W.", actionType: "APPROVE_ALL", targetId: "86826041005244411101", targetType: "case",
-      description: "Approved 3 code(s) for Saowalak Ruangrit", previousState: { caseIds: ["86826041005244411101"] }, timestamp: ago(60 * 49) },
-  ];
-}
 
 /** Best-effort state restoration from a log's previousState snapshot. */
 function restore(log: ActivityLog) {
@@ -78,28 +53,14 @@ function restore(log: ActivityLog) {
     case "APPROVE_ALL": {
       const s = log.previousState as ApproveSnapshot | null;
       if (!s?.caseIds?.length) return;
-      try {
-        const cur = new Set<string>(JSON.parse(localStorage.getItem("approvedCases") ?? "[]"));
-        s.caseIds.forEach(id => cur.delete(id));
-        localStorage.setItem("approvedCases", JSON.stringify([...cur]));
-        window.dispatchEvent(new Event("approvals:changed"));
-      } catch { /* demo keeps running */ }
+      window.dispatchEvent(new CustomEvent("approvals:undo", { detail: { caseIds: s.caseIds } }));
       break;
     }
   }
 }
 
 export function ActivityLogProvider({ children }: { children: React.ReactNode }) {
-  const [logs, setLogs] = useState<ActivityLog[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as ActivityLog[];
-    } catch { /* fall through to seed */ }
-    return seedLogs();
-  });
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); } catch { /* quota/private mode */ }
-  }, [logs]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
 
   const addLog = (log: NewActivityLog): string => {
     const id = uid();

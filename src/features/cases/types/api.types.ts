@@ -73,7 +73,7 @@ export interface ApiFinishedCase {
   codedDate: string;
   /** Responsible coder = the LATEST person to touch the case (= coders.at(-1)),
    *  which is not necessarily whoever approved it first. */
-  coder: string;           // display name (e.g. "Sarah K.")
+  coder: string;           // display name of the responsible coder (e.g. "Austin")
   coders?: string[];       // everyone who worked it, most recent last
   /** Raw workflow id behind `coder` ("demo.coder" = run_demo baseline,
    *  "web.coder" = approved through this UI). The Settings demo tools use it
@@ -171,5 +171,4 @@ export interface ApiCaseDetail {
   // Present only when served by the live server (server/app.py), which echoes
   // the coder's saved working state; absent in the static JSON export.
   codeEdits?: ApiStoredCode[] | null;
-  reportDraft?: string | null;
 }

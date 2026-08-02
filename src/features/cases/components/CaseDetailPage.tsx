@@ -8,6 +8,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { suggestCodes } from "../api/casesService";
@@ -27,7 +28,7 @@ import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
-import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
+import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
 
@@ -258,6 +259,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
   const { approvedIds, approve, reopen } = useApprovals();
   useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const c = caseData ?? { id: "C-0041", patient: "Margaret Liu", dept: "Cardiology", group: "Cardiovascular", confidence: 94 };
   const approved = approvedIds.has(c.id);
@@ -269,10 +271,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
   const [adding, setAdding] = useState<CodeSystem | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
-  // meeting item 9: the report is no longer editable in the app — it is the
-  // hospital's clinical record. A draft saved before that change still wins
-  // over the synced sections, so nobody's saved work disappears.
-  const [report] = useState(() => loadReportDraft(c.id) ?? "");
+  // meeting item 9: the report is not editable — it is the hospital's
+  // clinical record, rendered straight from the synced sections (the old
+  // draft feature was removed entirely).
 
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
@@ -285,7 +286,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     persistCodes([added, ...codes]);
     setAdding(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",
+      userId: me.userId, userName: me.userName, actionType: "ADD_CODE",
       targetId: c.id, targetType: "code",
       description: `Added code ${entry.code} - ${entry.desc} to ${c.patient}`,
       previousState: { caseId: c.id, code: added },
@@ -299,7 +300,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     persistCodes(codes.filter((_, i) => i !== deletingIdx));
     setDeletingIdx(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "DELETE_CODE",
+      userId: me.userId, userName: me.userName, actionType: "DELETE_CODE",
       targetId: c.id, targetType: "code",
       description: `Deleted code ${removed.code} from ${c.patient}`,
       previousState: { caseId: c.id, code: removed },
@@ -311,7 +312,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     setConfirmingApprove(false);
     approve([c.id]);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "APPROVE_CASE",
+      userId: me.userId, userName: me.userName, actionType: "APPROVE_CASE",
       targetId: c.id, targetType: "case",
       description: `Approved ${codes.length} code(s) for ${c.patient}`,
       previousState: { caseIds: [c.id] },
@@ -330,7 +331,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
   if (status !== prevStatus) {
     setPrevStatus(status);
     // precedence: server-saved edits (live backend = shared truth, may hold
-    // another session's work) -> localStorage -> seed from fetched codes ->
+    // another session's work) -> session cache -> seed from fetched codes ->
     // mock. The initial useState may briefly show local codes until the
     // fetch settles — cosmetic, the server copy replaces them here.
     const saved = (status === "ready" ? detail?.codeEdits : null) ?? loadCodeEdits(c.id);
@@ -412,7 +413,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             const next = codes.map((e, i) => i === editingIdx ? { ...before, ...u } : e);
             setCodes(next); saveCodeEdits(c.id, next); setEditingIdx(null);
             const logId = addLog({
-              userId: "sarah.k", userName: "Sarah K.", actionType: "EDIT_CODE",
+              userId: me.userId, userName: me.userName, actionType: "EDIT_CODE",
               targetId: c.id, targetType: "code",
               description: `Edited code ${before.code} → ${u.code} for ${c.patient}`,
               previousState: { caseId: c.id, before, after: { ...before, ...u } },
@@ -515,9 +516,6 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             {status !== "loading" && <VitalsStrip detail={detail} />}
             {status === "loading" ? (
               <ReportSkeleton />
-            ) : report !== "" ? (
-              /* the coder's saved draft wins over the synced sections */
-              <HighlightedReport text={report} accentRgb={gl.accentRgb} />
             ) : detail && detail.sections.length > 0 ? (
               /* real report sections from iMed MedHack_MedicalRecord (feedback item 6) */
               <div>

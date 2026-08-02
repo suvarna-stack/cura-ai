@@ -1,43 +1,35 @@
 // ============================================================
 // ApprovalsProvider — component half of the approvals context.
-// Dual-write: the approved set lives in the browser
-// (localStorage["approvedCases"]) for optimistic UI, AND each
-// action fires POST /cases/approve / POST /cases/{id}/reopen at
-// medcode-api (live-only since Phase 4; the server stamps the
-// logged-in coder and runs the hospital iMed write-back).
-// Reopened-but-not-re-approved cases live in a second persisted
-// set (localStorage["reopenedCases"]) that feeds the Dashboard's
-// Reopen tab; a confirmed server reopen bumps casesVersion so
-// useCases refetches the moved case without a remount.
+// The approved / reopened sets live in memory only: each action
+// updates them for optimistic UI AND fires POST /cases/approve /
+// POST /cases/{id}/reopen at medcode-api, which stamps the
+// logged-in coder and runs the hospital iMed write-back. The
+// server is the single source of truth — a reload rebuilds
+// everything from the API, so the browser can never show cases
+// the database doesn't have (demo-safety; localStorage ghosts
+// used to survive DB wipes).
+// Activity-log undo un-approves via the "approvals:undo"
+// CustomEvent (detail: { caseIds }).
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from "react";
 import { approveCases, hasLiveServer, reopenCase } from "../api/casesService";
 import { ApprovalsCtx } from "./ApprovalsContext";
 
 export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
-  const [approvedIds, setApprovedIds] = useState<Set<string>>(() => {
-    try { return new Set<string>(JSON.parse(localStorage.getItem("approvedCases") ?? "[]")); }
-    catch { return new Set<string>(); }
-  });
-  useEffect(() => { localStorage.setItem("approvedCases", JSON.stringify([...approvedIds])); }, [approvedIds]);
-  // activity-log undo rewrites localStorage["approvedCases"] directly and fires
-  // this event so the in-memory set follows without a page reload
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    const reread = () => {
-      try { setApprovedIds(new Set<string>(JSON.parse(localStorage.getItem("approvedCases") ?? "[]"))); }
-      catch { /* keep current state */ }
+    const onUndo = (e: Event) => {
+      const ids: string[] = (e as CustomEvent).detail?.caseIds ?? [];
+      if (ids.length === 0) return;
+      setApprovedIds(prev => { const n = new Set(prev); ids.forEach(id => n.delete(id)); return n; });
     };
-    window.addEventListener("approvals:changed", reread);
-    return () => window.removeEventListener("approvals:changed", reread);
+    window.addEventListener("approvals:undo", onUndo);
+    return () => window.removeEventListener("approvals:undo", onUndo);
   }, []);
-  // reopened-awaiting-re-approval set — persisted like approvedCases, so a
-  // reopen keeps working offline/static. In live mode pruneReopened() yields
-  // to the server when it still reports a case as finished.
-  const [reopenedIds, setReopenedIds] = useState<Set<string>>(() => {
-    try { return new Set<string>(JSON.parse(localStorage.getItem("reopenedCases") ?? "[]")); }
-    catch { return new Set<string>(); }
-  });
-  useEffect(() => { localStorage.setItem("reopenedCases", JSON.stringify([...reopenedIds])); }, [reopenedIds]);
+  // reopened-awaiting-re-approval set — feeds the Dashboard's Reopen tab until
+  // the server's refetched payload takes over (pruneReopened yields to the
+  // server when it still reports a case as finished).
+  const [reopenedIds, setReopenedIds] = useState<Set<string>>(new Set());
   // reopen POSTs still in flight — pruneReopened must not cancel their
   // optimistic hide against a finished list fetched before the POST landed
   const inFlight = useRef<Set<string>>(new Set());
@@ -58,9 +50,8 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     reopenCase(id).then(ok => {
       inFlight.current.delete(id);
       if (ok) setCasesVersion(v => v + 1); // server moved it → silent refetch
-      // no live server / failed write: the id stays in the persisted set —
-      // that IS the static-mode fallback (localStorage wins over fetched data);
-      // in live mode the next fetch's pruneReopened self-heals a failed write
+      // failed write / no live server: the id stays in the in-memory set for
+      // this session; in live mode the next fetch's pruneReopened self-heals
     });
   };
   const pruneReopened = useCallback((serverFinishedIds: string[]) => {

@@ -217,12 +217,15 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
           )}
         </Panel>
         <Panel title={t("hosp.labxray")}>
+          {/* both subsections ALWAYS render: reserved space with an explicit
+              "none recorded" beats a silently missing section — the coder
+              should see that labs/imaging truly don't exist for this visit */}
           <LabResults detail={detail} embedded />
-          {xray.length > 0 && (
-            <div className={(detail.orders ?? []).some((o) => o.order_category === "lab") ? "mt-2.5" : ""}>
-              <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
-                {t("hosp.xray")}
-              </p>
+          <div className="mt-2.5">
+            <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: gl.accent }}>
+              {t("hosp.xray")}
+            </p>
+            {xray.length > 0 ? (
               <div className="space-y-1.5">
                 {xray.map((o, i) => (
                   <div key={i}>
@@ -235,9 +238,10 @@ export function HospitalPanels({ detail }: { detail: ApiCaseDetail }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-          {xray.length === 0 && !(detail.orders ?? []).some((o) => o.order_category === "lab") && <Empty />}
+            ) : (
+              <p className="text-[12px] italic" style={{ color: gl.muted }}>{t("hosp.noXray")}</p>
+            )}
+          </div>
         </Panel>
         <Panel title={t("hosp.cpoe")}>
           {cpoe.length === 0 && cpoeTotal > 0 ? (

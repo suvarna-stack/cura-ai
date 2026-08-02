@@ -21,7 +21,7 @@ export async function fetchCases(): Promise<ApiCasesResponse> {
   return data
 }
 
-/** GET /api/cases/{id} — full detail incl. codeEdits/reportDraft. */
+/** GET /api/cases/{id} — full detail incl. codeEdits. */
 export async function fetchCaseDetail(id: string): Promise<ApiCaseDetail> {
   const { data } = await apiClient.get<ApiCaseDetail>(
     `/cases/${encodeURIComponent(id)}`,
@@ -58,10 +58,6 @@ export const reopenCase = (id: string) =>
 /** PUT /api/cases/{id}/codes — save working code edits (bare array). */
 export const saveCodesRemote = (id: string, codes: ApiStoredCode[]) =>
   send(`/cases/${encodeURIComponent(id)}/codes`, 'PUT', codes)
-
-/** PUT /api/cases/{id}/draft — save report draft (deprecated feature). */
-export const saveDraftRemote = (id: string, text: string) =>
-  send(`/cases/${encodeURIComponent(id)}/draft`, 'PUT', { text })
 
 /** POST /api/sync — pull every hospital case into medcode (non-destructive). */
 export interface SyncResult {

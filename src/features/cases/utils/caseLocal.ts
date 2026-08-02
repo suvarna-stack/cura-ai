@@ -1,12 +1,15 @@
 // ============================================================
-// caseLocal — POC persistence for per-case edits.
-// Dual-write: every save lands in localStorage (offline fallback)
-// AND fires PUT /cases/{id}/codes / .../draft at medcode-api
-// (live-only since Phase 4). Reads stay localStorage-only; the
-// server's copy comes back embedded in the case detail
-// (codeEdits / reportDraft).
+// caseLocal — per-case code edits, in-memory + server.
+// Every save updates a session-scoped cache (instant UI while
+// navigating between pages) AND fires PUT /cases/{id}/codes at
+// medcode-api. The server copy is the durable one: it comes back
+// embedded in the case detail (codeEdits) and wins on load.
+// Nothing is persisted in the browser — a reload starts clean
+// from the API, so a DB wipe can never leave stale edits behind
+// (demo-safety). Report drafts are gone: the report is the
+// hospital's record, read-only.
 // ============================================================
-import { saveCodesRemote, saveDraftRemote } from "../api/casesService";
+import { saveCodesRemote } from "../api/casesService";
 import type { CodeEntry } from "../types/case.types";
 
 export type StoredCode = CodeEntry & {
@@ -16,28 +19,13 @@ export type StoredCode = CodeEntry & {
   manual?: boolean;
 };
 
-const codesKey = (id: string) => `codeEdits:${id}`;
-const draftKey = (id: string) => `reportDraft:${id}`;
+const codeEdits = new Map<string, StoredCode[]>();
 
 export function loadCodeEdits(id: string): StoredCode[] | null {
-  try {
-    const raw = localStorage.getItem(codesKey(id));
-    return raw ? (JSON.parse(raw) as StoredCode[]) : null;
-  } catch {
-    return null;
-  }
+  return codeEdits.get(id) ?? null;
 }
 
 export function saveCodeEdits(id: string, codes: StoredCode[]) {
-  try { localStorage.setItem(codesKey(id), JSON.stringify(codes)); } catch { /* private mode / quota: demo still works, just unsaved */ }
+  codeEdits.set(id, codes);
   void saveCodesRemote(id, codes); // no-op (false) without a live server
-}
-
-export function loadReportDraft(id: string): string | null {
-  try { return localStorage.getItem(draftKey(id)); } catch { return null; }
-}
-
-export function saveReportDraft(id: string, text: string) {
-  try { localStorage.setItem(draftKey(id), text); } catch { /* see above */ }
-  void saveDraftRemote(id, text); // no-op (false) without a live server
 }

@@ -30,13 +30,15 @@ function byPanel(rows: OrderRow[]): Map<string, OrderRow[]> {
 export function LabResults({ detail, embedded }: {
   detail: ApiCaseDetail | null;
   /** inside a HospitalPanels panel: keep the Laboratory heading (the panel is
-   *  "Lab / X-ray") but drop the standalone divider chrome */
+   *  "Lab / X-ray") but drop the standalone divider chrome. Embedded, the
+   *  section ALWAYS renders — an explicit "no lab results" keeps the space
+   *  reserved so the coder sees the absence instead of a missing section. */
   embedded?: boolean;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
   const labs = (detail?.orders ?? []).filter((o) => o.order_category === "lab");
-  if (labs.length === 0) return null;
+  if (labs.length === 0 && !embedded) return null;
 
   return (
     <div className={embedded ? undefined : "mt-5 pt-4"}
@@ -44,6 +46,9 @@ export function LabResults({ detail, embedded }: {
       <p className="text-[12px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: gl.accent }}>
         <FlaskConical size={12} /> {t("report.labs")}
       </p>
+      {labs.length === 0 && (
+        <p className="text-[12px] italic" style={{ color: gl.muted }}>{t("hosp.noLab")}</p>
+      )}
       <div className="space-y-2">
         {[...byPanel(labs).entries()].map(([panel, rows]) => (
           <div key={panel} className="rounded-lg overflow-hidden" style={{ border: gl.borderSm }}>

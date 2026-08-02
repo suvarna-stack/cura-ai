@@ -8,6 +8,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
 import { useApprovals } from "../context/ApprovalsContext";
 import { useActivityLog } from "../context/ActivityLogContext";
+import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
 import { suggestCodes } from "../api/casesService";
@@ -27,7 +28,7 @@ import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
-import { loadCodeEdits, saveCodeEdits, loadReportDraft, type StoredCode } from "../utils/caseLocal";
+import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { IncompleteCase, CodeEntry } from "../types/case.types";
 
@@ -257,13 +258,13 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const { approvedIds, approve, reopen } = useApprovals();
   useDocumentTitle(caseData ? `Case ${caseData.vn ?? caseData.id}` : null);
   const { addLog } = useActivityLog();
+  const me = useCoderIdentity();
   const { showToast } = useToast();
   const c = caseData ?? { id: "C-0043", patient: "Frank Okafor", dept: "Cardiology 3B", confidence: 57, missing: "Procedure specificity", group: "cardio" };
   const approved = approvedIds.has(c.id);
-  // saved local edits/draft (POC persistence) win over both mock and fetched content;
-  // without one, content stays empty until the fetch settles (loading placeholder)
-  // item 9: the report is read-only now — Edit Report and its draft are gone
-  const [report, setReport] = useState(() => loadReportDraft(c.id) ?? "");
+  // item 9: the report is read-only — it renders straight from the synced
+  // hospital record once the fetch settles (drafts were removed entirely)
+  const [report, setReport] = useState("");
   const [codes, setCodes] = useState<StoredCode[]>(() => loadCodeEdits(c.id) ?? []);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   // add / delete / approve dialogs (Prompt 4)
@@ -282,7 +283,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
     persistCodes([added, ...codes]);
     setAdding(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "ADD_CODE",
+      userId: me.userId, userName: me.userName, actionType: "ADD_CODE",
       targetId: c.id, targetType: "code",
       description: `Added code ${entry.code} - ${entry.desc} to ${c.patient}`,
       previousState: { caseId: c.id, code: added },
@@ -296,7 +297,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
     persistCodes(codes.filter((_, i) => i !== deletingIdx));
     setDeletingIdx(null);
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "DELETE_CODE",
+      userId: me.userId, userName: me.userName, actionType: "DELETE_CODE",
       targetId: c.id, targetType: "code",
       description: `Deleted code ${removed.code} from ${c.patient}`,
       previousState: { caseId: c.id, code: removed },
@@ -309,7 +310,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
     approve([c.id]);
     const n = codes.filter(x => !x.missing).length;
     const logId = addLog({
-      userId: "sarah.k", userName: "Sarah K.", actionType: "APPROVE_CASE",
+      userId: me.userId, userName: me.userName, actionType: "APPROVE_CASE",
       targetId: c.id, targetType: "case",
       description: `Approved ${n} code(s) for ${c.patient}`,
       previousState: { caseIds: [c.id] },
@@ -327,13 +328,10 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const [prevStatus, setPrevStatus] = useState<typeof status>("loading");
   if (status !== prevStatus) {
     setPrevStatus(status);
-    // precedence (same rule as CaseDetail): server-saved draft/edits (live
-    // backend = shared truth) -> localStorage -> seed from fetched content -> mock
+    // precedence (same rule as CaseDetail): server-saved edits (live
+    // backend = shared truth) -> session cache -> seed from fetched content -> mock
     if (status === "ready" && detail) {
-      const savedDraft = detail.reportDraft ?? loadReportDraft(c.id);
-      if (savedDraft !== null) {
-        setReport(savedDraft);
-      } else if (detail.sections.length > 0) {
+      if (detail.sections.length > 0) {
         setReport(detail.sections
           .map(s => `[${s.fieldname}]  (${s.documenttype}${s.recorddatetime ? " · " + s.recorddatetime : ""})\n${s.value ?? "—"}`)
           .join("\n\n"));
@@ -365,7 +363,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       }
     } else if (status === "error") {
       // fetch failed -> graceful mock fallback (core design property, keep the demo alive)
-      if (loadReportDraft(c.id) === null) setReport(initialReport);
+      setReport(initialReport);
       if (!loadCodeEdits(c.id)) setCodes(initialCodes);
     }
   }
@@ -394,7 +392,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
     return () => { cancelled = true; };
   }, [status, c.id]);
 
-  const loadingContent = status === "loading" && loadReportDraft(c.id) === null;
+  const loadingContent = status === "loading";
 
   // hospital-panel vs chronological record view (persisted, shared across pages)
   const [view, setView] = useReportView();
@@ -431,7 +429,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             const next = codes.map((e, i) => i === editingIdx ? resolved : e);
             setCodes(next); saveCodeEdits(c.id, next); setEditingIdx(null);
             const logId = addLog({
-              userId: "sarah.k", userName: "Sarah K.", actionType: "EDIT_CODE",
+              userId: me.userId, userName: me.userName, actionType: "EDIT_CODE",
               targetId: c.id, targetType: "code",
               description: `Edited code ${before.code} → ${resolved.code} for ${c.patient}`,
               previousState: { caseId: c.id, before, after: resolved },

@@ -1,8 +1,8 @@
 // ============================================================
 // Activity Log types — every coder action (approve / add / delete /
-// edit / reopen / undo) becomes one ActivityLog entry. POC: entries
-// live in localStorage ("audit_activity_logs"); the real backend
-// will persist them as a coding_history table (SRS F12).
+// edit / reopen / undo) becomes one ActivityLog entry. Entries live
+// in memory for the session; the real backend will persist them as
+// a coding_history table (SRS F12).
 // ============================================================
 
 export type ActionType =
