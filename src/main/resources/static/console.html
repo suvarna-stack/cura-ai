@@ -181,6 +181,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .op .lock-mini {
+    flex: none;
+    margin-left: auto;
+    font-size: 10px;
+    opacity: .7;
+  }
   .badge {
     flex: 0 0 44px;
     font-family: var(--mono);
@@ -444,6 +450,89 @@ const GLOSSARY = {
 };
 const state = { spec: null, ops: [], current: null };
 
+/* ---- demo samples ------------------------------------------------------
+   One-click bodies for the four /api/v1 write calls. The POST/PUT responses
+   carry the generated object_ids; send() captures them into demoCtx so the
+   PUT/DELETE samples fill themselves with the right ids — no copy-pasting
+   between calls during a demo. Persisted so a page reload keeps the ids. */
+const DEMO_TN = '87026072209142300201';
+const demoCtx = JSON.parse(localStorage.getItem('imed-console-demo') || '{}');
+function saveDemoCtx() { localStorage.setItem('imed-console-demo', JSON.stringify(demoCtx)); }
+const NEED_POST = '(run the POST sample first)';
+function today() { return new Date().toISOString().slice(0, 10); }
+
+const SAMPLES = {
+  'post /api/v1/diagnosis': () => ({
+    body: {
+      request_id: uuid(),
+      object_id: demoCtx.tn || DEMO_TN,
+      fix_visit_type_id: 'OPD',
+      doctor_discharge: '1',
+      diagnosis_icd10: [{
+        icd10_code: 'E11.9',
+        icd10_description: 'Type 2 diabetes mellitus without complications',
+        fix_diagnosis_type_id: 'PRIMARY_DIAGNOSIS',
+        diagnosis_date: today(),
+        diagnosis_time: '14:30:00',
+      }],
+      diagnosis_icd9: [{
+        icd9_code: '39.95',
+        icd9_description: 'Hemodialysis',
+        fix_operation_type_id: 'OR Procedure',
+        date_in: today(), time_in: '14:00:00',
+        date_out: today(), time_out: '15:00:00',
+      }],
+      doctor_discharge_opd: { fix_opd_discharge_status_id: 'COMPLETE' },
+    },
+  }),
+  'put /api/v1/diagnosis/{visit_id}': () => ({
+    params: { visit_id: demoCtx.tn || DEMO_TN },
+    body: {
+      request_id: uuid(),
+      object_id: demoCtx.tn || DEMO_TN,
+      fix_visit_type_id: 'OPD',
+      doctor_discharge: '1',
+      diagnosis_icd10: [{
+        object_id: demoCtx.icd10_id || NEED_POST,
+        icd10_code: 'E11.65',
+        icd10_description: 'Type 2 diabetes mellitus with hyperglycaemia',
+        fix_diagnosis_type_id: 'PRIMARY_DIAGNOSIS',
+        diagnosis_date: today(),
+        diagnosis_time: '14:30:00',
+      }],
+    },
+  }),
+  'delete /api/v1/diagnosis/{visit_id}/icd10/{diagnosis_icd10_id}': () => ({
+    params: {
+      visit_id: demoCtx.tn || DEMO_TN,
+      diagnosis_icd10_id: demoCtx.icd10_id || NEED_POST,
+    },
+  }),
+  'delete /api/v1/diagnosis/{visit_id}/icd9/{diagnosis_icd9_id}': () => ({
+    params: {
+      visit_id: demoCtx.tn || DEMO_TN,
+      diagnosis_icd9_id: demoCtx.icd9_id || NEED_POST,
+    },
+  }),
+};
+
+function applySample(o) {
+  const make = SAMPLES[o.id];
+  if (!make) return;
+  const s = make();
+  for (const input of document.querySelectorAll('#params input[data-param]')) {
+    if (s.params && s.params[input.dataset.param] !== undefined) {
+      input.value = s.params[input.dataset.param];
+    }
+  }
+  const ta = document.getElementById('body');
+  if (ta && s.body !== undefined) {
+    ta.value = JSON.stringify(s.body, null, 2);
+    const e = document.getElementById('bodyerr');
+    if (e) e.hidden = true;
+  }
+}
+
 /* ---- token persistence ------------------------------------------------ */
 const tokenInput = document.getElementById('token');
 tokenInput.value = localStorage.getItem('imed-console-token') || '';
@@ -506,7 +595,8 @@ function renderNav() {
     b.className = 'op' + (state.current && state.current.id === o.id ? ' active' : '');
     b.style.setProperty('--m', METHOD_COLOR[o.method] || 'var(--muted)');
     b.innerHTML = '<span class="badge">' + o.method.toUpperCase() + '</span>' +
-                  '<span class="path">' + esc(o.path) + '</span>';
+                  '<span class="path">' + esc(o.path) + '</span>' +
+                  (o.secured ? '<span class="lock-mini" title="Bearer token required">🔒</span>' : '');
     b.title = o.op.summary || o.path;
     b.addEventListener('click', () => {
       state.current = o;
@@ -555,6 +645,7 @@ function renderOp(o) {
         </div>
         <div class="row">
           <button class="btn primary" id="send">Send request</button>
+          ${SAMPLES[o.id] ? '<button class="btn" id="sample">Use sample</button>' : ''}
           ${bodyExample !== null ? '<button class="btn" id="reset">Reset body</button>' : ''}
           <button class="btn" id="curl">Copy as curl</button>
           <span class="kbd-hint">⌘⏎ sends</span>
@@ -590,6 +681,8 @@ function renderOp(o) {
   if (bodyTa) bodyTa.value = JSON.stringify(bodyExample, null, 2);
 
   work.querySelector('#send').addEventListener('click', () => send(o));
+  const sampleBtn = work.querySelector('#sample');
+  if (sampleBtn) sampleBtn.addEventListener('click', () => applySample(o));
   const resetBtn = work.querySelector('#reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
     bodyTa.value = JSON.stringify(requestBodyExample(o.op), null, 2);
@@ -658,6 +751,22 @@ async function send(o) {
     return;
   }
   const ms = Math.round(performance.now() - t0);
+
+  // demo helper: remember the ids the diagnosis API generates so the
+  // PUT/DELETE "Use sample" buttons can fill themselves in
+  if (res.ok && (o.method === 'post' || o.method === 'put') && o.path.startsWith('/api/v1/diagnosis')) {
+    try {
+      const r = JSON.parse(text).result;
+      if (r) {
+        if (r.object_id) demoCtx.tn = r.object_id;
+        const d10 = Array.isArray(r.diagnosis_icd10) && r.diagnosis_icd10[0];
+        if (d10 && d10.object_id) demoCtx.icd10_id = d10.object_id;
+        const d9 = Array.isArray(r.diagnosis_icd9) && r.diagnosis_icd9[0];
+        if (d9 && d9.object_id) demoCtx.icd9_id = d9.object_id;
+        saveDemoCtx();
+      }
+    } catch (e) { /* not JSON — nothing to capture */ }
+  }
 
   const tone = res.status < 300 ? 'var(--ok)' : res.status < 500 ? 'var(--warn)' : 'var(--err)';
   let payload;
