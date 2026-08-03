@@ -2,7 +2,7 @@ import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState } from "react";
 import {
   FileText, Flag, ArrowLeft, BadgeCheck, Download, Printer,
-  RotateCcw, AlertCircle, Clock, Users, Trash2,
+  RotateCcw, AlertCircle, Clock, Users,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
@@ -11,19 +11,17 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
-import { AddCodeModal } from "./codes/AddCodeModal";
 import { ModalShell } from "../../../components/ui/Modal";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
-import { ConfirmDialog } from "./codes/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
-import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
-import { codeTypeFromRole, hasIcd10Primary } from "../utils/aiSuggestions";
+import { loadCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { codeTypeFromRole } from "../utils/aiSuggestions";
 import type { FinishedCase } from "../types/case.types";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
@@ -97,11 +95,9 @@ export function FinishedCaseDetailPage({
   const me = useCoderIdentity();
   const { showToast } = useToast();
   const [showReopen, setShowReopen] = useState(false);
-  // add / delete code dialogs (Prompt 4) — mutations persist to the same
-  // codeEdits store the other detail pages use; the tick forces a re-derive
-  const [adding, setAdding] = useState<CodeSystem | null>(null);
-  const [deleting, setDeleting] = useState<StoredCode | null>(null);
-  const [, setCodesTick] = useState(0);
+  // an approved case is FINAL: no add/edit/delete/reorder here — the columns
+  // render read-only and the only path to changing codes is the Reopen button
+  // (matching the backend, where the hospital diff runs at approve time only)
 
   // real report + final codes from the synced iMed data; the status tells
   // "still loading" apart from "fetch failed" so neither shows the wrong text
@@ -136,40 +132,6 @@ export function FinishedCaseDetailPage({
       : []);
   const codes = fullCodes.filter(k => !k.missing);
 
-  // mutations write through codeEdits (materialising the iMed list on first
-  // edit) and bump the tick so the derived list re-reads the session cache
-  const persistCodes = (next: StoredCode[]) => { saveCodeEdits(c.id, next); setCodesTick(v => v + 1); };
-
-  const handleAddCode = (entry: { code: string; type: string; desc: string;
-                                  operation_start?: string; operation_end?: string;
-                                  operation_type?: string; note?: string }) => {
-    const added: StoredCode = { ...entry, confidence: 100, manual: true };
-    // prepend: manual codes display grouped on top (see CodesColumn)
-    persistCodes([added, ...fullCodes]);
-    setAdding(null);
-    const logId = addLog({
-      userId: me.userId, userName: me.userName, actionType: "ADD_CODE",
-      targetId: c.id, targetType: "code",
-      description: `Added code ${entry.code} - ${entry.desc} to ${c.patient}`,
-      previousState: { caseId: c.id, code: added },
-    });
-    showToast(`Added code ${entry.code} - ${entry.desc} to ${c.patient}`, logId);
-  };
-
-  const handleDeleteCode = () => {
-    if (!deleting) return;
-    const removed = deleting;
-    persistCodes(fullCodes.filter(k => !(k.code === removed.code && k.desc === removed.desc)));
-    setDeleting(null);
-    const logId = addLog({
-      userId: me.userId, userName: me.userName, actionType: "DELETE_CODE",
-      targetId: c.id, targetType: "code",
-      description: `Deleted code ${removed.code} from ${c.patient}`,
-      previousState: { caseId: c.id, code: removed },
-    });
-    showToast(`Deleted code ${removed.code} from ${c.patient}`, logId);
-  };
-
   const panel: React.CSSProperties = {
     background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
     border: gl.border, boxShadow: gl.shadow,
@@ -198,19 +160,6 @@ export function FinishedCaseDetailPage({
           onClose={() => setShowReopen(false)}
         />
       )}
-      {adding && <AddCodeModal only={adding} icd10PrimaryTaken={hasIcd10Primary(codes)}
-        onAdd={handleAddCode} onClose={() => setAdding(null)} />}
-      {deleting && (
-        <ConfirmDialog
-          icon={Trash2} danger
-          title={t("confirm.deleteCode")}
-          body={t("confirm.deleteCodeBody", { code: deleting.code })}
-          confirmLabel={t("confirm.delete")}
-          onConfirm={handleDeleteCode}
-          onClose={() => setDeleting(null)}
-        />
-      )}
-
       <header className="shrink-0 px-6 py-3.5 flex items-center justify-between"
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
         <div className="flex items-center gap-3">
@@ -306,16 +255,12 @@ export function FinishedCaseDetailPage({
           </div>
         </div>
 
-        {/* three containers side by side: Report | ICD-10 | ICD-9 */}
+        {/* three containers side by side: Report | ICD-10 | ICD-9 — read-only:
+            no add/delete/reorder handlers, so the columns render no controls */}
         {(["icd10", "icd9"] as CodeSystem[]).map((sys) => (
           <CodesColumn key={sys} system={sys}
             codes={codes}
             loading={codes.length === 0 && status === "loading"}
-            /* the columns only see resolved codes, so unresolved "???" rows are
-               appended back rather than dropped from storage */
-            onReorder={(next) => persistCodes([...next, ...fullCodes.filter(k => k.missing)])}
-            onDelete={(i) => setDeleting(codes[i])}
-            onAdd={setAdding}
           />
         ))}
       </div>
