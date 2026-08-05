@@ -409,18 +409,6 @@ export function TrainingPage() {
       value: (stats?.chunksInIndex ?? totalChunks).toLocaleString(),
       icon: ListTree,
     },
-    {
-      label: 'Embedding model',
-      value: stats?.embedModel ?? '—',
-      icon: Sparkles,
-      small: true,
-    },
-    {
-      label: 'Last trained',
-      value: lastRun ? fmtDate(lastRun.finishedAt) : 'Never',
-      icon: Database,
-      small: true,
-    },
   ]
 
   return (
@@ -444,9 +432,7 @@ export function TrainingPage() {
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
               <t.icon size={16} className="text-primary" />
             </div>
-            <p
-              className={`${t.small ? 'text-[13px]' : 'text-[19px]'} leading-tight font-bold break-words text-text`}
-            >
+            <p className="text-[19px] leading-tight font-bold break-words text-text">
               {t.value}
             </p>
             <p className="mt-1 text-[12px] text-muted">{t.label}</p>
