@@ -11,6 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { useSync } from "../../context/SyncContext";
 import { formatDate } from "../../utils/formatDate";
+import { DatePickerPopover } from "./DatePickerPopover";
 import type { CaseFilters, DateMode, QuickFilter } from "../../hooks/useCaseFilters";
 
 export function DateFilterBar({ f }: { f: CaseFilters }) {
@@ -22,11 +23,6 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
   const windowLabel = w
     ? `${w.from ? formatDate(w.from) : "…"} – ${w.to ? formatDate(w.to) : "…"}`
     : null;
-
-  const inputStyle: React.CSSProperties = {
-    background: gl.inputBg, border: gl.border, color: gl.text,
-    colorScheme: gl.isDark ? "dark" : "light",
-  };
 
   return (
     <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-2xl"
@@ -61,36 +57,16 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
         })}
       </div>
 
-      {/* specific date */}
+      {/* specific date — one calendar click picks the day */}
       {f.dateMode === "specific" && (
-        <div className="flex items-center gap-2">
-          <input type="date" value={f.specificDate ?? ""}
-            onChange={(e) => f.setSpecificDate(e.target.value || null)}
-            aria-label={t("date.specificDate")}
-            className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
-          {f.specificDate && (
-            <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>
-          )}
-        </div>
+        <DatePickerPopover mode="single" date={f.specificDate}
+          onPick={f.setSpecificDate} />
       )}
 
-      {/* date range */}
+      {/* date range — two-month calendar, click start then end */}
       {f.dateMode === "range" && (
-        <div className="flex items-center gap-2">
-          {([
-            { label: t("date.from"), value: f.dateFrom, set: f.setDateFrom },
-            { label: t("date.to"),   value: f.dateTo,   set: f.setDateTo },
-          ]).map((r) => (
-            <label key={r.label} className="flex items-center gap-1.5">
-              <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>{r.label}</span>
-              <input type="date" value={r.value ?? ""} onChange={(e) => r.set(e.target.value || null)}
-                className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
-              {r.value && (
-                <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(r.value)}</span>
-              )}
-            </label>
-          ))}
-        </div>
+        <DatePickerPopover mode="range" from={f.dateFrom} to={f.dateTo}
+          onPick={(from, to) => { f.setDateFrom(from); f.setDateTo(to); }} />
       )}
 
       {/* quick chips */}
