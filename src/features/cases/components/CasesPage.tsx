@@ -12,6 +12,7 @@ import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
 import { ModalShell } from "../../../components/ui/Modal";
 import { Pagination } from "./global/Pagination";
+import { EmptyState } from "./global/EmptyState";
 import { CasePreview } from "./global/CasePreview";
 import { FilterPanel } from "./filters/FilterPanel";
 import { DateFilterBar } from "./filters/DateFilterBar";
@@ -146,7 +147,7 @@ export function CasesPage({
   setTab: (t: CaseTab) => void;
 }) {
   const { gl } = useTheme();
-  const { syncing, syncVersion } = useSync();
+  const { syncing, syncVersion, runSync } = useSync();
   const { t } = useLang();
   useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
@@ -360,6 +361,9 @@ export function CasesPage({
   // so a coder can't finish a filtered queue and think ALL cases are done
   const unfilteredComplete = activeComplete.length;
   const unfilteredIncomplete = activeGroups.reduce((s, g) => s + g.cases.length, 0);
+  // nothing synced at all (fresh start / after reset): every pool is empty, so
+  // the empty tabs point at Sync instead of at another equally empty tab
+  const noData = unfilteredComplete === 0 && unfilteredIncomplete === 0 && displayFinished.length === 0;
 
   // tabs are the single source of counts (stat cards removed — they duplicated these)
   const finishedCount = visibleFinished.length;
@@ -552,6 +556,19 @@ export function CasesPage({
               <div style={panelStyle(0)} inert={currentIdx !== 0 || undefined}
                 role="tabpanel" id="cases-panel-complete" aria-labelledby="cases-tab-complete">
                 <div className="p-3 space-y-2">
+                  {/* truly empty queue (not a filter artifact): say why, offer
+                      the action that fills it — sync when nothing is loaded at
+                      all, otherwise the tab where the waiting work actually is */}
+                  {unfilteredComplete === 0 && (noData ? (
+                    <EmptyState icon={CheckCircle2}
+                      title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
+                      actionLabel={t("empty.noData.action")} onAction={runSync} />
+                  ) : (
+                    <EmptyState icon={CheckCircle2}
+                      title={t("empty.complete.title")} subtext={t("empty.complete.sub")}
+                      actionLabel={unfilteredIncomplete > 0 ? t("empty.action.viewIncomplete", { n: unfilteredIncomplete }) : undefined}
+                      onAction={unfilteredIncomplete > 0 ? () => switchTab("incomplete") : undefined} />
+                  ))}
                   {/* forgot-the-filter guard: empty filtered list ≠ finished queue */}
                   {filters.active && filters.totalComplete === 0 && unfilteredComplete > 0 && (
                     <div className="text-center py-8">
@@ -565,7 +582,9 @@ export function CasesPage({
                     </div>
                   )}
                   {/* selection toolbar: the header checkbox selects/clears ALL filtered
-                      cases; individual row checkboxes below allow picking a subset */}
+                      cases; individual row checkboxes below allow picking a subset.
+                      Hidden at zero rows — "Select all (0)" invites a no-op. */}
+                  {filters.totalComplete > 0 && (
                   <div className="flex items-center gap-2.5 px-1 py-0.5">
                     <label className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
                       style={{ background: gl.inputBg, border: gl.border }}>
@@ -591,6 +610,7 @@ export function CasesPage({
                       </button>
                     )}
                   </div>
+                  )}
                   {pagedComplete.map((c) => (
                       <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
                         style={{
@@ -624,8 +644,10 @@ export function CasesPage({
                         </div>
                       </div>
                   ))}
-                  <Pagination current={completePage} total={filters.totalComplete} perPage={PER_PAGE}
-                    onPage={setCompletePage} />
+                  {filters.totalComplete > 0 && (
+                    <Pagination current={completePage} total={filters.totalComplete} perPage={PER_PAGE}
+                      onPage={setCompletePage} />
+                  )}
                 </div>
               </div>
 
@@ -633,6 +655,16 @@ export function CasesPage({
               <div style={panelStyle(1)} inert={currentIdx !== 1 || undefined}
                 role="tabpanel" id="cases-panel-incomplete" aria-labelledby="cases-tab-incomplete">
                 <div className="p-3 space-y-2">
+                  {unfilteredIncomplete === 0 && (noData ? (
+                    <EmptyState icon={AlertCircle}
+                      title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
+                      actionLabel={t("empty.noData.action")} onAction={runSync} />
+                  ) : (
+                    <EmptyState icon={AlertCircle}
+                      title={t("empty.incomplete.title")} subtext={t("empty.incomplete.sub")}
+                      actionLabel={unfilteredComplete > 0 ? t("empty.action.viewComplete", { n: unfilteredComplete }) : undefined}
+                      onAction={unfilteredComplete > 0 ? () => switchTab("complete") : undefined} />
+                  ))}
                   {filters.active && filters.totalIncomplete === 0 && unfilteredIncomplete > 0 && (
                     <div className="text-center py-8">
                       <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
@@ -644,6 +676,7 @@ export function CasesPage({
                       </button>
                     </div>
                   )}
+                  {filters.totalIncomplete > 0 && (
                   <div className="flex items-center gap-2.5 px-1 py-0.5">
                     <label className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
                       style={{ background: gl.inputBg, border: gl.border }}>
@@ -669,6 +702,7 @@ export function CasesPage({
                       </button>
                     )}
                   </div>
+                  )}
                   {pagedIncomplete.map((c) => (
                     <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
                       style={{
@@ -714,8 +748,10 @@ export function CasesPage({
                       </div>
                     </div>
                   ))}
-                  <Pagination current={incompletePage} total={filters.totalIncomplete} perPage={PER_PAGE}
-                    onPage={setIncompletePage} />
+                  {filters.totalIncomplete > 0 && (
+                    <Pagination current={incompletePage} total={filters.totalIncomplete} perPage={PER_PAGE}
+                      onPage={setIncompletePage} />
+                  )}
                 </div>
               </div>
 
@@ -725,11 +761,8 @@ export function CasesPage({
                 role="tabpanel" id="cases-panel-reopen" aria-labelledby="cases-tab-reopen">
                 <div className="p-3 space-y-2">
                   {reopenRows.length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
-                        {t("reopen.empty")}
-                      </p>
-                    </div>
+                    <EmptyState icon={RotateCcw}
+                      title={t("empty.reopen.title")} subtext={t("empty.reopen.sub")} />
                   )}
                   {filters.active && visibleReopen.length === 0 && reopenRows.length > 0 && (
                     <div className="text-center py-8">
@@ -803,7 +836,9 @@ export function CasesPage({
                       </div>
                     );
                   })}
-                  <Pagination current={1} total={visibleReopen.length} perPage={PER_PAGE} />
+                  {visibleReopen.length > 0 && (
+                    <Pagination current={1} total={visibleReopen.length} perPage={PER_PAGE} />
+                  )}
                 </div>
               </div>
 
@@ -811,6 +846,25 @@ export function CasesPage({
               <div style={panelStyle(3)} inert={currentIdx !== 3 || undefined}
                 role="tabpanel" id="cases-panel-finished" aria-labelledby="cases-tab-finished">
                 <div className="p-3 space-y-2">
+                  {displayFinished.length === 0 && (
+                    <EmptyState icon={Flag}
+                      title={t("empty.finished.title")} subtext={t("empty.finished.sub")}
+                      actionLabel={unfilteredComplete > 0 ? t("empty.action.viewComplete", { n: unfilteredComplete }) : undefined}
+                      onAction={unfilteredComplete > 0 ? () => switchTab("complete") : undefined} />
+                  )}
+                  {/* same forgot-the-filter guard as the queues — Finished
+                      bypasses useCaseFilters' lists, so it's applied here */}
+                  {filters.active && visibleFinished.length === 0 && displayFinished.length > 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
+                        {t("filter.emptyHidden", { n: displayFinished.length })}
+                      </p>
+                      <button onClick={filters.clearAll} className="text-[12px] font-bold mt-1.5 hover:opacity-80 transition-all"
+                        style={{ color: gl.accent }}>
+                        {t("filter.showAll")}
+                      </button>
+                    </div>
+                  )}
                   {visibleFinished.map((c) => (
                     // whole-row click is a mouse convenience; the View button below
                     // is the keyboard/screen-reader path to the same action
@@ -864,7 +918,9 @@ export function CasesPage({
                       </button>
                     </div>
                   ))}
-                  <Pagination current={1} total={visibleFinished.length} perPage={5} />
+                  {visibleFinished.length > 0 && (
+                    <Pagination current={1} total={visibleFinished.length} perPage={5} />
+                  )}
                 </div>
               </div>
 
