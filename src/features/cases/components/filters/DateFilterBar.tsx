@@ -88,9 +88,6 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
             onChange={(e) => f.setSpecificDate(e.target.value || null)}
             aria-label={t("date.specificDate")}
             className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
-          {f.specificDate && (
-            <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>
-          )}
         </div>
       )}
 
@@ -105,9 +102,6 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
               <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>{r.label}</span>
               <input type="date" value={r.value ?? ""} onChange={(e) => r.set(e.target.value || null)}
                 className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
-              {r.value && (
-                <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(r.value)}</span>
-              )}
             </label>
           ))}
         </div>
