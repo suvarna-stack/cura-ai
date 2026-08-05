@@ -1,4 +1,3 @@
-import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Bot, User, Send, Sparkles, BookOpen, Brain } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
