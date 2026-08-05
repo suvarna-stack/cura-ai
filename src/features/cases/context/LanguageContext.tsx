@@ -132,8 +132,6 @@ export const dict: Record<string, { en: string; th: string }> = {
   "date.to":           { en: "To",            th: "ถึง" },
   "date.title":        { en: "Sync period",   th: "ช่วงเวลาซิงค์" },
   "date.clearFilter":  { en: "Clear period",  th: "ล้างช่วงเวลา" },
-  "date.pickDate":     { en: "Pick a date",   th: "เลือกวันที่" },
-  "date.pickRange":    { en: "Pick a period", th: "เลือกช่วงวันที่" },
   // activity log
   "activity.title":    { en: "Activity Log",  th: "บันทึกกิจกรรม" },
   "activity.undo":     { en: "Undo",          th: "ยกเลิก" },

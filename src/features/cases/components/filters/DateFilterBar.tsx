@@ -11,8 +11,15 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { useSync } from "../../context/SyncContext";
 import { formatDate } from "../../utils/formatDate";
-import { DatePickerPopover } from "./DatePickerPopover";
 import type { CaseFilters, DateMode, QuickFilter } from "../../hooks/useCaseFilters";
+
+/** Local YYYY-MM-DD (toISOString would shift the day in TH). */
+function isoToday(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 export function DateFilterBar({ f }: { f: CaseFilters }) {
   const { gl } = useTheme();
@@ -24,10 +31,13 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
     ? `${w.from ? formatDate(w.from) : "…"} – ${w.to ? formatDate(w.to) : "…"}`
     : null;
 
+  const inputStyle: React.CSSProperties = {
+    background: gl.inputBg, border: gl.border, color: gl.text,
+    colorScheme: gl.isDark ? "dark" : "light",
+  };
+
   return (
-    // z-30: the bar's backdrop-filter makes it its own stacking layer — without
-    // an elevated z-index the calendar popover paints UNDER the tab row below
-    <div className="relative z-30 flex items-center gap-2 flex-wrap px-3 py-2 rounded-2xl"
+    <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-2xl"
       style={{
         background: gl.card, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
         border: f.dateActive ? `1px solid rgba(${gl.accentRgb},0.35)` : gl.border,
@@ -47,8 +57,20 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
           { mode: "quick"    as DateMode, label: `⚡ ${t("date.quick")}` },
         ]).map((m) => {
           const active = f.dateMode === m.mode;
+          // entering a mode pre-fills today, so the inputs show a REAL value
+          // (dark, and matching the Sync button) instead of the browser's pale
+          // placeholder skeleton — the complaint behind this default
+          const activate = () => {
+            f.setDateMode(active ? null : m.mode);
+            if (active) return;
+            if (m.mode === "specific" && !f.specificDate) f.setSpecificDate(isoToday());
+            if (m.mode === "range") {
+              if (!f.dateFrom) f.setDateFrom(isoToday());
+              if (!f.dateTo) f.setDateTo(isoToday());
+            }
+          };
           return (
-            <button key={m.mode} onClick={() => f.setDateMode(active ? null : m.mode)}
+            <button key={m.mode} onClick={activate}
               className="text-[12px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap hover:opacity-90 transition-all"
               style={active
                 ? { background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff", border: `1px solid rgba(${gl.accentRgb},0.45)` }
@@ -59,16 +81,36 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
         })}
       </div>
 
-      {/* specific date — one calendar click picks the day */}
+      {/* specific date */}
       {f.dateMode === "specific" && (
-        <DatePickerPopover mode="single" date={f.specificDate}
-          onPick={f.setSpecificDate} />
+        <div className="flex items-center gap-2">
+          <input type="date" value={f.specificDate ?? ""}
+            onChange={(e) => f.setSpecificDate(e.target.value || null)}
+            aria-label={t("date.specificDate")}
+            className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
+          {f.specificDate && (
+            <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(f.specificDate)}</span>
+          )}
+        </div>
       )}
 
-      {/* date range — two-month calendar, click start then end */}
+      {/* date range */}
       {f.dateMode === "range" && (
-        <DatePickerPopover mode="range" from={f.dateFrom} to={f.dateTo}
-          onPick={(from, to) => { f.setDateFrom(from); f.setDateTo(to); }} />
+        <div className="flex items-center gap-2">
+          {([
+            { label: t("date.from"), value: f.dateFrom, set: f.setDateFrom },
+            { label: t("date.to"),   value: f.dateTo,   set: f.setDateTo },
+          ]).map((r) => (
+            <label key={r.label} className="flex items-center gap-1.5">
+              <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>{r.label}</span>
+              <input type="date" value={r.value ?? ""} onChange={(e) => r.set(e.target.value || null)}
+                className="text-[12px] font-medium px-2 py-1.5 rounded-lg outline-none" style={inputStyle} />
+              {r.value && (
+                <span className="text-[12px] font-semibold" style={{ color: gl.accent }}>{formatDate(r.value)}</span>
+              )}
+            </label>
+          ))}
+        </div>
       )}
 
       {/* quick chips */}

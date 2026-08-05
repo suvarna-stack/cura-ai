@@ -105,3 +105,16 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Native date inputs (sync-period bar): the empty-state placeholder skeleton
+   (dd/mm/yyyy — Safari paints today's date) renders pale on the glass
+   surfaces; force the segment text to the input's own color at full opacity. */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="date"]::-webkit-datetime-edit-text {
+  color: currentColor;
+  opacity: 1;
+  font-weight: 600;
+}
