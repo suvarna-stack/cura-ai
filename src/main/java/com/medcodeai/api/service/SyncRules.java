@@ -1,9 +1,7 @@
 package com.medcodeai.api.service;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,17 +32,6 @@ public final class SyncRules {
             Map.entry('V', "External"), Map.entry('W', "External"),
             Map.entry('X', "External"), Map.entry('Y', "External"),
             Map.entry('Z', "Factors"));
-
-    // sync.py:31 REQUIRED_SECTIONS — OPD completeness (F03): need one of each group.
-    // LinkedHashMap to keep insertion order (chief, exam, assessment) like the
-    // Python dict — the missing[] list order is part of the stored value.
-    private static final Map<String, Set<String>> REQUIRED_SECTIONS = new LinkedHashMap<>();
-
-    static {
-        REQUIRED_SECTIONS.put("chief", Set.of("Chief Complaint", "Subjective"));
-        REQUIRED_SECTIONS.put("exam", Set.of("Physical Examination", "Objective"));
-        REQUIRED_SECTIONS.put("assessment", Set.of("Assessment", "Progression", "Present Illness"));
-    }
 
     // sync.py:86 DIAG_ROLE — hospital diagnosistype → our code_role (Q3 mapping)
     public static final Map<String, String> DIAG_ROLE = Map.of(
@@ -120,31 +107,21 @@ public final class SyncRules {
     }
 
     /**
-     * sync.py:158 completeness (F03) [POC]. Returns the missing[] labels in the
-     * source's order; empty means complete. IPD (enc "1") uses the discharge-audit
-     * rule (admission note + clinical summary); OPD needs one section of each
-     * required group. Completeness is about the DOCUMENTATION only — whether the
-     * chart holds everything a coder (or the AI suggester) needs. Whether a
-     * diagnosis has been coded yet is the work this product does, so it is
-     * deliberately NOT part of the rule (changed 2026-08-02; previously a
-     * missing principal dx made every uncoded case "incomplete").
+     * Completeness (F03) [POC]. Returns the missing[] labels; empty means
+     * complete. Rule changed 2026-08-05: a case is complete when the hospital
+     * data ALREADY CARRIED both code systems at sync time — at least one ICD-10
+     * diagnosis and at least one ICD-9 procedure. The old documentation-section
+     * rule (chief/exam/assessment, admission note/clinical summary) is gone;
+     * completeness now means "arrived already coded", and everything else is
+     * the coding work this product queues up. Same rule for OPD and IPD.
      */
-    public static List<String> missingSections(String enc, Set<String> fieldnames,
-                                                Set<String> documenttypes) {
+    public static List<String> missingCodes(boolean hasIcd10, boolean hasIcd9) {
         java.util.ArrayList<String> missing = new java.util.ArrayList<>();
-        if ("1".equals(enc)) {
-            if (!documenttypes.contains("Admission Note")) {
-                missing.add("admission_note");
-            }
-            if (!documenttypes.contains("Clinical Summary")) {
-                missing.add("discharge_summary");
-            }
-        } else {
-            for (Map.Entry<String, Set<String>> e : REQUIRED_SECTIONS.entrySet()) {
-                if (java.util.Collections.disjoint(fieldnames, e.getValue())) {
-                    missing.add(e.getKey());
-                }
-            }
+        if (!hasIcd10) {
+            missing.add("icd10");
+        }
+        if (!hasIcd9) {
+            missing.add("icd9");
         }
         return missing;
     }

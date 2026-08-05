@@ -40,6 +40,11 @@ public class CasesViewService {
 
     private static Map<String, String> missingLabels() {
         Map<String, String> m = new LinkedHashMap<>();
+        // 2026-08-05 rule: complete = hospital data arrived already coded
+        m.put("icd10", "ICD-10 diagnosis codes");
+        m.put("icd9", "ICD-9 procedure codes");
+        // legacy keys — rows synced under the old documentation rule keep
+        // their stored missing_detail until re-synced
         m.put("chief", "Chief complaint / subjective note");
         m.put("exam", "Physical examination / objective note");
         m.put("assessment", "Assessment / progression note");

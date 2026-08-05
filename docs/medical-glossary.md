@@ -97,7 +97,7 @@ per row.
 
 | Our role | Hospital's word | Plain meaning |
 |---|---|---|
-| `principal_diagnosis` | `PRIMARY_DIAGNOSIS` | The main reason for the visit. Exactly one (§5). A case without one counts as incomplete. |
+| `principal_diagnosis` | `PRIMARY_DIAGNOSIS` | The main reason for the visit. Exactly one (§5). |
 | `secondary_diagnosis` | `COMORBIDITY` | Another condition the patient also has that affects care. |
 | `other` | `OTHERS` | Present but not driving this visit. |
 | `external_cause` | `EXTERNAL_CAUSE_OF_INJURY` | *How* an injury happened, never the injury itself. ICD-10 chapters V–Y. |
@@ -226,7 +226,7 @@ the *primary* source for choosing the principal diagnosis).
 | **Plan** | What will be done next. |
 | **Progression** | How the patient is changing over time. |
 | **Order** | Instructions written (drugs, tests). |
-| **Subjective / Objective** | SOAP-note names for the same ideas: what the patient reports vs what was measured. Our completeness rule treats Subjective as an alternative to Chief Complaint, Objective as an alternative to Physical Examination. |
+| **Subjective / Objective** | SOAP-note names for the same ideas: what the patient reports vs what was measured. |
 
 `ccpi` in the API is a 120-character preview built from Chief Complaint →
 Subjective → Present Illness — a display snippet, not a clinical concept.
@@ -346,7 +346,7 @@ and note where they diverge from §5.
 |---|---|
 | **Disease group** | First letter of the principal ICD-10 code → a label (`I` → Cardiovascular, `E` → Endocrinology, `Z` → Factors); no principal code → `"Ungrouped"` (195 cases). A chapter bucket, not a grouping used in medicine, and **not** a DRG. |
 | **Severity** (low/medium/high) | Purely a count of secondary diagnoses: 0 low, 1–2 medium, ≥3 high. It does **not** mean the patient is sicker, and it is not the DRG complexity level. |
-| **Completeness / missing** | Does the chart have the required pieces? OPD: one of each of the chief / exam / assessment section groups, plus a principal diagnosis. IPD: an Admission Note, a Clinical Summary, plus a principal diagnosis. Labels: `chief`, `exam`, `assessment`, `admission_note`, `discharge_summary`, `primary_diagnosis`. A crude echo of the real audit criteria in §1/§5. |
+| **Completeness / missing** | Did the case arrive from the hospital **already coded**? Complete = at sync time the hospital data carried at least one ICD-10 diagnosis AND at least one ICD-9 procedure; anything less is incomplete — the coding work this product queues up. Labels: `icd10`, `icd9`. (Rule changed 2026-08-05; before that it checked chart documentation sections — old labels `chief`, `exam`, `assessment`, `admission_note`, `discharge_summary` may persist on rows not yet re-synced.) |
 | **Case status** | `open` → `in_review` → `approved`, or `reopened`. Our workflow, not a hospital state. |
 | **Confidence** | Would be an AI score; no source exists, always null. |
 | **Incomplete groups** (`surgery`, `ct-x-ray`, `medicine`, `other`) | Dashboard buckets derived from a case's orders, for filtering the work queue. |

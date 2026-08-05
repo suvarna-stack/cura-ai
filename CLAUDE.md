@@ -359,6 +359,21 @@ Milestones (git log --oneline reads as this sequence):
   keyboard drag-reorder of code priority is the one tracked follow-up. Lint's
   7 remaining errors are PRE-EXISTING react-hooks/react-refresh findings,
   untouched deliberately.
+- ✅ **Completeness rule = "arrived already coded" (2026-08-05):** the third
+  incarnation of the [POC] completeness rule. A case is now **complete** when
+  the hospital data at sync time already carried BOTH code systems — ≥1 ICD-10
+  diagnosis and ≥1 ICD-9 procedure; anything less is **incomplete** (missing
+  labels `icd10` / `icd9`). Replaces the documentation-sections rule
+  (chief/exam/assessment, admission note/clinical summary) entirely — same
+  rule for OPD and IPD. `SyncRules.missingCodes(hasIcd10, hasIcd9)` replaced
+  `missingSections`; `SyncService.writeCase` derives the booleans from the
+  hospital diagnosis/procedure rows (truthy `icd` only — same filter as code
+  import); `CasesViewService.MISSING_LABEL` gained the two new keys and KEEPS
+  the legacy ones, because stored `missing_detail` values only recompute on
+  the next sync (finalized cases are skipped by sync, so theirs stay frozen
+  under the old rule until reset/re-import). API shape unchanged
+  (`completeness_status`, `missing_detail`, `missing` all as before) — only
+  the semantics moved; glossary §11 updated, contract/types untouched.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

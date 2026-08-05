@@ -179,14 +179,9 @@ public class SyncService {
                            boolean isNew, String now, Map<String, Integer> stats) {
         String enc = SyncRules.encounterType(str(p.get("admissionnumber")));
 
-        Set<String> haveFields = new HashSet<>();
-        Set<String> docTypes = new HashSet<>();
-        for (Map<String, Object> s : b.sections()) {
-            haveFields.add(str(s.get("fieldname")));
-            docTypes.add(str(s.get("documenttype")));
-        }
         Map<String, Object> primary = null;
         int comorbidities = 0;
+        boolean hasIcd10 = false;
         for (Map<String, Object> d : b.diags()) {
             String dtype = str(d.get("diagnosistype"));
             if (primary == null && "PRIMARY_DIAGNOSIS".equals(dtype)) {
@@ -195,8 +190,17 @@ public class SyncService {
             if ("COMORBIDITY".equals(dtype)) {
                 comorbidities++;
             }
+            if (truthy(str(d.get("icd")))) {
+                hasIcd10 = true;
+            }
         }
-        List<String> missing = SyncRules.missingSections(enc, haveFields, docTypes);
+        boolean hasIcd9 = false;
+        for (Map<String, Object> pr : b.procs()) {
+            if (truthy(str(pr.get("icd")))) {
+                hasIcd9 = true;
+            }
+        }
+        List<String> missing = SyncRules.missingCodes(hasIcd10, hasIcd9);
         String completeness = missing.isEmpty() ? "complete" : "incomplete";
         String missingDetail = missing.isEmpty() ? null : String.join(",", missing);
         String group = SyncRules.diseaseGroup(primary == null ? null : str(primary.get("icd")));
