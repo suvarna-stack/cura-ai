@@ -9,6 +9,7 @@ import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -101,7 +102,27 @@ public class ImedApiClient {
 
     /** GET /api/cases — all hospital visits (medhack_patient). */
     public List<Map<String, Object>> cases() {
-        return getRows("/api/cases");
+        return cases(null, null);
+    }
+
+    /**
+     * GET /api/cases windowed on the visit datetime — the hospital resolves a
+     * visit's datetime as admissiondatetime, else the datetime encoded in the
+     * transaction number. Bounds are inclusive, passed through verbatim
+     * (normalization is the hospital's contract); null bound = unbounded.
+     */
+    public List<Map<String, Object>> cases(String from, String to) {
+        StringBuilder uri = new StringBuilder("/api/cases");
+        List<Object> vars = new ArrayList<>();
+        if (from != null) {
+            uri.append("?from={from}");
+            vars.add(from);
+        }
+        if (to != null) {
+            uri.append(from != null ? "&" : "?").append("to={to}");
+            vars.add(to);
+        }
+        return getRows(uri.toString(), vars.toArray());
     }
 
     public List<Map<String, Object>> medicalRecords(String tn) {

@@ -382,6 +382,33 @@ Milestones (git log --oneline reads as this sequence):
   restored audit rows FK to it (`coding_history.user_id`,
   `case_codes.assigned_by`, `knowledge_base.taught_by`).
   `DemoBaselineService.reset()` + contract updated.
+- ✅ **Time-windowed sync (2026-08-05):** coders pick a visit-date period and
+  pull only those cases, instead of always fetching the hospital's full list.
+  `POST /api/sync` takes an optional `{from, to}` body (`YYYY-MM-DD` or
+  datetime, inclusive, either side optional; malformed → 400; response echoes
+  a `window` key only when windowed). The filter runs HOSPITAL-side:
+  imed-mock's `GET /api/cases` gained `from`/`to` on the **visit datetime** —
+  `admissiondatetime` when filled, else the **YYMMDDHHMMSS encoded at
+  positions 4–15 of the transaction number** (verified identical to the
+  notes' recorddatetime on all 21 seed visits; `admissiondatetime` is blank
+  throughout the seed) — plus a `changed_since` filter backed by a new
+  `updated_at` text column on the two code tables (stamped by every /api/v1
+  create/update/cancel; visit-level max, floored at the visit datetime; seed
+  rows stay NULL; mock migration 0003 + baseline-schema ALTER so demo reset's
+  positional INSERT…SELECT * survives). medcode does NOT expose
+  `changed_since` yet — it's reserved for the deferred auto-sync; both
+  filters together are hospital open question 16 in `docs/imed-integration.md`.
+  Frontend: the header Sync button now opens `SyncDialog` (Today / Last 7
+  days / All presets + date inputs, defaults to today) → `runSync({from,to})`.
+  Tests: mock list-filter + changed_since tests (16/16 green);
+  `bulkSyncAcceptsAVisitDatetimeWindow` in `CasesApiIntegrationTest`.
+  **Found while testing, NOT fixed here: 13 pre-existing
+  CasesApiIntegrationTest failures** — the suite's KNOWN_CASE_ID/
+  APPROVABLE_CASE_ID are April-2026 TNs from the retired dataset, but the DB
+  now holds the curated July demo dataset (empty-start-state era), so every
+  test needing an approved/known case fails regardless of this change
+  (verified identical red set on a clean checkout). The suite needs re-basing
+  onto the new demo data.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

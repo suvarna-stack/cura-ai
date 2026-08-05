@@ -66,7 +66,25 @@ public class SyncService {
 
     /** Sync every case the hospital currently exposes. */
     public Map<String, Object> syncAll() {
-        return run(imed.cases());
+        return syncAll(null, null);
+    }
+
+    /**
+     * Sync only the cases whose VISIT datetime falls in [from, to] — the
+     * hospital resolves a visit's datetime (admissiondatetime, else the
+     * datetime encoded in the transaction number) and filters its list
+     * server-side; a null bound leaves that side open. Same non-destructive
+     * per-case rules either way.
+     */
+    public Map<String, Object> syncAll(String from, String to) {
+        Map<String, Object> out = run(imed.cases(from, to));
+        if (from != null || to != null) {
+            Map<String, Object> window = new LinkedHashMap<>();
+            window.put("from", from);
+            window.put("to", to);
+            out.put("window", window);
+        }
+        return out;
     }
 
     /** Sync one case; 404 when the hospital doesn't expose that transaction number. */

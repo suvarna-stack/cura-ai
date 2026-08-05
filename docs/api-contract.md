@@ -282,8 +282,26 @@ production ships with them off.
 
 ### POST /api/sync — pull case data from the hospital
 
-No request body. Fetches every case the hospital's iMed API exposes and loads
-it into medcode. **Non-destructive** (safe to re-run) — per case:
+Request body optional. With no body (or an empty object) fetches every case
+the hospital's iMed API exposes; with a window it pulls only the cases whose
+**visit datetime** falls inside it:
+
+```jsonc
+{ "from": "2026-07-22",            // optional; YYYY-MM-DD or "YYYY-MM-DD HH:MM[:SS]"
+  "to":   "2026-07-25" }           // optional; either side may be omitted
+```
+
+Bounds are inclusive and filtered by the hospital server-side; a date-only
+bound covers the whole day (`from` → 00:00:00, `to` → 23:59:59). The visit
+datetime is the hospital's rule: `admissiondatetime` when the extract filled
+it, else the datetime encoded in the transaction number. A malformed bound is
+`400 {"error": "<field> must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]"}`. Note
+the window selects by when the patient VISITED, not by when hospital data last
+changed — the hospital list also supports `changed_since` (its `updated_at`
+stamps) but medcode does not expose that yet.
+
+Loads the fetched cases into medcode. **Non-destructive** (safe to re-run) —
+per case:
 
 - **new** (unknown to medcode) → full import;
 - **open** → hospital-sourced data refreshed (the `cases` clinical columns,
@@ -304,7 +322,10 @@ it briefly blocks approve/reopen. Response:
   "skippedApproved": ["<case_id>", …],   // finalized, left untouched
   "failed": [ { "caseId": "<case_id>", "error": "<message>" }, … ],
   "stats": { "cases": 0, "sections": 0, "codes": 0, "orders": 0,
-             "chunks": 0, "vitals": 0, "coverageTypes": 0, "catalogCodes": 0 } }
+             "chunks": 0, "vitals": 0, "coverageTypes": 0, "catalogCodes": 0 },
+  "window": { "from": "2026-07-22", "to": "2026-07-25" } }
+  // "window" echoes the request bounds (null for an omitted side) and is
+  // ABSENT entirely on an unwindowed sync — the old shape is unchanged.
 ```
 
 Before the per-case loop, sync also mirrors the hospital's ICD reference
@@ -313,9 +334,9 @@ this database's `icd_10`/`icd_9` tables — insert new codes, fill blank
 descriptions, never overwrite an existing description. `stats.catalogCodes`
 counts the rows that changed.
 
-Note: the hospital's list endpoint has no "changed since" filter, so the fetch
-pulls the full list; only the writes are selective. `document_chunks` is
-populated for future retrieval but has no reader today.
+Note: an unwindowed sync pulls the hospital's full list; only the writes are
+selective. `document_chunks` is populated for future retrieval but has no
+reader today.
 
 ### POST /api/cases/{caseId}/sync — sync one case from the hospital
 

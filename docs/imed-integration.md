@@ -150,3 +150,22 @@ the shape is ours to negotiate.
     panel (2026-07-31). Is that reading right, and should return rows be
     shown, netted against the ordered quantity, or hidden in a coder-facing
     order list? (Their own CPOE screen shows plain positive quantities.)
+16. **Case-list filters: visit window + changed-since (2026-08-05, we built
+    both into the mock — this is the production ask)**. Our sync now pulls
+    selectively instead of fetching the full visit list every time. The case
+    list feed needs, in production:
+    (a) a **visit-datetime window** (`from`/`to`, inclusive) — we resolve a
+    visit's datetime as `admissiondatetime` when filled, else the
+    **YYMMDDHHMMSS we found encoded in positions 4–15 of the transaction
+    number** (matches the notes' recorddatetime on every extract visit we
+    have. Is that TN format guaranteed, and is `admissiondatetime` filled for
+    IPD only?);
+    (b) a **`changed_since` filter** — "visits whose data changed after T".
+    The mock backs this with an `updated_at` stamp on the diagnosis/procedure
+    rows (every create/update/cancel through the write API stamps it; the
+    filter takes the newest stamp per visit, floored at the visit datetime).
+    In their system the rolled-up "last changed" must also cover new
+    notes/labs/vitals landing on the visit, however they track that — a
+    modification timestamp, an extract-job stamp, anything visit-level works
+    for us. Without (b), a case synced once and coded later on their side
+    only reaches us when someone re-pulls its visit window.

@@ -469,6 +469,50 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void bulkSyncAcceptsAVisitDatetimeWindow() throws Exception {
+        // A window over nothing is a valid, empty sync — and the response
+        // echoes the window (the key is ABSENT on unwindowed syncs).
+        JsonNode none = postSync("{\"from\":\"2030-01-01\",\"to\":\"2030-01-02\"}");
+        assertTrue(none.get("ok").asBoolean());
+        assertTrue(none.get("imported").isEmpty() && none.get("refreshed").isEmpty()
+                && none.get("skippedApproved").isEmpty() && none.get("failed").isEmpty());
+        assertEquals("2030-01-01", none.get("window").get("from").asString());
+        assertEquals("2030-01-02", none.get("window").get("to").asString());
+
+        // One-day window: the hospital filters on the VISIT datetime, which its
+        // transaction numbers encode at positions 4-9 as YYMMDD — so every
+        // touched case must be from that day, and no other day leaks in.
+        JsonNode day = postSync("{\"from\":\"2026-07-24\",\"to\":\"2026-07-24\"}");
+        int touched = 0;
+        for (String bucket : List.of("imported", "refreshed", "skippedApproved")) {
+            for (JsonNode id : day.get(bucket)) {
+                assertEquals("260724", id.asString().substring(3, 9),
+                        "case outside the window was synced: " + id.asString());
+                touched++;
+            }
+        }
+        assertTrue(touched > 0, "the seeded hospital has visits on 2026-07-24");
+        assertTrue(day.get("failed").isEmpty());
+        assertTrue(day.get("window").get("to").asString().equals("2026-07-24"));
+
+        // malformed bound → 400 before any hospital call
+        mvc.perform(post("/api/sync").header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from\":\"next-tuesday\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error")
+                        .value("from must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]"));
+    }
+
+    private JsonNode postSync(String body) throws Exception {
+        String resp = mvc.perform(post("/api/sync").header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(resp);
+    }
+
     // ---- GET /api/icd-codes -------------------------------------------------
     // Added 2026-07-29 after the ICD-catalog split silently broke this endpoint:
     // its SQL still read the dropped `icd_codes` table, which compiles fine

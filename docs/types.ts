@@ -312,11 +312,25 @@ export interface DemoBaselineResponse {
 }
 
 /**
- * POST /api/sync (all cases) and POST /api/cases/{caseId}/sync (one case) — no
- * request body. Non-destructive pull from the hospital: new cases imported,
- * open cases refreshed (coder work kept), finalized cases skipped. For the
- * per-case route the arrays hold at most that one id; 404 if the hospital has
- * no such case.
+ * POST /api/sync request body — optional, and every field optional. Windows
+ * the pull to cases whose VISIT datetime (admissiondatetime, else the datetime
+ * encoded in the transaction number) falls in [from, to], filtered by the
+ * hospital server-side. Bounds inclusive; "YYYY-MM-DD" (a bare date covers the
+ * whole day) or "YYYY-MM-DD HH:MM[:SS]". Malformed → 400. Omit the body (or
+ * both fields) to pull everything.
+ */
+export interface SyncRequest {
+  from?: string;
+  to?: string;
+}
+
+/**
+ * POST /api/sync (all cases, optional SyncRequest window) and
+ * POST /api/cases/{caseId}/sync (one case — no request body).
+ * Non-destructive pull from the hospital: new cases imported, open cases
+ * refreshed (coder work kept), finalized cases skipped. For the per-case
+ * route the arrays hold at most that one id; 404 if the hospital has no such
+ * case.
  */
 export interface SyncResponse {
   ok: true;
@@ -340,6 +354,9 @@ export interface SyncResponse {
      *  blank descriptions filled; existing descriptions never overwritten) */
     catalogCodes: number;
   };
+  /** Echo of the request window (null for an omitted side). ABSENT on an
+   *  unwindowed sync — and always absent on the per-case route. */
+  window?: { from: string | null; to: string | null };
 }
 
 // ---------- POST /api/cases/{caseId}/suggest-codes ----------
