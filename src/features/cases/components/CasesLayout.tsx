@@ -6,11 +6,9 @@ import {
   Settings,
   Cpu,
   LogOut,
-  RefreshCw,
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
-import { useSync } from '../context/SyncContext'
 import { CasesProviders } from '../context/CasesProviders'
 import { useAuth } from '../../auth/hooks/useAuth'
 
@@ -24,7 +22,6 @@ const NAV = [
 function CoderShell() {
   const { gl } = useTheme()
   const { t } = useLang()
-  const { syncing, lastSync, runSync } = useSync()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
@@ -35,8 +32,6 @@ function CoderShell() {
   const handleLogout = () => {
     void logout().finally(() => navigate('/login', { replace: true }))
   }
-
-  const syncFailed = lastSync === 'sync.failed'
 
   return (
     <div
@@ -89,7 +84,8 @@ function CoderShell() {
           ))}
         </nav>
 
-        {/* logged-in coder + iMed sync + logout (coders never see the admin sidebar) */}
+        {/* logged-in coder + logout (coders never see the admin sidebar).
+            Syncing lives in the Dashboard's date bar, not up here. */}
         <div className="ml-auto flex items-center gap-2">
           {/* identity badge — quietest of the three, it is a label not a control */}
           {user && (
@@ -105,30 +101,7 @@ function CoderShell() {
               {user.fullName ?? user.email}
             </span>
           )}
-          {/* Sync is the primary header action — accent fill, same pill language
-              as the active nav item; turns danger-tinted when the last run failed */}
-          {/* header Sync = always the full pull; the Dashboard's date bar
-              offers the period-scoped variant */}
-          <button
-            type="button"
-            onClick={() => runSync()}
-            disabled={syncing}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-95 disabled:opacity-60"
-            style={{
-              color: syncFailed ? gl.danger : gl.accent,
-              background: syncFailed
-                ? `color-mix(in srgb, ${gl.danger} 14%, transparent)`
-                : `rgba(${gl.accentRgb},0.16)`,
-              border: syncFailed
-                ? `1px solid color-mix(in srgb, ${gl.danger} 32%, transparent)`
-                : `1px solid rgba(${gl.accentRgb},0.28)`,
-            }}
-            title={`${t('sync.label')} · ${t(lastSync)}`}
-          >
-            <RefreshCw size={14} className={syncing ? 'animate-spin' : undefined} />
-            {syncing ? t('sync.syncing') : t('sync.btn')}
-          </button>
-          {/* Logout — neutral glass chip: defined, but never competes with Sync */}
+          {/* Logout — neutral glass chip */}
           <button
             type="button"
             onClick={handleLogout}
