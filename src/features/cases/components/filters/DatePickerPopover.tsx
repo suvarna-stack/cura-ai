@@ -14,6 +14,22 @@ import { CalendarDays, ChevronDown } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { formatDate } from "../../utils/formatDate";
+import type { GL } from "../../types/theme.types";
+
+/**
+ * Theme vars for the calendar. They MUST sit on DayPicker's own root element
+ * (its `style` prop): style.css declares defaults on `.rdp-root`, which beat
+ * any value merely inherited from a wrapper.
+ */
+const rdpVars = (gl: GL): React.CSSProperties => ({
+  "--rdp-accent-color": gl.accent,
+  "--rdp-accent-background-color": `rgba(${gl.accentRgb},0.16)`,
+  "--rdp-today-color": gl.accent,
+  "--rdp-font-family": "inherit",
+  "--rdp-day-height": "2.1rem",
+  "--rdp-day-width": "2.1rem",
+  "--rdp-months-gap": "1rem", // default 2rem pushes two months past the panel cap -> vertical wrap
+} as React.CSSProperties);
 
 /** Local YYYY-MM-DD <-> Date (toISOString would shift the day in TH). */
 const toIso = (d: Date): string => {
@@ -92,20 +108,16 @@ export function DatePickerPopover(props: SingleProps | RangeProps) {
         <div id={panelId} role="dialog" aria-label={label}
           className="absolute left-0 top-full z-40 mt-2 rounded-2xl p-3"
           style={{
-            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+            // solid surface (glass over the case cards makes day numbers illegible)
+            background: gl.isDark ? "#1c1917" : "#ffffff",
             border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
             color: gl.text,
-            // react-day-picker theming — its grid inherits `color`, the vars
-            // paint selection/range/today in the app accent
-            ["--rdp-accent-color" as string]: gl.accent,
-            ["--rdp-accent-background-color" as string]: `rgba(${gl.accentRgb},0.16)`,
-            ["--rdp-today-color" as string]: gl.accent,
-            ["--rdp-font-family" as string]: "inherit",
-            ["--rdp-day-height" as string]: "2.1rem",
-            ["--rdp-day-width" as string]: "2.1rem",
+            // shrink-to-fit against the narrow trigger would wrap the two
+            // months vertically — size to the calendar itself instead
+            width: "max-content", maxWidth: "min(92vw, 44rem)",
           }}>
           {props.mode === "single" ? (
-            <DayPicker mode="single" required={false}
+            <DayPicker mode="single" required={false} style={rdpVars(gl)}
               locale={lang === "th" ? th : enUS}
               selected={fromIso(props.date)}
               defaultMonth={fromIso(props.date) ?? new Date()}
@@ -114,7 +126,7 @@ export function DatePickerPopover(props: SingleProps | RangeProps) {
                 if (d) setOpen(false); // one click picks the day and closes
               }} />
           ) : (
-            <DayPicker mode="range" required={false} numberOfMonths={2}
+            <DayPicker mode="range" required={false} numberOfMonths={2} style={rdpVars(gl)}
               locale={lang === "th" ? th : enUS}
               selected={{ from: fromIso(props.from), to: fromIso(props.to) }}
               defaultMonth={fromIso(props.from) ?? new Date()}

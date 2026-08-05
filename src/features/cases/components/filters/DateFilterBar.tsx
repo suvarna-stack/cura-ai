@@ -25,7 +25,9 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
     : null;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-2xl"
+    // z-30: the bar's backdrop-filter makes it its own stacking layer — without
+    // an elevated z-index the calendar popover paints UNDER the tab row below
+    <div className="relative z-30 flex items-center gap-2 flex-wrap px-3 py-2 rounded-2xl"
       style={{
         background: gl.card, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
         border: f.dateActive ? `1px solid rgba(${gl.accentRgb},0.35)` : gl.border,
