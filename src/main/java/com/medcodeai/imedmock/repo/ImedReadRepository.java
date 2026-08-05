@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSetMetaData;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,8 +43,55 @@ public class ImedReadRepository {
                 "SELECT 1 FROM imed.medhack_patient WHERE transactionnumber = ? LIMIT 1", tn).isEmpty();
     }
 
-    public List<Map<String, Object>> cases() {
-        return jdbc.query("SELECT * FROM imed.medhack_patient ORDER BY transactionnumber", ROW);
+    /**
+     * A visit's datetime for the from/to filter: admissiondatetime when the
+     * extract filled it (IPD), else the YYMMDDHHMMSS the hospital encodes in
+     * positions 4-15 of the transaction number (matches the notes'
+     * recorddatetime on every seeded visit). NULL when neither parses — such
+     * rows never match a window filter.
+     */
+    private static final String VISIT_DT = """
+            COALESCE(
+              CASE WHEN p.admissiondatetime ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                   THEN p.admissiondatetime::timestamp END,
+              CASE WHEN p.transactionnumber ~ '^...[0-9]{12}'
+                   THEN to_timestamp(substring(p.transactionnumber from 4 for 12),
+                                     'YYMMDDHH24MISS')::timestamp END)""";
+
+    /**
+     * When the visit's data last changed: the newest updated_at across its
+     * code rows (stamped by every /api/v1 write, cancels included), floored
+     * at the visit datetime itself (seed rows carry no stamp — their change
+     * time is the visit).
+     */
+    private static final String LAST_CHANGED = """
+            GREATEST(""" + VISIT_DT + """
+            ,
+              (SELECT max(d.updated_at::timestamp) FROM imed.medhack_diagnosis_icd10 d
+                WHERE d.transactionnumber = p.transactionnumber
+                  AND d.updated_at ~ '^[0-9]{4}-'),
+              (SELECT max(pr.updated_at::timestamp) FROM imed.medhack_procedure_icd9 pr
+                WHERE pr.transactionnumber = p.transactionnumber
+                  AND pr.updated_at ~ '^[0-9]{4}-'))""";
+
+    /** All visits, optionally windowed; every bound is inclusive and pre-normalized by the controller. */
+    public List<Map<String, Object>> cases(String from, String to, String changedSince) {
+        StringBuilder sql = new StringBuilder("SELECT p.* FROM imed.medhack_patient p WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (from != null) {
+            sql.append(" AND ").append(VISIT_DT).append(" >= ?::timestamp");
+            params.add(from);
+        }
+        if (to != null) {
+            sql.append(" AND ").append(VISIT_DT).append(" <= ?::timestamp");
+            params.add(to);
+        }
+        if (changedSince != null) {
+            sql.append(" AND ").append(LAST_CHANGED).append(" >= ?::timestamp");
+            params.add(changedSince);
+        }
+        sql.append(" ORDER BY transactionnumber");
+        return jdbc.query(sql.toString(), ROW, params.toArray());
     }
 
     // one method per table; tn-scoped, insertion order (no reliable natural key)

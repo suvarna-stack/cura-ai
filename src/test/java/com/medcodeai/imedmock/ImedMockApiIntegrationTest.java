@@ -69,12 +69,72 @@ class ImedMockApiIntegrationTest {
     }
 
     @Test
+    void casesListWindowsOnVisitDatetime() throws Exception {
+        // from/to filter on the visit datetime (TN positions 4-15, since the
+        // extract's admissiondatetime is blank); whole-day bounds, inclusive
+        JsonNode windowed = getJson("/api/cases?from=2026-07-24&to=2026-07-25");
+        assertTrue(windowed.size() > 0, "seeded visits exist on 2026-07-24/25");
+        JsonNode all = getJson("/api/cases");
+        assertTrue(windowed.size() < all.size(), "window must actually filter");
+        for (JsonNode c : windowed) {
+            String day = c.get("transactionnumber").asString().substring(3, 9);
+            assertTrue(day.equals("260724") || day.equals("260725"),
+                    "visit outside window served: " + c.get("transactionnumber"));
+        }
+        // datetime bounds narrow within a day; out-of-range is empty, not an error
+        String afternoon = mvc.perform(get("/api/cases")
+                        .param("from", "2026-07-24 14:00").param("to", "2026-07-24T23:59"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(json.readTree(afternoon).size() > 0, "T and space datetime forms both accepted");
+        assertEquals(0, getJson("/api/cases?from=2030-01-01").size());
+        mvc.perform(get("/api/cases").param("from", "tuesday"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void casesListChangedSinceSeesApiWrites() throws Exception {
+        String farFuture = "2100-01-01";
+        assertEquals(0, getJson("/api/cases?changed_since=" + farFuture).size());
+
+        // a write through /api/v1 stamps updated_at → the case (visit dated
+        // 2026-07-24) surfaces for a changed_since long after its visit
+        String today = java.time.LocalDate.now().toString();
+        JsonNode created = postDiagnosis(rid(), "Z01.8", "Other specified special examinations",
+                null, null);
+        String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
+        try {
+            assertTrue(containsTn(getJson("/api/cases?changed_since=" + today), KNOWN_TN),
+                    "written case must match changed_since");
+        } finally {
+            mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
+                    .header("Authorization", AUTH)).andExpect(status().isOk());
+        }
+        // a cancel is a change too — the case still matches after cleanup
+        assertTrue(containsTn(getJson("/api/cases?changed_since=" + today), KNOWN_TN));
+    }
+
+    private static boolean containsTn(JsonNode cases, String tn) {
+        for (JsonNode c : cases) {
+            if (tn.equals(c.get("transactionnumber").asString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Test
     void perCaseTablesServeRowsForKnownCase() throws Exception {
-        JsonNode diags = getJson("/api/cases/" + KNOWN_TN + "/diagnoses");
-        assertTrue(diags.size() > 0, "known case has imported diagnosis rows");
-        assertTrue(diags.get(0).has("icd"));
-        mvc.perform(get("/api/cases/{tn}/orders/labs", KNOWN_TN)).andExpect(status().isOk());
-        mvc.perform(get("/api/cases/{tn}/vital-signs", KNOWN_TN)).andExpect(status().isOk());
+        // The demo dataset starts UNCODED (2026-08-05 empty-start-state prep):
+        // diagnoses/procedures are empty until a write-back lands, so assert
+        // the clinical tables that do ship rows.
+        JsonNode notes = getJson("/api/cases/" + KNOWN_TN + "/medical-records");
+        assertTrue(notes.size() > 0, "known case has clinical note rows");
+        assertTrue(notes.get(0).has("recorddatetime"), "extract column names served verbatim");
+        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/orders/labs").size() > 0);
+        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/vital-signs").size() > 0);
+        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/diagnoses").isArray(),
+                "uncoded case serves [] (not an error) for diagnoses");
     }
 
     @Test

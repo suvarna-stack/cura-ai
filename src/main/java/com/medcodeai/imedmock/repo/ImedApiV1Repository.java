@@ -31,6 +31,11 @@ public class ImedApiV1Repository {
         this.jdbc = jdbc;
     }
 
+    /** Change stamp for the code tables — feeds the list endpoint's changed_since filter. */
+    private static String now() {
+        return LocalDateTime.now().format(TS);
+    }
+
     // ---- request_id dedup ---------------------------------------------------
 
     /** The stored response for a replayed request_id, or null when first seen. */
@@ -61,9 +66,9 @@ public class ImedApiV1Repository {
             String icd, String diagnosistype) {
         jdbc.update("""
                 INSERT INTO imed.medhack_diagnosis_icd10
-                (transactionnumber, encountertype, id, name, icd, diagnosistype, is_cancelled)
-                VALUES (?,?,?,?,?,?,NULL)""",
-                tn, encountertype, objectId, name, icd, diagnosistype);
+                (transactionnumber, encountertype, id, name, icd, diagnosistype, is_cancelled, updated_at)
+                VALUES (?,?,?,?,?,?,NULL,?)""",
+                tn, encountertype, objectId, name, icd, diagnosistype, now());
     }
 
     /** Updates only the provided (non-null) fields; 0 rows = unknown object_id. */
@@ -71,15 +76,15 @@ public class ImedApiV1Repository {
         return jdbc.update("""
                 UPDATE imed.medhack_diagnosis_icd10
                 SET name = COALESCE(?, name), icd = COALESCE(?, icd),
-                    diagnosistype = COALESCE(?, diagnosistype)
+                    diagnosistype = COALESCE(?, diagnosistype), updated_at = ?
                 WHERE transactionnumber = ? AND id = ? AND is_cancelled IS DISTINCT FROM '1'""",
-                name, icd, diagnosistype, tn, objectId);
+                name, icd, diagnosistype, now(), tn, objectId);
     }
 
     public int cancelIcd10(String tn, String objectId) {
         return jdbc.update("""
-                UPDATE imed.medhack_diagnosis_icd10 SET is_cancelled = '1'
-                WHERE transactionnumber = ? AND id = ?""", tn, objectId);
+                UPDATE imed.medhack_diagnosis_icd10 SET is_cancelled = '1', updated_at = ?
+                WHERE transactionnumber = ? AND id = ?""", now(), tn, objectId);
     }
 
     // ---- ICD-9 procedure rows ----------------------------------------------
@@ -89,9 +94,9 @@ public class ImedApiV1Repository {
         jdbc.update("""
                 INSERT INTO imed.medhack_procedure_icd9
                 (transactionnumber, encountertype, id, name, icd, startdatetime, enddatetime,
-                 operationtype, is_cancelled)
-                VALUES (?,?,?,?,?,?,?,?,NULL)""",
-                tn, encountertype, objectId, name, icd, startdatetime, enddatetime, operationtype);
+                 operationtype, is_cancelled, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,NULL,?)""",
+                tn, encountertype, objectId, name, icd, startdatetime, enddatetime, operationtype, now());
     }
 
     public int updateIcd9(String tn, String objectId, String name, String icd,
@@ -101,15 +106,15 @@ public class ImedApiV1Repository {
                 SET name = COALESCE(?, name), icd = COALESCE(?, icd),
                     startdatetime = COALESCE(?, startdatetime),
                     enddatetime = COALESCE(?, enddatetime),
-                    operationtype = COALESCE(?, operationtype)
+                    operationtype = COALESCE(?, operationtype), updated_at = ?
                 WHERE transactionnumber = ? AND id = ? AND is_cancelled IS DISTINCT FROM '1'""",
-                name, icd, startdatetime, enddatetime, operationtype, tn, objectId);
+                name, icd, startdatetime, enddatetime, operationtype, now(), tn, objectId);
     }
 
     public int cancelIcd9(String tn, String objectId) {
         return jdbc.update("""
-                UPDATE imed.medhack_procedure_icd9 SET is_cancelled = '1'
-                WHERE transactionnumber = ? AND id = ?""", tn, objectId);
+                UPDATE imed.medhack_procedure_icd9 SET is_cancelled = '1', updated_at = ?
+                WHERE transactionnumber = ? AND id = ?""", now(), tn, objectId);
     }
 
     // ---- medical discharge --------------------------------------------------

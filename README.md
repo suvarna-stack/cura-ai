@@ -45,7 +45,7 @@ non-uniform in the source; parsing is the consumer's job).
 
 | Endpoint | Source table |
 |---|---|
-| `GET /api/cases` | MedHack_Patient (all visits) |
+| `GET /api/cases` | MedHack_Patient (all visits; optional `from`/`to` window on the visit datetime — admissiondatetime, else the datetime encoded in the TN — and `changed_since` on the code rows' `updated_at`; bounds inclusive, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]`) |
 | `GET /api/cases/{tn}/medical-records` | MedHack_MedicalRecord |
 | `GET /api/cases/{tn}/medical-record-results` | MedHack_MedicalRecord_result |
 | `GET /api/cases/{tn}/diagnoses` | MedHack_Diagnosis(ICD10) |

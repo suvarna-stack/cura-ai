@@ -9,6 +9,7 @@ import org.springframework.util.FileCopyUtils;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Idempotent startup DDL for everything the real-shaped /api/v1 write API
@@ -30,7 +31,7 @@ import java.nio.charset.StandardCharsets;
  *   pulls these via GET /api/icd10-codes / /api/icd9-codes during sync.
  *
  * Manual mirror of this DDL: db/migrations/0001_api_v1.sql,
- * db/migrations/0002_icd_catalog.sql.
+ * db/migrations/0002_icd_catalog.sql, db/migrations/0003_updated_at.sql.
  */
 @Component
 public class SchemaBootstrap implements ApplicationRunner {
@@ -45,6 +46,20 @@ public class SchemaBootstrap implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         jdbc.execute("ALTER TABLE imed.medhack_diagnosis_icd10 ADD COLUMN IF NOT EXISTS is_cancelled text");
         jdbc.execute("ALTER TABLE imed.medhack_procedure_icd9 ADD COLUMN IF NOT EXISTS is_cancelled text");
+        // updated_at backs the list endpoint's changed_since filter (the
+        // "changed since" ask to the hospital, mocked here first). Seed rows
+        // keep it NULL — their change time is the visit itself, and the filter
+        // falls back to the visit datetime. Stamped by every /api/v1 write.
+        jdbc.execute("ALTER TABLE imed.medhack_diagnosis_icd10 ADD COLUMN IF NOT EXISTS updated_at text");
+        jdbc.execute("ALTER TABLE imed.medhack_procedure_icd9 ADD COLUMN IF NOT EXISTS updated_at text");
+        // A demo baseline snapshotted BEFORE this column existed must grow it
+        // too: /api/demo/reset refills live tables with positional
+        // INSERT … SELECT *, which breaks on a column-count mismatch.
+        for (String t : List.of("medhack_diagnosis_icd10", "medhack_procedure_icd9")) {
+            if (baselineTableExists(t)) {
+                jdbc.execute("ALTER TABLE imed_baseline." + t + " ADD COLUMN IF NOT EXISTS updated_at text");
+            }
+        }
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS imed.imed_request_log (
                     request_id text PRIMARY KEY,
@@ -90,6 +105,12 @@ public class SchemaBootstrap implements ApplicationRunner {
                     is_follow_up                text,
                     is_from                     text
                 )""");
+    }
+
+    private boolean baselineTableExists(String table) {
+        return !jdbc.queryForList(
+                "SELECT 1 FROM pg_tables WHERE schemaname = 'imed_baseline' AND tablename = ?",
+                table).isEmpty();
     }
 
     /**

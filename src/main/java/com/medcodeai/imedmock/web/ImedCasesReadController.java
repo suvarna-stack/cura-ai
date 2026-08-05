@@ -6,10 +6,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * READ direction of the hospital API — "give MedCode AI your case data".
@@ -34,10 +36,37 @@ public class ImedCasesReadController {
         this.repo = repo;
     }
 
+    /** Accepted filter formats; a date-only bound is widened to the whole day. */
+    private static final Pattern DT_PARAM =
+            Pattern.compile("^\\d{4}-\\d{2}-\\d{2}([ T]\\d{2}:\\d{2}(:\\d{2})?)?$");
+
     @GetMapping("/api/cases")
-    @Operation(summary = "All visits — MedHack_Patient")
-    public List<Map<String, Object>> cases() {
-        return repo.cases();
+    @Operation(summary = "All visits — MedHack_Patient",
+            description = "Optionally windowed. `from`/`to` filter on the VISIT datetime "
+                    + "(admissiondatetime, else the datetime encoded in the transaction number), "
+                    + "`changed_since` on when the visit's code rows last changed (updated_at, "
+                    + "floored at the visit datetime). All bounds inclusive, format "
+                    + "`YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]` — a bare date means start-of-day "
+                    + "(`from`/`changed_since`) or end-of-day (`to`).")
+    public List<Map<String, Object>> cases(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(name = "changed_since", required = false) String changedSince) {
+        return repo.cases(normalize("from", from, "00:00:00"),
+                normalize("to", to, "23:59:59"),
+                normalize("changed_since", changedSince, "00:00:00"));
+    }
+
+    private static String normalize(String name, String value, String timeIfDateOnly) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String v = value.trim().replace('T', ' ');
+        if (!DT_PARAM.matcher(v).matches()) {
+            throw new ApiExceptionHandler.BadRequestException(
+                    name + " must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]");
+        }
+        return v.length() == 10 ? v + " " + timeIfDateOnly : v;
     }
 
     @GetMapping("/api/cases/{tn}/medical-records")
