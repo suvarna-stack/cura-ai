@@ -33,8 +33,6 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         <SlidersHorizontal size={12} style={{ color: gl.accent }} />
         <span className="text-[13px] font-bold flex-1" style={{ color: gl.text }}>
           {t("filter.title")}
-          {/* date-filter indicator: coders should notice they're in a dated view */}
-          {f.dateActive && <span className="ml-1.5" title={t("date.title")}>📅</span>}
         </span>
         {f.active && (
           <button onClick={f.clearAll}
@@ -297,7 +295,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         </div>
         ));
       })()}
-      {/* the date filter lives in the DateFilterBar at the top of the Dashboard */}
+      {/* the date bar at the top of the Dashboard picks the SYNC period, not a filter */}
     </div>
   );
 }

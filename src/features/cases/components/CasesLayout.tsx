@@ -8,13 +8,11 @@ import {
   LogOut,
   RefreshCw,
 } from 'lucide-react'
-import { useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
 import { useSync } from '../context/SyncContext'
 import { CasesProviders } from '../context/CasesProviders'
 import { useAuth } from '../../auth/hooks/useAuth'
-import { SyncDialog } from './SyncDialog'
 
 const NAV = [
   { to: '/cases', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: false },
@@ -27,7 +25,6 @@ function CoderShell() {
   const { gl } = useTheme()
   const { t } = useLang()
   const { syncing, lastSync, runSync } = useSync()
-  const [syncDialogOpen, setSyncDialogOpen] = useState(false)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
@@ -110,9 +107,11 @@ function CoderShell() {
           )}
           {/* Sync is the primary header action — accent fill, same pill language
               as the active nav item; turns danger-tinted when the last run failed */}
+          {/* header Sync = always the full pull; the Dashboard's date bar
+              offers the period-scoped variant */}
           <button
             type="button"
-            onClick={() => setSyncDialogOpen(true)}
+            onClick={() => runSync()}
             disabled={syncing}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-95 disabled:opacity-60"
             style={{
@@ -146,11 +145,6 @@ function CoderShell() {
       <div id="main" tabIndex={-1} className="flex min-h-0 flex-1">
         <Outlet />
       </div>
-
-      {/* visit-date period picker — runSync fires with the chosen window */}
-      {syncDialogOpen && (
-        <SyncDialog onStart={runSync} onClose={() => setSyncDialogOpen(false)} />
-      )}
     </div>
   )
 }

@@ -312,31 +312,30 @@ export function CasesPage({
     [displayFinished, reopenRows]);
   const filters = useCaseFilters(activeComplete, activeGroups, facetExtra);
 
-  // Finished bypasses useCaseFilters' lists, so the sidebar facets, text search
-  // and date window are all applied here with the hook's exported predicates
+  // Finished bypasses useCaseFilters' lists, so the sidebar facets and text
+  // search are applied here with the hook's exported predicate (the date bar
+  // no longer filters — it picks the sync period)
   const searchQ = filters.query.trim().toLowerCase();
-  const { matchesDateIso, matchesFacets } = filters;
+  const { matchesFacets } = filters;
   const visibleFinished = useMemo(() =>
     displayFinished.filter(c =>
       matchesFacets(c) &&
-      matchesDateIso(c.created_at) &&
       (searchQ === "" ||
         c.id.toLowerCase().includes(searchQ) ||
         c.patient.toLowerCase().includes(searchQ) ||
         c.coder.toLowerCase().includes(searchQ) ||
         c.drg.toLowerCase().includes(searchQ))),  // drg holds the first ICD code
-    [displayFinished, searchQ, matchesDateIso, matchesFacets]);
+    [displayFinished, searchQ, matchesFacets]);
 
-  // the Reopen tab bypasses useCaseFilters' lists too — same predicates applied here
+  // the Reopen tab bypasses useCaseFilters' lists too — same predicate applied here
   const visibleReopen = useMemo(() =>
     reopenRows.filter(({ c }) =>
       matchesFacets(c) &&
-      matchesDateIso(c.created_at) &&
       (searchQ === "" ||
         c.id.toLowerCase().includes(searchQ) ||
         c.patient.toLowerCase().includes(searchQ) ||
         c.dept.toLowerCase().includes(searchQ))),
-    [reopenRows, searchQ, matchesDateIso, matchesFacets]);
+    [reopenRows, searchQ, matchesFacets]);
 
   // real pagination over the filtered+sorted complete / incomplete lists
   // (feedback items 1, 7); page resets during render when the result set,
@@ -504,8 +503,6 @@ export function CasesPage({
                       : filters.active && t.id === "finished" ? `${t.count}/${displayFinished.length}`
                       : t.count}
                   </span>
-                  {/* date-filter indicator (Prompt 3): the counts are a dated view */}
-                  {filters.dateActive && <span className="text-[12px]">📅</span>}
                 </button>
               );
             })}

@@ -1,18 +1,27 @@
 // ============================================================
-// Horizontal date-filter bar — sits at the top of the Dashboard
-// (moved out of the FilterPanel sidebar for better UX: dates are
-// the first thing coders narrow by). Same state/API as the other
-// filters via useCaseFilters.
+// Horizontal date bar — sits at the top of the Dashboard.
+// Repurposed 2026-08-05: the selected period no longer filters
+// the case lists, it is the SYNC period — the bar's Sync button
+// pulls only the hospital cases whose visit date falls inside it
+// (POST /api/sync {from,to}); with nothing selected it reads
+// "Sync all" and pulls everything. State via useCaseFilters.
 // ============================================================
-import { CalendarDays, X } from "lucide-react";
+import { CalendarDays, RefreshCw, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import { useSync } from "../../context/SyncContext";
 import { formatDate } from "../../utils/formatDate";
 import type { CaseFilters, DateMode, QuickFilter } from "../../hooks/useCaseFilters";
 
 export function DateFilterBar({ f }: { f: CaseFilters }) {
   const { gl } = useTheme();
   const { t } = useLang();
+  const { syncing, runSync } = useSync();
+
+  const w = f.syncWindow;
+  const windowLabel = w
+    ? `${w.from ? formatDate(w.from) : "…"} – ${w.to ? formatDate(w.to) : "…"}`
+    : null;
 
   const inputStyle: React.CSSProperties = {
     background: gl.inputBg, border: gl.border, color: gl.text,
@@ -109,7 +118,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
 
       <div className="flex-1" />
 
-      {/* clear */}
+      {/* clear the selected period (back to "Sync all") */}
       {f.dateActive && (
         <button onClick={f.clearDateFilter}
           className="flex items-center gap-1 text-[12px] font-semibold px-2 py-1 rounded-lg hover:opacity-80 transition-all"
@@ -117,6 +126,15 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
           <X size={10} /> {t("date.clearFilter")}
         </button>
       )}
+
+      {/* the action: pull the selected period from the hospital — or everything */}
+      <button onClick={() => runSync(w ?? undefined)} disabled={syncing}
+        className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-all disabled:opacity-60"
+        style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}
+        title={windowLabel ? `${t("sync.label")} · ${windowLabel}` : t("sync.label")}>
+        <RefreshCw size={12} className={syncing ? "animate-spin" : undefined} />
+        {syncing ? t("sync.syncing") : w ? `${t("sync.btn")} ${windowLabel}` : t("sync.all")}
+      </button>
     </div>
   );
 }

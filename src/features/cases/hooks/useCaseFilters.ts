@@ -148,7 +148,9 @@ export interface CaseFilters {
   active: boolean;
   query: string;
   setQuery: (q: string) => void;
-  // ---- date filtering (Prompt 3): compares case.created_at to the window ----
+  // ---- date period (repurposed 2026-08-05): the selection no longer filters
+  // the case lists — it is the SYNC period. DateFilterBar reads syncWindow and
+  // fires POST /api/sync {from,to}; no selection = sync all.
   dateMode: DateMode;
   setDateMode: (mode: DateMode) => void;
   specificDate: string | null;      // ISO date string (yyyy-mm-dd)
@@ -160,34 +162,35 @@ export interface CaseFilters {
   quickFilter: QuickFilter;
   setQuickFilter: (q: QuickFilter) => void;
   clearDateFilter: () => void;
-  /** true when any date window is currently applied */
+  /** true when a sync period is currently selected */
   dateActive: boolean;
-  /** the active date predicate — exported so the Finished tab (which bypasses
-   *  this hook's lists) can apply the same window to its own rows */
-  matchesDateIso: (iso: string | null | undefined) => boolean;
-  /** the active facet predicate — same reason: lets the Finished tab apply
-   *  the sidebar filters to its enriched rows */
+  /** the selected period as a visit-date window for POST /api/sync
+   *  (inclusive YYYY-MM-DD bounds); null = no selection = sync everything */
+  syncWindow: { from?: string; to?: string } | null;
+  /** the active facet predicate — lets the Finished tab (which bypasses this
+   *  hook's lists) apply the sidebar filters to its enriched rows */
   matchesFacets: (c: FacetableCase) => boolean;
 }
 
-// ---- date window helpers ---------------------------------------------------
-const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+// ---- sync-period helpers ----------------------------------------------------
+/** Local YYYY-MM-DD (toISOString would shift the day in TH). */
+const isoDay = (d: Date): string => {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+};
 
-function inQuickWindow(d: Date, q: Exclude<QuickFilter, null>): boolean {
+/** Quick chip -> period start; the period always ends today. */
+function quickStart(q: Exclude<QuickFilter, null>): string {
   const now = new Date();
   switch (q) {
-    case "today": return sameDay(d, now);
+    case "today": return isoDay(now);
     case "week": {
-      // current Mon–Sun week
       const dow = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
-      const mon = dayStart(new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow));
-      const nextMon = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 7);
-      return d >= mon && d < nextMon;
+      return isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow));
     }
-    case "month": return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    case "year":  return d.getFullYear() === now.getFullYear();
+    case "month": return isoDay(new Date(now.getFullYear(), now.getMonth(), 1));
+    case "year":  return isoDay(new Date(now.getFullYear(), 0, 1));
   }
 }
 
@@ -277,32 +280,21 @@ export function useCaseFilters(
       (c.hn ?? "").toLowerCase().includes(q) ||
       (c.codes ?? []).some((k) => k.code.toLowerCase().includes(q));
 
-    // date window over created_at — applies to ALL tabs (the Finished tab
-    // calls matchesDateIso itself since it bypasses this hook's lists)
+    // the date selection is the SYNC period, not a list filter (2026-08-05):
+    // resolve it to an inclusive {from,to} visit-date window for POST /api/sync
     const dateActive =
       (dateMode === "specific" && specificDate !== null) ||
       (dateMode === "range" && (dateFrom !== null || dateTo !== null)) ||
       (dateMode === "quick" && quickFilter !== null);
-    const matchesDateIso = (iso: string | null | undefined): boolean => {
-      if (!dateActive) return true;
-      if (!iso) return false;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return false;
-      if (dateMode === "specific" && specificDate) return sameDay(d, new Date(`${specificDate}T00:00:00`));
-      if (dateMode === "range") {
-        // inclusive between dateFrom 00:00 and dateTo 23:59
-        if (dateFrom && d < new Date(`${dateFrom}T00:00:00`)) return false;
-        if (dateTo && d > new Date(`${dateTo}T23:59:59.999`)) return false;
-        return true;
-      }
-      if (dateMode === "quick" && quickFilter) return inQuickWindow(d, quickFilter);
-      return true;
-    };
-    const matchesDate = (c: FacetPoolCase) => matchesDateIso(c.created_at);
+    const syncWindow = !dateActive ? null
+      : dateMode === "specific" && specificDate ? { from: specificDate, to: specificDate }
+      : dateMode === "range" ? { from: dateFrom ?? undefined, to: dateTo ?? undefined }
+      : quickFilter ? { from: quickStart(quickFilter), to: isoDay(new Date()) }
+      : null;
 
     const filteredComplete = complete
-      .filter((c) => matches(c, sel) && matchesQuery(c) && matchesDate(c)).sort(bySortMode);
-    const keep = (c: RichCase) => matches(c, sel) && matchesQuery(c) && matchesDate(c);
+      .filter((c) => matches(c, sel) && matchesQuery(c)).sort(bySortMode);
+    const keep = (c: RichCase) => matches(c, sel) && matchesQuery(c);
     // item 13: the Incomplete tab groups by the case's primary order type.
     // (Disease grouping was dropped at the hospital's request — the API still
     // sends disease groups, so the cases are flattened and re-bucketed here.)
@@ -347,7 +339,7 @@ export function useCaseFilters(
     };
 
     const facets: Facet[] = FACET_DEFS.filter((d) => !d.nested).map(({ key, label, labelOf, searchable, embedded }) => {
-      const facetPool = allCases.filter((c) => matchesExcept(c, sel, key) && matchesQuery(c) && matchesDate(c));
+      const facetPool = allCases.filter((c) => matchesExcept(c, sel, key) && matchesQuery(c));
       const counts = new Map<string, number>();
       for (const c of facetPool) for (const v of new Set(facetValue(c, key))) counts.set(v, (counts.get(v) ?? 0) + 1);
       for (const v of sel[key]) if (!counts.has(v)) counts.set(v, 0); // keep selected visible
@@ -391,15 +383,17 @@ export function useCaseFilters(
           if (next[key].has(value)) next[key].delete(value); else next[key].add(value);
           return next;
         }),
-      clearAll: () => { setSel(EMPTY); setQuery(""); clearDateFilter(); },
-      active: chips.length > 0 || q !== "" || dateActive,
+      // clearAll resets the facets/search only — the date selection is the
+      // sync period, cleared by its own bar button
+      clearAll: () => { setSel(EMPTY); setQuery(""); },
+      active: chips.length > 0 || q !== "",
       query, setQuery,
       dateMode, setDateMode,
       specificDate, setSpecificDate,
       dateFrom, setDateFrom,
       dateTo, setDateTo,
       quickFilter, setQuickFilter,
-      clearDateFilter, dateActive, matchesDateIso,
+      clearDateFilter, dateActive, syncWindow,
       matchesFacets: (c: FacetableCase) => matches(c, sel),
     };
   }, [complete, groups, facetExtra, sel, sortMode, query,
