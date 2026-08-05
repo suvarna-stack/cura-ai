@@ -20,15 +20,20 @@ import java.util.Map;
  * TABLE AS, replacing any previous baseline), then tells imed-mock-api to do
  * the same for the hospital DB (imed_baseline schema).
  *
- * reset: truncates + refills every baselined medcode table, prunes accounts
- * created after the snapshot (their sessions too), re-aligns the serial
- * sequences, invalidates the cases cache — then tells imed-mock-api to
- * restore the hospital side. Same two-phase order as approve: our commit
- * first, then the hospital call; a hospital failure 500s with our side done,
- * and re-running the reset heals (both restores are idempotent).
+ * reset: truncates + refills every baselined medcode table EXCEPT users,
+ * re-aligns the serial sequences, invalidates the cases cache — then tells
+ * imed-mock-api to restore the hospital side. Same two-phase order as
+ * approve: our commit first, then the hospital call; a hospital failure 500s
+ * with our side done, and re-running the reset heals (both restores are
+ * idempotent).
  *
- * auth_sessions is deliberately NOT part of the baseline: the demo operator
- * stays logged in through a reset (only sessions of pruned accounts die).
+ * Accounts SURVIVE a reset (2026-08-05 decision — the demo operator adds
+ * coder accounts mid-demo and wants to keep them): live users rows are never
+ * deleted or overwritten; a baseline account is re-inserted only if it was
+ * deleted since the snapshot, because restored audit rows FK to it.
+ *
+ * auth_sessions is deliberately NOT part of the baseline: everyone stays
+ * logged in through a reset.
  */
 @Service
 public class DemoBaselineService {
@@ -95,28 +100,25 @@ public class DemoBaselineService {
                 throw new com.medcodeai.api.web.ApiExceptionHandler.ConflictException(
                         "no demo baseline — POST /api/demo/snapshot first");
             }
-            // one statement so Postgres orders the FK web itself; users stays
-            // (pruned + upserted below so live sessions survive)
+            // one statement so Postgres orders the FK web itself; users is
+            // NOT touched — accounts survive a reset (2026-08-05 decision)
             jdbc.execute("TRUNCATE " + String.join(", ",
                     TABLES.stream().filter(t -> !"users".equals(t)).toList()));
 
-            // accounts created after the snapshot go away, sessions first (FK)
-            jdbc.update("DELETE FROM auth_sessions WHERE user_id NOT IN "
-                    + "(SELECT user_id FROM demo_baseline.users)");
-            jdbc.update("DELETE FROM users WHERE user_id NOT IN "
-                    + "(SELECT user_id FROM demo_baseline.users)");
+            // only re-insert baseline accounts that were deleted since the
+            // snapshot: restored rows (coding_history.user_id,
+            // case_codes.assigned_by, knowledge_base.taught_by) FK to them.
+            // Bare DO NOTHING also swallows an email-unique clash (baseline
+            // account deleted, email reused) — then the refill below fails on
+            // its FK and the whole reset rolls back, which beats silently
+            // resurrecting a replaced account.
             jdbc.update("""
                     INSERT INTO users (user_id, email, oauth_provider, oauth_subject, full_name,
                                        role, status, created_at, last_login_at, password_hash)
                     SELECT user_id, email, oauth_provider, oauth_subject, full_name,
                            role, status, created_at, last_login_at, password_hash
                     FROM demo_baseline.users
-                    ON CONFLICT (user_id) DO UPDATE SET
-                        email = EXCLUDED.email, oauth_provider = EXCLUDED.oauth_provider,
-                        oauth_subject = EXCLUDED.oauth_subject, full_name = EXCLUDED.full_name,
-                        role = EXCLUDED.role, status = EXCLUDED.status,
-                        created_at = EXCLUDED.created_at, last_login_at = EXCLUDED.last_login_at,
-                        password_hash = EXCLUDED.password_hash""");
+                    ON CONFLICT DO NOTHING""");
 
             Map<String, Object> counts = new LinkedHashMap<>();
             for (String t : TABLES) {

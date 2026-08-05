@@ -264,11 +264,12 @@ demo should start. Response
 
 No meaningful request body (legacy `baselineCoder` is ignored). Restores BOTH
 databases to the snapshotted demo baseline: truncates + refills every
-baselined medcode table from `demo_baseline` (accounts created after the
-snapshot are removed along with their sessions — the operator's own session
-survives; serial sequences re-aligned), invalidates the cases cache, then
-tells imed-mock-api to restore the hospital DB (undoing every write-back
-since the snapshot). Two-phase like approve: our side commits first, so a
+baselined medcode table from `demo_baseline` **except `users` — accounts and
+their sessions survive a reset** (accounts added or edited after the snapshot
+are kept as-is; a baseline account is re-created only if it was deleted since
+the snapshot, because restored audit rows reference it; serial sequences
+re-aligned), invalidates the cases cache, then tells imed-mock-api to restore
+the hospital DB (undoing every write-back since the snapshot). Two-phase like approve: our side commits first, so a
 hospital-side failure 500s with medcode already reset — re-running heals.
 Response `{"ok": true, "medcodeTables": {…}, "imedTables": {…}}` ·
 `409` if no snapshot was ever taken.

@@ -374,6 +374,14 @@ Milestones (git log --oneline reads as this sequence):
   under the old rule until reset/re-import). API shape unchanged
   (`completeness_status`, `missing_detail`, `missing` all as before) — only
   the semantics moved; glossary §11 updated, contract/types untouched.
+- ✅ **Demo reset keeps accounts (2026-08-05):** `POST /api/demo/reset` no
+  longer prunes accounts created after the snapshot, and no longer reverts
+  baseline accounts to their snapshotted row — the users table is left as-is
+  (everyone stays logged in). The one exception: a baseline account deleted
+  since the snapshot is re-inserted (`ON CONFLICT DO NOTHING`), because
+  restored audit rows FK to it (`coding_history.user_id`,
+  `case_codes.assigned_by`, `knowledge_base.taught_by`).
+  `DemoBaselineService.reset()` + contract updated.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
