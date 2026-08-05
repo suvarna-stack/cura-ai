@@ -25,11 +25,25 @@ const rdpVars = (gl: GL): React.CSSProperties => ({
   "--rdp-accent-color": gl.accent,
   "--rdp-accent-background-color": `rgba(${gl.accentRgb},0.16)`,
   "--rdp-today-color": gl.accent,
-  "--rdp-font-family": "inherit",
-  "--rdp-day-height": "2.1rem",
-  "--rdp-day-width": "2.1rem",
+  // compact: the library's 44px defaults read enormous next to the app's
+  // 12-13px type scale. day_button is the visible/clickable cell.
+  "--rdp-day-height": "2rem",
+  "--rdp-day-width": "2rem",
+  "--rdp-day_button-height": "1.85rem",
+  "--rdp-day_button-width": "1.85rem",
+  "--rdp-nav_button-height": "1.6rem",
+  "--rdp-nav_button-width": "1.6rem",
+  "--rdp-nav-height": "1.75rem",
+  "--rdp-weekday-padding": "0.25rem",
   "--rdp-months-gap": "1rem", // default 2rem pushes two months past the panel cap -> vertical wrap
+  fontSize: "12.5px",
 } as React.CSSProperties);
+
+/** Typography for the library's inner elements (caption, weekday row). */
+const rdpStyles = (gl: GL) => ({
+  month_caption: { fontSize: "13px", fontWeight: 700, height: "1.75rem" },
+  weekday: { fontSize: "11px", fontWeight: 600, color: gl.muted },
+});
 
 /** Local YYYY-MM-DD <-> Date (toISOString would shift the day in TH). */
 const toIso = (d: Date): string => {
@@ -117,7 +131,7 @@ export function DatePickerPopover(props: SingleProps | RangeProps) {
             width: "max-content", maxWidth: "min(92vw, 44rem)",
           }}>
           {props.mode === "single" ? (
-            <DayPicker mode="single" required={false} style={rdpVars(gl)}
+            <DayPicker mode="single" required={false} style={rdpVars(gl)} styles={rdpStyles(gl)}
               locale={lang === "th" ? th : enUS}
               selected={fromIso(props.date)}
               defaultMonth={fromIso(props.date) ?? new Date()}
@@ -126,7 +140,8 @@ export function DatePickerPopover(props: SingleProps | RangeProps) {
                 if (d) setOpen(false); // one click picks the day and closes
               }} />
           ) : (
-            <DayPicker mode="range" required={false} numberOfMonths={2} style={rdpVars(gl)}
+            <DayPicker mode="range" required={false} numberOfMonths={2}
+              style={rdpVars(gl)} styles={rdpStyles(gl)}
               locale={lang === "th" ? th : enUS}
               selected={{ from: fromIso(props.from), to: fromIso(props.to) }}
               defaultMonth={fromIso(props.from) ?? new Date()}
