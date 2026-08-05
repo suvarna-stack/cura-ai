@@ -10,7 +10,6 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
-import { ConfidencePill } from "./global/ConfidencePill";
 import { ModalShell } from "../../../components/ui/Modal";
 import { Pagination } from "./global/Pagination";
 import { CasePreview } from "./global/CasePreview";
@@ -21,10 +20,6 @@ import { useCases } from "../hooks/useCases";
 import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import type { RichCase } from "../hooks/useCases";
 import { useCaseFilters } from "../hooks/useCaseFilters";
-import {
-  listAiConfidence,
-  usePrefetchAiConfidence,
-} from "../utils/prefetchAiConfidence";
 import type { CaseTab, CompleteCase, IncompleteCase, FinishedCase } from "../types/case.types";
 
 const PER_PAGE = 10;
@@ -361,11 +356,6 @@ export function CasesPage({
   const pagedComplete = filters.filteredComplete.slice((completePage - 1) * PER_PAGE, completePage * PER_PAGE);
   const pagedIncomplete = filteredIncomplete.slice((incompletePage - 1) * PER_PAGE, incompletePage * PER_PAGE);
 
-  // Prefetch RAG confidence for the visible Complete page (no need to open detail).
-  const { loading: aiLoading } = usePrefetchAiConfidence(
-    tab === "complete" ? pagedComplete : [],
-  );
-
   // unfiltered totals — used to make filtered views explicit in the list itself,
   // so a coder can't finish a filtered queue and think ALL cases are done
   const unfilteredComplete = activeComplete.length;
@@ -621,14 +611,7 @@ export function CasesPage({
                           <CaseMeta c={c} />
                           <CasePreview c={c} />
                         </div>
-                        {/* col 3 — AI confidence (prefetched on the list; no detail open needed) */}
-                        <div className="shrink-0 self-stretch flex items-center px-2">
-                          <ConfidencePill
-                            value={listAiConfidence(c.id, c.confidence)}
-                            loading={!!aiLoading[c.id]}
-                          />
-                        </div>
-                        {/* col 4 — actions */}
+                        {/* col 3 — actions */}
                         <div className="flex items-center gap-2 shrink-0 self-stretch">
                           <button onClick={() => openCase(c)}
                             className="text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition-all"
