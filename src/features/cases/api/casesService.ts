@@ -59,17 +59,29 @@ export const reopenCase = (id: string) =>
 export const saveCodesRemote = (id: string, codes: ApiStoredCode[]) =>
   send(`/cases/${encodeURIComponent(id)}/codes`, 'PUT', codes)
 
-/** POST /api/sync — pull every hospital case into medcode (non-destructive). */
+/** POST /api/sync — pull hospital cases into medcode (non-destructive). */
 export interface SyncResult {
   ok: boolean
   imported: string[]
   refreshed: string[]
   skippedApproved: string[]
   failed: Array<{ caseId: string; error: string }>
+  /** echo of the request window; absent when the sync was unwindowed */
+  window?: { from: string | null; to: string | null }
 }
 
-export async function syncFromHospital(): Promise<SyncResult> {
-  const { data } = await apiClient.post<SyncResult>('/sync')
+/** Visit-date window (YYYY-MM-DD, inclusive); omit a side to leave it open. */
+export interface SyncWindow {
+  from?: string
+  to?: string
+}
+
+export async function syncFromHospital(window?: SyncWindow): Promise<SyncResult> {
+  const body =
+    window && (window.from || window.to)
+      ? { from: window.from || undefined, to: window.to || undefined }
+      : {}
+  const { data } = await apiClient.post<SyncResult>('/sync', body)
   return data
 }
 

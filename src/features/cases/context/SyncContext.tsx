@@ -4,6 +4,7 @@
 // The provider component lives in SyncProvider.tsx.
 // ============================================================
 import { createContext, useContext } from "react";
+import type { SyncWindow } from "../api/casesService";
 
 type SyncCtxValue = {
   syncing: boolean;
@@ -11,7 +12,8 @@ type SyncCtxValue = {
   lastSync: string;
   /** bumped when a sync finishes successfully — pass into useCases() to refetch */
   syncVersion: number;
-  runSync: () => void;
+  /** no window (or an empty one) pulls everything, as before */
+  runSync: (window?: SyncWindow) => void;
 };
 
 export const SyncCtx = createContext<SyncCtxValue>({
