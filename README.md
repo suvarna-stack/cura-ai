@@ -78,6 +78,13 @@ response instead of re-executing.
 |---|---|
 | `POST /api/v1/diagnosis` | Create ICD-10 dx + ICD-9 procedures + medical discharge in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
 | `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`; only provided fields change |
+
+POST and PUT also project the discharge status they carry
+(`fix_opd_discharge_status_id` / `fix_ipd_discharge_status_id`) onto the
+visit's own `medhack_patient.dischargestatus` — the extract column
+`GET /api/cases` serves — so an approval's discharge never leaves the visit
+row stale.
+
 | `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis — iMed's cancel flow: flagged `is_cancelled`, never hard-deleted, gone from reads. Idempotent |
 | `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |
 

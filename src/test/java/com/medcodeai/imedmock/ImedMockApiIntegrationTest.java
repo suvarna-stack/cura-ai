@@ -238,6 +238,9 @@ class ImedMockApiIntegrationTest {
         String dcId = created.get("result").get("doctor_discharge_ipd").get("object_id").asString();
         assertTrue(dxId.startsWith("DX10-") && pxId.startsWith("DX9-") && dcId.startsWith("DCI-"));
 
+        // …and the discharge status lands on the visit's own extract row
+        assertEquals("IPD_STATUS_1", patient(KNOWN_TN).get("dischargestatus").asString());
+
         // created rows are visible through the extract reads
         assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
         assertEquals(procsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/procedures").size());
@@ -261,6 +264,18 @@ class ImedMockApiIntegrationTest {
         row = findById(getJson("/api/cases/" + KNOWN_TN + "/diagnoses"), dxId);
         assertEquals("U07.2", row.get("icd").asString());
         assertEquals("COMORBIDITY", row.get("diagnosistype").asString());
+
+        // PUT of the discharge object re-projects onto the patient row
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                         "doctor_discharge":"1",
+                         "doctor_discharge_ipd":{"object_id":"%s",
+                           "fix_ipd_discharge_status_id":"IPD_STATUS_2"}}"""
+                        .formatted(rid(), KNOWN_TN, dcId)))
+                .andExpect(status().isOk());
+        assertEquals("IPD_STATUS_2", patient(KNOWN_TN).get("dischargestatus").asString());
 
         // PUT with a row missing object_id is rejected (mock-only strictness)
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
@@ -420,6 +435,16 @@ class ImedMockApiIntegrationTest {
                  "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
                    "fix_ipd_discharge_type_id":"IPD_TYPE_1"}}"""
                 .formatted(requestId, KNOWN_TN, icd10, dxName);
+    }
+
+    /** The visit's row from the case-list read (medhack_patient, verbatim). */
+    private JsonNode patient(String tn) throws Exception {
+        for (JsonNode c : getJson("/api/cases")) {
+            if (tn.equals(c.get("transactionnumber").asString())) {
+                return c;
+            }
+        }
+        throw new AssertionError("visit " + tn + " missing from /api/cases");
     }
 
     private JsonNode findById(JsonNode rows, String id) {

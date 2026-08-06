@@ -178,6 +178,24 @@ public class ImedApiV1Repository {
                 tn, objectId);
     }
 
+    /**
+     * Projects the medical discharge onto the visit row itself: the status id
+     * the caller sent becomes medhack_patient.dischargestatus, the column the
+     * extract reads (GET /api/cases) serve. The extract is a projection of the
+     * tables this API writes, so the visit row must not drift from the medical
+     * discharge just written: a coding approval that carries a discharge
+     * object shows up on the patient row too.
+     *
+     * Null status (a PUT that omits the field) leaves the stored value alone,
+     * same COALESCE rule as every other update here.
+     */
+    public int updatePatientDischargeStatus(String tn, String statusId) {
+        return jdbc.update("""
+                UPDATE imed.medhack_patient
+                SET dischargestatus = COALESCE(?, dischargestatus)
+                WHERE transactionnumber = ?""", statusId, tn);
+    }
+
     /** Column bundle for the wide IPD discharge row (order = table order). */
     public record DiagnosisIpdFields(String dischargeDoctorEid, String statusId, String typeId,
             String note, String reasonAdmission, String physicalExamination, String diagnostic,

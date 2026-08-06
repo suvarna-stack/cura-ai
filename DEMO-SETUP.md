@@ -108,7 +108,9 @@ Health checks: `http://localhost:8003/api/health`, `:8001/api/health` →
    code columns just stay empty — the demo still works, minus suggestions).
 5. Add/edit codes → **Approve** → the case moves to Finished, and on the
    hospital DB new rows appear in `imed.medhack_diagnosis_icd10` and
-   `imed.doctor_discharge_opd` (that's the write-back proof).
+   `imed.doctor_discharge_opd`, and that visit's
+   `imed.medhack_patient.dischargestatus` flips to the status the approval
+   sent (that's the write-back proof).
 6. **Settings → Reset demo** → both databases return to step 2's state, your
    login survives. If reset returns 409 "no demo baseline", the dumps didn't
    include the baseline schemas — re-restore, or freeze a new baseline with
