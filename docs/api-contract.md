@@ -400,6 +400,57 @@ Since the 2026-07-28 split this reads the `icd_10` and `icd_9` tables (one
 `icd_codes` table before then); `system` in the response says which one a row
 came from, and a code may legitimately exist in both.
 
+### GET /api/analytics — the Analytics page payload
+
+One request serves the whole page; every figure is a roll-up over **OPD visits
+only** (`encountertype = '0'`), the same population `GET /api/cases` serves.
+Query params:
+
+| param      | required | notes |
+|------------|----------|-------|
+| `days`     | no       | length of the `casesOverTime` window, ending today. Default `30`, capped at `365` |
+| `topCodes` | no       | rows in `topCodes`. Default `10`, capped at `50` |
+
+```jsonc
+{
+  "summary": {"total": 21, "complete": 4, "incomplete": 16, "reopened": 0, "finished": 1},
+  "casesOverTime": [ {"iso": "2026-07-22T00:00:00", "count": 1}, … ],
+  "coverageCounts": [ {"label": "OFC", "count": 5}, … ],
+  "topCodes": [ {"label": "D17.1 · lipoma at back", "count": 2,
+                 "code": "D17.1", "system": "ICD-10",
+                 "description": "lipoma at back"}, … ]
+}
+```
+
+- **`summary`** is the dashboard payload's `stats` object *verbatim* (served
+  from the same CasesCache), so the Analytics tiles can never drift from the
+  Dashboard's counts. `reopened` is its own exclusive queue — only `total`
+  covers all four.
+- **`casesOverTime`** has exactly `days` points, oldest first, **zero-filled**:
+  a day the hospital saw nobody is a `0`, not a missing point. A visit is dated
+  by `admissiondatetime`, else by the `YYMMDDHHMMSS` encoded at positions 4-15
+  of its transaction number — the same rule imed-mock-api applies to its
+  visit-date window, so both systems date a visit identically. A visit that
+  matches neither is absent from the series (but still counted in `summary`).
+  `iso` is **local midnight with no zone suffix** — a `Z` would render as the
+  previous day west of UTC.
+- **`coverageCounts`** groups by สิทธิการรักษา *scheme family* (`UCS`, `OFC`,
+  `WEL`, …), biggest first — not by raw `coverage_code`, of which the extract
+  carries ~40 variants of a handful of schemes. Visits whose coverage the
+  extract left blank group under `ไม่ระบุสิทธิ`.
+- **`topCodes`** ranks both catalogs together, counting every `case_codes` row
+  — imported-from-iMed and coder-assigned alike. `label` is `"code · description"`,
+  falling back to the bare code when the catalog has no description;
+  `code`/`system`/`description` are the same values unjoined, so a client can
+  relabel without parsing.
+
+`400 {"error": "days must be between 1 and 365"}` /
+`{"error": "topCodes must be between 1 and 50"}` outside those bounds.
+
+Until 2026-08-06 the Analytics page ran on hardcoded numbers in the frontend
+(a `USE_MOCK` flag); this endpoint replaced them, and no mock path remains —
+a failed request shows an error state rather than plausible fake figures.
+
 ## Authentication
 
 Since 2026-07-25 (Phase 3) auth guards the **whole API surface except**

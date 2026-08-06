@@ -406,6 +406,50 @@ export interface IcdCatalogHit {
   description: string;
 }
 
+// ---------- analytics ----------
+
+/** One point of the Cases-Over-Time series. */
+export interface AnalyticsDayPoint {
+  /** Local midnight, NO zone suffix ("2026-07-22T00:00:00") — a `Z` would
+   *  render as the previous day west of UTC. */
+  iso: string;
+  count: number;
+}
+
+/** One slice of the coverage donut: a สิทธิการรักษา scheme family, or
+ *  "ไม่ระบุสิทธิ" for visits the extract left blank. */
+export interface AnalyticsCoverageSlice {
+  label: string;
+  count: number;
+}
+
+/** One bar of the Top-ICD-Codes list. */
+export interface AnalyticsTopCode {
+  /** "code · description", or the bare code when the catalog has none. */
+  label: string;
+  count: number;
+  code: string;
+  system: "ICD-10" | "ICD-9";
+  description: string | null;
+}
+
+/**
+ * GET /api/analytics?days=…&topCodes=… — the whole Analytics page in one
+ * request. Every figure covers OPD visits only, the same population
+ * GET /api/cases serves.
+ *
+ * `summary` is the dashboard payload's `stats` verbatim, so the tiles cannot
+ * drift from the Dashboard. `casesOverTime` always has exactly `days` points,
+ * oldest first, zero-filled — an empty window is all-zero, never empty.
+ */
+export interface AnalyticsResponse {
+  /** Same shape and numbers as CasesResponse["stats"]. */
+  summary: { total: number; complete: number; incomplete: number; reopened: number; finished: number };
+  casesOverTime: AnalyticsDayPoint[];
+  coverageCounts: AnalyticsCoverageSlice[];
+  topCodes: AnalyticsTopCode[];
+}
+
 /** 400 / 404 body. 500s return Spring's default error body — the triggering
  *  action (approve/reopen) is idempotent: retry it. */
 export interface ApiError {

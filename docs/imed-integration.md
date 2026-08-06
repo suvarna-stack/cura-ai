@@ -98,6 +98,11 @@ the shape is ours to negotiate.
    Does the visit already have discharge data by then, and does our POST
    update it or fail on it? Can the discharge object echo their existing
    values? Can `doctor_discharge` ever be `"0"`?
+   Meanwhile we send `"Coding Approved"` as the discharge status id, which iMed
+   projects onto the visit's `medhack_patient.dischargestatus` — deliberately
+   not one of their clinical outcomes (`Improved`, `Not Improved`, …), which
+   are the doctor's to set. Their real id slots in via `IMED_DISCHARGE_STATUS_ID`
+   (and `IMED_DISCHARGE_TYPE_ID`), no code change.
 4. **Coder identity**: do our coder accounts get iMed `EMP…` ids for
    `coder_eid` / `doctor_eid`, or one system-level id?
 5. **Cancelled rows & reads**: does the extract/read layer already exclude

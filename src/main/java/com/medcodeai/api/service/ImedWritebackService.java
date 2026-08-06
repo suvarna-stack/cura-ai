@@ -19,9 +19,9 @@ import java.util.UUID;
  * APPROVE: the coder's finalized code set is diffed against the hospital's
  * LIVE rows (fetched through the extract reads, which exclude cancelled
  * rows). Removed codes → DELETE (cancel), changed codes → one PUT, new codes
- * → one POST (which also carries the required medical-discharge object —
- * placeholder master-data ids until the hospital answers open question 3 in
- * docs/imed-integration.md). Every touched row is journaled in
+ * → one POST (which also carries the required medical-discharge object — its
+ * status id is DISCHARGE_STATUS_ID below, the rest placeholder until the
+ * hospital answers open question 3 in docs/imed-integration.md). Every touched row is journaled in
  * imed_write_ops with its before-image. Order is cancel → update → create,
  * so a created code can never collide (409) with a row queued for cancel.
  *
@@ -51,9 +51,33 @@ public class ImedWritebackService {
             String start, String end, String opType) {
     }
 
+    /**
+     * The discharge status id every approve sends (OPD and IPD alike). The
+     * hospital's real master-data ids are still open question 3 in
+     * docs/imed-integration.md, so this is ours to choose until they answer —
+     * and iMed projects it onto the visit's own medhack_patient.dischargestatus,
+     * where the case list shows it. "Coding Approved" says what actually
+     * happened (a coder signed off the codes) and can't be mistaken for one of
+     * the hospital's clinical outcomes ("Improved", "Not Improved", …), which
+     * are the doctor's to set, not ours. IMED_DISCHARGE_STATUS_ID overrides it
+     * — that's where the hospital's id slots in, no code change.
+     */
+    private static final String DISCHARGE_STATUS_ID = envOr("IMED_DISCHARGE_STATUS_ID",
+            "Coding Approved");
+
+    /** IPD-only companion, unused by the patient-row projection; still the
+     *  placeholder until the hospital's discharge-type master data arrives. */
+    private static final String DISCHARGE_TYPE_ID = envOr("IMED_DISCHARGE_TYPE_ID",
+            "IPD_DISCHARGE_TYPE_ID");
+
     private final ImedApiClient imed;
     private final ImedWriteOpsRepository ops;
     private final JsonMapper json = new JsonMapper();
+
+    private static String envOr(String name, String fallback) {
+        String v = System.getenv(name);
+        return v == null || v.isBlank() ? fallback : v;
+    }
 
     public ImedWritebackService(ImedApiClient imed, ImedWriteOpsRepository ops) {
         this.imed = imed;
@@ -225,16 +249,18 @@ public class ImedWritebackService {
         }
         body.put("diagnosis_icd10", icd10);
         body.put("diagnosis_icd9", icd9);
-        // POST requires the visit-type-matching discharge object; placeholder
-        // master-data ids until open question 3 (discharge coupling) is answered
+        // POST requires the visit-type-matching discharge object; the status id
+        // is DISCHARGE_STATUS_ID (see above — iMed projects it onto the visit
+        // row), the rest stays placeholder until open question 3 (discharge
+        // coupling) is answered
         if ("0".equals(encountertype)) {
             Map<String, Object> d = new LinkedHashMap<>();
-            d.put("fix_opd_discharge_status_id", "OPD_DISCHARGE_STATUS_ID");
+            d.put("fix_opd_discharge_status_id", DISCHARGE_STATUS_ID);
             body.put("doctor_discharge_opd", d);
         } else {
             Map<String, Object> d = new LinkedHashMap<>();
-            d.put("fix_ipd_discharge_status_id", "IPD_DISCHARGE_STATUS_ID");
-            d.put("fix_ipd_discharge_type_id", "IPD_DISCHARGE_TYPE_ID");
+            d.put("fix_ipd_discharge_status_id", DISCHARGE_STATUS_ID);
+            d.put("fix_ipd_discharge_type_id", DISCHARGE_TYPE_ID);
             d.put("is_from", "MED_DC");
             body.put("doctor_discharge_ipd", d);
         }

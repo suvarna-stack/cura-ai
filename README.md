@@ -16,6 +16,10 @@ against [docs/api-contract.md](docs/api-contract.md) /
   never touches it directly, it only calls the iMed API (approval results on
   approve/reopen).
 
+> **รันทั้งระบบ (4 repo) ครั้งแรก?** → [RUN-ALL.md](RUN-ALL.md) — คู่มือภาษาไทย
+> ครอบคลุม imed-mock-api + medcode-api + RAG + audit-chart-frontend ตั้งแต่
+> เครื่องเปล่า เอกสารด้านล่างนี้เป็นของ repo นี้ repo เดียว
+
 ## Local dev — first-time setup included
 
 **Just cloned this (or got it from a teammate)?** The databases are NOT
