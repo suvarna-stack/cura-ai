@@ -1,33 +1,18 @@
+import { apiClient } from '../../../lib/axios'
 import type { AnalyticsData } from '../types/analytics.types'
-import { MOCK_ANALYTICS } from '../types/analytics.types'
 
 /**
- * Toggle mock responses until the real analytics API is ready.
+ * Analytics API — live against medcode-api since 2026-08-06. The page used to
+ * render hardcoded demo numbers behind a `USE_MOCK` flag; the server now
+ * rolls the same figures up out of the synced hospital data, so there is no
+ * mock path left to fall back to. A failed request surfaces as an error on
+ * the page rather than as plausible-looking fake data.
  */
-const USE_MOCK = true
 
-/**
- * Placeholder analytics API — wire to shared apiClient when ready.
- */
-export async function fetchAnalytics(): Promise<AnalyticsData> {
-  if (USE_MOCK) {
-    // refresh relative dates each call
-    return {
-      ...structuredClone(MOCK_ANALYTICS),
-      casesOverTime: Array.from({ length: 30 }, (_, i) => {
-        const d = new Date()
-        d.setDate(d.getDate() - (29 - i))
-        return {
-          iso: d.toISOString(),
-          count: 12 + Math.round(10 * Math.abs(Math.sin(i / 4))),
-        }
-      }),
-    }
-  }
-  // TODO: const { data } = await apiClient.get<AnalyticsData>('/analytics')
-  throw new Error('fetchAnalytics is not implemented')
-}
-
-export function isAnalyticsMock(): boolean {
-  return USE_MOCK
+/** GET /api/analytics — the whole page in one round trip. */
+export async function fetchAnalytics(days = 30): Promise<AnalyticsData> {
+  const { data } = await apiClient.get<AnalyticsData>('/analytics', {
+    params: { days },
+  })
+  return data
 }

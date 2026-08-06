@@ -1,41 +1,33 @@
+/** GET /api/analytics. Every figure is a roll-up over OPD visits only —
+ *  the same population the Dashboard lists. */
 export interface AnalyticsData {
+  /** The dashboard's own `stats`, verbatim. `reopened` is its own queue, so
+   *  complete + incomplete + finished only reaches `total` when it is 0. */
   summary: {
     complete: number
     incomplete: number
+    reopened: number
     finished: number
     total: number
   }
+  /** Visits per สิทธิการรักษา scheme family, biggest first. */
   coverageCounts: { label: string; count: number }[]
+  /** One point per day, zero-filled. `iso` is local midnight, no zone suffix. */
   casesOverTime: { iso: string; count: number }[]
-  topCodes: { label: string; count: number }[]
+  /** Most-assigned codes across both catalogs. */
+  topCodes: {
+    label: string
+    count: number
+    code: string
+    system: 'ICD-10' | 'ICD-9'
+    description: string | null
+  }[]
 }
 
-export const MOCK_ANALYTICS: AnalyticsData = {
-  summary: { complete: 754, incomplete: 322, finished: 25, total: 1101 },
-  coverageCounts: [
-    { label: 'UCS (บัตรทอง)', count: 412 },
-    { label: 'SSS (ประกันสังคม)', count: 265 },
-    { label: 'CSMBS (ข้าราชการ)', count: 189 },
-    { label: 'Self-pay', count: 134 },
-  ],
-  casesOverTime: Array.from({ length: 30 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (29 - i))
-    return {
-      iso: d.toISOString(),
-      count: 12 + Math.round(10 * Math.abs(Math.sin(i / 4))),
-    }
-  }),
-  topCodes: [
-    { label: 'I10 · Essential hypertension', count: 143 },
-    { label: 'E11.9 · Type 2 diabetes', count: 121 },
-    { label: 'J44.1 · COPD w/ exacerbation', count: 98 },
-    { label: 'I48.0 · Paroxysmal AF', count: 84 },
-    { label: 'N18.9 · CKD unspecified', count: 71 },
-    { label: 'E78.5 · Hyperlipidemia', count: 65 },
-    { label: 'I25.10 · ASHD', count: 52 },
-    { label: 'J18.9 · Pneumonia', count: 47 },
-    { label: 'I50.9 · Heart failure', count: 39 },
-    { label: 'K21.9 · GERD', count: 33 },
-  ],
+/** Shown while the first request is in flight — never as a fallback. */
+export const EMPTY_ANALYTICS: AnalyticsData = {
+  summary: { complete: 0, incomplete: 0, reopened: 0, finished: 0, total: 0 },
+  coverageCounts: [],
+  casesOverTime: [],
+  topCodes: [],
 }

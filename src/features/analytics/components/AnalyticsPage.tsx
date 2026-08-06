@@ -1,15 +1,21 @@
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { useEffect, useState, type CSSProperties } from 'react'
-import { Layers, CheckCircle2, AlertCircle, Flag } from 'lucide-react'
+import {
+  Layers,
+  CheckCircle2,
+  AlertCircle,
+  Flag,
+  BarChart3,
+  ShieldQuestion,
+  Tags,
+} from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { GlassCard } from '../../cases/components/global/GlassCard'
+import { EmptyState } from '../../cases/components/global/EmptyState'
 import { formatDate } from '../../cases/utils/formatDate'
-import {
-  fetchAnalytics,
-  isAnalyticsMock,
-} from '../api/analyticsService'
+import { fetchAnalytics } from '../api/analyticsService'
 import type { AnalyticsData } from '../types/analytics.types'
-import { MOCK_ANALYTICS } from '../types/analytics.types'
+import { EMPTY_ANALYTICS } from '../types/analytics.types'
 
 function polyline(data: number[], w: number, h: number, pad = 6) {
   const min = 0
@@ -103,9 +109,9 @@ function BarList({
 export function AnalyticsPage() {
   const { gl } = useTheme()
   useDocumentTitle("Analytics")
-  const useMock = isAnalyticsMock()
-  const [data, setData] = useState<AnalyticsData>(MOCK_ANALYTICS)
-  const [loading, setLoading] = useState(!useMock)
+  const [data, setData] = useState<AnalyticsData>(EMPTY_ANALYTICS)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +120,9 @@ export function AnalyticsPage() {
         const next = await fetchAnalytics()
         if (!cancelled) setData(next)
       } catch {
-        // keep MOCK_ANALYTICS
+        // No mock to fall back to: an unreachable server must READ as
+        // unreachable, not as a hospital with zero cases.
+        if (!cancelled) setFailed(true)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -128,6 +136,9 @@ export function AnalyticsPage() {
   const H = 170
   const pad = 12
   const timeCounts = data.casesOverTime.map((d) => d.count)
+  // The series is zero-filled server-side, so "all zero" — not "no points" —
+  // is what an empty window looks like.
+  const noVisits = timeCounts.every((c) => c === 0)
 
   const DONUT_R = 54
   const DONUT_CX = 80
@@ -214,21 +225,33 @@ export function AnalyticsPage() {
             Analytics
           </h1>
           <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
-            {useMock
-              ? 'Demo data (USE_MOCK)'
+            {failed
+              ? 'Could not reach the server'
               : 'Live view of the synced hospital data'}
           </p>
         </div>
       </header>
 
       <div className="space-y-4 p-5">
-        {loading && !useMock ? (
+        {failed && (
+          <GlassCard className="p-5">
+            <EmptyState
+              icon={BarChart3}
+              title="Analytics unavailable"
+              subtext="The server did not answer. These figures are read live on every visit — nothing is cached — so reload once it is back."
+              actionLabel="Reload"
+              onAction={() => window.location.reload()}
+            />
+          </GlassCard>
+        )}
+
+        {loading ? (
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <ChartSkeleton key={i} height={44} />
             ))}
           </div>
-        ) : (
+        ) : failed ? null : (
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {statRow.map((s) => (
               <GlassCard key={s.label} className="p-4">
@@ -255,9 +278,9 @@ export function AnalyticsPage() {
           </div>
         )}
 
-        {loading && !useMock ? (
+        {loading ? (
           <ChartSkeleton height={H} />
-        ) : (
+        ) : failed ? null : (
           <GlassCard className="p-5">
             <p className="mb-1 text-[15px] font-bold" style={{ color: gl.text }}>
               Cases Over Time
@@ -267,6 +290,13 @@ export function AnalyticsPage() {
               {formatDate(data.casesOverTime[0]?.iso ?? new Date())} –{' '}
               {formatDate(data.casesOverTime.at(-1)?.iso ?? new Date())}
             </p>
+            {noVisits ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No visits in this window"
+                subtext="No OPD visit in the last 30 days carries a date. Run a sync to pull more."
+              />
+            ) : (
             <div>
               <svg
                 viewBox={`0 0 ${W} ${H + 14}`}
@@ -330,13 +360,14 @@ export function AnalyticsPage() {
                 })}
               </svg>
             </div>
+            )}
           </GlassCard>
         )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {loading && !useMock ? (
+          {loading ? (
             <ChartSkeleton height={200} />
-          ) : (
+          ) : failed ? null : (
             <GlassCard className="p-5">
               <p
                 className="mb-1 text-[15px] font-bold"
@@ -347,6 +378,13 @@ export function AnalyticsPage() {
               <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
                 สิทธิการรักษา breakdown
               </p>
+              {data.coverageCounts.length === 0 ? (
+                <EmptyState
+                  icon={ShieldQuestion}
+                  title="No coverage data yet"
+                  subtext="Sync cases from iMed to see the สิทธิการรักษา breakdown."
+                />
+              ) : (
               <div className="flex items-center gap-4">
                 <svg width={160} height={160}>
                   {donutArcs.map((arc, i) => (
@@ -404,23 +442,32 @@ export function AnalyticsPage() {
                   ))}
                 </div>
               </div>
+              )}
             </GlassCard>
           )}
 
-          {loading && !useMock ? (
+          {loading ? (
             <ChartSkeleton height={180} />
-          ) : (
+          ) : failed ? null : (
             <GlassCard className="p-5">
               <p
                 className="mb-1 text-[15px] font-bold"
                 style={{ color: gl.text }}
               >
-                Top 10 ICD Codes
+                Top {data.topCodes.length || 10} ICD Codes
               </p>
               <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
                 Most frequent codes across all cases
               </p>
-              <BarList rows={data.topCodes} />
+              {data.topCodes.length === 0 ? (
+                <EmptyState
+                  icon={Tags}
+                  title="No codes assigned yet"
+                  subtext="Codes appear here once cases arrive coded from iMed or a coder assigns them."
+                />
+              ) : (
+                <BarList rows={data.topCodes} />
+              )}
             </GlassCard>
           )}
         </div>
