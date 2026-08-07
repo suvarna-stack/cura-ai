@@ -262,6 +262,12 @@ export interface CodeEdit {
    *  verbatim like any extra field, shown only in our UI, never sent to the
    *  hospital (its write API has no note field). */
   note?: string;
+  /** Where the row came from — "manual" (the coder typed it), "hospital" (an
+   *  imported iMed code) or "ai" (a RAG suggestion). NOT interpreted at
+   *  approve: stored + echoed verbatim like `note`. The UI groups each code
+   *  column by it and shows a confidence % on AI rows only (2026-08-07);
+   *  absent on payloads saved before that, which the UI infers instead. */
+  origin?: "manual" | "hospital" | "ai";
   /** truthy → row skipped at approve (unresolved placeholder) */
   missing?: boolean;
   /** The coder ticked this code for approval (selection-first UI, 2026-08-07).

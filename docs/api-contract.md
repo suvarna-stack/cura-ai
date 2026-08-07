@@ -198,6 +198,11 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
     "note": "internal coder note",  // NOT interpreted: stored + echoed verbatim like any
                               // extra field, shown only in our UI — never sent to iMed
                               // (the hospital write API has no note field)
+    "origin": "manual",       // "manual" | "hospital" | "ai" — where the row came from.
+                              // NOT interpreted: stored + echoed verbatim like `note`.
+                              // The UI groups each code column by it and shows a
+                              // confidence % on "ai" rows only; ABSENT on payloads
+                              // saved before 2026-08-07, which the UI infers instead
     "missing": false,         // truthy → row skipped at approve
     "selected": true,         // the coder ticked this code for approval. Explicit
                               // false → row skipped at approve. ABSENT → approved

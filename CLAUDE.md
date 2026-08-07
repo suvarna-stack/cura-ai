@@ -489,6 +489,36 @@ Milestones (git log --oneline reads as this sequence):
   no-diff approve still marks the visit with `mcai_code_rows: 0`); mock suite
   16/16 green. Our own API shape is unchanged, so `docs/api-contract.md` +
   `docs/types.ts` were untouched.
+- ✅ **Codes grouped by ORIGIN; no % on hospital codes (2026-08-07):** a code
+  column used to be one undifferentiated list, so a hospital-imported fact, a
+  RAG guess and the coder's own typing looked identical — and every one of
+  them wore a confidence %, because hospital rows were seeded `confidence:
+  100` and the AI's real score sat in the same slot. Now each ICD column
+  renders **labelled groups in a fixed order: Added by coder → From hospital
+  record → Suggested by AI → Not documented** (the 4th holds the "???"
+  placeholders, which are nobody's suggestion). The **% shows on AI rows
+  ONLY** — a hospital code is already in the hospital's record and a typed
+  code is the coder's own call, so neither has anything to be confident
+  about — and the column header's average plus the case-list AI Confidence
+  pill now average **AI rows only** (`avgAiConfidence`), so a case with no AI
+  opinion shows no number instead of a meaningless 100%. Carried by a new
+  `origin: "manual" | "hospital" | "ai"` field on **CodeEdit**, which needs
+  ZERO backend code: `PUT /codes` reparses and re-serializes the whole body
+  into JSONB with no field whitelist, so unknown keys round-trip verbatim
+  (same free ride as `note`) — only `docs/api-contract.md` + `docs/types.ts`
+  were touched here. Frontend (`../audit-chart-frontend`): new
+  `utils/codeOrigin.ts` owns the vocabulary, the order and `originOf()`,
+  whose **legacy fallback** reads pre-2026-08-07 payloads (no `origin`
+  anywhere) as manual-flag → manual, `confidence === 100` → hospital, else
+  AI; the three detail pages seed `origin` from the detail row's `source`
+  (`imported_from_imed` → hospital, else manual), `suggestedToStored` stamps
+  `ai`, and both Add-code paths stamp `manual`. Grouping replaces the old
+  two-way manual/auto split in `CodesColumn`; drag-reorder still snaps back
+  across a group line (grouping wins over free ordering), which is safe for
+  approve because manual and hospital rows carry role-bearing type labels and
+  so never steal the positional principal-diagnosis pick from a bare-labelled
+  AI row. Also confirmed while doing this: the completeness rule the coders
+  see IS "the hospital's own data arrived with both systems" — unchanged.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
