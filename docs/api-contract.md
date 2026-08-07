@@ -199,6 +199,9 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
                               // extra field, shown only in our UI — never sent to iMed
                               // (the hospital write API has no note field)
     "missing": false,         // truthy → row skipped at approve
+    "selected": true,         // the coder ticked this code for approval. Explicit
+                              // false → row skipped at approve. ABSENT → approved
+                              // (legacy payloads saved before the checkbox UI)
     "operation_start": "2026-04-02 23:55:00",  // ICD-9 rows only: the procedure's time
     "operation_end": "2026-04-03 05:05:00",    // window, written to iMed on approve
     "operation_type": "OR Procedure"           // ICD-9 rows only: extract vocabulary
@@ -217,6 +220,17 @@ the backend stays lenient because hospital-synced rows may lack times.
 `operation_type` rides along the same way: stored on the ICD-9 `case_codes`
 row at approve and sent to iMed as `fix_operation_type_id` when present
 (absent → the `GENERAL_OPERATION` placeholder, unchanged behavior).
+
+`selected` (2026-08-07) carries the coder's pick. The UI no longer asks coders
+to delete the suggestions they don't want — they tick the ones they do — so a
+row with `"selected": false` stays in the working state (visible, editable,
+re-tickable) but is NOT written at approve. A row with no `selected` key at all
+is approved, so payloads saved before this flow behave exactly as they did.
+One guard: if a payload's rows are ALL unselected, approve falls back to
+re-confirming the imported principal diagnosis — the same behavior as a case
+with no saved edits — because that shape means "nobody reviewed this case"
+(the UI saves RAG suggestions as soon as a case is opened, and cases can be
+approved in bulk from the list). Deleting every row still approves nothing.
 
 Responses: `{"ok": true}` · `400` (not an array) · `404` (unknown case).
 Working state never invalidates the dashboard cache and survives reopen.

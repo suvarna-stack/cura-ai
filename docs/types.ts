@@ -264,6 +264,12 @@ export interface CodeEdit {
   note?: string;
   /** truthy → row skipped at approve (unresolved placeholder) */
   missing?: boolean;
+  /** The coder ticked this code for approval (selection-first UI, 2026-08-07).
+   *  Explicit false → kept in the working state but NOT written at approve;
+   *  absent → written (payloads saved before the checkbox UI). A payload whose
+   *  rows are ALL unselected falls back to the imported principal diagnosis,
+   *  like a case with no saved edits. */
+  selected?: boolean;
   /** Procedure time window — interpreted on ICD-9 rows only; written to iMed
    *  as date_in/time_in/date_out/time_out on approve. "YYYY-MM-DD HH:MM[:SS]"
    *  or datetime-local's "YYYY-MM-DDTHH:MM"; unparseable → null. The UI

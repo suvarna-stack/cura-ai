@@ -434,6 +434,35 @@ Milestones (git log --oneline reads as this sequence):
   it, and don't reference it from tracked docs. (The tracked `dev.sh` is just as
   mac-bound — both are now labelled macOS/Linux-only, with Windows pointed at the
   manual path.)
+- ✅ **Selection-first code review (2026-08-07):** the coder flow inverted. AI /
+  hospital suggestions used to arrive as "everything is in, delete what's
+  wrong"; now **nothing is pre-ticked** and the coder ticks the codes that
+  belong on the case, then approves. The pick rides in the codeEdits payload as
+  a `selected` boolean, so it is durable (server copy) and survives reload,
+  and `ApprovalService.materializeCodeEdits` skips rows with an explicit
+  `selected: false` — an ABSENT key still approves, so payloads saved before
+  this flow behave exactly as they did. Unticked codes are NOT deleted: they
+  stay in the working state, visible and re-tickable, and never reach iMed
+  (verified live: a 3-row payload with one unticked code wrote 2 coder rows and
+  the hospital got only those two). One guard: an all-unticked payload falls
+  back to re-confirming the imported principal, the same path as "no saved
+  edits", because that shape means nobody reviewed the case (the UI saves RAG
+  suggestions as soon as a case is opened, and the list page can bulk-approve).
+  Frontend (`../audit-chart-frontend`): checkbox per code card (the diagnosis
+  title is its label, so the whole title is a target), ticked = accent fill +
+  ring / unticked recedes at 0.78 opacity, per-column tri-state "Select all"
+  + Clear (indeterminate = "mixed", same control the case list already uses),
+  the column badge counts `picked/total`, and Approve says "Approve (n)" and is
+  DISABLED at zero with the reason in its tooltip. Manual codes stay pre-ticked
+  (typing a code is picking it), "???" placeholders can't be ticked until
+  resolved, and delete/edit/drag are unchanged. New `utils/codeSelection.ts`
+  holds the rules incl. the legacy-payload migration (no `selected` key
+  anywhere → keep the coder's own codes ticked, everything else waits).
+  Contract + `docs/types.ts` + Swagger text updated; the new
+  `unselectedCodeEditsAreKeptButNotApproved` test sits in
+  `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
+  the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
+  known 13-failure problem, unrelated to this change).
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

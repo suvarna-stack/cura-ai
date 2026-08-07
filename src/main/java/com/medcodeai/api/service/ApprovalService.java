@@ -188,9 +188,19 @@ public class ApprovalService {
         coding.deleteCoderAssigned(tn);
         boolean firstIcd10 = true;
         int written = 0;
+        int skippedUnselected = 0;
         for (Object o : entries) {
             if (!(o instanceof Map<?, ?> e) || jsTruthy(e.get("missing"))) {
                 continue; // unresolved "???" placeholder rows never reach the DB
+            }
+            // Selection-first coding (2026-08-07): the UI ticks the codes to
+            // approve instead of deleting the unwanted ones, so an explicit
+            // `selected: false` means "the coder left this suggestion out".
+            // ABSENT means legacy payload (saved before the checkbox UI) —
+            // those still approve wholesale, as they always did.
+            if (e.containsKey("selected") && !jsTruthy(e.get("selected"))) {
+                skippedUnselected++;
+                continue;
             }
             String code = Py.or_(str(e.get("code")), "").strip();
             if (code.isEmpty() || code.equals("???")) {
@@ -241,6 +251,17 @@ public class ApprovalService {
                     blankToNull(str(e.get("operation_type"))));
             bump(stats, "coder_codes_created");
             written++;
+        }
+
+        // Nothing ticked and nothing else to write: the payload is an untouched
+        // suggestion list (the UI saves RAG suggestions as soon as a case is
+        // opened, and the list page can approve a case nobody reviewed). Treat
+        // it like "no saved edits at all" rather than finalizing an empty case.
+        // A coder who deliberately empties the list still lands on written == 0
+        // with skippedUnselected == 0 and writes nothing, as before.
+        if (written == 0 && skippedUnselected > 0) {
+            simulateCoderAssignment(tn, uid, coder, now, stats);
+            return;
         }
 
         Map<String, Object> detail = new LinkedHashMap<>();
