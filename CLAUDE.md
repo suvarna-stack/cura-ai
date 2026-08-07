@@ -463,6 +463,32 @@ Milestones (git log --oneline reads as this sequence):
   `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
   the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
   known 13-failure problem, unrelated to this change).
+- ✅ **Coding status on the hospital visit row (2026-08-07):** the hospital now
+  has an "approved" flag of its own — `imed.medhack_patient.coding_status`
+  (`'approved'` / NULL), the twin of our `cases.case_status`. It replaces the
+  old marker, which **overwrote `medhack_patient.dischargestatus`** — the
+  DOCTOR's clinical outcome ("Improved", …), never ours to write; the mock's
+  /api/v1 writes no longer touch that column, and the discharge status id we
+  send (`"Coding Approved"`, still open question 3) now stays inside
+  `doctor_discharge_opd/_ipd`. Set through a new optional **`coding_status`
+  field on the EXISTING `POST`/`PUT /api/v1/diagnosis` envelope** — no new
+  endpoint, and the status commits in the same hospital transaction as the
+  codes. `"approved"` on approve, the reserved `"open"` on reopen (clears to
+  NULL), absent = no change. `ImedWritebackService` puts it on the diff bodies
+  it already sends and falls back to ONE body-less PUT when the diff had
+  nothing to say (nothing changed, or only cancels — a DELETE carries no
+  body); `DiffResult` is what carries "did a body go out" back from
+  `diffKind`. Mock side: `SchemaBootstrap` + `db/migrations/0005` (with the
+  `imed_baseline` mirror, or positional demo reset breaks), `updateCodingStatus`
+  replacing `updatePatientDischargeStatus`, unknown status words → 400. Reads
+  needed no change — `GET /api/cases` serves `p.*`. This **revives** the
+  coding-status idea withdrawn 2026-08-02, but as a field on an existing route
+  instead of a table + dedicated endpoint (a smaller ask of the hospital).
+  Still OUR invention: hospital open question 17 in `docs/imed-integration.md`.
+  Verified live end-to-end (approve → `approved`, reopen → NULL, and the
+  no-diff approve still marks the visit with `mcai_code_rows: 0`); mock suite
+  16/16 green. Our own API shape is unchanged, so `docs/api-contract.md` +
+  `docs/types.ts` were untouched.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

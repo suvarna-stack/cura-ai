@@ -25,6 +25,11 @@ import java.util.UUID;
  * imed_write_ops with its before-image. Order is cancel → update → create,
  * so a created code can never collide (409) with a row queued for cancel.
  *
+ * Both directions also carry the visit's coding status (CODING_APPROVED /
+ * CODING_OPEN below) on the bodies they already send, falling back to one
+ * body-less PUT when the diff had nothing to say — so the hospital always
+ * ends up agreeing with our cases.case_status.
+ *
  * REOPEN: the revert plan is the journal replayed against live state — rows
  * we created get cancelled, rows we updated get PUT back to their
  * before-image, rows we cancelled get re-created (new object_ids; iMed has
@@ -52,20 +57,41 @@ public class ImedWritebackService {
     }
 
     /**
-     * The discharge status id every approve sends (OPD and IPD alike). The
-     * hospital's real master-data ids are still open question 3 in
-     * docs/imed-integration.md, so this is ours to choose until they answer —
-     * and iMed projects it onto the visit's own medhack_patient.dischargestatus,
-     * where the case list shows it. "Coding Approved" says what actually
-     * happened (a coder signed off the codes) and can't be mistaken for one of
-     * the hospital's clinical outcomes ("Improved", "Not Improved", …), which
-     * are the doctor's to set, not ours. IMED_DISCHARGE_STATUS_ID overrides it
-     * — that's where the hospital's id slots in, no code change.
+     * The discharge status id every approve sends (OPD and IPD alike), because
+     * the POST contract requires a discharge object. The hospital's real
+     * master-data ids are still open question 3 in docs/imed-integration.md,
+     * so this is ours to choose until they answer. "Coding Approved" says what
+     * actually happened (a coder signed off the codes) and can't be mistaken
+     * for one of the hospital's clinical outcomes ("Improved", "Not Improved",
+     * …), which are the doctor's to set. Since 2026-08-07 it stays INSIDE the
+     * discharge object — the visit row is marked by CODING_APPROVED above
+     * instead. IMED_DISCHARGE_STATUS_ID overrides it — that's where the
+     * hospital's id slots in, no code change.
      */
     private static final String DISCHARGE_STATUS_ID = envOr("IMED_DISCHARGE_STATUS_ID",
             "Coding Approved");
 
-    /** IPD-only companion, unused by the patient-row projection; still the
+    /**
+     * The coding-status extension (2026-08-07): the visit's coding workflow
+     * state on the hospital side — our cases.case_status, mirrored where the
+     * hospital can see it. It rides the `coding_status` field of the diagnosis
+     * POST/PUT we already send, so codes and status land in one hospital
+     * transaction; iMed stores it on medhack_patient.coding_status.
+     *
+     * This replaces the old marker, which overwrote the visit's
+     * dischargestatus — the DOCTOR's clinical outcome, never ours to set. The
+     * discharge object below still goes out (the POST contract requires one),
+     * but it no longer projects onto the visit row.
+     *
+     * Our extension, not in the hospital's PDF: the real iMed needs to add the
+     * field (open question 17 in docs/imed-integration.md). Sending it to an
+     * API that ignores unknown fields is harmless.
+     */
+    private static final String CODING_APPROVED = "approved";
+    /** The reserved word that clears it again on reopen. */
+    private static final String CODING_OPEN = "open";
+
+    /** IPD-only companion, unused by the discharge object's storage; still the
      *  placeholder until the hospital's discharge-type master data arrives. */
     private static final String DISCHARGE_TYPE_ID = envOr("IMED_DISCHARGE_TYPE_ID",
             "IPD_DISCHARGE_TYPE_ID");
@@ -86,19 +112,25 @@ public class ImedWritebackService {
 
     // ---- approve ------------------------------------------------------------
 
-    /** Applies the code diff; returns hospital code writes made. (The old
-     *  coding-status extension was withdrawn 2026-08-02 — the hospital's real
-     *  contract has no coding-status concept, so approve sends codes +
-     *  discharge only.) */
+    /** Applies the code diff and marks the visit coded; returns hospital code
+     *  writes made. */
     public int approveCase(String tn, String encountertype, List<TargetCode> targets,
             String coder, String now) {
-        int writes = 0;
-        writes += diffKind(tn, "icd10", liveRows(tn, "icd10"), targets, encountertype, coder, now);
-        writes += diffKind(tn, "icd9", liveRows(tn, "icd9"), targets, encountertype, coder, now);
-        return writes;
+        DiffResult a = diffKind(tn, "icd10", liveRows(tn, "icd10"), targets, encountertype, coder, now);
+        DiffResult b = diffKind(tn, "icd9", liveRows(tn, "icd9"), targets, encountertype, coder, now);
+        if (!a.bodySent() && !b.bodySent()) {
+            sendCodingStatus(tn, encountertype, CODING_APPROVED);
+        }
+        return a.writes() + b.writes();
     }
 
-    private int diffKind(String tn, String kind, List<Map<String, Object>> live,
+    /** What one kind's diff did: hospital code writes, and whether any of them
+     *  was a POST/PUT — the calls that carry the coding status. Cancels are
+     *  DELETEs with no body, so they write rows without marking the visit. */
+    private record DiffResult(int writes, boolean bodySent) {
+    }
+
+    private DiffResult diffKind(String tn, String kind, List<Map<String, Object>> live,
             List<TargetCode> allTargets, String encountertype, String coder, String now) {
         // first occurrence wins on duplicate codes — the hospital enforces
         // uniqueness per visit (409), so a doubled coder entry must not POST twice
@@ -133,6 +165,7 @@ public class ImedWritebackService {
         }
         // whatever's left live isn't in the finalized set → cancel first
         int writes = 0;
+        boolean bodySent = false;
         for (Map<String, Object> row : liveByCode.values()) {
             String objectId = str(row.get("id"));
             ops.insertOp(tn, "cancelled", kind, objectId, json.writeValueAsString(row), now);
@@ -146,26 +179,31 @@ public class ImedWritebackService {
                 ops.insertOp(tn, "updated", kind, str(before.get("id")),
                         json.writeValueAsString(before), now);
             }
-            imed.putDiagnosis(tn, putBody(tn, kind, updates, updateBefore, encountertype));
+            imed.putDiagnosis(tn, putBody(tn, kind, updates, updateBefore, encountertype,
+                    CODING_APPROVED));
             writes += updates.size();
+            bodySent = true;
         }
         // creates last (POST) — journaled after, we need the generated ids
         if (!creates.isEmpty()) {
             Map<String, Object> resp = imed.postDiagnosis(
-                    postBody(tn, kind, creates, encountertype, coder));
+                    postBody(tn, kind, creates, encountertype, coder, CODING_APPROVED));
             for (Map<String, Object> created : createdRows(resp, kind)) {
                 ops.insertOp(tn, "created", kind, str(created.get("object_id")), null, now);
             }
             writes += creates.size();
+            bodySent = true;
         }
-        return writes;
+        return new DiffResult(writes, bodySent);
     }
 
     // ---- reopen -------------------------------------------------------------
 
-    /** Reverts the journal against live state, clears status, clears journal. */
+    /** Reverts the journal against live state, clears the coding status,
+     *  clears the journal. */
     public void reopenCase(String tn, String encountertype, String now) {
         List<Map<String, Object>> journal = ops.opsForCase(tn);
+        boolean bodySent = false;
 
         for (String kind : List.of("icd10", "icd9")) {
             List<Map<String, Object>> live = journal.isEmpty() ? List.of() : liveRows(tn, kind);
@@ -197,7 +235,8 @@ public class ImedWritebackService {
                         TargetCode original = targetFromRow(kind, before);
                         if (row != null && differs(kind, original, row)) {
                             imed.putDiagnosis(tn, putBody(tn, kind,
-                                    List.of(original), List.of(before), encountertype));
+                                    List.of(original), List.of(before), encountertype, CODING_OPEN));
+                            bodySent = true;
                         }
                     }
                     case "cancelled" -> {
@@ -210,8 +249,15 @@ public class ImedWritebackService {
                 }
             }
             if (!recreates.isEmpty()) {
-                imed.postDiagnosis(postBody(tn, kind, recreates, encountertype, "medcode.reopen"));
+                imed.postDiagnosis(postBody(tn, kind, recreates, encountertype, "medcode.reopen",
+                        CODING_OPEN));
+                bodySent = true;
             }
+        }
+        // an empty journal (or a revert that needed no body) still has to clear
+        // the mark — the visit is back under a coder
+        if (!bodySent) {
+            sendCodingStatus(tn, encountertype, CODING_OPEN);
         }
 
         ops.clearCase(tn);
@@ -220,8 +266,8 @@ public class ImedWritebackService {
     // ---- body builders ------------------------------------------------------
 
     private Map<String, Object> postBody(String tn, String kind, List<TargetCode> codes,
-            String encountertype, String coder) {
-        Map<String, Object> body = visitEnvelope(tn, encountertype);
+            String encountertype, String coder, String codingStatus) {
+        Map<String, Object> body = visitEnvelope(tn, encountertype, codingStatus);
         List<Map<String, Object>> icd10 = new ArrayList<>();
         List<Map<String, Object>> icd9 = new ArrayList<>();
         for (TargetCode t : codes) {
@@ -268,8 +314,8 @@ public class ImedWritebackService {
     }
 
     private Map<String, Object> putBody(String tn, String kind, List<TargetCode> targets,
-            List<Map<String, Object>> beforeRows, String encountertype) {
-        Map<String, Object> body = visitEnvelope(tn, encountertype);
+            List<Map<String, Object>> beforeRows, String encountertype, String codingStatus) {
+        Map<String, Object> body = visitEnvelope(tn, encountertype, codingStatus);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int i = 0; i < targets.size(); i++) {
             TargetCode t = targets.get(i);
@@ -290,13 +336,21 @@ public class ImedWritebackService {
         return body;
     }
 
-    private Map<String, Object> visitEnvelope(String tn, String encountertype) {
+    private Map<String, Object> visitEnvelope(String tn, String encountertype, String codingStatus) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("request_id", rid(tn));
         body.put("object_id", tn);
         body.put("fix_visit_type_id", "0".equals(encountertype) ? "OPD" : "IPD");
         body.put("doctor_discharge", "1");
+        body.put("coding_status", codingStatus);
         return body;
+    }
+
+    /** A PUT carrying nothing but the coding status — the fallback for an
+     *  approve whose diff sent no body (nothing changed, or only cancels) and
+     *  the way reopen clears the mark. Touches no code row. */
+    private void sendCodingStatus(String tn, String encountertype, String codingStatus) {
+        imed.putDiagnosis(tn, visitEnvelope(tn, encountertype, codingStatus));
     }
 
     private static void putName(Map<String, Object> r, String descKey, String nameKey, String name) {
