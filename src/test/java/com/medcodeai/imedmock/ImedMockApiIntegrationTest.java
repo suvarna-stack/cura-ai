@@ -233,7 +233,8 @@ class ImedMockApiIntegrationTest {
         String dischargeBefore = String.valueOf(patient(KNOWN_TN).get("dischargestatus"));
 
         // POST: one diagnosis + one procedure + IPD discharge, ids generated
-        JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "93.90", "CPAP therapy");
+        JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "93.90", "CPAP therapy",
+                "approved");
         assertEquals("STATUS_SUCCESS", created.get("status").asString());
         String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         String pxId = created.get("result").get("diagnosis_icd9").get(0).get("object_id").asString();
@@ -429,6 +430,21 @@ class ImedMockApiIntegrationTest {
     /** POST one ICD-10 (+ optional ICD-9) with IPD discharge; returns the envelope. */
     private JsonNode postDiagnosis(String requestId, String icd10, String dxName,
             String icd9, String opName) throws Exception {
+        return postDiagnosis(requestId, icd10, dxName, icd9, opName, null);
+    }
+
+    /**
+     * …optionally carrying the coding_status extension. Tests that don't assert
+     * on it pass null DELIBERATELY: this suite writes to the live demo `imed`
+     * database, and a marked visit reads as an approved case in the hospital DB
+     * that medcode knows nothing about. Only the round-trip test sets it, and
+     * that test clears it again before finishing.
+     */
+    private JsonNode postDiagnosis(String requestId, String icd10, String dxName,
+            String icd9, String opName, String codingStatus) throws Exception {
+        String statusPart = codingStatus == null
+                ? ""
+                : "\"coding_status\":\"%s\",".formatted(codingStatus);
         String icd9Part = icd9 == null
                 ? "[]"
                 : """
@@ -437,14 +453,14 @@ class ImedMockApiIntegrationTest {
                         .formatted(icd9, opName);
         String body = """
                 {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                 "doctor_discharge":"1","coding_status":"approved",
+                 "doctor_discharge":"1",%s
                  "diagnosis_icd10":[{"icd10_code":"%s","beginning_diagnosis":"%s",
                    "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS","fix_dx_source":"MED_DC",
                    "coder_eid":"web.coder"}],
                  "diagnosis_icd9":%s,
                  "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
                    "fix_ipd_discharge_type_id":"IPD_TYPE_1","is_from":"MED_DC"}}"""
-                .formatted(requestId, KNOWN_TN, icd10, dxName, icd9Part);
+                .formatted(requestId, KNOWN_TN, statusPart, icd10, dxName, icd9Part);
         String resp = mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
