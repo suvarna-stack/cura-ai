@@ -43,6 +43,10 @@ class ImedMockApiIntegrationTest {
     @Autowired
     private MockMvc mvc;
 
+    /** Only for parking the demo baseline around the snapshot/reset test. */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final JsonMapper json = new JsonMapper();
 
     private static String rid() {
@@ -149,21 +153,56 @@ class ImedMockApiIntegrationTest {
 
     // ---- demo baseline (mock-only tooling) ----------------------------------
 
+    /**
+     * Snapshot OVERWRITES imed_baseline — the demo's start state. This suite
+     * runs against the live demo database, so taking one here would freeze
+     * whatever happens to be live (a real coder's approve included) as the
+     * state every future reset restores. That happened once, on 2026-08-07:
+     * a test run five minutes after an approve baked it into the baseline,
+     * and resetting the demo kept bringing the approved case back.
+     *
+     * So the test parks any existing baseline first and puts it back in a
+     * finally block — it exercises snapshot/reset for real, on a baseline it
+     * owns, and leaves the demo's own untouched.
+     */
     @Test
     void demoSnapshotAndResetRestoreHospitalState() throws Exception {
-        mvc.perform(post("/api/demo/snapshot")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(true));
-        int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
+        boolean parked = parkExistingBaseline();
+        try {
+            mvc.perform(post("/api/demo/snapshot")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ok").value(true));
+            int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
 
-        // a write-back lands...
-        postDiagnosis(rid(), "Z00.0", "General medical examination", "89.7",
-                "General physical examination");
-        assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+            // a write-back lands...
+            postDiagnosis(rid(), "Z00.0", "General medical examination", "89.7",
+                    "General physical examination");
+            assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
 
-        // ...and reset restores the snapshotted hospital state
-        mvc.perform(post("/api/demo/reset")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(true));
-        assertEquals(diagsBefore, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+            // ...and reset restores the snapshotted hospital state
+            mvc.perform(post("/api/demo/reset")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ok").value(true));
+            assertEquals(diagsBefore, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+        } finally {
+            restoreParkedBaseline(parked);
+        }
+    }
+
+    /** Moves the demo's baseline out of the way; false when there wasn't one. */
+    private boolean parkExistingBaseline() {
+        if (jdbc.queryForList("SELECT 1 FROM pg_namespace WHERE nspname = 'imed_baseline'").isEmpty()) {
+            return false;
+        }
+        jdbc.execute("DROP SCHEMA IF EXISTS imed_baseline_parked CASCADE");
+        jdbc.execute("ALTER SCHEMA imed_baseline RENAME TO imed_baseline_parked");
+        return true;
+    }
+
+    private void restoreParkedBaseline(boolean parked) {
+        if (!parked) {
+            return;
+        }
+        jdbc.execute("DROP SCHEMA IF EXISTS imed_baseline CASCADE");
+        jdbc.execute("ALTER SCHEMA imed_baseline_parked RENAME TO imed_baseline");
     }
 
     @Test
