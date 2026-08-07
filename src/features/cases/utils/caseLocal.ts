@@ -11,12 +11,22 @@
 // ============================================================
 import { saveCodesRemote } from "../api/casesService";
 import type { CodeEntry } from "../types/case.types";
+import type { CodeOrigin } from "./codeOrigin";
 
 export type StoredCode = CodeEntry & {
   missing?: boolean;
   missingMsg?: string;
   /** true for codes the coder added by hand (shows the "Manually Added" badge) */
   manual?: boolean;
+  /**
+   * Where this code came from — "manual" (the coder typed it), "hospital"
+   * (imported from iMed) or "ai" (a RAG suggestion). Drives the group the
+   * card renders in and whether its confidence % is shown at all; see
+   * utils/codeOrigin.ts. Rides the saved payload verbatim (the backend
+   * round-trips unknown CodeEdit keys), so it survives reload; absent on
+   * payloads saved before 2026-08-07, where originOf() infers it.
+   */
+  origin?: CodeOrigin;
   /**
    * The coder ticked this code for approval (selection-first review, 2026-08-07).
    * Nothing is pre-ticked: a suggestion is only approved once a human picks it.

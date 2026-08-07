@@ -27,6 +27,8 @@ import { useLang } from "../../context/LanguageContext";
 import { CodeCardsSkeleton, SkeletonBar } from "../global/DetailSkeletons";
 import type { StoredCode } from "../../utils/caseLocal";
 import { isPickable, isPicked } from "../../utils/codeSelection";
+import { ORIGIN_ORDER, originOf, isAiSuggested, avgAiConfidence } from "../../utils/codeOrigin";
+import type { CodeOrigin } from "../../utils/codeOrigin";
 import { formatWindow } from "../../utils/operationTime";
 
 /** Which column a code belongs in. Procedure systems (ICD-9, *-PCS) are ICD-9;
@@ -71,14 +73,27 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
   const filtered = codes
     .map((entry, index) => ({ entry, index }))
     .filter((r) => (system === "icd9") === isIcd9(r.entry.type));
-  // coder-entered codes group above the imported/AI ones. Reordering writes
-  // the DISPLAY order back into the array (applyReorder), so a drag across
-  // the group line snaps back — the group wins over free ordering. Safe for
-  // approve: manual codes carry role-bearing labels, so putting them first
-  // never steals the positional principal-diagnosis pick from a bare-labeled
-  // hospital/AI code unless the coder explicitly added a Primary Diagnosis.
-  const rows = [...filtered.filter((r) => r.entry.manual), ...filtered.filter((r) => !r.entry.manual)];
-  const manualCount = rows.filter((r) => r.entry.manual).length;
+  // Codes group by ORIGIN (2026-08-07): manual → hospital → AI → gaps, each
+  // under its own header, because "the coder typed this", "the hospital
+  // already had this" and "a model guessed this" carry completely different
+  // authority and a coder must not have to infer which is which.
+  // Reordering writes the DISPLAY order back into the array (applyReorder),
+  // so a drag across a group line snaps back — grouping wins over free
+  // ordering. Safe for approve: manual and hospital codes carry role-bearing
+  // labels, so putting them first never steals the positional
+  // principal-diagnosis pick from a bare-labeled AI row unless the coder
+  // explicitly added a Primary Diagnosis.
+  const groups = ORIGIN_ORDER
+    .map((origin) => ({ origin, items: filtered.filter((r) => originOf(r.entry) === origin) }))
+    .filter((g) => g.items.length > 0);
+  const rows = groups.flatMap((g) => g.items);
+  // column position of each group's first card, so its header renders once
+  const groupAt = new Map<number, { origin: CodeOrigin; count: number }>();
+  let groupPos = 0;
+  for (const g of groups) {
+    groupAt.set(groupPos, { origin: g.origin, count: g.items.length });
+    groupPos += g.items.length;
+  }
   // selection state of this column (positions are full-array indices, so the
   // parent can flip them without knowing how the column is filtered)
   const selectable = !!onToggle;
@@ -86,10 +101,9 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
   const pickedIdx = rows.filter((r) => isPicked(r.entry)).map((r) => r.index);
   const allPicked = pickableIdx.length > 0 && pickedIdx.length === pickableIdx.length;
   const somePicked = pickedIdx.length > 0 && !allPicked;
-  const scored = rows.filter((r) => !r.entry.missing);
-  const avg = scored.length
-    ? Math.round(scored.reduce((s, r) => s + r.entry.confidence, 0) / scored.length)
-    : null;
+  // the header % describes the AI ONLY — hospital codes are facts carrying a
+  // stamped 100, and averaging those in made the number meaningless
+  const avg = avgAiConfidence(rows.map((r) => r.entry));
 
   /** Meeting item 12: drop a code at a new position to change its priority.
    *  `from`/`to` are positions within THIS column, so a code keeps its system —
@@ -117,12 +131,26 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
     endDrag();
   };
 
-  /** small label above each origin group (manual vs hospital/AI) */
-  const groupHeader = (label: string) => (
-    <p className="text-[12px] font-bold uppercase tracking-wide px-1 pb-1"
-      style={{ color: gl.muted, opacity: 0.85 }}>
-      {label}
-    </p>
+  /** which string names each origin group, in ORIGIN_ORDER */
+  const GROUP_LABEL: Record<CodeOrigin, string> = {
+    manual: "code.groupManual",
+    hospital: "code.groupHospital",
+    ai: "code.groupAi",
+    gap: "code.groupGap",
+  };
+
+  /** header above each origin group — always drawn, even when a column holds
+   *  only one group, because "these came from the hospital" is exactly the
+   *  fact the coder needs and silence doesn't say it */
+  const groupHeader = (origin: CodeOrigin, count: number, first: boolean) => (
+    <div className={`flex items-center gap-2 px-1 pb-1 ${first ? "" : "pt-2.5"}`}>
+      <p className="text-[12px] font-bold uppercase tracking-wide"
+        style={{ color: origin === "manual" || origin === "hospital" ? gl.accent : gl.muted, opacity: 0.9 }}>
+        {t(GROUP_LABEL[origin])}
+      </p>
+      <span className="text-[12px] font-bold" style={{ color: gl.muted, opacity: 0.7 }}>{count}</span>
+      <span className="flex-1 h-px" style={{ background: `rgba(${gl.accentRgb},0.18)` }} />
+    </div>
   );
 
   /** a thin accent bar marking where the drop would land */
@@ -180,13 +208,13 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
               ? picked
                 ? `rgba(${gl.accentRgb},${gl.isDark ? 0.18 : 0.11})`
                 : gl.isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.72)"
-              : entry.manual
+              : originOf(entry) === "manual"
                 ? `rgba(${gl.accentRgb},${gl.isDark ? 0.16 : 0.10})`
                 : gl.isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.85)",
           border: `1px solid rgba(${gl.accentRgb},${
             entry.missing ? 0.20
               : selectable ? (picked ? 0.55 : gl.isDark ? 0.22 : 0.18)
-              : entry.manual ? 0.45 : gl.isDark ? 0.35 : 0.30})`,
+              : originOf(entry) === "manual" ? 0.45 : gl.isDark ? 0.35 : 0.30})`,
           // a ticked card gets an accent ring (drawn as a shadow so ticking
           // never reflows the list by a pixel) — state is never colour alone,
           // the checkbox carries it too
@@ -261,11 +289,14 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             style={{ background: `rgba(${gl.accentRgb},0.14)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}>
             {entry.code}
           </span>
-          {!entry.missing && (
+          {/* the % is a MODEL score, so only AI rows carry one. A hospital
+              code is already in the hospital's record — there is nothing to
+              be confident about — and a hand-typed code is the coder's own
+              call (2026-08-07). */}
+          {isAiSuggested(entry) && (
             <span className="text-[12px] font-bold" style={{ color: gl.muted }}>{entry.confidence}%</span>
           )}
-          {/* no per-card "Manually Added" badge — the group header (always shown
-              when manual codes exist) plus the stronger card tint carry origin */}
+          {/* no per-card origin badge — the group header carries origin */}
           {/* the hospital's operation type ("OR Procedure" …) as a chip, like
               the Type column on its own coder UI's operation grid */}
           {system === "icd9" && entry.operation_type && (
@@ -330,9 +361,13 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         <p className="text-[12px] font-normal mt-0.5" style={{ color: gl.muted }}>
           {loading
             ? <SkeletonBar className="h-2.5 w-24" />
-            : avg !== null
-              ? t("code.colSummary", { n: scored.length, avg })
-              : t("code.colSummaryEmpty")}
+            : rows.length === 0
+              ? t("code.colSummaryEmpty")
+              : avg !== null
+                // avg is the AI's own average; a column of hospital codes has
+                // no AI opinion in it and says so by omitting the number
+                ? t("code.colSummary", { n: rows.length, avg })
+                : t("code.colSummaryNoAi", { n: rows.length })}
         </p>
         {/* tri-state select-all — the same control the case list uses, so the
             two selection surfaces of the app behave identically. Hidden when
@@ -389,16 +424,17 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
           </p>
         ) : (
           <>
-            {rows.map((r, pos) => (
-              <div key={r.index}>
-                {/* group sub-headers, only when the column actually has both kinds */}
-                {manualCount > 0 && pos === 0 && groupHeader(t("code.groupManual"))}
-                {manualCount > 0 && manualCount < rows.length && pos === manualCount &&
-                  groupHeader(t("code.groupAuto"))}
-                {dragPos !== null && insertAt === pos && dropIndicator}
-                {card(r, pos)}
-              </div>
-            ))}
+            {rows.map((r, pos) => {
+              const head = groupAt.get(pos);
+              return (
+                <div key={r.index}>
+                  {/* origin group header — manual / hospital / AI / gaps */}
+                  {head && groupHeader(head.origin, head.count, pos === 0)}
+                  {dragPos !== null && insertAt === pos && dropIndicator}
+                  {card(r, pos)}
+                </div>
+              );
+            })}
             {dragPos !== null && insertAt === rows.length && dropIndicator}
           </>
         )}

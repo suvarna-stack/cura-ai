@@ -156,7 +156,9 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.icd9Box":  { en: "ICD-9 (procedure)",  th: "ICD-9 (หัตถการ)" },
   "code.addTo":    { en: "Add {system} code",  th: "เพิ่มรหัส {system}" },
   "code.emptyBox": { en: "No {system} code on this case yet.", th: "ยังไม่มีรหัส {system} ในเคสนี้" },
-  "code.colSummary":      { en: "{n} code(s) · avg {avg}% confidence", th: "{n} รหัส · ความมั่นใจเฉลี่ย {avg}%" },
+  // the % counts AI suggestions only — hospital codes are facts, not guesses
+  "code.colSummary":      { en: "{n} code(s) · AI avg {avg}% confidence", th: "{n} รหัส · ความมั่นใจเฉลี่ยของ AI {avg}%" },
+  "code.colSummaryNoAi":  { en: "{n} code(s)", th: "{n} รหัส" },
   "code.colSummaryEmpty": { en: "nothing suggested yet", th: "ยังไม่มีรหัสที่แนะนำ" },
   "confirm.approveCodesBody": {
     en: "You are about to approve the {n} code(s) you ticked for {patientName}. This will mark the case as complete.",
@@ -189,8 +191,11 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.manualBadge":      { en: "Manually Added",          th: "เพิ่มด้วยตนเอง" },
   // origin-group sub-headers inside a code column (shown only when a column
   // holds both coder-entered and hospital/AI codes)
-  "code.groupManual":      { en: "Manually added",          th: "เพิ่มด้วยตนเอง" },
-  "code.groupAuto":        { en: "Suggestions from AI",     th: "ข้อเสนอแนะจาก AI" },
+  // origin group headers — manual / hospital / AI / gaps (2026-08-07)
+  "code.groupManual":      { en: "Added by coder",          th: "ผู้ให้รหัสเพิ่มเอง" },
+  "code.groupHospital":    { en: "From hospital record",    th: "จากเวชระเบียนโรงพยาบาล" },
+  "code.groupAi":          { en: "Suggested by AI",         th: "ข้อเสนอแนะจาก AI" },
+  "code.groupGap":         { en: "Not documented",          th: "ไม่มีบันทึกไว้" },
   "code.codeLabel":        { en: "Code",                    th: "รหัส" },
   "code.addHint":          { en: "Fill in either box — or both to add an ICD-10 and an ICD-9 code at once.",
                              th: "กรอกกล่องใดกล่องหนึ่ง หรือทั้งสองกล่องเพื่อเพิ่มรหัส ICD-10 และ ICD-9 พร้อมกัน" },

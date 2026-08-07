@@ -289,7 +289,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
     // coder-entered = fact, and typing a code IS picking it — pre-ticked
-    const added: StoredCode = { ...entry, confidence: 100, manual: true, selected: true };
+    const added: StoredCode = { ...entry, confidence: 100, manual: true, origin: "manual", selected: true };
     // prepend: manual codes display grouped on top, and the saved order must
     // match what's shown (approve reads array order for the principal pick)
     persistCodes([added, ...codes]);
@@ -356,6 +356,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         type: codeTypeFromRole(k.code_system, k.code_role),
         desc: `${k.description ?? ""}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}` || k.code,
         confidence: k.source === "imported_from_imed" ? 100 : 85, // imported codes are facts, not AI guesses
+        // which group the card renders in; a hospital row shows no % at all
+        origin: k.source === "imported_from_imed" ? "hospital" as const : "manual" as const,
         // procedure time window + type (ICD-9 rows; the hospital's own record)
         operation_start: k.operation_start ?? undefined,
         operation_end: k.operation_end ?? undefined,

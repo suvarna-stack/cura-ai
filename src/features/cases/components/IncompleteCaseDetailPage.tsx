@@ -286,7 +286,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
     // coder-entered = fact, and typing a code IS picking it — pre-ticked
-    const added: StoredCode = { ...entry, confidence: 100, manual: true, selected: true };
+    const added: StoredCode = { ...entry, confidence: 100, manual: true, origin: "manual", selected: true };
     // prepend: manual codes display grouped on top, and the saved order must
     // match what's shown (approve reads array order for the principal pick)
     persistCodes([added, ...codes]);
@@ -359,6 +359,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           code: k.code, type: codeTypeFromRole(k.code_system, k.code_role),
           desc: k.description ?? k.code,
           confidence: 100, // imported from iMed = fact, not AI guess
+          // which group the card renders in; a hospital row shows no % at all
+          origin: k.source === "imported_from_imed" ? "hospital" as const : "manual" as const,
           // procedure time window + type (ICD-9 rows; the hospital's own record)
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,

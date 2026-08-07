@@ -84,6 +84,9 @@ export function usePrefetchAiConfidence(
             type: k.system ?? 'ICD-10',
             desc: k.code,
             confidence: 100,
+            // list-preview chips are the case's existing codes, i.e. hospital
+            // rows — the real detail seed refines this from `source` on open
+            origin: 'hospital' as const,
           }))
         const next = fillEmptySystems(existing, ai)
         if (next.length !== existing.length || !loadCodeEdits(row.id)) {
