@@ -1,0 +1,1908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedCode AI — Data Flow Diagrams</title>
+<meta name="description" content="Level 0-2 data flow diagrams for the medcode-api backend, plus the full process x table CRUD matrix.">
+<style>
+  :root {
+    --paper:      #EEF1EE;
+    --surface:    #FAFBF9;
+    --surface-2:  #E4E9E4;
+    --ink:        #16201C;
+    --muted:      #58675F;
+    --hair:       #C3CDC5;
+    --hair-soft:  #D8E0D8;
+
+    --proc:       #0E6B63;
+    --proc-fill:  #0E6B6314;
+    --ext:        #85641C;
+    --ext-fill:   #85641C14;
+    --store:      #3B5570;
+    --store-fill: #3B557012;
+    --write:      #A83A2E;
+    --write-fill: #A83A2E12;
+
+    --line:       #64766C;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono:  ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:      #0F1412;
+      --surface:    #161D19;
+      --surface-2:  #1E2723;
+      --ink:        #E2E9E3;
+      --muted:      #97A79E;
+      --hair:       #35443C;
+      --hair-soft:  #27332C;
+
+      --proc:       #4FBFB0;
+      --proc-fill:  #4FBFB01F;
+      --ext:        #D6A94E;
+      --ext-fill:   #D6A94E1C;
+      --store:      #7FA8CC;
+      --store-fill: #7FA8CC1A;
+      --write:      #E8776A;
+      --write-fill: #E8776A1A;
+
+      --line:       #8CA096;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:#0F1412; --surface:#161D19; --surface-2:#1E2723; --ink:#E2E9E3;
+    --muted:#97A79E; --hair:#35443C; --hair-soft:#27332C;
+    --proc:#4FBFB0; --proc-fill:#4FBFB01F; --ext:#D6A94E; --ext-fill:#D6A94E1C;
+    --store:#7FA8CC; --store-fill:#7FA8CC1A; --write:#E8776A; --write-fill:#E8776A1A;
+    --line:#8CA096;
+  }
+  :root[data-theme="light"] {
+    --paper:#EEF1EE; --surface:#FAFBF9; --surface-2:#E4E9E4; --ink:#16201C;
+    --muted:#58675F; --hair:#C3CDC5; --hair-soft:#D8E0D8;
+    --proc:#0E6B63; --proc-fill:#0E6B6314; --ext:#85641C; --ext-fill:#85641C14;
+    --store:#3B5570; --store-fill:#3B557012; --write:#A83A2E; --write-fill:#A83A2E12;
+    --line:#64766C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1230px; margin: 0 auto; padding: 0 28px 120px; }
+  .prose { max-width: 70ch; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 1px solid var(--hair);
+    padding: 60px 0 34px;
+    margin-bottom: 46px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(34px, 5.2vw, 54px);
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  h1 em { font-style: italic; color: var(--proc); }
+  .standfirst {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 66ch;
+    margin: 0 0 30px;
+  }
+  .factbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 34px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--hair-soft);
+    padding-top: 16px;
+  }
+  .factbar b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- jump nav ---------- */
+
+  nav.jump {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--hair-soft);
+    margin: 0 0 44px;
+    overflow-x: auto;
+  }
+  nav.jump ol {
+    display: flex; gap: 22px; list-style: none;
+    margin: 0; padding: 11px 0;
+    font-family: var(--mono); font-size: 11.5px; white-space: nowrap;
+  }
+  nav.jump a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; padding-bottom: 2px; }
+  nav.jump a:hover, nav.jump a:focus-visible { color: var(--proc); border-bottom-color: var(--proc); }
+
+  /* ---------- sections ---------- */
+
+  section { margin: 0 0 78px; scroll-margin-top: 62px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 30px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    margin: 34px 0 10px;
+  }
+  .sechead {
+    border-top: 2px solid var(--ink);
+    padding-top: 14px;
+    margin-bottom: 24px;
+  }
+  .sechead .eyebrow { margin-bottom: 10px; }
+  p { margin: 0 0 15px; }
+  .prose p:last-child { margin-bottom: 0; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  strong { font-weight: 650; }
+  a { color: var(--proc); }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 30px 0 0;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+  }
+  .plate {
+    overflow-x: auto;
+    padding: 26px 26px 8px;
+  }
+  figure svg { display: block; width: 100%; height: auto; }
+  .plate > svg { min-width: 720px; }
+  figcaption {
+    border-top: 1px solid var(--hair-soft);
+    padding: 14px 26px 18px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 96ch;
+  }
+  figcaption b {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+
+  /* ---------- svg vocabulary ---------- */
+
+  svg text { font-family: var(--sans); fill: var(--ink); }
+  .t-name  { font-size: 13px; font-weight: 640; }
+  .t-num   { font-family: var(--mono); font-size: 13px; font-weight: 600; fill: var(--proc); }
+  .t-sub   { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+  .t-body  { font-size: 11.5px; fill: var(--muted); }
+  .t-flow  { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+  .t-flow-w{ font-family: var(--mono); font-size: 9.5px; fill: var(--write); }
+  .t-lane  { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--muted); }
+  .t-err   { font-family: var(--mono); font-size: 10px; fill: var(--write); }
+  .t-store-id { font-family: var(--mono); font-size: 11px; font-weight: 600; fill: var(--store); }
+
+  .proc-box { fill: var(--proc-fill); stroke: var(--proc); stroke-width: 1.4; }
+  .proc-div { stroke: var(--proc); stroke-width: 1; opacity: 0.55; }
+  .ent-box  { fill: var(--ext-fill); stroke: var(--ext); stroke-width: 1.4; }
+  .store-bg { fill: var(--store-fill); }
+  .store-line { fill: none; stroke: var(--store); stroke-width: 1.4; }
+  .store-div  { stroke: var(--store); stroke-width: 1; opacity: 0.6; }
+  .store-mem  { stroke-dasharray: 5 3; }
+  .dup        { stroke: var(--ink); stroke-width: 1.4; opacity: 0.7; }
+
+  .flow   { fill: none; stroke: var(--line); stroke-width: 1.3; }
+  .flow-w { fill: none; stroke: var(--write); stroke-width: 1.5; }
+  .flow-d { fill: none; stroke: var(--line); stroke-width: 1.3; stroke-dasharray: 5 4; }
+  .ah   { fill: var(--line); }
+  .ah-w { fill: var(--write); }
+
+  .gate { fill: var(--proc-fill); stroke: var(--proc); stroke-width: 1.4; }
+  .lane { fill: none; stroke: var(--hair); stroke-width: 1; }
+  .lane-fill { fill: var(--surface-2); opacity: 0.5; }
+  .note-box { fill: none; stroke: var(--hair); stroke-width: 1; stroke-dasharray: 4 3; }
+  .rule { stroke: var(--hair); stroke-width: 1; }
+
+  /* ---------- tables ---------- */
+
+  .tablewrap { overflow-x: auto; margin: 26px 0 0; border: 1px solid var(--hair); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--hair-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+    border-bottom: 1px solid var(--hair); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+  .pnum { font-family: var(--mono); font-weight: 600; color: var(--proc); white-space: nowrap; }
+  .sid  { font-family: var(--mono); font-weight: 600; color: var(--store); white-space: nowrap; }
+
+  table.matrix { font-variant-numeric: tabular-nums; }
+  table.matrix th.rot { font-size: 10px; padding: 9px 6px; text-align: center; }
+  table.matrix td.cell { text-align: center; font-family: var(--mono); font-size: 11px; padding: 8px 6px; letter-spacing: 0.04em; }
+  table.matrix td.cell.on { color: var(--proc); font-weight: 600; }
+  table.matrix td.cell.off { color: var(--hair); }
+  table.matrix tbody tr:hover { background: var(--surface-2); }
+
+  /* ---------- callouts ---------- */
+
+  .callout {
+    border-left: 3px solid var(--write);
+    background: var(--write-fill);
+    padding: 14px 18px;
+    margin: 26px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 78ch;
+  }
+  .callout b { display: block; font-size: 12px; font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--write); margin-bottom: 4px; }
+
+  footer {
+    border-top: 1px solid var(--hair);
+    padding-top: 22px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 78ch;
+  }
+  footer a { color: var(--muted); }
+
+  :focus-visible { outline: 2px solid var(--proc); outline-offset: 2px; }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 0 18px 80px; }
+    .plate { padding: 18px 16px 6px; }
+    figcaption { padding: 12px 16px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">medcode-api · structured analysis</p>
+  <h1>Data flow diagrams for the <em>MedCode AI</em> backend</h1>
+  <p class="standfirst">
+    Where every byte enters this system, what it becomes on the way through, and where it
+    lands. One context diagram, two level-1 maps, six level-2 decompositions, and the
+    exhaustive process&#8202;×&#8202;table matrix the diagrams deliberately leave out.
+  </p>
+  <div class="factbar">
+    <span><b>System</b> medcode-api · Spring&nbsp;Boot&nbsp;4.1 · Java&nbsp;21</span>
+    <span><b>Notation</b> Gane&#8211;Sarson</span>
+    <span><b>Drawn from</b> source at commit <code>6235b1e</code></span>
+    <span><b>Date</b> 7 Aug 2026</span>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Figures">
+  <ol>
+    <li><a href="#notation">Notation</a></li>
+    <li><a href="#index">Index</a></li>
+    <li><a href="#fig1">1 · Context</a></li>
+    <li><a href="#fig2">2 · Coding pipeline</a></li>
+    <li><a href="#fig3">3 · Identity &amp; admin</a></li>
+    <li><a href="#fig4">4 · Sync</a></li>
+    <li><a href="#fig5">5 · Approve</a></li>
+    <li><a href="#fig6">6 · Reopen</a></li>
+    <li><a href="#fig7">7 · Auth</a></li>
+    <li><a href="#fig8">8 · RAG</a></li>
+    <li><a href="#fig9">9 · Lock &amp; cache</a></li>
+    <li><a href="#matrix">10 · CRUD matrix</a></li>
+  </ol>
+</nav>
+
+<!-- ============================ NOTATION ============================ -->
+
+<section id="notation">
+  <div class="sechead">
+    <p class="eyebrow">§0</p>
+    <h2>How to read these diagrams</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Four shapes, used the same way in every figure. Processes are ours and carry a level
+      number; entities sit outside the system boundary; stores are tables in the
+      <code>medcode</code> PostgreSQL database unless marked in&#8209;memory. A corner tick means the
+      same entity or store is drawn more than once in that figure, to keep lines short.
+    </p>
+    <p>
+      Colour is doubled by shape, never load&#8209;bearing on its own. The single exception worth
+      knowing: <strong>vermilion marks flows that write to the hospital</strong> — the one direction
+      in this system that changes a record we do not own.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1140 152" role="img" aria-label="Legend: process, external entity, data store, in-memory store, data flow arrow, hospital write flow, and the duplicate-symbol corner tick.">
+        <defs>
+          <marker id="ar-lg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+          <marker id="arw-lg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah-w"/></marker>
+        </defs>
+
+        <!-- process -->
+        <rect class="proc-box" x="20" y="24" width="180" height="70" rx="12"/>
+        <line class="proc-div" x1="20" y1="52" x2="200" y2="52"/>
+        <text class="t-num" x="34" y="44">6.0</text>
+        <text class="t-name" x="72" y="44">Process</text>
+        <text class="t-sub" x="34" y="70">what this backend</text>
+        <text class="t-sub" x="34" y="84">does to the data</text>
+        <text class="t-flow" x="20" y="122">Rounded box, numbered.</text>
+        <text class="t-flow" x="20" y="136">Our code.</text>
+
+        <!-- entity -->
+        <rect class="ent-box" x="240" y="24" width="180" height="70" rx="2"/>
+        <text class="t-name" x="256" y="52">External entity</text>
+        <text class="t-sub" x="256" y="72">a person or a system</text>
+        <text class="t-sub" x="256" y="86">outside our boundary</text>
+        <text class="t-flow" x="240" y="122">Square corners.</text>
+        <text class="t-flow" x="240" y="136">Source or sink only.</text>
+
+        <!-- store -->
+        <rect class="store-bg" x="460" y="24" width="180" height="70"/>
+        <path class="store-line" d="M640,24 H460 V94 H640"/>
+        <line class="store-div" x1="494" y1="24" x2="494" y2="94"/>
+        <text class="t-store-id" x="470" y="63">D1</text>
+        <text class="t-name" x="506" y="52">Data store</text>
+        <text class="t-sub" x="506" y="72">a table in the</text>
+        <text class="t-sub" x="506" y="86">medcode database</text>
+        <text class="t-flow" x="460" y="122">Open on the right.</text>
+        <text class="t-flow" x="460" y="136">Persistent.</text>
+
+        <!-- memory store -->
+        <rect class="store-bg" x="680" y="24" width="170" height="70"/>
+        <path class="store-line store-mem" d="M850,24 H680 V94 H850"/>
+        <line class="store-div store-mem" x1="714" y1="24" x2="714" y2="94"/>
+        <text class="t-store-id" x="690" y="63">M1</text>
+        <text class="t-name" x="726" y="52">Memory store</text>
+        <text class="t-sub" x="726" y="72">lives in the JVM,</text>
+        <text class="t-sub" x="726" y="86">lost on restart</text>
+        <text class="t-flow" x="680" y="122">Dashed outline.</text>
+        <text class="t-flow" x="680" y="136">Single instance only.</text>
+
+        <!-- flows -->
+        <line class="flow" x1="890" y1="40" x2="1010" y2="40" marker-end="url(#ar-lg)"/>
+        <text class="t-flow" x="1020" y="44">data flow</text>
+        <line class="flow-w" x1="890" y1="68" x2="1010" y2="68" marker-end="url(#arw-lg)"/>
+        <text class="t-flow-w" x="1020" y="72">write to the hospital</text>
+        <rect class="ent-box" x="890" y="86" width="34" height="26" rx="2"/>
+        <line class="dup" x1="890" y1="100" x2="904" y2="86"/>
+        <text class="t-flow" x="934" y="103">drawn more than once here</text>
+        <line class="flow-d" x1="890" y1="128" x2="1010" y2="128"/>
+        <text class="t-flow" x="1020" y="132">control, not data</text>
+      </svg>
+    </div>
+    <figcaption><b>Notation key</b> Gane–Sarson symbols. The same vocabulary carries through all ten figures, so the shapes never need re-learning.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ INDEX ============================ -->
+
+<section id="index">
+  <div class="sechead">
+    <p class="eyebrow">§1</p>
+    <h2>The processes and the stores they touch</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Eleven processes cover the whole HTTP surface. The numbering is stable: a process keeps
+      its number in every figure below, and the level&#8209;2 decompositions extend it
+      (<code>2.1</code>, <code>2.2</code>&nbsp;…).
+    </p>
+  </div>
+
+  <h3>Process index</h3>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>№</th><th>Process</th><th>HTTP surface</th><th>Talks to</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="pnum">1.0</td><td>Authenticate &amp; authorize</td><td class="mono">POST /api/auth/login · logout · GET /api/auth/me</td><td>browser</td></tr>
+        <tr><td class="pnum">2.0</td><td>Sync from the hospital</td><td class="mono">POST /api/sync · POST /api/cases/{id}/sync</td><td>iMed API</td></tr>
+        <tr><td class="pnum">3.0</td><td>Serve case views &amp; catalog search</td><td class="mono">GET /api/cases · /api/cases/{id} · /api/icd-codes</td><td>browser</td></tr>
+        <tr><td class="pnum">4.0</td><td>Save the coder's working state</td><td class="mono">PUT /api/cases/{id}/codes</td><td>browser</td></tr>
+        <tr><td class="pnum">5.0</td><td>Suggest codes</td><td class="mono">POST /api/cases/{id}/suggest-codes</td><td>RAG service</td></tr>
+        <tr><td class="pnum">6.0</td><td>Approve &amp; reopen</td><td class="mono">POST /api/cases/approve · POST /api/cases/{id}/reopen</td><td>iMed API</td></tr>
+        <tr><td class="pnum">7.0</td><td>Administer accounts</td><td class="mono">GET/POST/PUT/DELETE /api/admin/accounts · dashboard</td><td>browser</td></tr>
+        <tr><td class="pnum">8.0</td><td>Manage the knowledge index</td><td class="mono">/api/admin/knowledge/**</td><td>RAG service</td></tr>
+        <tr><td class="pnum">9.0</td><td>Report analytics</td><td class="mono">GET /api/analytics</td><td>browser</td></tr>
+        <tr><td class="pnum">10.0</td><td>Answer coder questions</td><td class="mono">POST /api/agent/chat</td><td>RAG service</td></tr>
+        <tr><td class="pnum">11.0</td><td>Snapshot &amp; reset the demo</td><td class="mono">POST /api/demo/snapshot · POST /api/demo/reset</td><td>iMed API</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Store index</h3>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Store</th><th>Tables</th><th>What it holds</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="sid">D1</td><td>Case record</td><td class="mono">cases · case_report_sections · case_codes · case_orders · case_vitals</td><td>Everything one hospital visit consists of, plus the coder's finalized codes</td></tr>
+        <tr><td class="sid">D2</td><td>Reference catalogs</td><td class="mono">icd_10 · icd_9 · coverage_types</td><td>Code masters and Thai coverage schemes; two ICD tables since the 2026-07-28 split</td></tr>
+        <tr><td class="sid">D3</td><td>Document chunks</td><td class="mono">document_chunks</td><td>Written by sync for future retrieval — <em>no reader today</em></td></tr>
+        <tr><td class="sid">D4</td><td>Working state</td><td class="mono">case_code_edits</td><td>The coder's unapproved <code>CodeEdit[]</code> payload, stored verbatim as JSONB</td></tr>
+        <tr><td class="sid">D5</td><td>Audit trail &amp; write journal</td><td class="mono">coding_history · imed_write_ops</td><td>Who did what, and the before-image of every hospital row we touched</td></tr>
+        <tr><td class="sid">D6</td><td>Accounts</td><td class="mono">users</td><td>BCrypt <code>password_hash</code>, role (<code>coder</code>/<code>admin</code>), status</td></tr>
+        <tr><td class="sid">D7</td><td>Sessions</td><td class="mono">auth_sessions</td><td>sha256 of each live Bearer token, plus its expiry</td></tr>
+        <tr><td class="sid">D8</td><td>Demo baseline</td><td class="mono">demo_baseline.&lt;table&gt;</td><td>A frozen copy of every table, in its own schema</td></tr>
+        <tr><td class="sid">M1</td><td>Cases cache</td><td class="mono">in-memory</td><td>The whole dashboard payload, rebuilt only after approve / reopen / reset</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ FIG 1 ============================ -->
+
+<section id="fig1">
+  <div class="sechead">
+    <p class="eyebrow">Figure 1 · Level 0</p>
+    <h2>Context — the system boundary</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Two kinds of human above, two machines below. The backend owns its database outright,
+      so no store appears at this level: everything crossing a line here crosses a process
+      boundary too.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 900 530" role="img" aria-label="Context diagram: medical coders and administrators send requests down to the MedCode AI backend, which reads case data from and writes diagnoses to the hospital iMed API, and exchanges clinical text for code candidates with the RAG service.">
+        <defs>
+          <marker id="ar-f1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+          <marker id="arw-f1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah-w"/></marker>
+        </defs>
+
+        <!-- entities -->
+        <rect class="ent-box" x="48" y="28" width="252" height="66" rx="2"/>
+        <text class="t-name" x="174" y="56" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="174" y="76" text-anchor="middle">audit-chart-frontend (browser)</text>
+
+        <rect class="ent-box" x="600" y="28" width="252" height="66" rx="2"/>
+        <text class="t-name" x="726" y="56" text-anchor="middle">Administrator</text>
+        <text class="t-sub" x="726" y="76" text-anchor="middle">admin console (browser)</text>
+
+        <rect class="ent-box" x="48" y="440" width="252" height="70" rx="2"/>
+        <text class="t-name" x="174" y="470" text-anchor="middle">Hospital iMed API</text>
+        <text class="t-sub" x="174" y="490" text-anchor="middle">medhack_* extract</text>
+        <text class="t-sub" x="174" y="503" text-anchor="middle">/api/v1 write contract</text>
+
+        <rect class="ent-box" x="600" y="440" width="252" height="70" rx="2"/>
+        <text class="t-name" x="726" y="470" text-anchor="middle">MedCode RAG service</text>
+        <text class="t-sub" x="726" y="490" text-anchor="middle">FastAPI · vector index</text>
+        <text class="t-sub" x="726" y="503" text-anchor="middle">knowledge graph · local LLM</text>
+
+        <!-- process 0 -->
+        <rect class="proc-box" x="48" y="214" width="804" height="110" rx="14"/>
+        <line class="proc-div" x1="48" y1="248" x2="852" y2="248"/>
+        <text class="t-num" x="68" y="239">0</text>
+        <text class="t-name" x="94" y="239">MedCode AI backend</text>
+        <text class="t-sub" x="836" y="239" text-anchor="end">medcode-api</text>
+        <text class="t-body" x="450" y="278" text-anchor="middle">Spring Boot 4.1 · Java 21 · exactly one instance</text>
+        <text class="t-body" x="450" y="300" text-anchor="middle">owns the medcode PostgreSQL database and the API contract</text>
+
+        <!-- coder flows -->
+        <line class="flow" x1="120" y1="96" x2="120" y2="208" marker-end="url(#ar-f1)"/>
+        <line class="flow" x1="228" y1="206" x2="228" y2="100" marker-end="url(#ar-f1)"/>
+        <text class="t-flow" x="112" y="128" text-anchor="end">credentials</text>
+        <text class="t-flow" x="112" y="144" text-anchor="end">code picks</text>
+        <text class="t-flow" x="112" y="160" text-anchor="end">approve · sync</text>
+        <text class="t-flow" x="238" y="128">session token</text>
+        <text class="t-flow" x="238" y="144">case dashboard</text>
+        <text class="t-flow" x="238" y="160">code suggestions</text>
+
+        <!-- admin flows -->
+        <line class="flow" x1="674" y1="96" x2="674" y2="208" marker-end="url(#ar-f1)"/>
+        <line class="flow" x1="782" y1="206" x2="782" y2="100" marker-end="url(#ar-f1)"/>
+        <text class="t-flow" x="666" y="128" text-anchor="end">account edits</text>
+        <text class="t-flow" x="666" y="144" text-anchor="end">training PDFs</text>
+        <text class="t-flow" x="790" y="128">account list</text>
+        <text class="t-flow" x="790" y="144">index status</text>
+
+        <!-- imed flows -->
+        <line class="flow-w" x1="120" y1="326" x2="120" y2="434" marker-end="url(#arw-f1)"/>
+        <line class="flow" x1="228" y1="434" x2="228" y2="330" marker-end="url(#ar-f1)"/>
+        <text class="t-flow-w" x="112" y="354" text-anchor="end">diagnosis POST</text>
+        <text class="t-flow-w" x="112" y="370" text-anchor="end">PUT · DELETE</text>
+        <text class="t-flow-w" x="112" y="386" text-anchor="end">coding_status</text>
+        <text class="t-flow" x="238" y="354">visits · notes</text>
+        <text class="t-flow" x="238" y="370">orders · labs</text>
+        <text class="t-flow" x="238" y="386">vitals · ICD master</text>
+
+        <!-- rag flows -->
+        <line class="flow" x1="674" y1="326" x2="674" y2="434" marker-end="url(#ar-f1)"/>
+        <line class="flow" x1="782" y1="434" x2="782" y2="330" marker-end="url(#ar-f1)"/>
+        <text class="t-flow" x="666" y="354" text-anchor="end">clinical text</text>
+        <text class="t-flow" x="666" y="370" text-anchor="end">questions</text>
+        <text class="t-flow" x="666" y="386" text-anchor="end">documents</text>
+        <text class="t-flow" x="790" y="354">code candidates</text>
+        <text class="t-flow" x="790" y="370">answers</text>
+        <text class="t-flow" x="790" y="386">index stats</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1 — Level 0 context</b> Both downstream systems are swappable by base URL alone (<code>IMED_API_BASE</code>, <code>RAG_API_BASE</code>); locally they are the sibling repos <code>imed-mock-api</code> and <code>RAG</code>. Only the hospital direction contains writes we cannot undo unilaterally.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 2 ============================ -->
+
+<section id="fig2">
+  <div class="sechead">
+    <p class="eyebrow">Figure 2 · Level 1</p>
+    <h2>The case coding pipeline</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Read top to bottom and it is a case's life: pulled from the hospital, shown to a coder,
+      annotated by a machine, ticked by a human, sent back. Each row shows a process, the
+      stores it leans on, and the party on the other end of the wire.
+    </p>
+    <p>
+      Only the <em>primary</em> stores are drawn. The complete process&#8202;×&#8202;table map lives in
+      <a href="#matrix">Figure 10</a>.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1200 1080" role="img" aria-label="Level 1 data flow for the coding pipeline: sync from hospital writes the case record and reference catalogs; serve case views reads them through an in-memory cache; suggest codes reads report sections and calls the RAG service; save working state stores the coder's code edits; approve and reopen reads those picks, writes coder codes and the audit journal, and diffs against the hospital iMed API.">
+        <defs>
+          <marker id="ar-f2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+          <marker id="arw-f2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah-w"/></marker>
+        </defs>
+
+        <!-- ================= ROW 1 · 2.0 Sync ================= -->
+        <rect class="store-bg" x="26" y="32" width="280" height="56"/>
+        <path class="store-line" d="M306,32 H26 V88 H306"/>
+        <line class="store-div" x1="60" y1="32" x2="60" y2="88"/>
+        <text class="t-store-id" x="34" y="64">D1</text>
+        <text class="t-name" x="72" y="52">Case record</text>
+        <text class="t-sub" x="72" y="68">cases · case_report_sections</text>
+        <text class="t-sub" x="72" y="81">case_orders · case_vitals · case_codes</text>
+
+        <rect class="store-bg" x="26" y="104" width="280" height="56"/>
+        <path class="store-line" d="M306,104 H26 V160 H306"/>
+        <line class="store-div" x1="60" y1="104" x2="60" y2="160"/>
+        <text class="t-store-id" x="34" y="136">D2</text>
+        <text class="t-name" x="72" y="126">Reference catalogs</text>
+        <text class="t-sub" x="72" y="145">icd_10 · icd_9 · coverage_types</text>
+
+        <rect class="proc-box" x="436" y="44" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="76" x2="816" y2="76"/>
+        <text class="t-num" x="454" y="67">2.0</text>
+        <text class="t-name" x="494" y="67">Sync from the hospital</text>
+        <text class="t-sub" x="454" y="99">POST /api/sync · POST /api/cases/{id}/sync</text>
+        <text class="t-body" x="454" y="118">import new · refresh open · skip finalized</text>
+        <text class="t-body" x="454" y="136">optional {from,to} visit window, filtered hospital-side</text>
+
+        <rect class="ent-box" x="946" y="60" width="228" height="72" rx="2"/>
+        <text class="t-name" x="1060" y="90" text-anchor="middle">Hospital iMed API</text>
+        <text class="t-sub" x="1060" y="110" text-anchor="middle">read direction</text>
+
+        <line class="flow" x1="432" y1="60" x2="312" y2="60" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="52" text-anchor="middle">case + order rows</text>
+        <line class="flow" x1="432" y1="132" x2="312" y2="132" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="124" text-anchor="middle">new codes only</text>
+        <line class="flow" x1="942" y1="80" x2="822" y2="80" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="72" text-anchor="middle">visits · notes · orders</text>
+        <line class="flow" x1="820" y1="112" x2="940" y2="112" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="104" text-anchor="middle">GET windowed list</text>
+
+        <!-- ================= ROW 2 · 3.0 Serve views ================= -->
+        <rect class="store-bg" x="26" y="208" width="280" height="56"/>
+        <path class="store-line" d="M306,208 H26 V264 H306"/>
+        <line class="store-div" x1="60" y1="208" x2="60" y2="264"/>
+        <line class="dup" x1="26" y1="222" x2="40" y2="208"/>
+        <text class="t-store-id" x="34" y="240">D1</text>
+        <text class="t-name" x="72" y="228">Case record</text>
+        <text class="t-sub" x="72" y="247">+ D5 history · D6 users (coder names)</text>
+
+        <rect class="store-bg" x="26" y="280" width="280" height="56"/>
+        <path class="store-line store-mem" d="M306,280 H26 V336 H306"/>
+        <line class="store-div store-mem" x1="60" y1="280" x2="60" y2="336"/>
+        <text class="t-store-id" x="34" y="312">M1</text>
+        <text class="t-name" x="72" y="302">Cases cache</text>
+        <text class="t-sub" x="72" y="321">in-memory · whole dashboard payload</text>
+
+        <rect class="proc-box" x="436" y="220" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="252" x2="816" y2="252"/>
+        <text class="t-num" x="454" y="243">3.0</text>
+        <text class="t-name" x="494" y="243">Serve case views</text>
+        <text class="t-sub" x="454" y="275">GET /api/cases · /{id} · /api/icd-codes</text>
+        <text class="t-body" x="454" y="294">LinkedHashMap — stable key order, absent vs. null</text>
+        <text class="t-body" x="454" y="312">dashboard is OPD only; detail serves every visit</text>
+
+        <rect class="ent-box" x="946" y="236" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="250" x2="960" y2="236"/>
+        <text class="t-name" x="1060" y="266" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="286" text-anchor="middle">browser</text>
+
+        <line class="flow" x1="312" y1="236" x2="432" y2="236" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="228" text-anchor="middle">case + coder rows</text>
+        <line class="flow" x1="432" y1="302" x2="312" y2="302" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="294" text-anchor="middle">store payload</text>
+        <line class="flow" x1="312" y1="326" x2="432" y2="326" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="346" text-anchor="middle">cached payload</text>
+        <line class="flow" x1="942" y1="256" x2="822" y2="256" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="248" text-anchor="middle">GET /api/cases</text>
+        <line class="flow" x1="820" y1="288" x2="940" y2="288" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="280" text-anchor="middle">dashboard · detail</text>
+
+        <!-- ================= ROW 3 · 5.0 Suggest ================= -->
+        <rect class="store-bg" x="26" y="384" width="280" height="56"/>
+        <path class="store-line" d="M306,384 H26 V440 H306"/>
+        <line class="store-div" x1="60" y1="384" x2="60" y2="440"/>
+        <line class="dup" x1="26" y1="398" x2="40" y2="384"/>
+        <text class="t-store-id" x="34" y="416">D1</text>
+        <text class="t-name" x="72" y="406">Report sections</text>
+        <text class="t-sub" x="72" y="425">case_report_sections — read only</text>
+
+        <rect class="proc-box" x="436" y="396" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="428" x2="816" y2="428"/>
+        <text class="t-num" x="454" y="419">5.0</text>
+        <text class="t-name" x="494" y="419">Suggest codes</text>
+        <text class="t-sub" x="454" y="451">POST /api/cases/{id}/suggest-codes</text>
+        <text class="t-body" x="454" y="470">narrative: diagnosis-ish sections first, capped at 6000 chars</text>
+        <text class="t-body" x="454" y="488">writes nothing — the coder saves through 4.0</text>
+
+        <rect class="ent-box" x="946" y="370" width="228" height="64" rx="2"/>
+        <line class="dup" x1="946" y1="384" x2="960" y2="370"/>
+        <text class="t-name" x="1060" y="398" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="416" text-anchor="middle">case detail page</text>
+
+        <rect class="ent-box" x="946" y="462" width="228" height="64" rx="2"/>
+        <text class="t-name" x="1060" y="490" text-anchor="middle">MedCode RAG service</text>
+        <text class="t-sub" x="1060" y="508" text-anchor="middle">POST /suggest</text>
+
+        <line class="flow" x1="312" y1="412" x2="432" y2="412" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="404" text-anchor="middle">section text</text>
+        <line class="flow" x1="942" y1="390" x2="822" y2="390" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="382" text-anchor="middle">POST …/suggest-codes</text>
+        <line class="flow" x1="820" y1="418" x2="940" y2="418" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="410" text-anchor="middle">code candidates</text>
+        <line class="flow" x1="820" y1="478" x2="940" y2="478" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="470" text-anchor="middle">clinical narrative</text>
+        <line class="flow" x1="942" y1="506" x2="822" y2="506" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="498" text-anchor="middle">codes + confidence</text>
+
+        <!-- ================= ROW 4 · 4.0 Working state ================= -->
+        <rect class="store-bg" x="26" y="560" width="280" height="56"/>
+        <path class="store-line" d="M306,560 H26 V616 H306"/>
+        <line class="store-div" x1="60" y1="560" x2="60" y2="616"/>
+        <line class="dup" x1="26" y1="574" x2="40" y2="560"/>
+        <text class="t-store-id" x="34" y="592">D1</text>
+        <text class="t-name" x="72" y="582">cases</text>
+        <text class="t-sub" x="72" y="601">existence check only — 404 otherwise</text>
+
+        <rect class="store-bg" x="26" y="632" width="280" height="56"/>
+        <path class="store-line" d="M306,632 H26 V688 H306"/>
+        <line class="store-div" x1="60" y1="632" x2="60" y2="688"/>
+        <text class="t-store-id" x="34" y="664">D4</text>
+        <text class="t-name" x="72" y="654">Working state</text>
+        <text class="t-sub" x="72" y="673">case_code_edits — CodeEdit[] as JSONB</text>
+
+        <rect class="proc-box" x="436" y="572" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="604" x2="816" y2="604"/>
+        <text class="t-num" x="454" y="595">4.0</text>
+        <text class="t-name" x="494" y="595">Save the coder's working state</text>
+        <text class="t-sub" x="454" y="627">PUT /api/cases/{id}/codes</text>
+        <text class="t-body" x="454" y="646">stored verbatim — selected, note and extra keys round-trip</text>
+        <text class="t-body" x="454" y="664">deliberately does NOT invalidate the cases cache</text>
+
+        <rect class="ent-box" x="946" y="588" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="602" x2="960" y2="588"/>
+        <text class="t-name" x="1060" y="618" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="638" text-anchor="middle">ticks the codes to approve</text>
+
+        <line class="flow" x1="312" y1="588" x2="432" y2="588" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="580" text-anchor="middle">case exists?</text>
+        <line class="flow" x1="432" y1="660" x2="312" y2="660" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="652" text-anchor="middle">replace payload</text>
+        <line class="flow" x1="942" y1="608" x2="822" y2="608" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="600" text-anchor="middle">CodeEdit[] array</text>
+        <line class="flow" x1="820" y1="640" x2="940" y2="640" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="632" text-anchor="middle">{ ok: true }</text>
+
+        <!-- ================= ROW 5 · 6.0 Approve & reopen ================= -->
+        <rect class="store-bg" x="26" y="736" width="280" height="56"/>
+        <path class="store-line" d="M306,736 H26 V792 H306"/>
+        <line class="store-div" x1="60" y1="736" x2="60" y2="792"/>
+        <line class="dup" x1="26" y1="750" x2="40" y2="736"/>
+        <text class="t-store-id" x="34" y="768">D4</text>
+        <text class="t-name" x="72" y="758">Working state</text>
+        <text class="t-sub" x="72" y="777">the ticked picks — unticked rows are kept, not sent</text>
+
+        <rect class="store-bg" x="26" y="808" width="280" height="56"/>
+        <path class="store-line" d="M306,808 H26 V864 H306"/>
+        <line class="store-div" x1="60" y1="808" x2="60" y2="864"/>
+        <line class="dup" x1="26" y1="822" x2="40" y2="808"/>
+        <text class="t-store-id" x="34" y="840">D1</text>
+        <text class="t-name" x="72" y="830">Coded case</text>
+        <text class="t-sub" x="72" y="849">case_codes (coder_assigned) · cases.case_status</text>
+
+        <rect class="store-bg" x="26" y="872" width="280" height="56"/>
+        <path class="store-line" d="M306,872 H26 V928 H306"/>
+        <line class="store-div" x1="60" y1="872" x2="60" y2="928"/>
+        <text class="t-store-id" x="34" y="904">D5</text>
+        <text class="t-name" x="72" y="894">Audit trail &amp; journal</text>
+        <text class="t-sub" x="72" y="913">coding_history · imed_write_ops</text>
+
+        <rect class="proc-box" x="436" y="748" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="780" x2="816" y2="780"/>
+        <text class="t-num" x="454" y="771">6.0</text>
+        <text class="t-name" x="494" y="771">Approve &amp; reopen</text>
+        <text class="t-sub" x="454" y="803">POST /api/cases/approve · /api/cases/{id}/reopen</text>
+        <text class="t-body" x="454" y="822">our transaction commits first, then the hospital calls run</text>
+        <text class="t-body" x="454" y="840">actor = the logged-in account; a body coder field is ignored</text>
+
+        <rect class="ent-box" x="946" y="764" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="778" x2="960" y2="764"/>
+        <text class="t-name" x="1060" y="794" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="814" text-anchor="middle">browser</text>
+
+        <line class="flow" x1="312" y1="764" x2="432" y2="764" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="756" text-anchor="middle">saved picks</text>
+        <line class="flow" x1="432" y1="836" x2="312" y2="836" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="371" y="828" text-anchor="middle">coder_assigned rows</text>
+        <path class="flow" d="M470,852 V900 H312" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="392" y="892" text-anchor="middle">history + before-images</text>
+        <line class="flow" x1="942" y1="784" x2="822" y2="784" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="776" text-anchor="middle">{ ids: [ … ] }</text>
+        <line class="flow" x1="820" y1="816" x2="940" y2="816" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="882" y="808" text-anchor="middle">approved · stats</text>
+
+        <!-- ================= ROW 6 · hospital write ================= -->
+        <rect class="ent-box" x="946" y="964" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="978" x2="960" y2="964"/>
+        <text class="t-name" x="1060" y="994" text-anchor="middle">Hospital iMed API</text>
+        <text class="t-sub" x="1060" y="1014" text-anchor="middle">write direction</text>
+
+        <path class="flow-w" d="M620,852 V984 H940" marker-end="url(#arw-f2)"/>
+        <text class="t-flow-w" x="800" y="976" text-anchor="middle">POST · PUT · DELETE /api/v1/diagnosis</text>
+        <path class="flow" d="M946,1016 H560 V856" marker-end="url(#ar-f2)"/>
+        <text class="t-flow" x="800" y="1010" text-anchor="middle">live icd10 / icd9 rows</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2 — Level 1, coding pipeline</b> The one flow worth tracing twice: 6.0 reads D4 (what the coder ticked), writes D1 and D5, <em>then</em> reads the hospital's live rows to compute a diff. It never replays a stored request — it recomputes against whatever the hospital currently holds, which is what makes a retry heal instead of double-write. Decomposed in <a href="#fig5">Figure 5</a>.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 3 ============================ -->
+
+<section id="fig3">
+  <div class="sechead">
+    <p class="eyebrow">Figure 3 · Level 1</p>
+    <h2>Identity, administration, knowledge and analytics</h2>
+  </div>
+  <div class="prose">
+    <p>
+      The other six processes. Three of them (8.0, 10.0, and part of 11.0) are mostly
+      conduits — they exist so the browser never speaks to the RAG service or the hospital
+      directly, and so a token check happens before anything downstream is touched.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1200 1060" role="img" aria-label="Level 1 data flow for identity and administration: authenticate reads accounts and writes sessions; administer accounts does full CRUD on users and revokes sessions; manage knowledge index proxies the RAG service and fills the ICD catalogs; report analytics reads the cases cache and case tables; answer coder questions proxies RAG chat; snapshot and reset copies every table to and from the demo baseline schema and calls the hospital mock.">
+        <defs>
+          <marker id="ar-f3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+        </defs>
+
+        <!-- ROW 1 · 1.0 -->
+        <rect class="store-bg" x="26" y="32" width="280" height="56"/>
+        <path class="store-line" d="M306,32 H26 V88 H306"/>
+        <line class="store-div" x1="60" y1="32" x2="60" y2="88"/>
+        <text class="t-store-id" x="34" y="64">D6</text>
+        <text class="t-name" x="72" y="54">Accounts</text>
+        <text class="t-sub" x="72" y="73">users — password_hash · role · status</text>
+
+        <rect class="store-bg" x="26" y="104" width="280" height="56"/>
+        <path class="store-line" d="M306,104 H26 V160 H306"/>
+        <line class="store-div" x1="60" y1="104" x2="60" y2="160"/>
+        <text class="t-store-id" x="34" y="136">D7</text>
+        <text class="t-name" x="72" y="126">Sessions</text>
+        <text class="t-sub" x="72" y="145">auth_sessions — sha256(token) · expires_at</text>
+
+        <rect class="proc-box" x="436" y="44" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="76" x2="816" y2="76"/>
+        <text class="t-num" x="454" y="67">1.0</text>
+        <text class="t-name" x="494" y="67">Authenticate &amp; authorize</text>
+        <text class="t-sub" x="454" y="99">POST /api/auth/login · logout · GET /api/auth/me</text>
+        <text class="t-body" x="454" y="118">guards every route except login, health and Swagger</text>
+        <text class="t-body" x="454" y="136">the raw token is never stored — only its sha256</text>
+
+        <rect class="ent-box" x="946" y="60" width="228" height="72" rx="2"/>
+        <text class="t-name" x="1060" y="90" text-anchor="middle">Coder or administrator</text>
+        <text class="t-sub" x="1060" y="110" text-anchor="middle">browser · Bearer token</text>
+
+        <line class="flow" x1="432" y1="60" x2="312" y2="60" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="52" text-anchor="middle">verify · stamp login</text>
+        <line class="flow" x1="432" y1="126" x2="312" y2="126" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="118" text-anchor="middle">open · revoke</text>
+        <line class="flow" x1="312" y1="150" x2="432" y2="150" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="170" text-anchor="middle">session + role</text>
+        <line class="flow" x1="942" y1="80" x2="822" y2="80" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="72" text-anchor="middle">password · Bearer</text>
+        <line class="flow" x1="820" y1="112" x2="940" y2="112" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="104" text-anchor="middle">token · 401 · 403</text>
+
+        <!-- ROW 2 · 7.0 -->
+        <rect class="store-bg" x="26" y="208" width="280" height="56"/>
+        <path class="store-line" d="M306,208 H26 V264 H306"/>
+        <line class="store-div" x1="60" y1="208" x2="60" y2="264"/>
+        <line class="dup" x1="26" y1="222" x2="40" y2="208"/>
+        <text class="t-store-id" x="34" y="240">D6</text>
+        <text class="t-name" x="72" y="230">Accounts</text>
+        <text class="t-sub" x="72" y="249">full CRUD — delete blocked once history exists</text>
+
+        <rect class="store-bg" x="26" y="280" width="280" height="56"/>
+        <path class="store-line" d="M306,280 H26 V336 H306"/>
+        <line class="store-div" x1="60" y1="280" x2="60" y2="336"/>
+        <line class="dup" x1="26" y1="294" x2="40" y2="280"/>
+        <text class="t-store-id" x="34" y="312">D7</text>
+        <text class="t-name" x="72" y="302">Sessions</text>
+        <text class="t-sub" x="72" y="321">revoked when an account is deactivated</text>
+
+        <rect class="proc-box" x="436" y="220" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="252" x2="816" y2="252"/>
+        <text class="t-num" x="454" y="243">7.0</text>
+        <text class="t-name" x="494" y="243">Administer accounts</text>
+        <text class="t-sub" x="454" y="275">/api/admin/accounts · /api/admin/dashboard</text>
+        <text class="t-body" x="454" y="294">admin role required — a coder token gets 403</text>
+        <text class="t-body" x="454" y="312">409 rather than orphaning an audit row</text>
+
+        <rect class="ent-box" x="946" y="236" width="228" height="72" rx="2"/>
+        <text class="t-name" x="1060" y="266" text-anchor="middle">Administrator</text>
+        <text class="t-sub" x="1060" y="286" text-anchor="middle">admin console</text>
+
+        <line class="flow" x1="432" y1="236" x2="312" y2="236" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="228" text-anchor="middle">create · edit · delete</text>
+        <line class="flow" x1="432" y1="308" x2="312" y2="308" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="300" text-anchor="middle">revoke sessions</text>
+        <line class="flow" x1="942" y1="256" x2="822" y2="256" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="248" text-anchor="middle">account changes</text>
+        <line class="flow" x1="820" y1="288" x2="940" y2="288" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="280" text-anchor="middle">rows · counts</text>
+
+        <!-- ROW 3 · 8.0 -->
+        <rect class="store-bg" x="26" y="384" width="280" height="56"/>
+        <path class="store-line" d="M306,384 H26 V440 H306"/>
+        <line class="store-div" x1="60" y1="384" x2="60" y2="440"/>
+        <line class="dup" x1="26" y1="398" x2="40" y2="384"/>
+        <text class="t-store-id" x="34" y="416">D2</text>
+        <text class="t-name" x="72" y="406">Reference catalogs</text>
+        <text class="t-sub" x="72" y="425">icd_10 · icd_9 — add and fill blanks only</text>
+
+        <rect class="proc-box" x="436" y="396" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="428" x2="816" y2="428"/>
+        <text class="t-num" x="454" y="419">8.0</text>
+        <text class="t-name" x="494" y="419">Manage the knowledge index</text>
+        <text class="t-sub" x="454" y="451">/api/admin/knowledge/** — a proxy, plus sync-codes</text>
+        <text class="t-body" x="454" y="470">"training" = chunk → embed → graph, not fine-tuning</text>
+        <text class="t-body" x="454" y="488">an existing description is never overwritten</text>
+
+        <rect class="ent-box" x="946" y="370" width="228" height="64" rx="2"/>
+        <line class="dup" x1="946" y1="384" x2="960" y2="370"/>
+        <text class="t-name" x="1060" y="398" text-anchor="middle">Administrator</text>
+        <text class="t-sub" x="1060" y="416" text-anchor="middle">AI Training page</text>
+
+        <rect class="ent-box" x="946" y="462" width="228" height="64" rx="2"/>
+        <text class="t-name" x="1060" y="490" text-anchor="middle">MedCode RAG service</text>
+        <text class="t-sub" x="1060" y="508" text-anchor="middle">no auth — internal only</text>
+
+        <line class="flow" x1="432" y1="412" x2="312" y2="412" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="404" text-anchor="middle">extracted titles</text>
+        <line class="flow" x1="942" y1="390" x2="822" y2="390" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="382" text-anchor="middle">PDF / CSV uploads</text>
+        <line class="flow" x1="820" y1="418" x2="940" y2="418" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="410" text-anchor="middle">docs · stats · progress</text>
+        <line class="flow" x1="820" y1="478" x2="940" y2="478" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="470" text-anchor="middle">upload · rebuild</text>
+        <line class="flow" x1="942" y1="506" x2="822" y2="506" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="498" text-anchor="middle">status · code pairs</text>
+
+        <!-- ROW 4 · 9.0 -->
+        <rect class="store-bg" x="26" y="560" width="280" height="56"/>
+        <path class="store-line store-mem" d="M306,560 H26 V616 H306"/>
+        <line class="store-div store-mem" x1="60" y1="560" x2="60" y2="616"/>
+        <line class="dup" x1="26" y1="574" x2="40" y2="560"/>
+        <text class="t-store-id" x="34" y="592">M1</text>
+        <text class="t-name" x="72" y="582">Cases cache</text>
+        <text class="t-sub" x="72" y="601">the summary tiles, verbatim — never drift</text>
+
+        <rect class="store-bg" x="26" y="632" width="280" height="56"/>
+        <path class="store-line" d="M306,632 H26 V688 H306"/>
+        <line class="store-div" x1="60" y1="632" x2="60" y2="688"/>
+        <line class="dup" x1="26" y1="646" x2="40" y2="632"/>
+        <text class="t-store-id" x="34" y="664">D1</text>
+        <text class="t-name" x="72" y="654">Case record + D2</text>
+        <text class="t-sub" x="72" y="673">visit dates · case_codes · coverage_types</text>
+
+        <rect class="proc-box" x="436" y="572" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="604" x2="816" y2="604"/>
+        <text class="t-num" x="454" y="595">9.0</text>
+        <text class="t-name" x="494" y="595">Report analytics</text>
+        <text class="t-sub" x="454" y="627">GET /api/analytics?days&amp;topCodes</text>
+        <text class="t-body" x="454" y="646">OPD only — the same population the dashboard serves</text>
+        <text class="t-body" x="454" y="664">zero-filled series; local midnight, no Z suffix</text>
+
+        <rect class="ent-box" x="946" y="588" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="602" x2="960" y2="588"/>
+        <text class="t-name" x="1060" y="618" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="638" text-anchor="middle">Analytics page</text>
+
+        <line class="flow" x1="312" y1="588" x2="432" y2="588" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="580" text-anchor="middle">stats block</text>
+        <line class="flow" x1="312" y1="660" x2="432" y2="660" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="652" text-anchor="middle">counts · rankings</text>
+        <line class="flow" x1="942" y1="608" x2="822" y2="608" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="600" text-anchor="middle">GET /api/analytics</text>
+        <line class="flow" x1="820" y1="640" x2="940" y2="640" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="632" text-anchor="middle">series · top codes</text>
+
+        <!-- ROW 5 · 10.0 -->
+        <rect class="note-box" x="26" y="746" width="280" height="108" rx="4"/>
+        <text class="t-name" x="166" y="784" text-anchor="middle">no store</text>
+        <text class="t-sub" x="166" y="806" text-anchor="middle">the server is stateless here —</text>
+        <text class="t-sub" x="166" y="820" text-anchor="middle">the browser owns the transcript</text>
+        <text class="t-sub" x="166" y="834" text-anchor="middle">and re-sends it every turn</text>
+
+        <rect class="proc-box" x="436" y="748" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="780" x2="816" y2="780"/>
+        <text class="t-num" x="454" y="771">10.0</text>
+        <text class="t-name" x="500" y="771">Answer coder questions</text>
+        <text class="t-sub" x="454" y="803">POST /api/agent/chat</text>
+        <text class="t-body" x="454" y="822">any valid token — unlike the admin-only knowledge routes</text>
+        <text class="t-body" x="454" y="840">keeps the most recent 40 well-formed turns</text>
+
+        <rect class="ent-box" x="946" y="722" width="228" height="64" rx="2"/>
+        <line class="dup" x1="946" y1="736" x2="960" y2="722"/>
+        <text class="t-name" x="1060" y="750" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="1060" y="768" text-anchor="middle">Agent page</text>
+
+        <rect class="ent-box" x="946" y="814" width="228" height="64" rx="2"/>
+        <line class="dup" x1="946" y1="828" x2="960" y2="814"/>
+        <text class="t-name" x="1060" y="842" text-anchor="middle">MedCode RAG service</text>
+        <text class="t-sub" x="1060" y="860" text-anchor="middle">POST /chat · local CPU LLM</text>
+
+        <line class="flow-d" x1="312" y1="800" x2="432" y2="800"/>
+        <line class="flow" x1="942" y1="742" x2="822" y2="742" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="734" text-anchor="middle">question + history</text>
+        <line class="flow" x1="820" y1="770" x2="940" y2="770" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="762" text-anchor="middle">answer + contexts</text>
+        <line class="flow" x1="820" y1="830" x2="940" y2="830" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="822" text-anchor="middle">POST /chat</text>
+        <line class="flow" x1="942" y1="858" x2="822" y2="858" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="850" text-anchor="middle">answer · sources</text>
+
+        <!-- ROW 6 · 11.0 -->
+        <rect class="store-bg" x="26" y="912" width="280" height="56"/>
+        <path class="store-line" d="M306,912 H26 V968 H306"/>
+        <line class="store-div" x1="60" y1="912" x2="60" y2="968"/>
+        <text class="t-store-id" x="34" y="944">D8</text>
+        <text class="t-name" x="72" y="934">Demo baseline</text>
+        <text class="t-sub" x="72" y="953">demo_baseline.&lt;table&gt; — a copy of each</text>
+
+        <rect class="store-bg" x="26" y="984" width="280" height="56"/>
+        <path class="store-line" d="M306,984 H26 V1040 H306"/>
+        <line class="store-div" x1="60" y1="984" x2="60" y2="1040"/>
+        <line class="dup" x1="26" y1="998" x2="40" y2="984"/>
+        <text class="t-store-id" x="34" y="1016">D1–D7</text>
+        <text class="t-name" x="86" y="1006">Every baselined table</text>
+        <text class="t-sub" x="86" y="1025">truncate + refill — users is exempt</text>
+
+        <rect class="proc-box" x="436" y="924" width="380" height="104" rx="12"/>
+        <line class="proc-div" x1="436" y1="956" x2="816" y2="956"/>
+        <text class="t-num" x="454" y="947">11.0</text>
+        <text class="t-name" x="500" y="947">Snapshot &amp; reset the demo</text>
+        <text class="t-sub" x="454" y="979">POST /api/demo/snapshot · /api/demo/reset</text>
+        <text class="t-body" x="454" y="998">accounts survive a reset; a deleted baseline one is re-inserted</text>
+        <text class="t-body" x="454" y="1016">off by construction in containers (DEMO_TOOLS_ENABLED)</text>
+
+        <rect class="ent-box" x="946" y="940" width="228" height="72" rx="2"/>
+        <line class="dup" x1="946" y1="954" x2="960" y2="940"/>
+        <text class="t-name" x="1060" y="970" text-anchor="middle">Hospital iMed API</text>
+        <text class="t-sub" x="1060" y="990" text-anchor="middle">its own baseline schema</text>
+
+        <line class="flow" x1="432" y1="940" x2="312" y2="940" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="932" text-anchor="middle">freeze a copy</text>
+        <line class="flow" x1="312" y1="1012" x2="432" y2="1012" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="371" y="1004" text-anchor="middle">restore rows</text>
+        <line class="flow" x1="820" y1="984" x2="940" y2="984" marker-end="url(#ar-f3)"/>
+        <text class="t-flow" x="882" y="976" text-anchor="middle">snapshot · reset</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 3 — Level 1, supporting processes</b> Note the dashed line at 10.0: it carries no data. The agent chat holds nothing server-side, so the conversation exists only in the browser and in whatever the RAG service logs. 11.0 is the only process that writes every store at once — which is why it is disabled in containers.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 4 ============================ -->
+
+<section id="fig4">
+  <div class="sechead">
+    <p class="eyebrow">Figure 4 · Level 2 of 2.0</p>
+    <h2>Sync — pulling a visit out of the hospital</h2>
+  </div>
+  <div class="prose">
+    <p>
+      The batch prologue runs once; everything from the gate down runs once per visit, each in
+      its own transaction so one bad case cannot roll back the batch. The gate is the whole
+      safety story: a case a coder has already finalized is never re-written by a sync.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1100 990" role="img" aria-label="Level 2 decomposition of sync: validate the window, fetch the visit list, upsert coverage codes, mirror the ICD masters, then for each visit check case status — finalized visits are skipped, open or unknown visits have their nine per-visit tables fetched, POC fields derived, rows inserted or refreshed, a case_synced history row appended, and finally the cases cache is invalidated.">
+        <defs>
+          <marker id="ar-f4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+        </defs>
+
+        <!-- column headers -->
+        <text class="t-lane" x="26" y="20">hospital iMed API</text>
+        <text class="t-lane" x="550" y="20" text-anchor="middle">process 2.0</text>
+        <text class="t-lane" x="1074" y="20" text-anchor="end">medcode stores</text>
+        <line class="rule" x1="26" y1="28" x2="1074" y2="28"/>
+
+        <!-- 2.1 -->
+        <rect class="proc-box" x="380" y="56" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="88">2.1</text>
+        <text class="t-name" x="438" y="88">Validate the visit window</text>
+        <rect class="note-box" x="814" y="56" width="260" height="52" rx="4"/>
+        <text class="t-sub" x="944" y="79" text-anchor="middle">400 on a malformed bound</text>
+        <text class="t-sub" x="944" y="94" text-anchor="middle">YYYY-MM-DD or with a time</text>
+        <line class="flow-d" x1="724" y1="82" x2="810" y2="82"/>
+
+        <!-- 2.2 -->
+        <line class="flow" x1="550" y1="112" x2="550" y2="148" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="152" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="184">2.2</text>
+        <text class="t-name" x="438" y="184">Fetch the visit list</text>
+        <rect class="ent-box" x="26" y="152" width="260" height="52" rx="2"/>
+        <text class="t-sub" x="156" y="175" text-anchor="middle">GET /api/cases</text>
+        <text class="t-sub" x="156" y="190" text-anchor="middle">?from=&amp;to= (visit datetime)</text>
+        <line class="flow" x1="376" y1="167" x2="290" y2="167" marker-end="url(#ar-f4)"/>
+        <line class="flow" x1="290" y1="189" x2="376" y2="189" marker-end="url(#ar-f4)"/>
+
+        <!-- 2.3 -->
+        <line class="flow" x1="550" y1="208" x2="550" y2="244" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="248" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="280">2.3</text>
+        <text class="t-name" x="438" y="280">Upsert the coverage codes</text>
+        <rect class="store-bg" x="814" y="248" width="260" height="52"/>
+        <path class="store-line" d="M1074,248 H814 V300 H1074"/>
+        <line class="store-div" x1="848" y1="248" x2="848" y2="300"/>
+        <text class="t-store-id" x="822" y="279">D2</text>
+        <text class="t-sub" x="860" y="272">coverage_types</text>
+        <text class="t-sub" x="860" y="288">scheme family + payer, derived</text>
+        <line class="flow" x1="724" y1="274" x2="810" y2="274" marker-end="url(#ar-f4)"/>
+
+        <!-- 2.4 -->
+        <line class="flow" x1="550" y1="304" x2="550" y2="340" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="344" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="376">2.4</text>
+        <text class="t-name" x="438" y="376">Mirror the ICD masters</text>
+        <rect class="ent-box" x="26" y="344" width="260" height="52" rx="2"/>
+        <line class="dup" x1="26" y1="358" x2="40" y2="344"/>
+        <text class="t-sub" x="156" y="367" text-anchor="middle">GET /api/icd10-codes</text>
+        <text class="t-sub" x="156" y="382" text-anchor="middle">GET /api/icd9-codes</text>
+        <line class="flow" x1="376" y1="359" x2="290" y2="359" marker-end="url(#ar-f4)"/>
+        <line class="flow" x1="290" y1="381" x2="376" y2="381" marker-end="url(#ar-f4)"/>
+        <rect class="store-bg" x="814" y="344" width="260" height="52"/>
+        <path class="store-line" d="M1074,344 H814 V396 H1074"/>
+        <line class="store-div" x1="848" y1="344" x2="848" y2="396"/>
+        <line class="dup" x1="814" y1="358" x2="828" y2="344"/>
+        <text class="t-store-id" x="822" y="375">D2</text>
+        <text class="t-sub" x="860" y="368">icd_10 · icd_9</text>
+        <text class="t-sub" x="860" y="384">insert new · fill blanks only</text>
+        <line class="flow" x1="724" y1="370" x2="810" y2="370" marker-end="url(#ar-f4)"/>
+
+        <!-- gate -->
+        <line class="flow" x1="550" y1="400" x2="550" y2="428" marker-end="url(#ar-f4)"/>
+        <polygon class="gate" points="550,432 720,472 550,512 380,472"/>
+        <text class="t-name" x="550" y="468" text-anchor="middle">case_status</text>
+        <text class="t-sub" x="550" y="486" text-anchor="middle">open, or unknown?</text>
+        <rect class="note-box" x="814" y="444" width="260" height="56" rx="4"/>
+        <text class="t-sub" x="944" y="466" text-anchor="middle">no → skippedApproved</text>
+        <text class="t-sub" x="944" y="482" text-anchor="middle">a finalized coding is never</text>
+        <text class="t-sub" x="944" y="495" text-anchor="middle">silently invalidated</text>
+        <line class="flow" x1="724" y1="472" x2="810" y2="472" marker-end="url(#ar-f4)"/>
+
+        <!-- 2.5 -->
+        <line class="flow" x1="550" y1="516" x2="550" y2="552" marker-end="url(#ar-f4)"/>
+        <text class="t-flow" x="560" y="538">yes</text>
+        <rect class="proc-box" x="380" y="556" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="588">2.5</text>
+        <text class="t-name" x="438" y="588">Fetch the per-visit bundle</text>
+        <rect class="ent-box" x="26" y="540" width="260" height="84" rx="2"/>
+        <line class="dup" x1="26" y1="554" x2="40" y2="540"/>
+        <text class="t-sub" x="156" y="562" text-anchor="middle">nine GETs per visit:</text>
+        <text class="t-sub" x="156" y="578" text-anchor="middle">records · results · diagnoses</text>
+        <text class="t-sub" x="156" y="592" text-anchor="middle">procedures · drugs · labs</text>
+        <text class="t-sub" x="156" y="606" text-anchor="middle">beds · vital-signs · billing</text>
+        <line class="flow" x1="376" y1="571" x2="290" y2="571" marker-end="url(#ar-f4)"/>
+        <line class="flow" x1="290" y1="593" x2="376" y2="593" marker-end="url(#ar-f4)"/>
+
+        <!-- 2.6 -->
+        <line class="flow" x1="550" y1="612" x2="550" y2="648" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="652" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="684">2.6</text>
+        <text class="t-name" x="438" y="684">Derive the [POC] fields</text>
+        <rect class="note-box" x="814" y="644" width="260" height="68" rx="4"/>
+        <text class="t-sub" x="944" y="664" text-anchor="middle">OPD/IPD · disease group</text>
+        <text class="t-sub" x="944" y="680" text-anchor="middle">severity from comorbidity count</text>
+        <text class="t-sub" x="944" y="696" text-anchor="middle">complete = arrived with both systems</text>
+        <line class="flow-d" x1="724" y1="678" x2="810" y2="678"/>
+
+        <!-- 2.7 -->
+        <line class="flow" x1="550" y1="708" x2="550" y2="744" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="748" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="780">2.7</text>
+        <text class="t-name" x="438" y="780">Insert, or refresh in place</text>
+        <rect class="store-bg" x="814" y="740" width="260" height="68"/>
+        <path class="store-line" d="M1074,740 H814 V808 H1074"/>
+        <line class="store-div" x1="848" y1="740" x2="848" y2="808"/>
+        <text class="t-store-id" x="822" y="778">D1</text>
+        <text class="t-sub" x="860" y="760">cases · sections · orders</text>
+        <text class="t-sub" x="860" y="776">vitals · imported codes · chunks</text>
+        <text class="t-sub" x="860" y="794">coder work is never touched</text>
+        <line class="flow" x1="724" y1="774" x2="810" y2="774" marker-end="url(#ar-f4)"/>
+
+        <!-- 2.8 -->
+        <line class="flow" x1="550" y1="804" x2="550" y2="840" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="844" width="340" height="52" rx="10"/>
+        <text class="t-num" x="398" y="876">2.8</text>
+        <text class="t-name" x="438" y="876">Append a case_synced row</text>
+        <rect class="store-bg" x="814" y="844" width="260" height="52"/>
+        <path class="store-line" d="M1074,844 H814 V896 H1074"/>
+        <line class="store-div" x1="848" y1="844" x2="848" y2="896"/>
+        <text class="t-store-id" x="822" y="875">D5</text>
+        <text class="t-sub" x="860" y="868">coding_history</text>
+        <text class="t-sub" x="860" y="884">append only — traceability</text>
+        <line class="flow" x1="724" y1="870" x2="810" y2="870" marker-end="url(#ar-f4)"/>
+
+        <!-- loop back -->
+        <path class="flow" d="M380,870 H340 V472 H376" marker-end="url(#ar-f4)"/>
+        <text class="t-flow" x="332" y="672" text-anchor="end">next visit</text>
+
+        <!-- 2.9 -->
+        <line class="flow" x1="550" y1="900" x2="550" y2="936" marker-end="url(#ar-f4)"/>
+        <rect class="proc-box" x="380" y="940" width="340" height="44" rx="10"/>
+        <text class="t-num" x="398" y="968">2.9</text>
+        <text class="t-name" x="438" y="968">Invalidate the cases cache</text>
+        <rect class="store-bg" x="814" y="940" width="260" height="44"/>
+        <path class="store-line store-mem" d="M1074,940 H814 V984 H1074"/>
+        <line class="store-div store-mem" x1="848" y1="940" x2="848" y2="984"/>
+        <text class="t-store-id" x="822" y="967">M1</text>
+        <text class="t-sub" x="860" y="967">Cases cache — dropped</text>
+        <line class="flow" x1="724" y1="962" x2="810" y2="962" marker-end="url(#ar-f4)"/>
+      </svg>
+    </div>
+    <figcaption><b>Figure 4 — Level 2 of process 2.0</b> The whole batch runs inside the single write lock, so a sync briefly blocks approve and reopen. Refresh means delete-then-reinsert of hospital-sourced rows only: <code>coder_assigned</code> codes, saved edits, <code>case_status</code> and history survive untouched, which is what makes re-running a sync safe. The hospital list has no "changed since" filter exposed to us yet, so an unwindowed sync fetches everything and only the writes are selective.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 5 ============================ -->
+
+<section id="fig5">
+  <div class="sechead">
+    <p class="eyebrow">Figure 5 · Level 2 of 6.1</p>
+    <h2>Approve — two phases, one lock</h2>
+  </div>
+  <div class="prose">
+    <p>
+      This is the diagram to read before changing anything in <code>ApprovalService</code>. Our
+      database commits <em>first</em>; the hospital calls are queued during the transaction and
+      only sent afterwards, still holding the write lock. That ordering is deliberate, and it
+      has a consequence worth staring at: the two sides can disagree.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1220 640" role="img" aria-label="Approve as a three-lane timeline: the backend reads saved code edits and writes coder codes, case status and history to PostgreSQL; the transaction commits; then it reads the hospital's live diagnosis rows, sends cancel then update then create calls, and journals the before-images. A failure after the commit leaves our side committed.">
+        <defs>
+          <marker id="ar-f5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+          <marker id="arw-f5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah-w"/></marker>
+        </defs>
+
+        <!-- lanes -->
+        <rect class="lane-fill" x="26" y="52" width="1168" height="134"/>
+        <rect class="lane" x="26" y="52" width="1168" height="134"/>
+        <text class="t-lane" x="42" y="74">medcode PostgreSQL</text>
+
+        <rect class="lane" x="26" y="206" width="1168" height="176"/>
+        <text class="t-lane" x="42" y="228">medcode-api · WriteGate held throughout</text>
+
+        <rect class="lane-fill" x="26" y="402" width="1168" height="134"/>
+        <rect class="lane" x="26" y="402" width="1168" height="134"/>
+        <text class="t-lane" x="42" y="424">hospital iMed API</text>
+
+        <!-- commit divider -->
+        <line class="flow-d" x1="580" y1="206" x2="580" y2="382"/>
+        <text class="t-flow" x="580" y="200" text-anchor="middle">our transaction COMMITS here</text>
+
+        <!-- lane 1 stores -->
+        <rect class="store-bg" x="60" y="98" width="200" height="62"/>
+        <path class="store-line" d="M260,98 H60 V160 H260"/>
+        <line class="store-div" x1="92" y1="98" x2="92" y2="160"/>
+        <text class="t-store-id" x="66" y="133">D4</text>
+        <text class="t-sub" x="102" y="124">case_code_edits</text>
+        <text class="t-sub" x="102" y="140">the ticked picks</text>
+
+        <rect class="store-bg" x="300" y="98" width="230" height="62"/>
+        <path class="store-line" d="M530,98 H300 V160 H530"/>
+        <line class="store-div" x1="332" y1="98" x2="332" y2="160"/>
+        <text class="t-store-id" x="306" y="133">D1</text>
+        <text class="t-sub" x="342" y="118">case_codes (replaced)</text>
+        <text class="t-sub" x="342" y="133">cases.case_status</text>
+        <text class="t-sub" x="342" y="148">coding_history ×2</text>
+
+        <rect class="store-bg" x="990" y="98" width="180" height="62"/>
+        <path class="store-line" d="M1170,98 H990 V160 H1170"/>
+        <line class="store-div" x1="1022" y1="98" x2="1022" y2="160"/>
+        <text class="t-store-id" x="996" y="133">D5</text>
+        <text class="t-sub" x="1032" y="124">imed_write_ops</text>
+        <text class="t-sub" x="1032" y="140">before-images</text>
+
+        <!-- lane 2 steps -->
+        <rect class="proc-box" x="60" y="272" width="200" height="56" rx="10"/>
+        <text class="t-num" x="76" y="296">6.1</text>
+        <text class="t-name" x="112" y="296">Materialize</text>
+        <text class="t-sub" x="76" y="316">unticked rows skipped</text>
+
+        <rect class="proc-box" x="300" y="272" width="230" height="56" rx="10"/>
+        <text class="t-num" x="316" y="296">6.2</text>
+        <text class="t-name" x="352" y="296">Finalize &amp; queue</text>
+        <text class="t-sub" x="316" y="316">status + audit, ops queued</text>
+
+        <rect class="proc-box" x="620" y="272" width="200" height="56" rx="10"/>
+        <text class="t-num" x="636" y="296">6.3</text>
+        <text class="t-name" x="672" y="296">Read live rows</text>
+        <text class="t-sub" x="636" y="316">per kind: icd10, icd9</text>
+
+        <rect class="proc-box" x="850" y="272" width="200" height="56" rx="10"/>
+        <text class="t-num" x="866" y="296">6.4</text>
+        <text class="t-name" x="902" y="296">Diff &amp; apply</text>
+        <text class="t-sub" x="866" y="316">cancel → update → create</text>
+
+        <rect class="proc-box" x="1078" y="272" width="92" height="56" rx="10"/>
+        <text class="t-num" x="1094" y="296">6.5</text>
+        <text class="t-sub" x="1094" y="316">journal</text>
+
+        <line class="flow" x1="264" y1="300" x2="296" y2="300" marker-end="url(#ar-f5)"/>
+        <line class="flow" x1="534" y1="300" x2="616" y2="300" marker-end="url(#ar-f5)"/>
+        <line class="flow" x1="824" y1="300" x2="846" y2="300" marker-end="url(#ar-f5)"/>
+        <line class="flow" x1="1054" y1="300" x2="1074" y2="300" marker-end="url(#ar-f5)"/>
+
+        <!-- lane 1 <-> lane 2 -->
+        <line class="flow" x1="160" y1="164" x2="160" y2="268" marker-end="url(#ar-f5)"/>
+        <text class="t-flow" x="168" y="220">read</text>
+        <line class="flow" x1="415" y1="268" x2="415" y2="164" marker-end="url(#ar-f5)"/>
+        <text class="t-flow" x="423" y="220">write</text>
+        <line class="flow" x1="1124" y1="268" x2="1124" y2="164" marker-end="url(#ar-f5)"/>
+        <text class="t-flow" x="1132" y="220">write</text>
+
+        <!-- lane 3 boxes -->
+        <rect class="ent-box" x="620" y="446" width="200" height="62" rx="2"/>
+        <text class="t-sub" x="720" y="472" text-anchor="middle">GET diagnoses</text>
+        <text class="t-sub" x="720" y="488" text-anchor="middle">GET procedures</text>
+
+        <rect class="ent-box" x="850" y="446" width="320" height="62" rx="2"/>
+        <text class="t-sub" x="1010" y="468" text-anchor="middle">DELETE …/icd10|icd9/{object_id}</text>
+        <text class="t-sub" x="1010" y="483" text-anchor="middle">PUT /api/v1/diagnosis/{visit_id}</text>
+        <text class="t-sub" x="1010" y="498" text-anchor="middle">POST /api/v1/diagnosis + coding_status</text>
+
+        <line class="flow" x1="700" y1="332" x2="700" y2="442" marker-end="url(#ar-f5)"/>
+        <line class="flow" x1="745" y1="442" x2="745" y2="336" marker-end="url(#ar-f5)"/>
+        <text class="t-flow" x="754" y="392">live rows</text>
+        <line class="flow-w" x1="950" y1="332" x2="950" y2="442" marker-end="url(#arw-f5)"/>
+        <text class="t-flow-w" x="960" y="392">in that order — a create</text>
+        <text class="t-flow-w" x="960" y="406">can never hit the 409</text>
+
+        <!-- endpoints -->
+        <text class="t-sub" x="60" y="252">approve ids arrive from the coder</text>
+        <text class="t-sub" x="1170" y="252" text-anchor="end">then: lock released, cache invalidated</text>
+
+        <!-- failure note -->
+        <line class="rule" x1="26" y1="562" x2="1194" y2="562"/>
+        <text class="t-err" x="26" y="588">If any hospital call fails, the request 500s with our side already committed.</text>
+        <text class="t-err" x="26" y="606">Approving again re-runs the diff against live hospital state and converges — healing is a re-diff, never a replay of the failed request.</text>
+        <text class="t-sub" x="26" y="628">Known gap: a crash between a POST and journaling its new object_ids leaves rows reopen cannot attribute. A re-approve matches them by code and heals; a reopen would keep them.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 5 — Level 2 of approve</b> Read left to right as time. The dashed line is the only moment that matters for correctness: everything left of it is atomic, everything right of it is a sequence of independent HTTP calls that can each fail. Both directions recompute from live state, which is why "just do it again" is the documented recovery.</figcaption>
+  </figure>
+
+  <div class="callout">
+    <b>Ordering is load-bearing</b>
+    Cancel, then update, then create. A code moved from one visit row to another would collide
+    with the hospital's per-visit uniqueness rule (409) if the create ran before the cancel of
+    the row it replaces.
+  </div>
+</section>
+
+<!-- ============================ FIG 6 ============================ -->
+
+<section id="fig6">
+  <div class="sechead">
+    <p class="eyebrow">Figure 6 · Level 2 of 6.6</p>
+    <h2>Reopen — replaying the journal backwards</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Reopen is not an undo log applied blindly. Each journal entry is checked against the
+      hospital's <em>current</em> rows before its inverse is sent, so a reopen after someone else
+      edited the visit does the least damage it can.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1140 560" role="img" aria-label="Reopen: on our side the case status returns to open, coder-assigned codes are deleted, a reopened history row is appended and the coder's saved edits are kept. On the hospital side each journal entry is inverted — rows we created are cancelled, rows we updated are put back to their before-image, and rows we cancelled are re-created with new object ids — then the coding status is cleared and the journal is emptied.">
+        <defs>
+          <marker id="ar-f6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+          <marker id="arw-f6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah-w"/></marker>
+        </defs>
+
+        <text class="t-lane" x="26" y="22">our side · one transaction</text>
+        <text class="t-lane" x="700" y="22" text-anchor="middle">hospital side · after the commit</text>
+        <line class="rule" x1="26" y1="30" x2="1114" y2="30"/>
+
+        <!-- our side -->
+        <rect class="proc-box" x="26" y="58" width="290" height="48" rx="10"/>
+        <text class="t-name" x="44" y="88">cases.case_status → open</text>
+        <line class="flow" x1="171" y1="110" x2="171" y2="130" marker-end="url(#ar-f6)"/>
+        <rect class="proc-box" x="26" y="134" width="290" height="48" rx="10"/>
+        <text class="t-name" x="44" y="164">delete coder_assigned codes</text>
+        <line class="flow" x1="171" y1="186" x2="171" y2="206" marker-end="url(#ar-f6)"/>
+        <rect class="proc-box" x="26" y="210" width="290" height="48" rx="10"/>
+        <text class="t-name" x="44" y="240">append a reopened history row</text>
+
+        <rect class="note-box" x="26" y="288" width="290" height="64" rx="4"/>
+        <text class="t-name" x="171" y="314" text-anchor="middle">case_code_edits are KEPT</text>
+        <text class="t-sub" x="171" y="334" text-anchor="middle">the coder's work survives a reopen —</text>
+        <text class="t-sub" x="171" y="347" text-anchor="middle">that is the point of reopening</text>
+
+        <!-- journal store -->
+        <rect class="store-bg" x="380" y="120" width="300" height="72"/>
+        <path class="store-line" d="M680,120 H380 V192 H680"/>
+        <line class="store-div" x1="414" y1="120" x2="414" y2="192"/>
+        <text class="t-store-id" x="388" y="160">D5</text>
+        <text class="t-name" x="428" y="148">imed_write_ops</text>
+        <text class="t-sub" x="428" y="166">one row per hospital row we touched,</text>
+        <text class="t-sub" x="428" y="180">with its before-image</text>
+
+        <line class="flow" x1="320" y1="156" x2="376" y2="156" marker-end="url(#ar-f6)"/>
+
+        <!-- branches -->
+        <path class="flow-w" d="M684,156 H720 V88 H756" marker-end="url(#arw-f6)"/>
+        <rect class="ent-box" x="760" y="62" width="354" height="52" rx="2"/>
+        <text class="t-name" x="778" y="86">created</text>
+        <text class="t-sub" x="852" y="86">→ DELETE the row we made</text>
+        <text class="t-sub" x="778" y="104">only if it is still live</text>
+
+        <path class="flow-w" d="M684,156 H756" marker-end="url(#arw-f6)"/>
+        <rect class="ent-box" x="760" y="130" width="354" height="52" rx="2"/>
+        <text class="t-name" x="778" y="154">updated</text>
+        <text class="t-sub" x="852" y="154">→ PUT the before-image back</text>
+        <text class="t-sub" x="778" y="172">only if it still differs</text>
+
+        <path class="flow-w" d="M684,156 H720 V224 H756" marker-end="url(#arw-f6)"/>
+        <rect class="ent-box" x="760" y="198" width="354" height="52" rx="2"/>
+        <text class="t-name" x="778" y="222">cancelled</text>
+        <text class="t-sub" x="852" y="222">→ POST it again, new object_id</text>
+        <text class="t-sub" x="778" y="240">only if the code is absent now</text>
+
+        <!-- converge -->
+        <path class="flow" d="M937,254 V288" marker-end="url(#ar-f6)"/>
+        <rect class="proc-box" x="760" y="292" width="354" height="52" rx="10"/>
+        <text class="t-name" x="778" y="316">Clear the coding status</text>
+        <text class="t-sub" x="778" y="334">no body went out? one bare PUT coding_status = open</text>
+
+        <line class="flow" x1="937" y1="348" x2="937" y2="376" marker-end="url(#ar-f6)"/>
+        <rect class="proc-box" x="760" y="380" width="354" height="44" rx="10"/>
+        <text class="t-name" x="778" y="408">Empty the journal for this visit</text>
+
+        <!-- footnote -->
+        <line class="rule" x1="26" y1="452" x2="1114" y2="452"/>
+        <text class="t-err" x="26" y="478">iMed has no un-cancel.</text>
+        <text class="t-sub" x="26" y="498">A row we cancelled and then restore comes back with a new object_id — identical content, different identity. Anything holding the old id (a hospital-side report, an export) sees a</text>
+        <text class="t-sub" x="26" y="514">deletion followed by an insertion, not a revert. This is the one place where our undo is not transparent to the hospital, and it is a consequence of their contract, not ours.</text>
+        <text class="t-sub" x="26" y="538">Reopen also runs under the write lock and invalidates the cases cache, exactly like approve.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 6 — Level 2 of reopen</b> The three branches are the inverse of the three diff operations in Figure 5, each guarded by a live-state check. The journal is cleared only after the full revert, so a failure mid-revert leaves a journal a retry can finish.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 7 ============================ -->
+
+<section id="fig7">
+  <div class="sechead">
+    <p class="eyebrow">Figure 7 · Level 2 of 1.0</p>
+    <h2>Authentication — minting a token, and spending it</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Two separate flows share one store. The left runs once per login; the right runs on
+      every guarded request. What crosses between them is a hash, never the token itself.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1200 580" role="img" aria-label="Authentication in two flows. Login: the rate limiter can return 429, the account is looked up, BCrypt verifies the password and the account must be active or 401 is returned, then a random token is minted and its sha256 stored in auth_sessions. Guarded request: the Bearer token is hashed, looked up in auth_sessions, admin routes additionally check the role, and the resolved principal is what approve and reopen stamp into the audit trail.">
+        <defs>
+          <marker id="ar-f7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+        </defs>
+
+        <line class="rule" x1="600" y1="20" x2="600" y2="470"/>
+
+        <!-- ===== A · login ===== -->
+        <text class="t-lane" x="40" y="24">A · login · the only public write</text>
+
+        <rect class="ent-box" x="40" y="46" width="440" height="44" rx="2"/>
+        <text class="t-sub" x="260" y="73" text-anchor="middle">POST /api/auth/login  { email, password }</text>
+        <line class="flow" x1="260" y1="94" x2="260" y2="114" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="40" y="118" width="440" height="52" rx="10"/>
+        <text class="t-num" x="58" y="141">1.1</text>
+        <text class="t-name" x="96" y="141">Rate-limit gate</text>
+        <text class="t-sub" x="58" y="160">in-memory, keyed by email · 5 failures, then a lockout</text>
+        <text class="t-err" x="494" y="149">429</text>
+        <line class="flow" x1="260" y1="174" x2="260" y2="194" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="40" y="198" width="440" height="52" rx="10"/>
+        <text class="t-num" x="58" y="221">1.2</text>
+        <text class="t-name" x="96" y="221">Look up the account</text>
+        <text class="t-sub" x="58" y="240">users — password_hash, status, role</text>
+        <line class="flow" x1="260" y1="254" x2="260" y2="274" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="40" y="278" width="440" height="52" rx="10"/>
+        <text class="t-num" x="58" y="301">1.3</text>
+        <text class="t-name" x="96" y="301">Verify · BCrypt, and status = active</text>
+        <text class="t-sub" x="58" y="320">one message for every failure — never says which one</text>
+        <text class="t-err" x="494" y="309">401</text>
+        <line class="flow" x1="260" y1="334" x2="260" y2="354" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="40" y="358" width="440" height="52" rx="10"/>
+        <text class="t-num" x="58" y="381">1.4</text>
+        <text class="t-name" x="96" y="381">Mint 32 random bytes</text>
+        <text class="t-sub" x="58" y="400">store sha256(token) as session_id · stamp last_login_at</text>
+        <line class="flow" x1="260" y1="414" x2="260" y2="434" marker-end="url(#ar-f7)"/>
+
+        <rect class="ent-box" x="40" y="438" width="440" height="44" rx="2"/>
+        <text class="t-sub" x="260" y="459" text-anchor="middle">{ token, user }  ·  the raw token is returned once</text>
+        <text class="t-sub" x="260" y="474" text-anchor="middle">and never persisted anywhere</text>
+
+        <!-- ===== B · guarded request ===== -->
+        <text class="t-lane" x="720" y="24">B · every guarded request</text>
+
+        <rect class="ent-box" x="720" y="46" width="440" height="44" rx="2"/>
+        <text class="t-sub" x="940" y="73" text-anchor="middle">Authorization: Bearer &lt;token&gt;</text>
+        <line class="flow" x1="940" y1="94" x2="940" y2="114" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="720" y="118" width="440" height="52" rx="10"/>
+        <text class="t-num" x="738" y="141">1.5</text>
+        <text class="t-name" x="776" y="141">Hash the presented token</text>
+        <text class="t-sub" x="738" y="160">sha256 → session_id · a stolen database yields no tokens</text>
+        <line class="flow" x1="940" y1="174" x2="940" y2="194" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="720" y="198" width="440" height="52" rx="10"/>
+        <text class="t-num" x="738" y="221">1.6</text>
+        <text class="t-name" x="776" y="221">Resolve the session</text>
+        <text class="t-sub" x="738" y="240">auth_sessions ⋈ users — live, unexpired, active</text>
+        <text class="t-err" x="1174" y="229" text-anchor="end">401</text>
+        <line class="flow" x1="940" y1="254" x2="940" y2="274" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="720" y="278" width="440" height="52" rx="10"/>
+        <text class="t-num" x="738" y="301">1.7</text>
+        <text class="t-name" x="776" y="301">Role gate — /api/admin/** only</text>
+        <text class="t-sub" x="738" y="320">every other guarded route takes either role</text>
+        <text class="t-err" x="1174" y="309" text-anchor="end">403</text>
+        <line class="flow" x1="940" y1="334" x2="940" y2="354" marker-end="url(#ar-f7)"/>
+
+        <rect class="proc-box" x="720" y="358" width="440" height="52" rx="10"/>
+        <text class="t-name" x="738" y="381">Principal → the handler</text>
+        <text class="t-sub" x="738" y="400">approve and reopen stamp its email as the acting coder</text>
+        <line class="flow" x1="940" y1="414" x2="940" y2="434" marker-end="url(#ar-f7)"/>
+
+        <rect class="note-box" x="720" y="438" width="440" height="44" rx="4"/>
+        <text class="t-sub" x="940" y="459" text-anchor="middle">public, by design: login · /api/health · /api/healthz · Swagger</text>
+        <text class="t-sub" x="940" y="474" text-anchor="middle">everything else answers 401 without a token</text>
+
+        <!-- shared store -->
+        <rect class="store-bg" x="380" y="514" width="440" height="52"/>
+        <path class="store-line" d="M820,514 H380 V566 H820"/>
+        <line class="store-div" x1="414" y1="514" x2="414" y2="566"/>
+        <text class="t-store-id" x="388" y="546">D7</text>
+        <text class="t-name" x="428" y="536">auth_sessions</text>
+        <text class="t-sub" x="428" y="555">session_id = sha256(token) · user_id · expires_at (SESSION_TTL_DAYS, default 7)</text>
+        <path class="flow" d="M260,486 V540 H376" marker-end="url(#ar-f7)"/>
+        <text class="t-flow" x="300" y="532">insert</text>
+        <path class="flow" d="M824,540 H940 V486" marker-end="url(#ar-f7)"/>
+        <text class="t-flow" x="852" y="532">look up</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 7 — Level 2 of process 1.0</b> Enforcement is a hand-written <code>HandlerInterceptor</code>, not <code>spring-boot-starter-security</code> — the starter would lock every route by default. Only <code>spring-security-crypto</code> is on the classpath, for BCrypt. Both the rate limiter and the session lookup are per-process, which is one more reason this backend must run as a single instance.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 8 ============================ -->
+
+<section id="fig8">
+  <div class="sechead">
+    <p class="eyebrow">Figure 8 · Level 2 of 5.0, 8.0, 10.0</p>
+    <h2>The RAG seam — four flows, one service</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Everything AI-shaped in this product goes through one FastAPI service that has no
+      authentication of its own. Three of these four flows are pass-throughs; the fourth,
+      <code>sync-codes</code>, is the odd one out — it reads what the index already holds and writes
+      our own catalogs.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1200 660" role="img" aria-label="Four flows across the RAG seam: an administrator uploads documents which the RAG service chunks, embeds and graphs; sync-codes reads extracted code and title pairs and writes them into our ICD catalogs; a coder opening a case sends a clinical narrative and receives code candidates; and the agent chat forwards a question with its history and returns an answer with contexts.">
+        <defs>
+          <marker id="ar-f8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+        </defs>
+
+        <text class="t-lane" x="26" y="22">who starts it</text>
+        <text class="t-lane" x="516" y="22" text-anchor="middle">our proxy</text>
+        <text class="t-lane" x="1174" y="22" text-anchor="end">MedCode RAG service · RAG_API_BASE</text>
+        <line class="rule" x1="26" y1="30" x2="1174" y2="30"/>
+
+        <!-- RAG panel -->
+        <rect class="ent-box" x="790" y="52" width="384" height="382" rx="2"/>
+        <text class="t-name" x="982" y="82" text-anchor="middle">FastAPI · no auth of its own</text>
+        <text class="t-sub" x="810" y="112">POST /documents/upload · /documents/rebuild</text>
+        <text class="t-sub" x="810" y="130">GET  /documents · /stats · /documents/codes</text>
+        <text class="t-sub" x="810" y="148">POST /retrieve · /chat · /suggest</text>
+        <line class="rule" x1="810" y1="170" x2="1154" y2="170"/>
+        <text class="t-name" x="810" y="196">Ingest</text>
+        <text class="t-sub" x="810" y="216">chunk → embed (multilingual) → knowledge graph</text>
+        <text class="t-sub" x="810" y="232">accepted with 202; the work continues in the background</text>
+        <text class="t-name" x="810" y="264">Retrieve &amp; generate</text>
+        <text class="t-sub" x="810" y="284">vector + graph hits, then a local CPU LLM</text>
+        <text class="t-sub" x="810" y="300">tens of seconds normally; minutes on the first-ever call</text>
+        <line class="rule" x1="810" y1="322" x2="1154" y2="322"/>
+        <text class="t-err" x="810" y="348">Must only be reachable from this backend.</text>
+        <text class="t-sub" x="810" y="368">It authenticates nobody, so the proxy's token check is the</text>
+        <text class="t-sub" x="810" y="384">only thing standing between the index and the network.</text>
+        <text class="t-sub" x="810" y="410">Optional by design: everything except suggestions, Agent</text>
+        <text class="t-sub" x="810" y="426">and Training works with it switched off.</text>
+
+        <!-- flow 1 · training -->
+        <rect class="ent-box" x="26" y="60" width="200" height="52" rx="2"/>
+        <text class="t-name" x="126" y="84" text-anchor="middle">Administrator</text>
+        <text class="t-sub" x="126" y="102" text-anchor="middle">AI Training page</text>
+        <rect class="proc-box" x="286" y="60" width="440" height="52" rx="10"/>
+        <text class="t-num" x="304" y="83">8.0</text>
+        <text class="t-name" x="344" y="83">Proxy the knowledge routes</text>
+        <text class="t-sub" x="304" y="102">/api/admin/knowledge/docs · stats · train · retrieve · chat</text>
+        <line class="flow" x1="230" y1="86" x2="282" y2="86" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="730" y1="78" x2="786" y2="78" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="786" y1="98" x2="730" y2="98" marker-end="url(#ar-f8)"/>
+
+        <!-- flow 2 · sync-codes -->
+        <rect class="ent-box" x="26" y="180" width="200" height="52" rx="2"/>
+        <line class="dup" x1="26" y1="194" x2="40" y2="180"/>
+        <text class="t-name" x="126" y="204" text-anchor="middle">Administrator</text>
+        <text class="t-sub" x="126" y="222" text-anchor="middle">"Sync codes" button</text>
+        <rect class="proc-box" x="286" y="180" width="440" height="52" rx="10"/>
+        <text class="t-num" x="304" y="203">8.1</text>
+        <text class="t-name" x="344" y="203">Harvest codes from the index</text>
+        <text class="t-sub" x="304" y="222">POST …/knowledge/sync-codes — NOT a proxy: it writes our tables</text>
+        <line class="flow" x1="230" y1="206" x2="282" y2="206" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="730" y1="198" x2="786" y2="198" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="786" y1="218" x2="730" y2="218" marker-end="url(#ar-f8)"/>
+
+        <rect class="store-bg" x="286" y="272" width="440" height="60"/>
+        <path class="store-line" d="M726,272 H286 V332 H726"/>
+        <line class="store-div" x1="320" y1="272" x2="320" y2="332"/>
+        <text class="t-store-id" x="294" y="306">D2</text>
+        <text class="t-name" x="334" y="296">icd_10 · icd_9</text>
+        <text class="t-sub" x="334" y="316">adds codes and fills blank descriptions — never overwrites one</text>
+        <line class="flow" x1="506" y1="236" x2="506" y2="268" marker-end="url(#ar-f8)"/>
+        <text class="t-flow" x="516" y="258">code + title pairs</text>
+
+        <!-- flow 3 · suggest -->
+        <rect class="ent-box" x="26" y="380" width="200" height="52" rx="2"/>
+        <text class="t-name" x="126" y="404" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="126" y="422" text-anchor="middle">opens a case</text>
+        <rect class="proc-box" x="286" y="380" width="440" height="52" rx="10"/>
+        <text class="t-num" x="304" y="403">5.0</text>
+        <text class="t-name" x="344" y="403">Suggest codes</text>
+        <text class="t-sub" x="304" y="422">narrative ≤ 6000 chars · no text at all → 200 with an empty list</text>
+        <line class="flow" x1="230" y1="406" x2="282" y2="406" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="730" y1="398" x2="786" y2="398" marker-end="url(#ar-f8)"/>
+        <line class="flow" x1="786" y1="418" x2="730" y2="418" marker-end="url(#ar-f8)"/>
+
+        <!-- flow 4 · agent -->
+        <rect class="ent-box" x="26" y="486" width="200" height="52" rx="2"/>
+        <line class="dup" x1="26" y1="500" x2="40" y2="486"/>
+        <text class="t-name" x="126" y="510" text-anchor="middle">Medical coder</text>
+        <text class="t-sub" x="126" y="528" text-anchor="middle">Agent page</text>
+        <rect class="proc-box" x="286" y="486" width="440" height="52" rx="10"/>
+        <text class="t-num" x="304" y="509">10.0</text>
+        <text class="t-name" x="350" y="509">Answer coder questions</text>
+        <text class="t-sub" x="304" y="528">question + up to 40 prior turns, re-sent by the browser each time</text>
+        <line class="flow" x1="230" y1="512" x2="282" y2="512" marker-end="url(#ar-f8)"/>
+        <path class="flow" d="M730,504 H760 V450 H786" marker-end="url(#ar-f8)"/>
+        <path class="flow" d="M786,470 H770 V524 H730" marker-end="url(#ar-f8)"/>
+
+        <!-- footnote -->
+        <line class="rule" x1="26" y1="576" x2="1174" y2="576"/>
+        <text class="t-sub" x="26" y="602">A RAG-side 4xx becomes 400 { error } on our side; an unreachable service becomes 500 with a "RAG API not reachable" message. "Training" here means indexing</text>
+        <text class="t-sub" x="26" y="618">documents, not fine-tuning model weights — no model in this system is ever modified by anything a user uploads.</text>
+        <text class="t-sub" x="26" y="644">8.0 and 8.1 require the admin role. 5.0 and 10.0 take either role — a coder must be able to use them.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 8 — Level 2 of the RAG seam</b> The asymmetry is the point: three flows return whatever the RAG service said, in its own snake_case, straight to the browser. Only 8.1 crosses back into our database, and it does so additively, so a coding manual can never clobber a description that came from the hospital.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ FIG 9 ============================ -->
+
+<section id="fig9">
+  <div class="sechead">
+    <p class="eyebrow">Figure 9 · Cross-cutting</p>
+    <h2>One writer, one cache</h2>
+  </div>
+  <div class="prose">
+    <p>
+      Two in-process mechanisms shape every flow above, and both are the reason this backend
+      must never be scaled past one instance. The negative fact is as important as the
+      positive ones: saving working state deliberately does <em>not</em> invalidate the cache.
+    </p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1120 480" role="img" aria-label="Concurrency: sync, approve and reopen, and demo reset all pass through a single ReentrantLock before reaching PostgreSQL, and each invalidates the in-memory cases cache afterwards. Saving working state bypasses the lock and deliberately does not invalidate the cache. Serving case views and reporting analytics read the cache.">
+        <defs>
+          <marker id="ar-f9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="ah"/></marker>
+        </defs>
+
+        <!-- writers -->
+        <rect class="proc-box" x="26" y="56" width="220" height="46" rx="10"/>
+        <text class="t-num" x="42" y="84">2.0</text>
+        <text class="t-name" x="82" y="84">Sync</text>
+        <rect class="proc-box" x="26" y="114" width="220" height="46" rx="10"/>
+        <text class="t-num" x="42" y="142">6.0</text>
+        <text class="t-name" x="82" y="142">Approve &amp; reopen</text>
+        <rect class="proc-box" x="26" y="172" width="220" height="46" rx="10"/>
+        <text class="t-num" x="42" y="200">11.0</text>
+        <text class="t-name" x="88" y="200">Demo reset</text>
+
+        <line class="flow" x1="250" y1="79" x2="322" y2="112" marker-end="url(#ar-f9)"/>
+        <line class="flow" x1="250" y1="137" x2="322" y2="137" marker-end="url(#ar-f9)"/>
+        <line class="flow" x1="250" y1="195" x2="322" y2="162" marker-end="url(#ar-f9)"/>
+
+        <!-- lock -->
+        <rect class="proc-box" x="326" y="56" width="180" height="162" rx="12"/>
+        <text class="t-name" x="416" y="112" text-anchor="middle">WriteGate</text>
+        <text class="t-sub" x="416" y="134" text-anchor="middle">one ReentrantLock</text>
+        <text class="t-sub" x="416" y="150" text-anchor="middle">one writer at a time</text>
+        <text class="t-sub" x="416" y="174" text-anchor="middle">a sync briefly blocks</text>
+        <text class="t-sub" x="416" y="188" text-anchor="middle">an approve, and vice versa</text>
+
+        <line class="flow" x1="510" y1="137" x2="602" y2="137" marker-end="url(#ar-f9)"/>
+
+        <!-- db -->
+        <rect class="store-bg" x="606" y="86" width="280" height="86"/>
+        <path class="store-line" d="M886,86 H606 V172 H886"/>
+        <line class="store-div" x1="640" y1="86" x2="640" y2="172"/>
+        <text class="t-store-id" x="614" y="132">DB</text>
+        <text class="t-name" x="654" y="122">medcode PostgreSQL</text>
+        <text class="t-sub" x="654" y="142">D1–D8 · each case commits in</text>
+        <text class="t-sub" x="654" y="156">its own transaction</text>
+
+        <!-- non-writer -->
+        <rect class="proc-box" x="26" y="262" width="220" height="46" rx="10"/>
+        <text class="t-num" x="42" y="290">4.0</text>
+        <text class="t-name" x="82" y="290">Save working state</text>
+        <path class="flow-d" d="M250,285 H560 V172" marker-end="url(#ar-f9)"/>
+        <text class="t-flow" x="300" y="277">bypasses the lock — a single-row JSONB write</text>
+
+        <!-- cache -->
+        <rect class="store-bg" x="606" y="330" width="280" height="86"/>
+        <path class="store-line store-mem" d="M886,330 H606 V416 H886"/>
+        <line class="store-div store-mem" x1="640" y1="330" x2="640" y2="416"/>
+        <text class="t-store-id" x="614" y="376">M1</text>
+        <text class="t-name" x="654" y="366">Cases cache</text>
+        <text class="t-sub" x="654" y="386">the whole dashboard payload,</text>
+        <text class="t-sub" x="654" y="400">rebuilt lazily on the next read</text>
+
+        <path class="flow" d="M416,222 V373 H602" marker-end="url(#ar-f9)"/>
+        <text class="t-flow" x="426" y="300">invalidate, after the lock is released</text>
+
+        <line class="flow-d" x1="470" y1="308" x2="602" y2="352"/>
+        <line class="flow-d" x1="596" y1="346" x2="608" y2="358"/>
+        <line class="flow-d" x1="608" y1="346" x2="596" y2="358"/>
+        <text class="t-err" x="466" y="326">4.0 does NOT invalidate</text>
+
+        <!-- readers -->
+        <rect class="proc-box" x="946" y="330" width="148" height="40" rx="10"/>
+        <text class="t-num" x="962" y="356">3.0</text>
+        <text class="t-name" x="1000" y="356">Case views</text>
+        <rect class="proc-box" x="946" y="378" width="148" height="40" rx="10"/>
+        <text class="t-num" x="962" y="404">9.0</text>
+        <text class="t-name" x="1000" y="404">Analytics</text>
+        <line class="flow" x1="890" y1="350" x2="942" y2="350" marker-end="url(#ar-f9)"/>
+        <line class="flow" x1="890" y1="398" x2="942" y2="398" marker-end="url(#ar-f9)"/>
+
+        <line class="rule" x1="26" y1="440" x2="1094" y2="440"/>
+        <text class="t-sub" x="26" y="464">Both mechanisms live in the JVM. A second instance would take the lock independently and serve a stale cache — hence max-instances=1 on Cloud Run.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 9 — the lock and the cache</b> The crossed-out edge is a design decision, not an omission: a coder ticking codes writes many times per case, and rebuilding the whole dashboard payload on each keystroke-scale save would be wasteful. The dashboard only shows finalized state, which nothing but approve, reopen, sync and reset can change.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ MATRIX ============================ -->
+
+<section id="matrix">
+  <div class="sechead">
+    <p class="eyebrow">Figure 10 · Reference</p>
+    <h2>Every process against every table</h2>
+  </div>
+  <div class="prose">
+    <p>
+      What the level-1 diagrams leave out on purpose. <strong>C</strong> create, <strong>R</strong>
+      read, <strong>U</strong> update, <strong>D</strong> delete. A dot means the process never
+      touches that table.
+    </p>
+  </div>
+
+  <div class="tablewrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>Table</th>
+          <th class="rot">1.0<br>auth</th>
+          <th class="rot">2.0<br>sync</th>
+          <th class="rot">3.0<br>views</th>
+          <th class="rot">4.0<br>edits</th>
+          <th class="rot">5.0<br>suggest</th>
+          <th class="rot">6.0<br>approve</th>
+          <th class="rot">7.0<br>admin</th>
+          <th class="rot">8.0<br>knowledge</th>
+          <th class="rot">9.0<br>analytics</th>
+          <th class="rot">10.0<br>agent</th>
+          <th class="rot">11.0<br>demo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">cases</td>
+          <td class="cell off">·</td><td class="cell on">CRU</td><td class="cell on">R</td><td class="cell on">R</td><td class="cell on">R</td><td class="cell on">RU</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">case_report_sections</td>
+          <td class="cell off">·</td><td class="cell on">CD</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">case_codes</td>
+          <td class="cell off">·</td><td class="cell on">CD</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">case_orders</td>
+          <td class="cell off">·</td><td class="cell on">CD</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">case_vitals</td>
+          <td class="cell off">·</td><td class="cell on">CD</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">case_code_edits</td>
+          <td class="cell off">·</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell on">CU</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">coding_history</td>
+          <td class="cell off">·</td><td class="cell on">C</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">C</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">imed_write_ops</td>
+          <td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">icd_10 · icd_9</td>
+          <td class="cell off">·</td><td class="cell on">CRU</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CR</td><td class="cell off">·</td><td class="cell on">CRU</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">coverage_types</td>
+          <td class="cell off">·</td><td class="cell on">CRU</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">document_chunks</td>
+          <td class="cell off">·</td><td class="cell on">CD</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">knowledge_base</td>
+          <td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRD</td></tr>
+        <tr><td class="mono">users</td>
+          <td class="cell on">RU</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CR</td><td class="cell on">CRUD</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CR</td></tr>
+        <tr><td class="mono">auth_sessions</td>
+          <td class="cell on">CRD</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">D</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td></tr>
+        <tr><td class="mono">demo_baseline.*</td>
+          <td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">CRUD</td></tr>
+        <tr><td class="mono">M1 cases cache</td>
+          <td class="cell off">·</td><td class="cell on">D</td><td class="cell on">CR</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">D</td><td class="cell off">·</td><td class="cell off">·</td><td class="cell on">R</td><td class="cell off">·</td><td class="cell on">D</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Three rows worth a second look</h3>
+    <p>
+      <code>document_chunks</code> is written by every sync and read by nothing — it was populated
+      for a retrieval path the RAG service ended up owning instead.
+      <code>knowledge_base</code> is touched only by the demo baseline; nothing in the running system
+      writes it.
+      And <code>users</code> is the only table 11.0 does not truncate: accounts and their live
+      sessions survive a demo reset, with a deleted baseline account re-inserted purely so the
+      restored audit rows still have something to point at.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Drawn from the source at <code>6235b1e</code> on 7 August 2026, cross-checked against
+    <code>docs/api-contract.md</code> and the live <code>medcode</code> schema. Notation follows
+    Gane&#8211;Sarson as summarised by
+    <a href="https://lucid.co/diagram/dfd/symbols-and-notation">Lucidchart</a> and the
+    level-decomposition convention described by
+    <a href="https://flowova.ai/blog/data-flow-diagram-guide">Flowova</a>; the
+    one-legend-per-diagram and colour-plus-shape rules follow
+    <a href="https://learn.microsoft.com/en-us/azure/well-architected/architect-role/design-diagrams">Microsoft's
+    Well-Architected guidance on architecture diagrams</a>.
+  </p>
+  <p>
+    When a response shape changes, this page goes stale in the same commit that
+    <code>docs/api-contract.md</code>, <code>docs/types.ts</code> and
+    <code>CasesApiIntegrationTest</code> do.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>
