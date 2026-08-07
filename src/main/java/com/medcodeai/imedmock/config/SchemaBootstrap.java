@@ -30,9 +30,14 @@ import java.util.List;
  *   is ON CONFLICT DO NOTHING throughout, so re-running is safe). MedCode AI
  *   pulls these via GET /api/icd10-codes / /api/icd9-codes during sync.
  *
+ * - coding_status on medhack_patient: the visit's coding workflow state,
+ *   written by MedCode AI on approve/reopen (our extension, not the
+ *   hospital's PDF — see db/migrations/0005_coding_status.sql).
+ *
  * Manual mirror of this DDL: db/migrations/0001_api_v1.sql,
  * db/migrations/0002_icd_catalog.sql, db/migrations/0003_updated_at.sql,
- * db/migrations/0004_precoded_demo_visits.sql.
+ * db/migrations/0004_precoded_demo_visits.sql,
+ * db/migrations/0005_coding_status.sql.
  */
 @Component
 public class SchemaBootstrap implements ApplicationRunner {
@@ -60,6 +65,17 @@ public class SchemaBootstrap implements ApplicationRunner {
             if (baselineTableExists(t)) {
                 jdbc.execute("ALTER TABLE imed_baseline." + t + " ADD COLUMN IF NOT EXISTS updated_at text");
             }
+        }
+        // coding_status: the coding workflow's own state on the visit row —
+        // 'approved' once a coder signed the codes off, NULL while open. Set
+        // through the coding_status field of POST/PUT /api/v1/diagnosis, and
+        // deliberately SEPARATE from dischargestatus, which is the doctor's
+        // clinical outcome and no longer ours to overwrite (see
+        // DiagnosisApiController). Same baseline mirror as updated_at.
+        jdbc.execute("ALTER TABLE imed.medhack_patient ADD COLUMN IF NOT EXISTS coding_status text");
+        if (baselineTableExists("medhack_patient")) {
+            jdbc.execute("ALTER TABLE imed_baseline.medhack_patient "
+                    + "ADD COLUMN IF NOT EXISTS coding_status text");
         }
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS imed.imed_request_log (

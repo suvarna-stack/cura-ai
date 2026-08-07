@@ -40,10 +40,20 @@ import java.util.UUID;
  * - DELETE cancels one dx/procedure via the cancel flow (is_cancelled flag,
  *   audit trail — never a hard delete; not applicable to discharge data).
  * - request_id: replays return the stored response instead of re-executing.
- * - The discharge status the caller sends (OPD or IPD) is also projected onto
- *   the visit's own medhack_patient.dischargestatus, the column the extract
- *   reads serve — the extract is a projection of the tables written here, so
- *   an approval's discharge must not leave the visit row stale.
+ *
+ * One field is OURS, not the PDF's — the coding-status extension (proposed to
+ * the hospital, open question 17 in medcode-api's docs/imed-integration.md):
+ * - `coding_status` in the POST/PUT envelope sets medhack_patient.coding_status
+ *   on the visit row: "approved" when a coder signs the codes off, the
+ *   reserved value "open" to clear it again on reopen. Absent/blank = no
+ *   change, so a caller speaking the hospital's exact contract is unaffected.
+ *   It rides the calls that already write the codes, so the codes and the
+ *   status land in ONE transaction.
+ * - Until 2026-08-07 the approval marker instead overwrote the visit's
+ *   dischargestatus with the discharge status id sent here. That column is the
+ *   DOCTOR's clinical outcome ("Improved", "Not Improved", …), so the writes
+ *   no longer touch it: discharge data now stays inside doctor_discharge_opd /
+ *   _ipd, where the caller put it.
  *
  * Mock-only strictness (documented divergences, all safe for the real swap):
  * - PUT rows without object_id are REJECTED with detail, where the real API
@@ -65,6 +75,8 @@ public class DiagnosisApiController {
     private static final Set<String> VISIT_TYPES = Set.of("OPD", "IPD");
     private static final Set<String> DX_TYPES = Set.of(
             "PRIMARY_DIAGNOSIS", "COMORBIDITY", "OTHERS", "EXTERNAL_CAUSE_OF_INJURY");
+    /** The coding-status extension's vocabulary; "open" stores NULL (cleared). */
+    private static final Set<String> CODING_STATUSES = Set.of("approved", "open");
 
     private final ImedReadRepository read;
     private final ImedApiV1Repository repo;
@@ -84,7 +96,9 @@ public class DiagnosisApiController {
                     + "`result`, and the caller must keep them for later PUT/DELETE. "
                     + "`doctor_discharge` must be \"1\"; the discharge object matching "
                     + "`fix_visit_type_id` (OPD/IPD) is required. Replaying the same "
-                    + "`request_id` returns the stored response without re-executing.")
+                    + "`request_id` returns the stored response without re-executing. "
+                    + "Optional `coding_status` (medcode extension) marks the visit row: "
+                    + "\"approved\", or \"open\" to clear it.")
     @ApiResponse(responseCode = "200", description = "STATUS_SUCCESS envelope with generated object_ids")
     @ApiResponse(responseCode = "400", description = "STATUS_BUSINESS_ERROR invalid_request")
     @ApiResponse(responseCode = "401", description = "Missing/wrong Bearer token")
@@ -149,7 +163,6 @@ public class DiagnosisApiController {
             String id = newId("DCO-");
             repo.upsertDischargeOpd(id, tn, d.fix_opd_discharge_status_id(),
                     d.base_doctor_discharge_type_id(), d.note());
-            repo.updatePatientDischargeStatus(tn, d.fix_opd_discharge_status_id());
             result.put("doctor_discharge_opd", Map.of("object_id", id));
         } else {
             DiagnosisRequest.DischargeIpd d = req.doctor_discharge_ipd();
@@ -160,9 +173,9 @@ public class DiagnosisApiController {
                     "doctor_discharge_ipd.fix_ipd_discharge_type_id is required");
             String id = newId("DCI-");
             repo.upsertDischargeIpd(id, tn, ipdFields(d));
-            repo.updatePatientDischargeStatus(tn, d.fix_ipd_discharge_status_id());
             result.put("doctor_discharge_ipd", Map.of("object_id", id));
         }
+        applyCodingStatus(req, tn, result);
 
         return envelope(req.request_id(), result, "POST /api/v1/diagnosis");
     }
@@ -174,7 +187,9 @@ public class DiagnosisApiController {
     @Operation(summary = "Edit existing diagnoses, procedures or discharge data",
             description = "Every edited object must carry the `object_id` returned by POST — rows "
                     + "without one are rejected (the real API silently ignores them; the mock is "
-                    + "deliberately louder). Only provided fields are changed.")
+                    + "deliberately louder). Only provided fields are changed. A body carrying "
+                    + "just `coding_status` (medcode extension) marks or clears the visit "
+                    + "without touching any code row.")
     @ApiResponse(responseCode = "200", description = "STATUS_SUCCESS envelope with the edited object_ids")
     @ApiResponse(responseCode = "400", description = "STATUS_BUSINESS_ERROR invalid_request")
     @ApiResponse(responseCode = "401", description = "Missing/wrong Bearer token")
@@ -223,7 +238,6 @@ public class DiagnosisApiController {
             int n = repo.updateDischargeOpd(tn, d.object_id(), d.fix_opd_discharge_status_id(),
                     d.base_doctor_discharge_type_id(), d.note());
             require(n > 0, "unknown doctor_discharge_opd object_id " + d.object_id());
-            repo.updatePatientDischargeStatus(tn, d.fix_opd_discharge_status_id());
             result.put("doctor_discharge_opd", Map.of("object_id", d.object_id()));
         }
         if (req.doctor_discharge_ipd() != null) {
@@ -231,9 +245,9 @@ public class DiagnosisApiController {
             require(!blank(d.object_id()), "doctor_discharge_ipd.object_id is required on PUT");
             int n = repo.updateDischargeIpd(tn, d.object_id(), ipdFields(d));
             require(n > 0, "unknown doctor_discharge_ipd object_id " + d.object_id());
-            repo.updatePatientDischargeStatus(tn, d.fix_ipd_discharge_status_id());
             result.put("doctor_discharge_ipd", Map.of("object_id", d.object_id()));
         }
+        applyCodingStatus(req, tn, result);
 
         return envelope(req.request_id(), result, "PUT /api/v1/diagnosis/" + visitId);
     }
@@ -294,6 +308,23 @@ public class DiagnosisApiController {
                 require(req.doctor_discharge_opd() == null, "doctor_discharge_opd must be absent for IPD");
             }
         }
+    }
+
+    /**
+     * The coding-status extension: absent/blank changes nothing, "approved"
+     * marks the visit coded, "open" clears the mark (reopen). Echoed in the
+     * result so the caller can see what stuck. Mock-only strictness: an
+     * unknown word is a business error rather than a silently stored string.
+     */
+    private void applyCodingStatus(DiagnosisRequest req, String tn, Map<String, Object> result) {
+        String s = req.coding_status();
+        if (blank(s)) {
+            return;
+        }
+        String value = s.strip().toLowerCase();
+        require(CODING_STATUSES.contains(value), "coding_status must be one of " + CODING_STATUSES);
+        repo.updateCodingStatus(tn, "open".equals(value) ? null : value);
+        result.put("coding_status", "open".equals(value) ? null : value);
     }
 
     private void requireVisit(String tn) {

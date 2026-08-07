@@ -79,11 +79,20 @@ response instead of re-executing.
 | `POST /api/v1/diagnosis` | Create ICD-10 dx + ICD-9 procedures + medical discharge in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
 | `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`; only provided fields change |
 
-POST and PUT also project the discharge status they carry
-(`fix_opd_discharge_status_id` / `fix_ipd_discharge_status_id`) onto the
-visit's own `medhack_patient.dischargestatus` — the extract column
-`GET /api/cases` serves — so an approval's discharge never leaves the visit
-row stale.
+POST and PUT carry one field that is NOT in the hospital's PDF: the optional
+`coding_status` (medcode's proposed extension — open question 17 in
+medcode-api's `docs/imed-integration.md`). `"approved"` marks the visit's own
+`medhack_patient.coding_status`, the reserved word `"open"` clears it again on
+reopen, and absent/blank changes nothing — so a caller speaking the exact
+hospital contract is unaffected. It sets the visit in the SAME transaction as
+the codes; a body carrying only `coding_status` marks the visit without
+touching a code row. Any other word is a 400 (mock-only strictness).
+
+The discharge status the caller sends (`fix_opd_discharge_status_id` /
+`fix_ipd_discharge_status_id`) stays inside `doctor_discharge_opd` / `_ipd`.
+Until 2026-08-07 it was also written onto `medhack_patient.dischargestatus` —
+that column is the DOCTOR's clinical outcome, so the write API no longer
+touches it.
 
 | `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis — iMed's cancel flow: flagged `is_cancelled`, never hard-deleted, gone from reads. Idempotent |
 | `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |

@@ -178,22 +178,23 @@ public class ImedApiV1Repository {
                 tn, objectId);
     }
 
+    // ---- coding status (medcode extension) ----------------------------------
+
     /**
-     * Projects the medical discharge onto the visit row itself: the status id
-     * the caller sent becomes medhack_patient.dischargestatus, the column the
-     * extract reads (GET /api/cases) serve. The extract is a projection of the
-     * tables this API writes, so the visit row must not drift from the medical
-     * discharge just written: a coding approval that carries a discharge
-     * object shows up on the patient row too.
+     * The visit's coding workflow state on its own extract row —
+     * medhack_patient.coding_status, written by MedCode AI's approve
+     * ('approved') and reopen (cleared). Set ONLY when the caller sends the
+     * field; the controller resolves the sent value first, so a plain NULL
+     * here means "clear it" and reaches the column as such.
      *
-     * Null status (a PUT that omits the field) leaves the stored value alone,
-     * same COALESCE rule as every other update here.
+     * Deliberately NOT dischargestatus: that column is the doctor's clinical
+     * outcome, and the /api/v1 writes stopped touching it when this one
+     * arrived (see db/migrations/0005_coding_status.sql).
      */
-    public int updatePatientDischargeStatus(String tn, String statusId) {
+    public int updateCodingStatus(String tn, String codingStatus) {
         return jdbc.update("""
-                UPDATE imed.medhack_patient
-                SET dischargestatus = COALESCE(?, dischargestatus)
-                WHERE transactionnumber = ?""", statusId, tn);
+                UPDATE imed.medhack_patient SET coding_status = ?
+                WHERE transactionnumber = ?""", codingStatus, tn);
     }
 
     /** Column bundle for the wide IPD discharge row (order = table order). */

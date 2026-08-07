@@ -229,6 +229,8 @@ class ImedMockApiIntegrationTest {
     void diagnosisCreateEditCancelRoundTrip() throws Exception {
         int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
         int procsBefore = getJson("/api/cases/" + KNOWN_TN + "/procedures").size();
+        // the doctor's clinical discharge outcome — no /api/v1 write may touch it
+        String dischargeBefore = String.valueOf(patient(KNOWN_TN).get("dischargestatus"));
 
         // POST: one diagnosis + one procedure + IPD discharge, ids generated
         JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "93.90", "CPAP therapy");
@@ -238,8 +240,12 @@ class ImedMockApiIntegrationTest {
         String dcId = created.get("result").get("doctor_discharge_ipd").get("object_id").asString();
         assertTrue(dxId.startsWith("DX10-") && pxId.startsWith("DX9-") && dcId.startsWith("DCI-"));
 
-        // …and the discharge status lands on the visit's own extract row
-        assertEquals("IPD_STATUS_1", patient(KNOWN_TN).get("dischargestatus").asString());
+        // …the coding status the POST carried marks the visit's own extract row
+        assertEquals("approved", patient(KNOWN_TN).get("coding_status").asString());
+        assertEquals("approved", created.get("result").get("coding_status").asString());
+        // …and the doctor's discharge column is untouched (it lives in
+        // doctor_discharge_ipd now, not on the patient row)
+        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("dischargestatus")));
 
         // created rows are visible through the extract reads
         assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
@@ -265,7 +271,8 @@ class ImedMockApiIntegrationTest {
         assertEquals("U07.2", row.get("icd").asString());
         assertEquals("COMORBIDITY", row.get("diagnosistype").asString());
 
-        // PUT of the discharge object re-projects onto the patient row
+        // PUT of the discharge object edits the discharge row only — the visit
+        // row's clinical column still isn't ours to write
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -275,7 +282,26 @@ class ImedMockApiIntegrationTest {
                            "fix_ipd_discharge_status_id":"IPD_STATUS_2"}}"""
                         .formatted(rid(), KNOWN_TN, dcId)))
                 .andExpect(status().isOk());
-        assertEquals("IPD_STATUS_2", patient(KNOWN_TN).get("dischargestatus").asString());
+        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("dischargestatus")));
+
+        // a body carrying nothing but coding_status clears the mark (reopen)
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                         "doctor_discharge":"1","coding_status":"open"}"""
+                        .formatted(rid(), KNOWN_TN)))
+                .andExpect(status().isOk());
+        assertTrue(patient(KNOWN_TN).get("coding_status").isNull(), "reopen clears coding_status");
+
+        // an unknown word is a business error, not a silently stored string
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                         "doctor_discharge":"1","coding_status":"halfway"}"""
+                        .formatted(rid(), KNOWN_TN)))
+                .andExpect(status().isBadRequest());
 
         // PUT with a row missing object_id is rejected (mock-only strictness)
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
@@ -411,7 +437,7 @@ class ImedMockApiIntegrationTest {
                         .formatted(icd9, opName);
         String body = """
                 {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                 "doctor_discharge":"1",
+                 "doctor_discharge":"1","coding_status":"approved",
                  "diagnosis_icd10":[{"icd10_code":"%s","beginning_diagnosis":"%s",
                    "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS","fix_dx_source":"MED_DC",
                    "coder_eid":"web.coder"}],

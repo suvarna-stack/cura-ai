@@ -11,12 +11,18 @@ import java.util.List;
  *
  * Validation is conditional (POST vs PUT, OPD vs IPD), so it lives in
  * DiagnosisApiController.validate(), not in bean annotations.
+ *
+ * One field is NOT from the PDF: `coding_status`, our proposed extension for
+ * the coding workflow state on the visit row (see DiagnosisApiController and
+ * db/migrations/0005_coding_status.sql). It is optional everywhere, so a
+ * caller speaking the hospital's contract exactly is unaffected.
  */
 public record DiagnosisRequest(
         String request_id,
         String object_id, // the visit_id
         String fix_visit_type_id,
         String doctor_discharge,
+        String coding_status, // medcode extension — see DiagnosisApiController
         List<Icd10Row> diagnosis_icd10,
         List<Icd9Row> diagnosis_icd9,
         DischargeOpd doctor_discharge_opd,
