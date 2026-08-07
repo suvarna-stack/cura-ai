@@ -161,7 +161,10 @@ cd ~/medcode/imed-mock-api  && scripts/seed_local_imed_pg.sh   # สร้าง
 
 ---
 
-## 5. รันระบบ — 4 terminal ตามลำดับนี้
+## 5. รันระบบ — 4 terminal ตามลำดับนี้ (ใช้ได้ทุก OS)
+
+> วิธีนี้คือวิธีหลักและ **ทำงานได้ทั้ง macOS / Linux / Windows** — ถ้าอยู่บน
+> mac หรือ Linux แล้วอยากได้คำสั่งเดียวจบ ดูทางลัดในหัวข้อ 5.1
 
 ลำดับสำคัญ: **iMed → RAG → medcode → frontend**
 (medcode-api ตอน boot ไม่ได้เรียก RAG ทันที แต่เรียกโรงพยาบาลตอน sync/approve)
@@ -210,7 +213,8 @@ cd ~/medcode/medcode-api
 
 เช็ก: <http://localhost:8001/api/healthz> · Swagger: <http://localhost:8001/swagger-ui.html>
 
-**ทางลัด:** สคริปต์เดียวรันทั้ง iMed + medcode (ข้าม Terminal 1):
+**ทางลัด (macOS / Linux เท่านั้น):** สคริปต์เดียวรันทั้ง iMed + medcode
+(ข้าม Terminal 1):
 
 ```bash
 cd ~/medcode/medcode-api
@@ -218,7 +222,13 @@ scripts/dev.sh          # seed อันที่ยังไม่มี → �
 scripts/dev.sh --seed   # บังคับ seed ใหม่ทั้ง 2 database ก่อน (ล้างข้อมูลในเครื่อง)
 ```
 
-(ยังต้องรัน RAG กับ frontend เองแยก terminal)
+`dev.sh` รันแค่ **backend 2 ตัว** — RAG กับ frontend ยังต้องเปิด terminal
+เองตามข้างบน
+
+> 🪟 **Windows ใช้สคริปต์พวกนี้ไม่ได้** — `scripts/*.sh` เป็น bash + `lsof` +
+> `brew` รันบน PowerShell/cmd ไม่ขึ้น ให้ใช้วิธี 4 terminal ตามหัวข้อนี้
+> (ตั้ง env ตามหัวข้อ 8, ใช้ `.\mvnw.cmd`) ซึ่งเป็นวิธีมาตรฐานที่ใช้ได้ทุก OS
+> อยู่แล้ว — หรือรันผ่าน WSL / Git Bash
 
 ### Terminal 4 — เว็บ `:5173`
 
@@ -337,7 +347,7 @@ $env:DATABASE_URL = 'postgresql://postgres:<password>@localhost:5432/medcode'
 | `./mvnw` ไม่ทำงาน | `chmod +x mvnw` (Windows ใช้ `.\mvnw.cmd`) |
 | `something already serves :8001` ตอนรัน dev.sh | มี medcode-api ค้างอยู่ — `lsof -tiTCP:8001 | xargs kill` |
 | `imed-mock-api not found at …` ตอนรัน dev.sh | repo ไม่ได้วางเป็นพี่น้องกัน — `export IMED_DIR=/path/to/imed-mock-api` |
-| หน้า **Analytics** เป็นข้อมูลปลอม | ตั้งใจ — ยังไม่มี endpoint รองรับ (`USE_MOCK = true`) ไม่ใช่บั๊ก |
+| หน้า **Analytics** ว่าง / ขึ้น error | ตั้งแต่ 2026-08-07 หน้านี้ใช้ข้อมูลจริงจาก `GET /api/analytics` แล้ว (ไม่มี mock ให้ fallback อีก) — ถ้าว่างแปลว่า backend ตอบไม่ได้ ดู log ของ :8001 |
 
 ---
 

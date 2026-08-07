@@ -194,10 +194,12 @@ Milestones (git log --oneline reads as this sequence):
   **Training page is LIVE** against all seven `/api/admin/knowledge/**` routes
   (`trainingService.ts`, `sync-codes` included); and `suggest-codes` +
   `icd-codes` are called from the case detail pages and the Add-code modal.
-  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller,
-  and **Analytics + Agent-chat remain `USE_MOCK = true`** stubs — we have no
-  endpoints behind those two and none are planned, so DON'T read `/analytics`
-  or `/agent/*` TODOs as a contract we owe.
+  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller.
+  (**Superseded 2026-08-07:** the old "Analytics + Agent-chat remain
+  `USE_MOCK = true`, no endpoints behind them and none planned" note is DEAD —
+  both pages are live now. `/api/agent/chat` landed with the RAG work, and
+  `GET /api/analytics` landed 2026-08-07; `USE_MOCK` is gone from
+  `analyticsService.ts` and `agentService.ts`.)
   Behavior worth knowing: their code/draft/approve writes are best-effort —
   failures are swallowed and the browser keeps its own `localStorage` copy, so
   a rejected write still looks saved on screen.
@@ -409,6 +411,29 @@ Milestones (git log --oneline reads as this sequence):
   test needing an approved/known case fails regardless of this change
   (verified identical red set on a clean checkout). The suite needs re-basing
   onto the new demo data.
+- ✅ **Analytics live + local `dev_all.sh` gains RAG (2026-08-07):** two
+  things landed the same day. (1) **`GET /api/analytics`** arrived from remote
+  (`AnalyticsController` / `AnalyticsService` / `AnalyticsRepository`, plus a
+  real discharge status on approve) and the frontend's Analytics page dropped
+  its mock fallback — so **Analytics and Agent chat are both LIVE now**, killing
+  the old "no endpoints behind those two and none planned" note in two places
+  above. That commit **forgot `OpenApiDocsTest.EXPECTED_PATHS`** and so shipped
+  the build red on the reverse assertion (`docs/api-contract.md` + `docs/types.ts`
+  were done); adding `/api/analytics` to the list was the whole fix — exactly the
+  drift that assertion exists to catch, working as designed. (2) **`scripts/
+  dev_all.sh` now starts RAG too** (`:8000`, via `RAG/.venv/bin/python run.py`,
+  `RAG_DIR` overridable), so one command brings up all four repos. RAG is treated
+  as **optional-by-design** — a missing `.venv` or a failed start only WARNs and
+  the stack continues, because everything except AI suggestions / Agent / Training
+  works without it; `--no-rag` skips it deliberately. Teardown sweeps `:8000`
+  because `uvicorn --reload` runs a child worker the parent PID doesn't cover.
+  **`dev_all.sh` is deliberately NOT in git** (`.git/info/exclude`) — the team
+  isn't all on macOS and `scripts/*.sh` is bash + `lsof` + `brew`, so the
+  four-terminal path in `RUN-ALL.md` §5 stays the one documented route. It was
+  briefly tracked on 2026-08-07 and untracked again the same day; don't re-add
+  it, and don't reference it from tracked docs. (The tracked `dev.sh` is just as
+  mac-bound — both are now labelled macOS/Linux-only, with Windows pointed at the
+  manual path.)
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -475,11 +500,12 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 ## Open tasks
 
 - **Frontend** (`../audit-chart-frontend`) — built and live against this
-  backend; the repo itself stays out of scope here. Two loose ends on OUR side
-  of the seam, both re-checked 2026-07-29: `POST /api/cases/{id}/sync`
-  (per-case) has no caller — bulk `/api/sync` and the whole Training/knowledge
-  surface ARE wired — and the two still-mocked pages (Analytics, Agent) have no
-  endpoints behind them. Neither is a promise we've made.
+  backend; the repo itself stays out of scope here. One loose end on OUR side
+  of the seam, re-checked 2026-08-07: `POST /api/cases/{id}/sync` (per-case)
+  still has no caller — bulk `/api/sync` and the whole Training/knowledge
+  surface ARE wired. Not a promise we've made. (Analytics and Agent used to sit
+  in this list as permanently-mocked pages; both are live now — see the
+  2026-08-07 Progress entry.)
 - **`GET /api/icd-codes` has no automated test.** It is documented and
   hand-verified, but nothing asserts its behavior — which is precisely how the
   2026-07-29 break shipped green. Covering the UNION path, the `system` filter,
