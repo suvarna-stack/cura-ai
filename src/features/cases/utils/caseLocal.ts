@@ -17,6 +17,15 @@ export type StoredCode = CodeEntry & {
   missingMsg?: string;
   /** true for codes the coder added by hand (shows the "Manually Added" badge) */
   manual?: boolean;
+  /**
+   * The coder ticked this code for approval (selection-first review, 2026-08-07).
+   * Nothing is pre-ticked: a suggestion is only approved once a human picks it.
+   * Unticked codes STAY here — they remain visible, editable and re-tickable —
+   * and the backend skips them when it materializes the edits at approve
+   * (`selected: false` → not written; the key absent means a payload saved
+   * before this flow, which the backend still approves wholesale).
+   */
+  selected?: boolean;
 };
 
 const codeEdits = new Map<string, StoredCode[]>();
