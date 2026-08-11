@@ -33,7 +33,7 @@ Decisions taken 2026-07-24 (with the team):
 |---|---|
 | `imed_object_id` per code row | PUT/DELETE address rows by the hospital's id. For rows imported from the extract, `medhack_diagnosis_icd10.id` is assumed to BE that id (open question 1). For rows we create, POST returns it. |
 | Pre-approve snapshot per edited row | Reopen must PUT the original values back — the API has no "undo", so we keep the before-image. |
-| `request_id` per outbound write | The API dedups by it; a retry after a 500 must replay the SAME id to heal without double-writing. Format: `MCAI-<caseId>-<action>-<n>`. |
+| `request_id` per outbound write | The API dedups by it. Format as built: `MCAI-<caseId>-<random UUID>`, **fresh per call** — we never replay an id, because healing comes from re-diffing live hospital state, not from replaying the request (their dedup only guards duplicated network sends). |
 
 ## Field mapping (our contract → theirs)
 
