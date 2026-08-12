@@ -11,6 +11,7 @@ import logging
 from typing import Any, Callable
 
 from app.config import get_settings
+from app.core import registry
 from app.core.chunking import chunk_text
 from app.core.graphstore import get_graphstore
 from app.core.llm import get_llm
@@ -143,12 +144,26 @@ def _is_thai(text: str) -> bool:
     return any("฀" <= ch <= "๿" for ch in text)
 
 
+def _attach_display_names(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Chunk metadata carries the immutable source id; the registry owns the
+    (renameable) display filename. Resolve it once per query so citations
+    follow renames without touching the index."""
+    if not hits:
+        return hits
+    names = {d["source"]: d.get("filename") or d["source"]
+             for d in registry.all_documents()}
+    for h in hits:
+        h["display_name"] = names.get(h["source"], h["source"])
+    return hits
+
+
 def _build_context(hits: list[dict[str, Any]]) -> str:
     blocks = []
     for i, h in enumerate(hits, 1):
         page = h.get("metadata", {}).get("page") or _page_from_id(h.get("id", ""))
         loc = f", p.{page}" if page else ""
-        blocks.append(f"[{i}] (source: {h['source']}{loc})\n{h['text']}")
+        name = h.get("display_name") or h["source"]
+        blocks.append(f"[{i}] (source: {name}{loc})\n{h['text']}")
     return "\n\n".join(blocks)
 
 
@@ -173,7 +188,7 @@ def retrieve_chunks(
         hits = _graph_hits(question)
     else:
         hits = _plain_hits(question, top_k or settings.top_k)
-    return mode, hits
+    return mode, _attach_display_names(hits)
 
 
 def answer_question(
