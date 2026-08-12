@@ -124,6 +124,8 @@ export function FinishedCaseDetailPage({
           code: k.code, type: codeTypeFromRole(k.code_system, k.code_role),
           desc: `${k.description ?? k.code}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}`,
           confidence: 100, // imported from iMed = fact
+          // which group the card renders in; a hospital row shows no % at all
+          origin: k.source === "imported_from_imed" ? "hospital" as const : "manual" as const,
           // procedure time window + type (ICD-9 rows; the hospital's own record)
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,

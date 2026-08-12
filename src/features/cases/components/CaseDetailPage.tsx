@@ -29,6 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { pickedCount, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
 
@@ -277,10 +278,18 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
+  // selection-first review (2026-08-07): the coder ticks the codes to approve;
+  // suggestions arrive unticked and stay on the case when they aren't picked
+  const picked = pickedCount(codes);
+  const unpicked = unpickedCount(codes);
+  const toggleCode = (index: number) => persistCodes(toggleAt(codes, index));
+  const toggleMany = (indices: number[], next: boolean) => persistCodes(setPicked(codes, indices, next));
+
   const handleAddCode = (entry: { code: string; type: string; desc: string;
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
-    const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
+    // coder-entered = fact, and typing a code IS picking it — pre-ticked
+    const added: StoredCode = { ...entry, confidence: 100, manual: true, origin: "manual", selected: true };
     // prepend: manual codes display grouped on top, and the saved order must
     // match what's shown (approve reads array order for the principal pick)
     persistCodes([added, ...codes]);
@@ -314,10 +323,10 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     const logId = addLog({
       userId: me.userId, userName: me.userName, actionType: "APPROVE_CASE",
       targetId: c.id, targetType: "case",
-      description: `Approved ${codes.length} code(s) for ${c.patient}`,
+      description: `Approved ${picked} code(s) for ${c.patient}`,
       previousState: { caseIds: [c.id] },
     });
-    showToast(`Approved ${codes.length} code(s) for ${c.patient}`, logId);
+    showToast(`Approved ${picked} code(s) for ${c.patient}`, logId);
     onBack(); // the case leaves this list on approval — return to the dashboard
   };
 
@@ -336,7 +345,9 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     // fetch settles — cosmetic, the server copy replaces them here.
     const saved = (status === "ready" ? detail?.codeEdits : null) ?? loadCodeEdits(c.id);
     if (saved) {
-      setCodes(saved);
+      // a payload saved before the tick-to-approve flow keeps the coder's own
+      // codes ticked; everything else waits to be picked (withSelectionDefaults)
+      setCodes(withSelectionDefaults(saved));
     } else if (status === "ready" && detail && detail.codes.length > 0) {
       setCodes(detail.codes.map((k) => ({
         code: k.code,
@@ -345,6 +356,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         type: codeTypeFromRole(k.code_system, k.code_role),
         desc: `${k.description ?? ""}${k.code_role ? ` · ${k.code_role.replace(/_/g, " ")}` : ""}` || k.code,
         confidence: k.source === "imported_from_imed" ? 100 : 85, // imported codes are facts, not AI guesses
+        // which group the card renders in; a hospital row shows no % at all
+        origin: k.source === "imported_from_imed" ? "hospital" as const : "manual" as const,
         // procedure time window + type (ICD-9 rows; the hospital's own record)
         operation_start: k.operation_start ?? undefined,
         operation_end: k.operation_end ?? undefined,
@@ -439,7 +452,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         <ConfirmDialog
           icon={CheckCircle2}
           title={t("confirm.title")}
-          body={t("confirm.approveCodesBody", { n: codes.length, patientName: c.patient })}
+          body={t("confirm.approveCodesBody", { n: picked, patientName: c.patient })
+                + (unpicked > 0 ? t("confirm.approveSkipped", { n: unpicked }) : "")}
           confirmLabel={t("btn.approve")}
           onConfirm={handleApprove}
           onClose={() => setConfirmingApprove(false)}
@@ -483,12 +497,19 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
+          {/* approve is only meaningful once something is ticked — the button
+              says how many codes it will send, and blocks (with the reason) at
+              zero instead of silently finalizing an empty case */}
           <button onClick={() => (approved ? reopen(c.id) : setConfirmingApprove(true))}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all"
-            style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>
+            disabled={!approved && picked === 0}
+            title={!approved && picked === 0 ? t("code.pickNone") : undefined}
+            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed"
+            style={!approved && picked === 0
+              ? { background: `rgba(${gl.accentRgb},0.10)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }
+              : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>
             {approved
               ? <><RotateCcw size={13} /> {t("detail.unapprove")}</>
-              : <><CheckCircle2 size={13} /> {t("detail.approveAll")}</>}
+              : <><CheckCircle2 size={13} /> {picked > 0 ? t("detail.approveN", { n: picked }) : t("detail.approveAll")}</>}
           </button>
         </div>
       </header>
@@ -556,6 +577,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
               onEdit={setEditingIdx}
               onDelete={setDeletingIdx}
               onAdd={setAdding}
+              onToggle={toggleCode}
+              onToggleAll={toggleMany}
             />
           );
         })}

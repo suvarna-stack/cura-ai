@@ -1,5 +1,6 @@
 import type { SuggestedCode } from '../api/casesService'
 import { loadCodeEdits, type StoredCode } from '../utils/caseLocal'
+import { avgAiConfidence } from '../utils/codeOrigin'
 
 /** Procedure systems (ICD-9, *-PCS) → ICD-9 column; everything else → ICD-10. */
 export const isIcd9Type = (type: string) => /icd[- ]?9|pcs/i.test(type)
@@ -40,16 +41,17 @@ export function suggestedToStored(s: SuggestedCode): StoredCode {
     type: s.system,
     desc: s.description || s.code,
     confidence: s.confidence,
+    origin: 'ai',
   }
 }
 
-/** Average confidence from locally saved code edits (RAG suggestions / coder scores). */
+/** Average confidence from locally saved code edits — the RAG rows only.
+ *  Hospital-imported codes are facts carrying a stamped 100, so counting them
+ *  would inflate the pill into meaninglessness (2026-08-07). */
 export function avgStoredConfidence(caseId: string): number | null {
   const codes = loadCodeEdits(caseId)
   if (!codes?.length) return null
-  const scored = codes.filter((c) => !c.missing && typeof c.confidence === 'number')
-  if (!scored.length) return null
-  return Math.round(scored.reduce((s, c) => s + c.confidence, 0) / scored.length)
+  return avgAiConfidence(codes)
 }
 
 /**

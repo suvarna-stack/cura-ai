@@ -29,6 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { pickedCount, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { IncompleteCase, CodeEntry } from "../types/case.types";
 
@@ -274,10 +275,18 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
+  // selection-first review (2026-08-07): the coder ticks the codes to approve.
+  // "???" placeholder rows can't be ticked at all until they're filled in.
+  const picked = pickedCount(codes);
+  const unpicked = unpickedCount(codes);
+  const toggleCode = (index: number) => persistCodes(toggleAt(codes, index));
+  const toggleMany = (indices: number[], next: boolean) => persistCodes(setPicked(codes, indices, next));
+
   const handleAddCode = (entry: { code: string; type: string; desc: string;
                                   operation_start?: string; operation_end?: string;
                                   operation_type?: string; note?: string }) => {
-    const added: StoredCode = { ...entry, confidence: 100, manual: true }; // coder-entered = fact
+    // coder-entered = fact, and typing a code IS picking it — pre-ticked
+    const added: StoredCode = { ...entry, confidence: 100, manual: true, origin: "manual", selected: true };
     // prepend: manual codes display grouped on top, and the saved order must
     // match what's shown (approve reads array order for the principal pick)
     persistCodes([added, ...codes]);
@@ -308,7 +317,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const handleApprove = () => {
     setConfirmingApprove(false);
     approve([c.id]);
-    const n = codes.filter(x => !x.missing).length;
+    const n = picked; // only the ticked codes are sent
     const logId = addLog({
       userId: me.userId, userName: me.userName, actionType: "APPROVE_CASE",
       targetId: c.id, targetType: "case",
@@ -340,7 +349,9 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       }
       const savedCodes = detail.codeEdits ?? loadCodeEdits(c.id);
       if (savedCodes) {
-        setCodes(savedCodes);
+        // payloads saved before the tick-to-approve flow keep the coder's own
+        // codes ticked; the rest wait to be picked (withSelectionDefaults)
+        setCodes(withSelectionDefaults(savedCodes));
       } else {
         const real = detail.codes.map(k => ({
           // role-bearing label, so the Edit dialog opens on the right type and
@@ -348,6 +359,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           code: k.code, type: codeTypeFromRole(k.code_system, k.code_role),
           desc: k.description ?? k.code,
           confidence: 100, // imported from iMed = fact, not AI guess
+          // which group the card renders in; a hospital row shows no % at all
+          origin: k.source === "imported_from_imed" ? "hospital" as const : "manual" as const,
           // procedure time window + type (ICD-9 rows; the hospital's own record)
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,
@@ -424,7 +437,9 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             const before = codes[editingIdx];
             const filled = before.missing && u.code.trim() !== "" && !u.code.includes("?");
             const resolved: StoredCode = filled
-              ? { ...u, missing: false, missingMsg: undefined, confidence: 100 }
+              // resolving a "???" row means the coder typed the code themselves,
+              // so it is ticked for approval like any hand-added code
+              ? { ...u, missing: false, missingMsg: undefined, confidence: 100, selected: true }
               : { ...before, ...u };
             const next = codes.map((e, i) => i === editingIdx ? resolved : e);
             setCodes(next); saveCodeEdits(c.id, next); setEditingIdx(null);
@@ -455,7 +470,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         <ConfirmDialog
           icon={CheckCircle2}
           title={t("confirm.title")}
-          body={t("confirm.approveCodesBody", { n: codes.filter(x => !x.missing).length, patientName: c.patient })}
+          body={t("confirm.approveCodesBody", { n: picked, patientName: c.patient })
+                + (unpicked > 0 ? t("confirm.approveSkipped", { n: unpicked }) : "")}
           confirmLabel={t("btn.approve")}
           onConfirm={handleApprove}
           onClose={() => setConfirmingApprove(false)}
@@ -500,12 +516,18 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
+          {/* approve sends the ticked codes only — blocked (with the reason)
+              while nothing is ticked, rather than finalizing an empty case */}
           <button onClick={() => (approved ? reopen(c.id) : setConfirmingApprove(true))}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all"
-            style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>
+            disabled={!approved && picked === 0}
+            title={!approved && picked === 0 ? t("code.pickNone") : undefined}
+            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed"
+            style={!approved && picked === 0
+              ? { background: `rgba(${gl.accentRgb},0.10)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }
+              : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>
             {approved
               ? <><RotateCcw size={13} /> {t("detail.unapprove")}</>
-              : <><CheckCircle2 size={13} /> {t("detail.approveAll")}</>}
+              : <><CheckCircle2 size={13} /> {picked > 0 ? t("detail.approveN", { n: picked }) : t("detail.approveAll")}</>}
           </button>
         </div>
       </header>
@@ -559,6 +581,8 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
               onEdit={setEditingIdx}
               onDelete={setDeletingIdx}
               onAdd={setAdding}
+              onToggle={toggleCode}
+              onToggleAll={toggleMany}
             />
           );
         })}
