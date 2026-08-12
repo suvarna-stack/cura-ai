@@ -195,8 +195,9 @@ public class CasesWriteController {
                     + "`codeEdits` on the detail endpoint. Fields the backend interprets at "
                     + "approve time: `code` (skipped if empty or `???`), `type` (labels matching "
                     + "`icd-9`/`pcs` → ICD-9 procedure, anything else → ICD-10), `missing` "
-                    + "(truthy → row skipped), and on ICD-9 rows `operation_start`/"
-                    + "`operation_end` (the procedure's time window, sent to iMed). "
+                    + "(truthy → row skipped), `selected` (the coder's tick — explicit "
+                    + "`false` → row skipped, absent → approved), and on ICD-9 rows "
+                    + "`operation_start`/`operation_end` (the procedure's time window, sent to iMed). "
                     + "Extra fields are stored and echoed, never interpreted.\n\n"
                     + "Working state never invalidates the dashboard cache and survives reopen.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",

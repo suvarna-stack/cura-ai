@@ -79,10 +79,30 @@ update (PUT).
 
 ### Coding status (our proposed extension — not in their PDF)
 
-`PUT /api/v1/coding-status/{visit_id}` `{request_id, coding_status,
-finalized_at, updated_by}` on approve; `DELETE` on reopen. Backed by the
-hospital-side coding-status table they agreed to add. The mock implements it;
-the shape is ours to negotiate.
+**Current shape (2026-08-07): one optional field, no new endpoint.** The
+diagnosis POST/PUT envelope carries `coding_status`, which iMed stores on the
+visit's own row (`medhack_patient.coding_status`) — the hospital-side twin of
+our `cases.case_status`:
+
+| medcode | iMed API | Stored as |
+|---|---|---|
+| approve (`case_status = 'approved'`) | `coding_status: "approved"` | `medhack_patient.coding_status = 'approved'` |
+| reopen (`case_status = 'open'`) | `coding_status: "open"` (reserved word = clear) | `medhack_patient.coding_status = NULL` |
+| never coded | field absent | `NULL` |
+
+It rides the calls the diff already makes, so the codes and the status land in
+ONE hospital transaction. When the diff has no body to send (nothing changed,
+or only cancels — a DELETE carries no body), write-back sends one
+`PUT /api/v1/diagnosis/{visit_id}` carrying just the status. Absent or blank
+means "no change", so a caller speaking the hospital's exact contract is
+unaffected — see open question 17.
+
+This **replaces** the marker we used before, which overwrote the visit's
+`dischargestatus` (the doctor's clinical outcome — not ours to set). It also
+replaces the older, heavier version of this same idea: a dedicated
+`PUT/DELETE /api/v1/coding-status/{visit_id}` plus its own hospital-side
+table, built 2026-07-24 and withdrawn 2026-08-02. A field on an existing
+endpoint is a smaller ask than a new route.
 
 ## Open questions for the hospital
 
@@ -98,6 +118,13 @@ the shape is ours to negotiate.
    Does the visit already have discharge data by then, and does our POST
    update it or fail on it? Can the discharge object echo their existing
    values? Can `doctor_discharge` ever be `"0"`?
+   Meanwhile we send `"Coding Approved"` as the discharge status id —
+   deliberately not one of their clinical outcomes (`Improved`, `Not
+   Improved`, …), which are the doctor's to set. Their real id slots in via
+   `IMED_DISCHARGE_STATUS_ID` (and `IMED_DISCHARGE_TYPE_ID`), no code change.
+   Since 2026-08-07 that value stays INSIDE the discharge object: it no longer
+   overwrites `medhack_patient.dischargestatus`, because the approval marker
+   moved to the visit row's own `coding_status` column (open question 17).
 4. **Coder identity**: do our coder accounts get iMed `EMP…` ids for
    `coder_eid` / `doctor_eid`, or one system-level id?
 5. **Cancelled rows & reads**: does the extract/read layer already exclude
@@ -169,3 +196,19 @@ the shape is ours to negotiate.
     modification timestamp, an extract-job stamp, anything visit-level works
     for us. Without (b), a case synced once and coded later on their side
     only reaches us when someone re-pulls its visit window.
+17. **Coding status on the visit (2026-08-07, built into the mock — this is
+    the production ask)**. Can the visit carry a **coding workflow state** the
+    hospital can see: "these codes have been reviewed and approved by a
+    medical coder", cleared again if the case is reopened? Concretely we ask
+    for (a) one nullable column on the visit — the mock calls it
+    `medhack_patient.coding_status`, values `approved` / NULL — served by the
+    case-list read like any other visit field, and (b) an optional
+    `coding_status` field on the existing `POST`/`PUT /api/v1/diagnosis`
+    envelope to set it (`"approved"`, or `"open"` to clear), so no new
+    endpoint is needed and the status commits in the same transaction as the
+    codes. Today the only hospital-visible sign that coding finished is the
+    codes themselves. **Note what we stopped doing:** the marker used to be
+    written into `medhack_patient.dischargestatus` — a clinical field the
+    doctor owns — which we no longer touch. If the answer to this question is
+    "no new column", tell us where a coding state belongs instead; we would
+    rather have none than borrow a clinical one.

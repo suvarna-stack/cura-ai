@@ -47,6 +47,7 @@ class OpenApiDocsTest {
             "/api/sync",
             "/api/cases/{caseId}/sync",
             "/api/icd-codes",
+            "/api/analytics",
             "/api/auth/login",
             "/api/auth/logout",
             "/api/auth/me",

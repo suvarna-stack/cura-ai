@@ -262,8 +262,20 @@ export interface CodeEdit {
    *  verbatim like any extra field, shown only in our UI, never sent to the
    *  hospital (its write API has no note field). */
   note?: string;
+  /** Where the row came from — "manual" (the coder typed it), "hospital" (an
+   *  imported iMed code) or "ai" (a RAG suggestion). NOT interpreted at
+   *  approve: stored + echoed verbatim like `note`. The UI groups each code
+   *  column by it and shows a confidence % on AI rows only (2026-08-07);
+   *  absent on payloads saved before that, which the UI infers instead. */
+  origin?: "manual" | "hospital" | "ai";
   /** truthy → row skipped at approve (unresolved placeholder) */
   missing?: boolean;
+  /** The coder ticked this code for approval (selection-first UI, 2026-08-07).
+   *  Explicit false → kept in the working state but NOT written at approve;
+   *  absent → written (payloads saved before the checkbox UI). A payload whose
+   *  rows are ALL unselected falls back to the imported principal diagnosis,
+   *  like a case with no saved edits. */
+  selected?: boolean;
   /** Procedure time window — interpreted on ICD-9 rows only; written to iMed
    *  as date_in/time_in/date_out/time_out on approve. "YYYY-MM-DD HH:MM[:SS]"
    *  or datetime-local's "YYYY-MM-DDTHH:MM"; unparseable → null. The UI
@@ -404,6 +416,50 @@ export interface IcdCatalogHit {
   code: string;
   system: "ICD-10" | "ICD-9";
   description: string;
+}
+
+// ---------- analytics ----------
+
+/** One point of the Cases-Over-Time series. */
+export interface AnalyticsDayPoint {
+  /** Local midnight, NO zone suffix ("2026-07-22T00:00:00") — a `Z` would
+   *  render as the previous day west of UTC. */
+  iso: string;
+  count: number;
+}
+
+/** One slice of the coverage donut: a สิทธิการรักษา scheme family, or
+ *  "ไม่ระบุสิทธิ" for visits the extract left blank. */
+export interface AnalyticsCoverageSlice {
+  label: string;
+  count: number;
+}
+
+/** One bar of the Top-ICD-Codes list. */
+export interface AnalyticsTopCode {
+  /** "code · description", or the bare code when the catalog has none. */
+  label: string;
+  count: number;
+  code: string;
+  system: "ICD-10" | "ICD-9";
+  description: string | null;
+}
+
+/**
+ * GET /api/analytics?days=…&topCodes=… — the whole Analytics page in one
+ * request. Every figure covers OPD visits only, the same population
+ * GET /api/cases serves.
+ *
+ * `summary` is the dashboard payload's `stats` verbatim, so the tiles cannot
+ * drift from the Dashboard. `casesOverTime` always has exactly `days` points,
+ * oldest first, zero-filled — an empty window is all-zero, never empty.
+ */
+export interface AnalyticsResponse {
+  /** Same shape and numbers as CasesResponse["stats"]. */
+  summary: { total: number; complete: number; incomplete: number; reopened: number; finished: number };
+  casesOverTime: AnalyticsDayPoint[];
+  coverageCounts: AnalyticsCoverageSlice[];
+  topCodes: AnalyticsTopCode[];
 }
 
 /** 400 / 404 body. 500s return Spring's default error body — the triggering

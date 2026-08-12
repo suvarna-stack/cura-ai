@@ -198,7 +198,15 @@ Request: a **bare JSON array** of `CodeEdit` (stored verbatim, echoed back as
     "note": "internal coder note",  // NOT interpreted: stored + echoed verbatim like any
                               // extra field, shown only in our UI — never sent to iMed
                               // (the hospital write API has no note field)
+    "origin": "manual",       // "manual" | "hospital" | "ai" — where the row came from.
+                              // NOT interpreted: stored + echoed verbatim like `note`.
+                              // The UI groups each code column by it and shows a
+                              // confidence % on "ai" rows only; ABSENT on payloads
+                              // saved before 2026-08-07, which the UI infers instead
     "missing": false,         // truthy → row skipped at approve
+    "selected": true,         // the coder ticked this code for approval. Explicit
+                              // false → row skipped at approve. ABSENT → approved
+                              // (legacy payloads saved before the checkbox UI)
     "operation_start": "2026-04-02 23:55:00",  // ICD-9 rows only: the procedure's time
     "operation_end": "2026-04-03 05:05:00",    // window, written to iMed on approve
     "operation_type": "OR Procedure"           // ICD-9 rows only: extract vocabulary
@@ -217,6 +225,17 @@ the backend stays lenient because hospital-synced rows may lack times.
 `operation_type` rides along the same way: stored on the ICD-9 `case_codes`
 row at approve and sent to iMed as `fix_operation_type_id` when present
 (absent → the `GENERAL_OPERATION` placeholder, unchanged behavior).
+
+`selected` (2026-08-07) carries the coder's pick. The UI no longer asks coders
+to delete the suggestions they don't want — they tick the ones they do — so a
+row with `"selected": false` stays in the working state (visible, editable,
+re-tickable) but is NOT written at approve. A row with no `selected` key at all
+is approved, so payloads saved before this flow behave exactly as they did.
+One guard: if a payload's rows are ALL unselected, approve falls back to
+re-confirming the imported principal diagnosis — the same behavior as a case
+with no saved edits — because that shape means "nobody reviewed this case"
+(the UI saves RAG suggestions as soon as a case is opened, and cases can be
+approved in bulk from the list). Deleting every row still approves nothing.
 
 Responses: `{"ok": true}` · `400` (not an array) · `404` (unknown case).
 Working state never invalidates the dashboard cache and survives reopen.
@@ -399,6 +418,57 @@ ICD-10 or ICD-9"}` for any other system value.
 Since the 2026-07-28 split this reads the `icd_10` and `icd_9` tables (one
 `icd_codes` table before then); `system` in the response says which one a row
 came from, and a code may legitimately exist in both.
+
+### GET /api/analytics — the Analytics page payload
+
+One request serves the whole page; every figure is a roll-up over **OPD visits
+only** (`encountertype = '0'`), the same population `GET /api/cases` serves.
+Query params:
+
+| param      | required | notes |
+|------------|----------|-------|
+| `days`     | no       | length of the `casesOverTime` window, ending today. Default `30`, capped at `365` |
+| `topCodes` | no       | rows in `topCodes`. Default `10`, capped at `50` |
+
+```jsonc
+{
+  "summary": {"total": 21, "complete": 4, "incomplete": 16, "reopened": 0, "finished": 1},
+  "casesOverTime": [ {"iso": "2026-07-22T00:00:00", "count": 1}, … ],
+  "coverageCounts": [ {"label": "OFC", "count": 5}, … ],
+  "topCodes": [ {"label": "D17.1 · lipoma at back", "count": 2,
+                 "code": "D17.1", "system": "ICD-10",
+                 "description": "lipoma at back"}, … ]
+}
+```
+
+- **`summary`** is the dashboard payload's `stats` object *verbatim* (served
+  from the same CasesCache), so the Analytics tiles can never drift from the
+  Dashboard's counts. `reopened` is its own exclusive queue — only `total`
+  covers all four.
+- **`casesOverTime`** has exactly `days` points, oldest first, **zero-filled**:
+  a day the hospital saw nobody is a `0`, not a missing point. A visit is dated
+  by `admissiondatetime`, else by the `YYMMDDHHMMSS` encoded at positions 4-15
+  of its transaction number — the same rule imed-mock-api applies to its
+  visit-date window, so both systems date a visit identically. A visit that
+  matches neither is absent from the series (but still counted in `summary`).
+  `iso` is **local midnight with no zone suffix** — a `Z` would render as the
+  previous day west of UTC.
+- **`coverageCounts`** groups by สิทธิการรักษา *scheme family* (`UCS`, `OFC`,
+  `WEL`, …), biggest first — not by raw `coverage_code`, of which the extract
+  carries ~40 variants of a handful of schemes. Visits whose coverage the
+  extract left blank group under `ไม่ระบุสิทธิ`.
+- **`topCodes`** ranks both catalogs together, counting every `case_codes` row
+  — imported-from-iMed and coder-assigned alike. `label` is `"code · description"`,
+  falling back to the bare code when the catalog has no description;
+  `code`/`system`/`description` are the same values unjoined, so a client can
+  relabel without parsing.
+
+`400 {"error": "days must be between 1 and 365"}` /
+`{"error": "topCodes must be between 1 and 50"}` outside those bounds.
+
+Until 2026-08-06 the Analytics page ran on hardcoded numbers in the frontend
+(a `USE_MOCK` flag); this endpoint replaced them, and no mock path remains —
+a failed request shows an error state rather than plausible fake figures.
 
 ## Authentication
 

@@ -194,10 +194,12 @@ Milestones (git log --oneline reads as this sequence):
   **Training page is LIVE** against all seven `/api/admin/knowledge/**` routes
   (`trainingService.ts`, `sync-codes` included); and `suggest-codes` +
   `icd-codes` are called from the case detail pages and the Add-code modal.
-  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller,
-  and **Analytics + Agent-chat remain `USE_MOCK = true`** stubs — we have no
-  endpoints behind those two and none are planned, so DON'T read `/analytics`
-  or `/agent/*` TODOs as a contract we owe.
+  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller.
+  (**Superseded 2026-08-07:** the old "Analytics + Agent-chat remain
+  `USE_MOCK = true`, no endpoints behind them and none planned" note is DEAD —
+  both pages are live now. `/api/agent/chat` landed with the RAG work, and
+  `GET /api/analytics` landed 2026-08-07; `USE_MOCK` is gone from
+  `analyticsService.ts` and `agentService.ts`.)
   Behavior worth knowing: their code/draft/approve writes are best-effort —
   failures are swallowed and the browser keeps its own `localStorage` copy, so
   a rejected write still looks saved on screen.
@@ -409,6 +411,114 @@ Milestones (git log --oneline reads as this sequence):
   test needing an approved/known case fails regardless of this change
   (verified identical red set on a clean checkout). The suite needs re-basing
   onto the new demo data.
+- ✅ **Analytics live + local `dev_all.sh` gains RAG (2026-08-07):** two
+  things landed the same day. (1) **`GET /api/analytics`** arrived from remote
+  (`AnalyticsController` / `AnalyticsService` / `AnalyticsRepository`, plus a
+  real discharge status on approve) and the frontend's Analytics page dropped
+  its mock fallback — so **Analytics and Agent chat are both LIVE now**, killing
+  the old "no endpoints behind those two and none planned" note in two places
+  above. That commit **forgot `OpenApiDocsTest.EXPECTED_PATHS`** and so shipped
+  the build red on the reverse assertion (`docs/api-contract.md` + `docs/types.ts`
+  were done); adding `/api/analytics` to the list was the whole fix — exactly the
+  drift that assertion exists to catch, working as designed. (2) **`scripts/
+  dev_all.sh` now starts RAG too** (`:8000`, via `RAG/.venv/bin/python run.py`,
+  `RAG_DIR` overridable), so one command brings up all four repos. RAG is treated
+  as **optional-by-design** — a missing `.venv` or a failed start only WARNs and
+  the stack continues, because everything except AI suggestions / Agent / Training
+  works without it; `--no-rag` skips it deliberately. Teardown sweeps `:8000`
+  because `uvicorn --reload` runs a child worker the parent PID doesn't cover.
+  **`dev_all.sh` is deliberately NOT in git** (`.git/info/exclude`) — the team
+  isn't all on macOS and `scripts/*.sh` is bash + `lsof` + `brew`, so the
+  four-terminal path in `RUN-ALL.md` §5 stays the one documented route. It was
+  briefly tracked on 2026-08-07 and untracked again the same day; don't re-add
+  it, and don't reference it from tracked docs. (The tracked `dev.sh` is just as
+  mac-bound — both are now labelled macOS/Linux-only, with Windows pointed at the
+  manual path.)
+- ✅ **Selection-first code review (2026-08-07):** the coder flow inverted. AI /
+  hospital suggestions used to arrive as "everything is in, delete what's
+  wrong"; now **nothing is pre-ticked** and the coder ticks the codes that
+  belong on the case, then approves. The pick rides in the codeEdits payload as
+  a `selected` boolean, so it is durable (server copy) and survives reload,
+  and `ApprovalService.materializeCodeEdits` skips rows with an explicit
+  `selected: false` — an ABSENT key still approves, so payloads saved before
+  this flow behave exactly as they did. Unticked codes are NOT deleted: they
+  stay in the working state, visible and re-tickable, and never reach iMed
+  (verified live: a 3-row payload with one unticked code wrote 2 coder rows and
+  the hospital got only those two). One guard: an all-unticked payload falls
+  back to re-confirming the imported principal, the same path as "no saved
+  edits", because that shape means nobody reviewed the case (the UI saves RAG
+  suggestions as soon as a case is opened, and the list page can bulk-approve).
+  Frontend (`../audit-chart-frontend`): checkbox per code card (the diagnosis
+  title is its label, so the whole title is a target), ticked = accent fill +
+  ring / unticked recedes at 0.78 opacity, per-column tri-state "Select all"
+  + Clear (indeterminate = "mixed", same control the case list already uses),
+  the column badge counts `picked/total`, and Approve says "Approve (n)" and is
+  DISABLED at zero with the reason in its tooltip. Manual codes stay pre-ticked
+  (typing a code is picking it), "???" placeholders can't be ticked until
+  resolved, and delete/edit/drag are unchanged. New `utils/codeSelection.ts`
+  holds the rules incl. the legacy-payload migration (no `selected` key
+  anywhere → keep the coder's own codes ticked, everything else waits).
+  Contract + `docs/types.ts` + Swagger text updated; the new
+  `unselectedCodeEditsAreKeptButNotApproved` test sits in
+  `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
+  the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
+  known 13-failure problem, unrelated to this change).
+- ✅ **Coding status on the hospital visit row (2026-08-07):** the hospital now
+  has an "approved" flag of its own — `imed.medhack_patient.coding_status`
+  (`'approved'` / NULL), the twin of our `cases.case_status`. It replaces the
+  old marker, which **overwrote `medhack_patient.dischargestatus`** — the
+  DOCTOR's clinical outcome ("Improved", …), never ours to write; the mock's
+  /api/v1 writes no longer touch that column, and the discharge status id we
+  send (`"Coding Approved"`, still open question 3) now stays inside
+  `doctor_discharge_opd/_ipd`. Set through a new optional **`coding_status`
+  field on the EXISTING `POST`/`PUT /api/v1/diagnosis` envelope** — no new
+  endpoint, and the status commits in the same hospital transaction as the
+  codes. `"approved"` on approve, the reserved `"open"` on reopen (clears to
+  NULL), absent = no change. `ImedWritebackService` puts it on the diff bodies
+  it already sends and falls back to ONE body-less PUT when the diff had
+  nothing to say (nothing changed, or only cancels — a DELETE carries no
+  body); `DiffResult` is what carries "did a body go out" back from
+  `diffKind`. Mock side: `SchemaBootstrap` + `db/migrations/0005` (with the
+  `imed_baseline` mirror, or positional demo reset breaks), `updateCodingStatus`
+  replacing `updatePatientDischargeStatus`, unknown status words → 400. Reads
+  needed no change — `GET /api/cases` serves `p.*`. This **revives** the
+  coding-status idea withdrawn 2026-08-02, but as a field on an existing route
+  instead of a table + dedicated endpoint (a smaller ask of the hospital).
+  Still OUR invention: hospital open question 17 in `docs/imed-integration.md`.
+  Verified live end-to-end (approve → `approved`, reopen → NULL, and the
+  no-diff approve still marks the visit with `mcai_code_rows: 0`); mock suite
+  16/16 green. Our own API shape is unchanged, so `docs/api-contract.md` +
+  `docs/types.ts` were untouched.
+- ✅ **Codes grouped by ORIGIN; no % on hospital codes (2026-08-07):** a code
+  column used to be one undifferentiated list, so a hospital-imported fact, a
+  RAG guess and the coder's own typing looked identical — and every one of
+  them wore a confidence %, because hospital rows were seeded `confidence:
+  100` and the AI's real score sat in the same slot. Now each ICD column
+  renders **labelled groups in a fixed order: Added by coder → From hospital
+  record → Suggested by AI → Not documented** (the 4th holds the "???"
+  placeholders, which are nobody's suggestion). The **% shows on AI rows
+  ONLY** — a hospital code is already in the hospital's record and a typed
+  code is the coder's own call, so neither has anything to be confident
+  about — and the column header's average plus the case-list AI Confidence
+  pill now average **AI rows only** (`avgAiConfidence`), so a case with no AI
+  opinion shows no number instead of a meaningless 100%. Carried by a new
+  `origin: "manual" | "hospital" | "ai"` field on **CodeEdit**, which needs
+  ZERO backend code: `PUT /codes` reparses and re-serializes the whole body
+  into JSONB with no field whitelist, so unknown keys round-trip verbatim
+  (same free ride as `note`) — only `docs/api-contract.md` + `docs/types.ts`
+  were touched here. Frontend (`../audit-chart-frontend`): new
+  `utils/codeOrigin.ts` owns the vocabulary, the order and `originOf()`,
+  whose **legacy fallback** reads pre-2026-08-07 payloads (no `origin`
+  anywhere) as manual-flag → manual, `confidence === 100` → hospital, else
+  AI; the three detail pages seed `origin` from the detail row's `source`
+  (`imported_from_imed` → hospital, else manual), `suggestedToStored` stamps
+  `ai`, and both Add-code paths stamp `manual`. Grouping replaces the old
+  two-way manual/auto split in `CodesColumn`; drag-reorder still snaps back
+  across a group line (grouping wins over free ordering), which is safe for
+  approve because manual and hospital rows carry role-bearing type labels and
+  so never steal the positional principal-diagnosis pick from a bare-labelled
+  AI row. Also confirmed while doing this: the completeness rule the coders
+  see IS "the hospital's own data arrived with both systems" — unchanged.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -475,11 +585,12 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 ## Open tasks
 
 - **Frontend** (`../audit-chart-frontend`) — built and live against this
-  backend; the repo itself stays out of scope here. Two loose ends on OUR side
-  of the seam, both re-checked 2026-07-29: `POST /api/cases/{id}/sync`
-  (per-case) has no caller — bulk `/api/sync` and the whole Training/knowledge
-  surface ARE wired — and the two still-mocked pages (Analytics, Agent) have no
-  endpoints behind them. Neither is a promise we've made.
+  backend; the repo itself stays out of scope here. One loose end on OUR side
+  of the seam, re-checked 2026-08-07: `POST /api/cases/{id}/sync` (per-case)
+  still has no caller — bulk `/api/sync` and the whole Training/knowledge
+  surface ARE wired. Not a promise we've made. (Analytics and Agent used to sit
+  in this list as permanently-mocked pages; both are live now — see the
+  2026-08-07 Progress entry.)
 - **`GET /api/icd-codes` has no automated test.** It is documented and
   hand-verified, but nothing asserts its behavior — which is precisely how the
   2026-07-29 break shipped green. Covering the UNION path, the `system` filter,

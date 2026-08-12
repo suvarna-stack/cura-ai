@@ -16,6 +16,10 @@ against [docs/api-contract.md](docs/api-contract.md) /
   never touches it directly, it only calls the iMed API (approval results on
   approve/reopen).
 
+> **รันทั้งระบบ (4 repo) ครั้งแรก?** → [RUN-ALL.md](RUN-ALL.md) — คู่มือภาษาไทย
+> ครอบคลุม imed-mock-api + medcode-api + RAG + audit-chart-frontend ตั้งแต่
+> เครื่องเปล่า เอกสารด้านล่างนี้เป็นของ repo นี้ repo เดียว
+
 ## Local dev — first-time setup included
 
 **Just cloned this (or got it from a teammate)?** The databases are NOT
@@ -31,7 +35,9 @@ cd ../imed-mock-api && scripts/seed_local_imed_pg.sh   # builds db "imed" (sibli
 cd ../medcode-api && ./mvnw spring-boot:run            # :8001 this backend
 ```
 
-**Shortcut — one line to bring it all up:**
+**Shortcut — one line to bring it all up** (macOS/Linux only; these scripts are
+bash and shell out to `lsof`/`brew`. On Windows run the manual steps above in
+separate terminals — see `RUN-ALL.md` §5, the portable path — or use WSL/Git Bash):
 
 ```bash
 scripts/dev.sh          # seeds anything missing, starts the fake hospital (:8003),
@@ -43,6 +49,10 @@ It prints the Swagger URL and the admin login (`admin@medcodeai.demo` /
 `admin1234`) once ready. Postgres must be installed; it will `brew services
 start` it if it's not already running. Keep the two repos as sibling folders (or
 set `IMED_DIR`).
+
+`dev.sh` covers the two backends only. The full product is four repos — add
+RAG (`:8000`) and the frontend (`:5173`) in their own terminals; the complete
+runbook for all four, on every OS, is `RUN-ALL.md`.
 
 Good to know:
 

@@ -428,6 +428,70 @@ class CasesApiIntegrationTest {
         }
     }
 
+    @Test
+    void unselectedCodeEditsAreKeptButNotApproved() throws Exception {
+        // Selection-first coding (2026-08-07): the UI ticks the codes to approve
+        // instead of deleting the rest, so `selected: false` rows must survive in
+        // the working state (still visible and re-tickable) while staying out of
+        // the materialized coder_assigned rows. Same mirror-the-imported-codes
+        // shape as the operation-times test, so the hospital diff only creates
+        // the one new procedure (reverted by reopen in the finally).
+        JsonNode imported = getJson("/api/cases/" + APPROVABLE_CASE_ID).get("codes");
+        List<String> entries = new ArrayList<>();
+        for (JsonNode c : imported) {
+            entries.add(json.writeValueAsString(java.util.Map.of(
+                    "code", c.get("code").asString(),
+                    "type", c.get("code_system").asString(),
+                    "desc", c.get("description").isNull() ? "" : c.get("description").asString(),
+                    "selected", true)));
+        }
+        entries.add("""
+                {"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
+                 "selected":true}""");
+        // the suggestion the coder left unticked
+        entries.add("""
+                {"code":"V89.2","type":"ICD-10 External Cause","selected":false,
+                 "desc":"Person injured in unspecified motor-vehicle accident, traffic"}""");
+        try {
+            mvc.perform(put("/api/cases/{id}/codes", APPROVABLE_CASE_ID).header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("[" + String.join(",", entries) + "]"))
+                    .andExpect(status().isOk());
+            mvc.perform(post("/api/cases/approve").header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"ids\":[\"" + APPROVABLE_CASE_ID + "\"]}"))
+                    .andExpect(status().isOk());
+
+            JsonNode detail = getJson("/api/cases/" + APPROVABLE_CASE_ID);
+            boolean tickedMaterialized = false;
+            boolean untickedMaterialized = false;
+            for (JsonNode c : detail.get("codes")) {
+                if (!"coder_assigned".equals(c.get("source").asString())) {
+                    continue;
+                }
+                tickedMaterialized |= "93.22".equals(c.get("code").asString());
+                untickedMaterialized |= "V89.2".equals(c.get("code").asString());
+            }
+            assertTrue(tickedMaterialized, "a ticked edit becomes a coder_assigned row");
+            assertFalse(untickedMaterialized, "an unticked edit is never written at approve");
+
+            // the unticked row is still working state — the coder can tick it later
+            boolean echoed = false;
+            for (JsonNode e : detail.get("codeEdits")) {
+                if ("V89.2".equals(e.get("code").asString())) {
+                    echoed = true;
+                    assertFalse(e.get("selected").asBoolean(), "its selected flag round-trips");
+                }
+            }
+            assertTrue(echoed, "unticked codes stay in the saved codeEdits payload");
+        } finally {
+            mvc.perform(post("/api/cases/{id}/reopen", APPROVABLE_CASE_ID).header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isOk());
+            jdbc.update("DELETE FROM case_code_edits WHERE case_id=?", APPROVABLE_CASE_ID);
+        }
+    }
+
     // ---- sync (pull from the hospital) ----
     // Exercised through the per-case route: it drives the SAME SyncService engine
     // as bulk POST /api/sync but touches one case, so the suite stays fast and
