@@ -19,6 +19,8 @@ interface AgentChatResponse {
   contexts: {
     text: string
     source: string
+    /** current display filename from the RAG registry (follows renames) */
+    display_name?: string
     score: number
     via: string
     metadata: Record<string, unknown>
@@ -42,8 +44,8 @@ export async function sendAgentMessage(
   const sources: string[] = []
   for (const c of data.contexts) {
     const page = c.metadata?.page
-    const label =
-      typeof page === 'number' ? `${c.source} p.${page}` : c.source
+    const name = (c.display_name || c.source).replace(/\.[^.]+$/, '')
+    const label = typeof page === 'number' ? `${name} p.${page}` : name
     if (!sources.includes(label)) sources.push(label)
   }
   return { answer: data.answer, sources }
