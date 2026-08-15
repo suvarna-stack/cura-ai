@@ -519,6 +519,25 @@ Milestones (git log --oneline reads as this sequence):
   so never steal the positional principal-diagnosis pick from a bare-labelled
   AI row. Also confirmed while doing this: the completeness rule the coders
   see IS "the hospital's own data arrived with both systems" — unchanged.
+- ✅ **Agent chat streams + grounded code lookup (2026-08-15):** prep for the
+  GPU-less prod host (decided: no API, no GPU, 15-30s answer budget — accuracy
+  comes from retrieval, not model size). New `POST /api/agent/chat/stream` —
+  same body as /chat, SSE passthrough of the RAG side's new `/chat/stream`
+  (`meta` with contexts first, `delta` pieces, terminal `done`/`error`;
+  mid-stream failures are events because headers are already out).
+  `RagApiClient.streamChat` pipes bytes with per-chunk flush over a shared JDK
+  HttpClient (HTTP/1.1 — same uvicorn h2c gotcha). RAG side (`../RAG`) also
+  gained: exact-substring code lookup (codes named in the question fetch their
+  literal chunks via Chroma `$contains`, ranked ahead of semantic hits, capped
+  union of 8), `unverified_codes` on /chat responses (codes the answer cites
+  that no retrieved chunk contains — the medical grounding guard), and
+  `display_name` on every context (rename-following citation labels).
+  Frontend streams with a blocking-endpoint fallback and renders the
+  unverified-codes warning; dict mode caps answers at 224 tokens.
+  Contract + types.ts + OpenApiDocsTest updated (test green). Deferred by
+  choice: bge reranker (needs a ~1GB model download; flag off until wanted)
+  and the prod model swap (host .env: 3B-class `OLLAMA_MODEL`, 8+ cores,
+  32GB RAM — dev keeps Eir-8B unchanged).
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
