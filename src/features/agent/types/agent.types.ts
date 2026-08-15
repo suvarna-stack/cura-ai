@@ -6,6 +6,8 @@ export type AgentMessage = {
   text: string
   /** deduplicated citation labels, e.g. "icd9 p.12" — agent replies only */
   sources?: string[]
+  /** ICD codes the answer cites that its sources never contained */
+  unverifiedCodes?: string[]
   time: string
 }
 
