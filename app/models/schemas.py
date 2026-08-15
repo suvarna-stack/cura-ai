@@ -87,6 +87,9 @@ class QueryResponse(BaseModel):
     answer: str
     mode: str
     contexts: list[RetrievedChunk]
+    # Codes the answer cites that appear in NO retrieved chunk — the UI warns
+    # instead of trusting them (medical grounding guard).
+    unverified_codes: list[str] = Field(default_factory=list)
 
 
 class RetrieveRequest(BaseModel):

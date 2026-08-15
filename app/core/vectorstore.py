@@ -122,6 +122,36 @@ class VectorStore:
             )
         return hits
 
+    def find_text(self, needle: str, limit: int = 2) -> list[dict[str, Any]]:
+        """Exact substring search (no embeddings) — how a literal code like
+        "I33" finds its tabular entry even when semantic search would miss it.
+
+        Shortest chunks win: a tabular code list line beats a page of guideline
+        prose that merely mentions the code.
+        """
+        collection = self._ensure_collection()
+        res = collection.get(
+            where_document={"$contains": needle},
+            include=["documents", "metadatas"],
+            limit=200,  # bound the scan; common tokens can match thousands
+        )
+        rows = list(zip(res.get("ids", []), res.get("documents", []),
+                        res.get("metadatas", [])))
+        rows.sort(key=lambda r: len(r[1] or ""))
+        hits: list[dict[str, Any]] = []
+        for cid, doc, meta in rows[:limit]:
+            meta = meta or {}
+            hits.append(
+                {
+                    "id": cid,
+                    "text": doc,
+                    "source": meta.get("source", "unknown"),
+                    "score": 1.0,
+                    "metadata": meta,
+                }
+            )
+        return hits
+
     def count(self) -> int:
         return self._ensure_collection().count()
 
