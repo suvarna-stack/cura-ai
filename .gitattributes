@@ -1,0 +1,7 @@
+# The Postgres init scripts run INSIDE a Linux container. A Windows clone with
+# core.autocrlf=true would give them CRLF line endings, and the container's
+# shell fails on the \r ("bad interpreter" / silent no-op) — so the databases
+# would come up empty with no obvious cause. Force LF regardless of platform.
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

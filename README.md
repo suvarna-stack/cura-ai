@@ -21,9 +21,15 @@ siblings. Nothing is copied between repos.
 
 ## Prerequisites
 
-- Docker (Docker Desktop, Colima, OrbStack — any Docker Engine 20.10+)
+- Docker (Docker Desktop, Colima, OrbStack — any Docker Engine 20.10+), given
+  **at least 4GB of RAM** in its settings
 - Ollama running on the **host**, if you want AI generation (see below)
 - No native Postgres on port 5433 and nothing on 8080/8001/8003/8000
+
+Nothing else: no Java, Node, Python or PostgreSQL install is needed — every
+build happens inside the images. Windows and Linux work the same as macOS (on
+Windows use Docker Desktop with the WSL2 backend, and run the commands from
+PowerShell or a WSL shell).
 
 ## Run it
 
