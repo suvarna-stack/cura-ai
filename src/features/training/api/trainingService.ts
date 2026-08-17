@@ -37,6 +37,8 @@ interface RagStats {
 interface RagChunk {
   text: string
   source: string
+  /** current display filename from the RAG registry (follows renames) */
+  display_name?: string
   score: number
   via: string
   metadata: Record<string, unknown>
@@ -74,7 +76,7 @@ function toKbDoc(d: RagDocument): KbDoc {
 function toHit(c: RagChunk): RetrievalHit {
   const page = c.metadata?.page
   return {
-    docName: c.source,
+    docName: c.display_name || c.source,
     page: typeof page === 'number' ? page : null,
     score: c.score,
     snippet: c.text,

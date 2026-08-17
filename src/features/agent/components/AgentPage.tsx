@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Bot, User, Send, Sparkles, BookOpen, Brain } from 'lucide-react'
+import { Bot, User, Send, Sparkles, BookOpen, Brain, Lightbulb } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
-import { agentErrorMessage, sendAgentMessage } from '../api/agentService'
+import {
+  agentErrorMessage,
+  sendAgentMessage,
+  streamAgentMessage,
+} from '../api/agentService'
 import type {
   AgentChatTurn,
   AgentMessage,
@@ -37,10 +41,11 @@ function RichText({ text }: { text: string }) {
 export function AgentPage() {
   const { gl } = useTheme()
   const { t } = useLang()
-  const [mode, setMode] = useState<ChatMode>('learn')
+  const [mode, setMode] = useState<ChatMode>('dict')
   const [convo, setConvo] = useState<AgentMessage[]>([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const headerMsgs = useMemo<AgentMessage[]>(
@@ -50,14 +55,17 @@ export function AgentPage() {
 
   const messages = [...headerMsgs, ...convo]
 
+  // Depends on `convo` (not just its length) so the view follows the answer
+  // while it streams into an existing message.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [convo.length, pending, mode])
+  }, [convo, pending, mode])
 
   function switchMode(next: ChatMode) {
     if (next === mode || pending) return
     setMode(next)
     setConvo([])
+    setShowSuggestions(true)
   }
 
   async function send(textOverride?: string) {
@@ -71,22 +79,72 @@ export function AgentPage() {
     setInput('')
     setPending(true)
     setConvo((prev) => [...prev, msg('coder', text)])
+
+    // Streaming: the agent bubble appears on the first delta and grows as
+    // the model types. Dictionary answers are capped shorter — they should
+    // be an entry + a sentence, and shorter = faster on CPU hosts.
+    const agentId = uid++
+    let streamed = false
+    const upsert = (m: AgentMessage) =>
+      setConvo((prev) =>
+        prev.some((x) => x.id === agentId)
+          ? prev.map((x) => (x.id === agentId ? m : x))
+          : [...prev, m],
+      )
     try {
-      const { answer, sources } = await sendAgentMessage(text, history)
-      setConvo((prev) => [...prev, msg('agent', answer, sources)])
+      const reply = await streamAgentMessage(
+        text,
+        history,
+        mode === 'dict' ? 224 : 320,
+        (partial) => {
+          streamed = true
+          setPending(false)
+          upsert({ id: agentId, role: 'agent', text: partial, time: now() })
+        },
+      )
+      upsert({
+        id: agentId,
+        role: 'agent',
+        text: reply.answer,
+        sources: reply.sources,
+        unverifiedCodes: reply.unverifiedCodes,
+        time: now(),
+      })
     } catch (err) {
-      setConvo((prev) => [
-        ...prev,
-        msg('agent', agentErrorMessage(err, t('agent.error'))),
-      ])
+      if (streamed) {
+        // Mid-answer failure: keep the partial text, append the error note.
+        setConvo((prev) => [
+          ...prev,
+          msg('agent', agentErrorMessage(err, t('agent.error'))),
+        ])
+      } else {
+        // Stream never started (older backend / proxy hiccup) — fall back to
+        // the blocking endpoint before giving up.
+        try {
+          const reply = await sendAgentMessage(text, history)
+          upsert({
+            id: agentId,
+            role: 'agent',
+            text: reply.answer,
+            sources: reply.sources,
+            unverifiedCodes: reply.unverifiedCodes,
+            time: now(),
+          })
+        } catch (err2) {
+          setConvo((prev) => [
+            ...prev,
+            msg('agent', agentErrorMessage(err2, t('agent.error'))),
+          ])
+        }
+      }
     } finally {
       setPending(false)
     }
   }
 
   const modeTabs: { id: ChatMode; label: string; icon: typeof Brain }[] = [
-    { id: 'learn', label: t('agent.tab.learn'), icon: Brain },
     { id: 'dict', label: t('agent.tab.dict'), icon: BookOpen },
+    { id: 'learn', label: t('agent.tab.learn'), icon: Brain },
   ]
 
   return (
@@ -94,7 +152,7 @@ export function AgentPage() {
     // the messages list below is the only thing that scrolls.
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header
-        className="flex shrink-0 items-center gap-3 px-6 py-4"
+        className="flex shrink-0 items-center gap-3 px-6 py-2.5"
         style={{
           background: gl.headerBg,
           backdropFilter: gl.blur20,
@@ -103,7 +161,7 @@ export function AgentPage() {
         }}
       >
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-2xl"
+          className="flex h-9 w-9 items-center justify-center rounded-2xl"
           style={{
             background: gl.card,
             backdropFilter: gl.blur16,
@@ -132,36 +190,36 @@ export function AgentPage() {
             </p>
           </div>
         </div>
-      </header>
 
-      <div className="flex shrink-0 gap-2 px-6 pt-4">
-        {modeTabs.map((tab) => {
-          const active = tab.id === mode
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => switchMode(tab.id)}
-              className="rounded-full px-4 py-2 text-[12px] font-bold transition-all hover:opacity-90"
-              style={
-                active
-                  ? {
-                      background: gl.accentGrad,
-                      color: '#fff',
-                      boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.30)`,
-                    }
-                  : {
-                      background: gl.inputBg,
-                      color: gl.muted,
-                      border: gl.borderSm,
-                    }
-              }
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+        <div className="ml-auto flex shrink-0 gap-2">
+          {modeTabs.map((tab) => {
+            const active = tab.id === mode
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => switchMode(tab.id)}
+                className="rounded-full px-4 py-2 text-[12px] font-bold transition-all hover:opacity-90"
+                style={
+                  active
+                    ? {
+                        background: gl.accentGrad,
+                        color: '#fff',
+                        boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.30)`,
+                      }
+                    : {
+                        background: gl.inputBg,
+                        color: gl.muted,
+                        border: gl.borderSm,
+                      }
+                }
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+      </header>
 
       <div
         className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6"
@@ -251,6 +309,16 @@ export function AgentPage() {
                   </span>
                 )}
 
+                {m.unverifiedCodes && m.unverifiedCodes.length > 0 && (
+                  <span
+                    className="max-w-full px-1 text-[10px] font-medium"
+                    style={{ color: gl.warning }}
+                    role="note"
+                  >
+                    ⚠ {m.unverifiedCodes.join(', ')} — {t('agent.unverified')}
+                  </span>
+                )}
+
                 {m.time !== '' && (
                   <span
                     className="px-1 text-[12px] font-normal"
@@ -317,35 +385,46 @@ export function AgentPage() {
           borderTop: gl.borderSm,
         }}
       >
-      <div
-        className="flex shrink-0 gap-2 overflow-x-auto px-6 pt-3 pb-2"
-        style={{ scrollbarWidth: 'none' } as CSSProperties}
-      >
-        {CHIP_KEYS[mode].map((key) => {
-          const p = t(key)
-          return (
-            <button
-              key={key}
-              type="button"
-              disabled={pending}
-              onClick={() => void send(p)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all hover:opacity-80 disabled:opacity-50"
-              style={{
-                background: gl.row,
-                backdropFilter: gl.blur16,
-                border: gl.borderSm,
-                color: gl.muted,
-              }}
-            >
-              {p.length > 64 ? p.slice(0, 61) + '…' : p}
-            </button>
-          )
-        })}
-      </div>
+      <div className="relative shrink-0 px-6 pt-3 pb-3">
+        {showSuggestions && (
+          <div
+            className="absolute inset-x-6 bottom-full z-10 mb-2 flex flex-wrap gap-2 rounded-2xl p-3"
+            style={{
+              background: gl.card,
+              backdropFilter: gl.blur20,
+              WebkitBackdropFilter: gl.blur20,
+              border: gl.border,
+              boxShadow: gl.shadow,
+            }}
+          >
+            {CHIP_KEYS[mode].map((key) => {
+              const p = t(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setShowSuggestions(false)
+                    void send(p)
+                  }}
+                  className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:opacity-80 disabled:opacity-50"
+                  style={{
+                    background: gl.row,
+                    backdropFilter: gl.blur16,
+                    border: gl.borderSm,
+                    color: gl.muted,
+                  }}
+                >
+                  {p.length > 64 ? p.slice(0, 61) + '…' : p}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
-      <div className="shrink-0 px-6 pt-2 pb-6">
         <div
-          className="flex items-end gap-3 rounded-2xl px-4 py-3"
+          className="flex items-center gap-3 rounded-2xl px-4 py-2.5"
           style={{
             background: gl.card,
             backdropFilter: gl.blur20,
@@ -354,7 +433,7 @@ export function AgentPage() {
           }}
         >
           <div
-            className="mb-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
             style={{
               background: `rgba(${gl.accentRgb},0.22)`,
               border: `1px solid rgba(${gl.accentRgb},0.32)`,
@@ -373,15 +452,33 @@ export function AgentPage() {
               }
             }}
             placeholder={t(`agent.placeholder.${mode}`)}
-            rows={2}
+            rows={1}
             className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none"
             style={{ color: gl.text }}
           />
           <button
             type="button"
+            aria-label="Toggle suggested questions"
+            aria-expanded={showSuggestions}
+            onClick={() => setShowSuggestions((s) => !s)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all hover:opacity-80"
+            style={
+              showSuggestions
+                ? {
+                    background: `rgba(${gl.accentRgb},0.18)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.30)`,
+                    color: gl.accent,
+                  }
+                : { color: gl.muted }
+            }
+          >
+            <Lightbulb size={14} />
+          </button>
+          <button
+            type="button"
             onClick={() => void send()}
             disabled={!input.trim() || pending}
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
             style={
               input.trim() && !pending
                 ? {
@@ -400,8 +497,9 @@ export function AgentPage() {
             <Send size={13} />
           </button>
         </div>
+        {showSuggestions && (
         <p
-          className="mt-2 text-center text-[12px] font-normal"
+          className="mt-1.5 text-center text-[12px] font-normal"
           style={{ color: gl.muted }}
         >
           <kbd
@@ -427,6 +525,7 @@ export function AgentPage() {
           </kbd>{' '}
           {t('agent.shiftEnter')}
         </p>
+        )}
       </div>
       </div>
     </main>

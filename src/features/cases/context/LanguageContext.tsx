@@ -295,6 +295,7 @@ export const dict: Record<string, { en: string; th: string }> = {
   "agent.thinking":       { en: "Thinking — the local model can take a minute…", th: "กำลังคิด — โมเดลในเครื่องอาจใช้เวลาสักครู่…" },
   "agent.error":          { en: "Sorry — the agent is unavailable right now.", th: "ขออภัย — ขณะนี้ AI ผู้ช่วยไม่พร้อมใช้งาน" },
   "agent.sources":        { en: "Sources", th: "แหล่งอ้างอิง" },
+  "agent.unverified":     { en: "Not found in sources — verify before use", th: "ไม่พบในแหล่งอ้างอิง — โปรดตรวจสอบก่อนใช้" },
   "agent.enter":          { en: "to send", th: "เพื่อส่ง" },
   "agent.shiftEnter":     { en: "for new line", th: "ขึ้นบรรทัดใหม่" },
   "agent.chip.learn.0":   { en: "Patient has chest pain and ST elevation on ECG. What ICD codes apply?", th: "ผู้ป่วยเจ็บหน้าอกและพบ ST elevation ใน ECG ควรใช้รหัส ICD อะไร?" },
