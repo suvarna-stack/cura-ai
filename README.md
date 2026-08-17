@@ -42,6 +42,13 @@ RAG/
 
 ## Setup
 
+> **Prefer Docker?** The sibling repo
+> [`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this
+> service together with the rest of MedCode AI (five containers, one command) —
+> no Python install, no venv. Retrieval runs in the container; generation talks
+> to **Ollama on your host**, because Docker on macOS has no GPU passthrough.
+> The steps below are for running it natively instead.
+
 ```bash
 # from the RAG/ folder
 python -m venv .venv
