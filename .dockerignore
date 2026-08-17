@@ -1,0 +1,30 @@
+# Build context trimming. The venv alone is 1.3GB and would be copied into the
+# build context on every build even though the image installs its own deps.
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+.claude/
+
+# Secrets: settings come from the container's environment, not a copied .env
+.env
+.env.*
+
+# Not part of the service: the retired standalone UI, the research notebooks,
+# the test suite and the host-side ingestion scripts.
+frontend/
+grag-ouz/
+rag-ouz/
+tests/
+scripts/
+*.md
+
+# NOTE: data/ is deliberately NOT ignored — the committed chroma index, graph
+# and document registry are the demo baseline, and the image ships them so a
+# fresh named volume starts populated (see the Dockerfile).
