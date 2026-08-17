@@ -11,7 +11,7 @@ export const isIcd9Type = (type: string) => /icd[- ]?9|pcs/i.test(type)
  * case, so the add/edit dialogs use this to block a second one; an ICD-9
  * "Primary" is a procedure and doesn't count.
  */
-export const isIcd10PrimaryType = (type: string) =>
+const isIcd10PrimaryType = (type: string) =>
   !isIcd9Type(type) && /primary|principal/i.test(type)
 
 /** True when the case already carries a real (resolved) primary ICD-10 row. */
