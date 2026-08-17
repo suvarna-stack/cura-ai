@@ -519,6 +519,62 @@ Milestones (git log --oneline reads as this sequence):
   so never steal the positional principal-diagnosis pick from a bare-labelled
   AI row. Also confirmed while doing this: the completeness rule the coders
   see IS "the hospital's own data arrived with both systems" — unchanged.
+- ✅ **All four repos dockerized + a compose stack (2026-08-17):** the whole
+  system now runs as five containers. Shape decided deliberately: **four
+  separate images, each built from its own repo's own Dockerfile**, plus ONE
+  compose file that owns only the seam between them — it lives in a new fifth
+  sibling folder `../medcode-stack/` (compose + Postgres init scripts +
+  `.env.example` + README, no application code), so no repo becomes the hidden
+  owner of the other three. One image per service, never a bundle: three
+  runtimes, RAG must stay independently killable (it is optional-by-design), and
+  Cloud Run wants one image per service anyway. New files: `Dockerfile` +
+  `nginx.conf` in `../audit-chart-frontend`, `Dockerfile` in `../RAG`, a
+  `.dockerignore` in all four repos (RAG's `.venv` alone is 1.3GB of build
+  context). Key decisions and the traps they avoid:
+  - **The frontend is nginx + the built SPA with `/api` proxied to
+    `medcode-api`.** Vite inlines `VITE_API_BASE_URL` at BUILD time, so a baked
+    hostname would mean one image per environment; building with the relative
+    `/api` gives one image everywhere and same-origin requests, so CORS stops
+    mattering. Two nginx defaults are load-bearing overrides:
+    `proxy_read_timeout 600s` (AI suggestions/training legitimately run for
+    minutes — the 60s default 504s them) and `client_max_body_size 50m`
+    (training PDF uploads; the 1m default 413s them).
+  - **ONE Postgres container, both databases**, seeded from the two committed
+    dumps by `db/initdb/*.sh` — which run only once, on an empty volume, so
+    re-seeding is `docker compose down -v`. `postgres:18` moved its data
+    directory: the volume must mount at **`/var/lib/postgresql`**, NOT
+    `.../data` (the old path makes the image refuse to boot). The healthcheck
+    must be `pg_isready -h 127.0.0.1` — the socket form reports ready while the
+    entrypoint is still seeding on its temporary socket-only server.
+    `SchemaBootstrap` still supplies everything the dumps lack, unchanged.
+  - **RAG generation stays on the HOST's Ollama** (`OLLAMA_BASE` →
+    `host.docker.internal`, `extra_hosts: host-gateway`): Docker on macOS has no
+    GPU passthrough, so an in-container Ollama is CPU-only and far slower. torch
+    installs from PyTorch's **CPU index** (the PyPI wheel drags in all of CUDA)
+    with a plain-PyPI fallback for arm64. `data/` (chroma + graph + uploads) is a
+    named volume seeded from the image's committed baseline; the bge-m3 download
+    lands in a second volume, and `PREFETCH_EMBED_MODEL=1` bakes it into the
+    image instead (~3GB bigger, offline-capable — right for CI/prod, wrong for
+    an 8GB laptop). `run.py`'s `--reload` is bypassed; uvicorn runs directly,
+    one worker.
+  - Published ports dodge the two permanently-busy host ports so the stack can
+    run **alongside** the native four-terminal setup: web on **8080** (5173 is
+    vite), Postgres on **5433** (5432 is Homebrew PG). All overridable in `.env`.
+  - The two Java images kept their `ENV SWAGGER_ENABLED=false` /
+    `DEMO_TOOLS_ENABLED=false` (off by construction stays); the demo compose
+    file opts back in explicitly and visibly. Both run as UID 1000 and both
+    now install `curl` — imed-mock's existing HEALTHCHECK had always been
+    silently failing, because the JRE image ships no HTTP client.
+  Verified live in containers: both DBs seeded, all four services healthy,
+  login + `GET /api/cases` through the nginx proxy, `POST /api/sync` pulling
+  from imed-mock over the compose network, and an approve writing 5 diff rows
+  with `coding_status='approved'` on the hospital visit row (`dischargestatus`
+  correctly untouched). Found in passing, NOT ours: `npm ci` fails in
+  `../audit-chart-frontend` on a pre-existing peer conflict
+  (`eslint-plugin-jsx-a11y@6.10.2` wants eslint ≤9, devDeps pin eslint 10) —
+  its Dockerfile uses `--legacy-peer-deps` and the repo is untouched.
+  This does NOT replace the native dev loop, and `RUN-ALL.md`'s manual path
+  stays the documented route for anyone not using Docker.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

@@ -1,0 +1,17 @@
+# Build context trimming — everything here is either rebuilt inside the image
+# or has no business in it. The Dockerfile COPYs only mvnw/.mvn/pom.xml/src.
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+*.iml
+
+# Docs and dev-only scripts (scripts/*.sh are macOS/Linux host tooling)
+docs/
+*.md
+scripts/
+
+# The seed dumps are restored by the Postgres container, never by the app image
+db/

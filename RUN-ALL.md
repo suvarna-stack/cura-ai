@@ -166,6 +166,33 @@ cd ~/medcode/imed-mock-api  && scripts/seed_local_imed_pg.sh   # สร้าง
 > วิธีนี้คือวิธีหลักและ **ทำงานได้ทั้ง macOS / Linux / Windows** — ถ้าอยู่บน
 > mac หรือ Linux แล้วอยากได้คำสั่งเดียวจบ ดูทางลัดในหัวข้อ 5.1
 
+### ทางเลือก — รันด้วย Docker คำสั่งเดียว (ทุก OS)
+
+ถ้ามี Docker อยู่แล้วและไม่อยากลง PostgreSQL / Node / Python เอง มี compose
+ที่รันทั้งระบบ (4 repo + Postgres = 5 container) อยู่ที่ repo พี่น้องชื่อ
+**`medcode-stack`** ซึ่งต้องวางไว้ข้าง ๆ อีก 4 repo:
+
+```bash
+cd ~/medcode/medcode-stack
+cp .env.example .env
+docker compose up -d --build      # ครั้งแรกนานหน่อย (build Java 2 ตัว + npm + torch)
+```
+
+เปิด <http://localhost:8080> (ไม่ใช่ 5173) แล้ว login ด้วยแอดมินใน `.env`
+ฐานข้อมูลทั้ง 2 ตัวถูก seed จากไฟล์ dump ให้อัตโนมัติตอนสร้าง volume ครั้งแรก
+
+ต่างจากวิธี 4 terminal ตรงนี้:
+
+- **เว็บอยู่พอร์ต 8080** และ Postgres อยู่ **5433** — เลี่ยงพอร์ตที่เครื่อง dev
+  มักใช้อยู่แล้ว (5173 = vite, 5432 = Postgres ที่ลงในเครื่อง) จึงรันคู่กันได้
+- เบราว์เซอร์ยิง `/api` ที่ origin เดียวกัน (nginx proxy ให้) → ไม่มีเรื่อง CORS
+- **Ollama ยังต้องลงในเครื่อง** (container คุยออกมาที่ `host.docker.internal`)
+  เพราะ Docker บน macOS ใช้ GPU ไม่ได้
+- seed ใหม่ = `docker compose down -v` แล้ว `up` อีกครั้ง
+
+รายละเอียดทั้งหมด (พอร์ต, env, volume, การรันเทสต์, ข้อจำกัดเรื่อง RAM/ดิสก์)
+อยู่ใน `../medcode-stack/README.md`
+
 ลำดับสำคัญ: **iMed → RAG → medcode → frontend**
 (medcode-api ตอน boot ไม่ได้เรียก RAG ทันที แต่เรียกโรงพยาบาลตอน sync/approve)
 
