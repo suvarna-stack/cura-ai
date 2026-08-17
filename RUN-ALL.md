@@ -101,11 +101,14 @@ git clone https://github.com/Occamy-medihack/RAG.git
 └── RAG/                  :8000  AI
 ```
 
-> 📌 **บนเครื่องนี้ (ปัจจุบัน)** `imed-mock-api` ไม่ได้อยู่ข้าง ๆ แต่อยู่ที่
-> `~/audit_chart/imed-mock-api` เวลารัน `scripts/dev.sh` ต้องบอกที่อยู่ก่อน:
+> 📌 วาง 4 repo เป็น **พี่น้องกัน** ตามผังนี้แล้ว `scripts/dev.sh` หา
+> `imed-mock-api` เจอเอง (ค่า default คือ `../imed-mock-api`) ถ้าวางไว้ที่อื่น
+> ค่อยบอกที่อยู่ก่อนรัน:
 > ```bash
-> export IMED_DIR=~/audit_chart/imed-mock-api
+> export IMED_DIR=/path/to/imed-mock-api
 > ```
+> ถ้าจะรันด้วย Docker ให้ clone `medcode-stack` มาวางเป็น repo ที่ 5 ในผังนี้
+> ด้วย (ดูหัวข้อ 5)
 
 ---
 
