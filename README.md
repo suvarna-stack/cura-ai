@@ -229,6 +229,18 @@ of never (the default drags long `@Operation`/`@Schema` descriptions onto
 
 ## Docker
 
+**The whole system in one command** — the sibling repo
+[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this
+mock, medcode-api, the web UI, RAG and one Postgres (holding both the `imed` and
+`medcode` databases, each seeded from its repo's committed dump) as five
+containers. Clone the five repos as siblings, then:
+
+```bash
+cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+```
+
+This service alone, against a database you already run:
+
 ```bash
 docker build -t imed-mock-api .
 docker run -p 8003:8003 \
