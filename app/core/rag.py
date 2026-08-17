@@ -8,9 +8,11 @@ Two retrieval modes:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+import re
+from typing import Any, Callable, Iterator
 
 from app.config import get_settings
+from app.core import registry
 from app.core.chunking import chunk_text
 from app.core.graphstore import get_graphstore
 from app.core.llm import get_llm
@@ -143,12 +145,71 @@ def _is_thai(text: str) -> bool:
     return any("฀" <= ch <= "๿" for ch in text)
 
 
+# ICD-10: letter + 2 digits + optional decimals ("I33", "K59.0"). ICD-9
+# procedure codes are bare numbers, so the decimal point is required there
+# ("39.95") to avoid matching every number in a sentence.
+_ICD10_RE = re.compile(r"\b[A-Z]\d{2}(?:\.\d{1,3})?\b")
+_ICD9_RE = re.compile(r"\b\d{2,3}\.\d{1,2}\b")
+
+# Retrieval can now merge two channels (exact code matches + semantic hits);
+# cap the union so the prompt stays small enough for CPU-budget latency.
+_MAX_CONTEXT_CHUNKS = 8
+
+
+def _codes_in(text: str) -> list[str]:
+    """ICD-shaped tokens in reading order, deduplicated."""
+    seen: list[str] = []
+    for m in (*_ICD10_RE.findall(text), *_ICD9_RE.findall(text)):
+        if m not in seen:
+            seen.append(m)
+    return seen
+
+
+def _code_hits(question: str) -> list[dict[str, Any]]:
+    """Exact-substring chunks for codes named in the question.
+
+    "what is I33" is a lookup, not a semantic question — embeddings are weak
+    at short code strings, so fetch the literal entries and put them first.
+    """
+    hits: list[dict[str, Any]] = []
+    for code in _codes_in(question)[:3]:
+        for h in get_store().find_text(code, limit=2):
+            h["via"] = f"exact match: {code}"
+            hits.append(h)
+    return hits
+
+
+def _verify_codes(answer: str, hits: list[dict[str, Any]]) -> list[str]:
+    """Codes the answer mentions that appear in NO retrieved chunk.
+
+    The grounding guarantee for medical use: anything the model cited that its
+    sources never contained gets flagged to the user instead of trusted.
+    """
+    context = "\n".join(h.get("text", "") for h in hits)
+    ctx_codes = set(_codes_in(context))
+    return [c for c in _codes_in(answer) if c not in ctx_codes]
+
+
+def _attach_display_names(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Chunk metadata carries the immutable source id; the registry owns the
+    (renameable) display filename. Resolve it once per query so citations
+    follow renames without touching the index."""
+    if not hits:
+        return hits
+    names = {d["source"]: d.get("filename") or d["source"]
+             for d in registry.all_documents()}
+    for h in hits:
+        h["display_name"] = names.get(h["source"], h["source"])
+    return hits
+
+
 def _build_context(hits: list[dict[str, Any]]) -> str:
     blocks = []
     for i, h in enumerate(hits, 1):
         page = h.get("metadata", {}).get("page") or _page_from_id(h.get("id", ""))
         loc = f", p.{page}" if page else ""
-        blocks.append(f"[{i}] (source: {h['source']}{loc})\n{h['text']}")
+        name = h.get("display_name") or h["source"]
+        blocks.append(f"[{i}] (source: {name}{loc})\n{h['text']}")
     return "\n\n".join(blocks)
 
 
@@ -173,19 +234,30 @@ def retrieve_chunks(
         hits = _graph_hits(question)
     else:
         hits = _plain_hits(question, top_k or settings.top_k)
-    return mode, hits
+
+    # Exact code matches outrank semantic hits: they ARE the answer for
+    # dictionary-style questions, and they anchor the model on real entries.
+    code_hits = _code_hits(question)
+    if code_hits:
+        seen_ids = {h["id"] for h in code_hits}
+        hits = code_hits + [h for h in hits if h.get("id") not in seen_ids]
+    return mode, _attach_display_names(hits[:_MAX_CONTEXT_CHUNKS])
 
 
-def answer_question(
+_EMPTY_INDEX_MSG = ("I don't have any indexed documents to answer from yet. "
+                    "Please ingest documents first.")
+
+
+def _prepare(
     question: str,
-    top_k: int | None = None,
-    temperature: float | None = None,
-    max_new_tokens: int | None = None,
-    mode: str | None = None,
-    history: list[dict[str, str]] | None = None,
-) -> dict[str, Any]:
-    history = history or []
+    top_k: int | None,
+    mode: str | None,
+    history: list[dict[str, str]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, str]] | None]:
+    """Shared retrieval + prompt assembly for the blocking and streaming paths.
 
+    Returns (mode, hits, messages); messages is None when the index is empty.
+    """
     # Follow-up questions ("what about for children?") are meaningless to the
     # retriever alone — prepend the previous user turn so the vector query
     # carries the topic.
@@ -196,15 +268,8 @@ def answer_question(
         retrieval_query = f"{prev_user}\n{question}"
 
     mode, hits = retrieve_chunks(retrieval_query, top_k=top_k, mode=mode)
-
     if not hits:
-        return {
-            "question": question,
-            "answer": "I don't have any indexed documents to answer from yet. "
-            "Please ingest documents first.",
-            "mode": mode,
-            "contexts": [],
-        }
+        return mode, [], None
 
     context = _build_context(hits)
     keep = get_settings().chat_history_turns
@@ -225,8 +290,55 @@ def answer_question(
             "content": f"Context:\n{context}\n\nQuestion: {question}{lang_note}",
         },
     ]
+    return mode, hits, messages
+
+
+def answer_question(
+    question: str,
+    top_k: int | None = None,
+    temperature: float | None = None,
+    max_new_tokens: int | None = None,
+    mode: str | None = None,
+    history: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    mode, hits, messages = _prepare(question, top_k, mode, history or [])
+    if messages is None:
+        return {"question": question, "answer": _EMPTY_INDEX_MSG,
+                "mode": mode, "contexts": [], "unverified_codes": []}
 
     answer = get_llm().generate(
         messages, max_new_tokens=max_new_tokens, temperature=temperature
     )
-    return {"question": question, "answer": answer, "mode": mode, "contexts": hits}
+    return {"question": question, "answer": answer, "mode": mode,
+            "contexts": hits, "unverified_codes": _verify_codes(answer, hits)}
+
+
+def answer_stream(
+    question: str,
+    top_k: int | None = None,
+    temperature: float | None = None,
+    max_new_tokens: int | None = None,
+    mode: str | None = None,
+    history: list[dict[str, str]] | None = None,
+) -> Iterator[tuple[str, Any]]:
+    """Streaming twin of answer_question.
+
+    Yields ("meta", {mode, contexts}) once, then ("delta", text) pieces as the
+    LLM generates, then ("done", {unverified_codes}) — contexts go out first so
+    the UI can show sources while the answer is still typing.
+    """
+    mode, hits, messages = _prepare(question, top_k, mode, history or [])
+    yield "meta", {"mode": mode, "contexts": hits}
+    if messages is None:
+        yield "delta", _EMPTY_INDEX_MSG
+        yield "done", {"unverified_codes": []}
+        return
+
+    parts: list[str] = []
+    for piece in get_llm().generate_stream(
+        messages, max_new_tokens=max_new_tokens, temperature=temperature
+    ):
+        parts.append(piece)
+        yield "delta", piece
+    answer = "".join(parts)
+    yield "done", {"unverified_codes": _verify_codes(answer, hits)}

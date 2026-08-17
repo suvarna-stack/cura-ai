@@ -75,7 +75,8 @@ class QueryRequest(BaseModel):
 
 class RetrievedChunk(BaseModel):
     text: str
-    source: str
+    source: str                      # immutable source id (chunk metadata)
+    display_name: str = ""           # current display filename from the registry
     score: float
     via: str = "vector match"        # why this chunk is here (graph explanation)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -86,6 +87,9 @@ class QueryResponse(BaseModel):
     answer: str
     mode: str
     contexts: list[RetrievedChunk]
+    # Codes the answer cites that appear in NO retrieved chunk — the UI warns
+    # instead of trusting them (medical grounding guard).
+    unverified_codes: list[str] = Field(default_factory=list)
 
 
 class RetrieveRequest(BaseModel):

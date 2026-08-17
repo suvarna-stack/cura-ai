@@ -84,6 +84,13 @@ class LocalLLM:
         new_tokens = output[0][inputs["input_ids"].shape[1] :]
         return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
+    def generate_stream(self, messages, max_new_tokens=None, temperature=None):
+        """Streaming interface parity with OllamaLLM. transformers generation
+        here is blocking, so this degrades to a single final chunk — the SSE
+        plumbing stays identical either way."""
+        yield self.generate(messages, max_new_tokens=max_new_tokens,
+                            temperature=temperature)
+
 
 class OllamaLLM:
     """Same .generate() interface, served by a local Ollama server.
@@ -142,6 +149,56 @@ class OllamaLLM:
                 "start it (the Ollama app) or set LLM_BACKEND=transformers."
             ) from exc
         return resp.json()["message"]["content"].strip()
+
+    def generate_stream(self, messages, max_new_tokens=None, temperature=None):
+        """Yield answer text incrementally (Ollama's native NDJSON stream).
+
+        On CPU hosts full generation takes tens of seconds; streaming puts the
+        first words on screen in ~2-3s, which is the difference between "slow"
+        and "broken" for the chat UI.
+        """
+        import json
+
+        import httpx
+
+        settings = self._settings
+        temperature = settings.temperature if temperature is None else temperature
+        max_new_tokens = settings.max_new_tokens if max_new_tokens is None else max_new_tokens
+
+        try:
+            with httpx.stream(
+                "POST",
+                f"{settings.ollama_base}/api/chat",
+                json={
+                    "model": settings.ollama_model,
+                    "messages": messages,
+                    "stream": True,
+                    "keep_alive": "2h",
+                    "options": {
+                        "num_predict": max_new_tokens,
+                        "temperature": temperature,
+                        "top_p": 0.9,
+                        "repeat_penalty": settings.repetition_penalty,
+                        "num_ctx": 3072,
+                    },
+                },
+                timeout=300.0,
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    piece = data.get("message", {}).get("content", "")
+                    if piece:
+                        yield piece
+                    if data.get("done"):
+                        break
+        except httpx.ConnectError as exc:
+            raise RuntimeError(
+                f"Ollama server not reachable at {settings.ollama_base} — "
+                "start it (the Ollama app) or set LLM_BACKEND=transformers."
+            ) from exc
 
 
 _llm: LocalLLM | OllamaLLM | None = None
