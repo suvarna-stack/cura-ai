@@ -1,0 +1,16 @@
+# Build context trimming — npm ci reinstalls deps inside the image and vite
+# rebuilds dist/, so shipping either would only slow the build down.
+node_modules/
+dist/
+dist-ssr/
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Local env: the image's API base URL comes from the VITE_API_BASE_URL build
+# arg, never from a copied .env (which points at localhost:8001).
+.env
+.env.*
