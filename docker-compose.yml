@@ -1,0 +1,154 @@
+# MedCode AI — the whole system as five containers.
+#
+# Each of the four repos builds its OWN image from its OWN Dockerfile; this file
+# only owns the seam between them: startup order, the env vars that point them
+# at each other, the shared Postgres, and the volumes. Build contexts are the
+# sibling repos, so this folder must sit beside them:
+#
+#   development/
+#     medcode-api/  imed-mock-api/  audit-chart-frontend/  RAG/  medcode-stack/
+#
+# Ports are all overridable in .env — the defaults avoid the two host ports that
+# are permanently busy on the dev Macs (5432 = Homebrew Postgres, 5173 = the
+# vite dev server), so this stack can run alongside the native setup.
+name: medcode
+
+services:
+  # ---------------------------------------------------------------- Postgres
+  # ONE server, TWO databases: "medcode" (ours) and "imed" (the hospital's) —
+  # the same shape the GCP deploy plan calls for. Both are seeded from the
+  # committed dumps on FIRST boot only (see db/initdb); re-seeding means
+  # `docker compose down -v`.
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Left as the default admin db; the two real databases are created by
+      # db/initdb/00-create-databases.sh so both get identical treatment.
+      POSTGRES_DB: postgres
+    volumes:
+      # postgres:18+ wants the volume at /var/lib/postgresql, NOT .../data —
+      # the image now stores data in a major-version subdirectory so pg_upgrade
+      # can hardlink across versions, and refuses to start on the old layout.
+      - pgdata:/var/lib/postgresql
+      - ./db/initdb:/docker-entrypoint-initdb.d:ro
+      - ../medcode-api/db/seed.sql.gz:/seed/medcode.sql.gz:ro
+      - ../imed-mock-api/db/seed.sql.gz:/seed/imed.sql.gz:ro
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    healthcheck:
+      # -h 127.0.0.1 is load-bearing: during init the entrypoint runs a
+      # temporary server on a unix socket only, so a socket-based pg_isready
+      # would report "ready" while seeding is still running and TCP is closed.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d medcode"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ------------------------------------------------------- hospital (mock)
+  # Stands in for the real iMed API until the hospital provides one; swapping to
+  # the real thing is an IMED_API_BASE change on medcode-api, nothing more.
+  imed-mock-api:
+    build:
+      context: ../imed-mock-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/imed
+      IMED_API_TOKEN: ${IMED_API_TOKEN:-imed-mock-token}
+      PORT: 8003
+    ports:
+      - "${IMED_PORT:-8003}:8003"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------- RAG
+  # AI suggestions, agent chat, knowledge training. Optional by design: if this
+  # is down, everything else still works, which is why nothing depends_on it.
+  rag:
+    build:
+      context: ../RAG
+      args:
+        # 0 keeps bge-m3 (~2.3GB) OUT of the image — it lands in the hfcache
+        # volume on first use instead, which is the right trade on a dev laptop
+        # with little free disk. Set to 1 for a self-contained offline image.
+        PREFETCH_EMBED_MODEL: ${PREFETCH_EMBED_MODEL:-0}
+    environment:
+      LLM_BACKEND: ${LLM_BACKEND:-ollama}
+      # Generation runs on the HOST's Ollama app — Docker on macOS has no GPU
+      # passthrough, so an in-container Ollama would be CPU-only and far slower.
+      OLLAMA_BASE: ${OLLAMA_BASE:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M}
+      EMBED_DEVICE: cpu
+      PORT: 8000
+    extra_hosts:
+      # Makes host.docker.internal resolve on plain Docker Engine / Colima.
+      # If Ollama is still unreachable, put your Mac's LAN IP in OLLAMA_BASE.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Chroma index, knowledge graph, uploaded PDFs — state, not build output.
+      # A fresh named volume is seeded from the image's committed baseline.
+      - ragdata:/app/data
+      # Hugging Face cache. With PREFETCH_EMBED_MODEL=0 the embedding model is
+      # downloaded on first use and kept HERE, so it survives image rebuilds and
+      # is downloaded once rather than baked into every image layer.
+      - hfcache:/opt/hf
+    ports:
+      - "${RAG_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  # -------------------------------------------------------------- backend
+  medcode-api:
+    build:
+      context: ../medcode-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/medcode
+      IMED_API_BASE: http://imed-mock-api:8003
+      IMED_API_TOKEN: ${IMED_API_TOKEN:-imed-mock-token}
+      RAG_API_BASE: http://rag:8000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@medcodeai.demo}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-admin1234}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-7}
+      # The image forces both OFF (safe by construction for prod). This is the
+      # local demo stack, so we opt back in explicitly and visibly.
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      DEMO_TOOLS_ENABLED: ${DEMO_TOOLS_ENABLED:-true}
+      PORT: 8001
+    ports:
+      - "${API_PORT:-8001}:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      # Not service_healthy: hospital calls only happen on approve/reopen, so
+      # the backend can boot before the mock finishes starting.
+      imed-mock-api:
+        condition: service_started
+    # In-process write lock + cases cache: NEVER scale this past one instance.
+    deploy:
+      replicas: 1
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------- web
+  # Built SPA served by nginx, with /api proxied to medcode-api — one origin, so
+  # no CORS and no API hostname baked into the bundle.
+  web:
+    build:
+      context: ../audit-chart-frontend
+      args:
+        VITE_API_BASE_URL: /api
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      # nginx resolves the proxy_pass hostname at startup and exits if it can't,
+      # so medcode-api's container must exist first.
+      medcode-api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  ragdata:
+  hfcache:
