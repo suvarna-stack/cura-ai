@@ -588,6 +588,20 @@ export interface AgentChatRequest {
   max_new_tokens?: number;
 }
 
+/** One retrieved chunk (shared by /chat and /chat/stream meta). */
+export interface AgentChatContext {
+  text: string;
+  /** document source id (e.g. "icd9") — immutable */
+  source: string;
+  /** current display filename from the RAG registry (follows renames) — cite this */
+  display_name?: string;
+  score: number;
+  /** why this chunk was retrieved: graph explanation, "vector match", or
+   *  "exact match: <code>" for literal ICD-code lookups */
+  via: string;
+  metadata: Record<string, unknown>;
+}
+
 /** POST /api/agent/chat — response (RAG pass-through, snake_case). */
 export interface AgentChatResponse {
   question: string;
@@ -595,13 +609,17 @@ export interface AgentChatResponse {
   /** retrieval strategy used: "graph" | "plain" */
   mode: string;
   /** the chunks the answer was grounded in */
-  contexts: {
-    text: string;
-    /** document source id (e.g. "icd9") */
-    source: string;
-    score: number;
-    /** why this chunk was retrieved (graph explanation or "vector match") */
-    via: string;
-    metadata: Record<string, unknown>;
-  }[];
+  contexts: AgentChatContext[];
+  /** ICD codes the answer cites that appear in NO retrieved chunk — warn, don't trust */
+  unverified_codes: string[];
 }
+
+// POST /api/agent/chat/stream — same request body, answered as
+// text/event-stream. Each SSE `data:` line is one AgentChatStreamEvent;
+// order: one "meta" (sources first), many "delta", then a terminal "done" —
+// or a terminal "error" (mid-stream failures can't use an HTTP status).
+export type AgentChatStreamEvent =
+  | { type: "meta"; mode: string; contexts: AgentChatContext[] }
+  | { type: "delta"; text: string }
+  | { type: "done"; unverified_codes: string[] }
+  | { type: "error"; message: string };

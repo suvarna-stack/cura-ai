@@ -10,7 +10,17 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
+import tools.jackson.databind.json.JsonMapper;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -46,16 +56,18 @@ public class RagApiClient {
 
     private final String base;
     private final RestClient http;
+    private final HttpClient jdk;
+    private final JsonMapper json = new JsonMapper();
 
     public RagApiClient() {
         String env = System.getenv("RAG_API_BASE");
         this.base = (env == null || env.isEmpty()) ? "http://localhost:8000" : env;
         // HTTP/1.1 only: the JDK client's default h2c upgrade breaks uvicorn
         // ("Unsupported upgrade request" -> multipart bodies arrive mangled).
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder()
-                        .version(HttpClient.Version.HTTP_1_1)
-                        .connectTimeout(Duration.ofSeconds(2)).build());
+        this.jdk = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(2)).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(jdk);
         factory.setReadTimeout(Duration.ofSeconds(600));
         this.http = RestClient.builder().baseUrl(base).requestFactory(factory).build();
     }
@@ -144,6 +156,54 @@ public class RagApiClient {
     /** POST /chat — full RAG answer from the local LLM (slow on CPU). */
     public Map<String, Object> chat(Map<String, Object> body) {
         return postJson("/chat", body);
+    }
+
+    /** POST /chat/stream — pipe the RAG SSE byte stream through untouched.
+     *  Per-chunk flush is what makes it a live stream; buffering the whole
+     *  body would silently degrade this back to a blocking call. */
+    public void streamChat(Map<String, Object> body, OutputStream out) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(base + "/chat/stream"))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(600))
+                    .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
+                    .build();
+            HttpResponse<InputStream> resp =
+                    jdk.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream in = resp.body()) {
+                if (resp.statusCode() != 200) {
+                    in.readAllBytes(); // drain
+                    writeSseError(out, "RAG service rejected the stream ("
+                            + resp.statusCode() + ")");
+                    return;
+                }
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    out.write(buf, 0, n);
+                    out.flush();
+                }
+            }
+        } catch (IOException e) {
+            // Headers are already out — deliver the failure as a stream event.
+            writeSseError(out, "RAG service not reachable — is it running on "
+                    + base + "?");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            writeSseError(out, "stream interrupted");
+        }
+    }
+
+    private void writeSseError(OutputStream out, String message) {
+        try {
+            String event = "data: " + json.writeValueAsString(
+                    Map.of("type", "error", "message", message)) + "\n\n";
+            out.write(event.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e); // client hung up — nothing to do
+        }
     }
 
     /** POST /suggest — ICD-9/10 suggestions from clinical text + knowledge index. */

@@ -630,9 +630,35 @@ RAG service's `/chat`:
 }
 // response — RAG pass-through (snake_case)
 { "question": "...", "answer": "...", "mode": "graph",
-  "contexts": [ { "text": "...", "source": "icd9", "score": 0.61,
-                  "via": "vector match", "metadata": {} } ] }
+  "contexts": [ { "text": "...", "source": "icd9", "display_name": "icd9.pdf",
+                  "score": 0.61, "via": "vector match", "metadata": {} } ],
+  "unverified_codes": [] }
 ```
+
+Each context's `source` is the immutable document id; `display_name` is the
+current (renameable) display filename — cite that one. `via` is `"exact
+match: <code>"` when the chunk was found by literal ICD-code lookup rather
+than semantic search (codes named in the question are looked up verbatim and
+those chunks lead the list). `unverified_codes` lists ICD codes the answer
+mentions that appear in **no** retrieved chunk — surface them as a warning,
+never as fact.
+
+### /api/agent/chat/stream — streaming variant (SSE)
+
+`POST /api/agent/chat/stream` — same request body and auth as `/api/agent/chat`,
+answered as `text/event-stream`. Events arrive in order:
+
+```jsonc
+{ "type": "meta", "mode": "graph", "contexts": [ /* as above */ ] } // first
+{ "type": "delta", "text": "The" }        // answer pieces, many
+{ "type": "done", "unverified_codes": [] } // terminal
+{ "type": "error", "message": "..." }      // terminal instead, on failure
+```
+
+Sources arrive before the answer starts, so the UI can render them while the
+model is still generating. Because headers are already sent when generation
+fails, mid-stream errors surface as the `error` event, not an HTTP status.
+Validation errors (blank `question`) still fail fast with a normal `400`.
 
 The server is stateless — the browser owns the conversation and re-sends it
 as `history` each call (the proxy keeps the most recent 40 well-formed turns,
