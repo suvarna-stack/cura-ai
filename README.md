@@ -173,6 +173,21 @@ response shape and behavior directly.
 
 ## Docker
 
+**The whole system in one command** — the sibling repo
+[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs all four
+repos plus Postgres as five containers. Clone the five repos as siblings, then:
+
+```bash
+cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+```
+
+The app comes up on <http://localhost:8080> (nginx serves the SPA and proxies
+`/api` here), with both databases seeded from the committed dumps. Docker is the
+only prerequisite — no Java, Node, Python or PostgreSQL install needed. See that
+repo's README for ports, env vars and the RAM/disk notes.
+
+This service alone, against a database you already run:
+
 ```bash
 docker build -t medcode-api .
 docker run -p 8002:8002 -e PORT=8002 \
