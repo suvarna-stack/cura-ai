@@ -116,8 +116,9 @@ public class ImedWritebackService {
      *  writes made. */
     public int approveCase(String tn, String encountertype, List<TargetCode> targets,
             String coder, String now) {
-        DiffResult a = diffKind(tn, "icd10", liveRows(tn, "icd10"), targets, encountertype, coder, now);
-        DiffResult b = diffKind(tn, "icd9", liveRows(tn, "icd9"), targets, encountertype, coder, now);
+        Map<String, Object> live = liveCase(tn);   // one R2 call, both blocks
+        DiffResult a = diffKind(tn, "icd10", liveRows(live, "icd10"), targets, encountertype, coder, now);
+        DiffResult b = diffKind(tn, "icd9", liveRows(live, "icd9"), targets, encountertype, coder, now);
         if (!a.bodySent() && !b.bodySent()) {
             sendCodingStatus(tn, encountertype, CODING_APPROVED);
         }
@@ -204,9 +205,10 @@ public class ImedWritebackService {
     public void reopenCase(String tn, String encountertype, String now) {
         List<Map<String, Object>> journal = ops.opsForCase(tn);
         boolean bodySent = false;
+        Map<String, Object> liveCase = journal.isEmpty() ? Map.of() : liveCase(tn);
 
         for (String kind : List.of("icd10", "icd9")) {
-            List<Map<String, Object>> live = journal.isEmpty() ? List.of() : liveRows(tn, kind);
+            List<Map<String, Object>> live = journal.isEmpty() ? List.of() : liveRows(liveCase, kind);
             Map<String, Map<String, Object>> liveById = new LinkedHashMap<>();
             Map<String, Map<String, Object>> liveByCode = new LinkedHashMap<>();
             for (Map<String, Object> row : live) {
@@ -411,8 +413,57 @@ public class ImedWritebackService {
                 str(row.get("operationtype")));
     }
 
-    private List<Map<String, Object>> liveRows(String tn, String kind) {
-        return "icd10".equals(kind) ? imed.diagnoses(tn) : imed.procedures(tn);
+    /**
+     * The visit's live code rows, read through the contract's R2 (one call
+     * carries both systems). Cancelled rows are already excluded by the
+     * hospital, which is what makes the diff safe.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> liveCase(String tn) {
+        Object cases = imed.syncCases(List.of(tn)).get("cases");
+        if (cases instanceof List<?> l && !l.isEmpty() && l.get(0) instanceof Map<?, ?> c) {
+            return (Map<String, Object>) c;
+        }
+        return Map.of();
+    }
+
+    /**
+     * One code block, translated back to the EXTRACT's key names (id, icd,
+     * name, diagnosistype, startdatetime, …) rather than the contract's.
+     *
+     * Deliberate: those names are also the shape of the before-images stored in
+     * imed_write_ops, and a journal written before 2026-08-19 must stay
+     * replayable by a reopen running after it. Translating at this one boundary
+     * keeps the diff and the reverse-replay untouched, and keeps old and new
+     * journal rows interchangeable.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> liveRows(Map<String, Object> liveCase, String kind) {
+        boolean icd10 = "icd10".equals(kind);
+        Object block = liveCase.get(icd10 ? "diagnoses" : "procedures");
+        if (!(block instanceof List<?> rows)) {
+            return List.of();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : rows) {
+            if (!(o instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Map<String, Object> r = (Map<String, Object>) m;
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("id", r.get("object_id"));
+            t.put("icd", r.get(icd10 ? "icd10_code" : "icd9_code"));
+            t.put("name", r.get("description"));
+            if (icd10) {
+                t.put("diagnosistype", r.get("diagnosis_type"));
+            } else {
+                t.put("startdatetime", r.get("operation_start"));
+                t.put("enddatetime", r.get("operation_end"));
+                t.put("operationtype", r.get("operation_type"));
+            }
+            out.add(t);
+        }
+        return out;
     }
 
     @SuppressWarnings("unchecked")

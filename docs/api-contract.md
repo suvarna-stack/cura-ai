@@ -150,9 +150,15 @@ real values here when the extract has them).
                   "ordered_at": "…",
                   "detail": { "…": "…" }             // the raw hospital order row (order_detail
                   }, ... ],                          //   JSONB) verbatim — keys differ per
-                                                     //   imed_source (dosage/quantity on drugs,
-                                                     //   panelname/itemname/itemvalue/itemuom on
+                                                     //   imed_source (dosage_signature/quantity on
+                                                     //   drugs, panel_name/item_name/value/unit on
                                                      //   labs, …); null when no source row stored.
+                                                     //   NOTE: these are the hospital's OWN field
+                                                     //   names, so they changed with the R1-R6
+                                                     //   contract (2026-08-19). Rows synced before
+                                                     //   that keep the old extract names
+                                                     //   (panelname/itemname/…) until re-synced —
+                                                     //   read new-or-old, as the frontend does.
                                                      //   Category-grouped, max 50 rows PER
                                                      //   category (a global cap starved late
                                                      //   categories on lab-heavy cases)

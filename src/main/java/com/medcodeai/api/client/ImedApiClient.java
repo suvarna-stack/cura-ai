@@ -9,7 +9,6 @@ import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,11 +24,19 @@ import java.util.Map;
  *   PUT    /api/v1/diagnosis/{visit_id}               — edit rows by object_id
  *   DELETE /api/v1/diagnosis/{visit_id}/icd10|icd9/{id} — cancel one row
  *
- * READ / sync (inbound) — pull the hospital's case data for SyncService, one
- * method per read endpoint of imed-mock-api's ImedCasesReadController. Rows
- * arrive verbatim (exact extract column names, values as stored — datetime
- * parsing is the caller's job, per Data Mapping Q5). Cancelled rows are
- * already excluded by the hospital side.
+ * READ / sync (inbound) — the "MedCode AI Case Data API" contract (R1-R6,
+ * docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf), the read surface we
+ * specified and the hospital is building; imed-mock-api serves it today:
+ *   POST /api/v1/cases/check          — R1 cheap poll: what changed since T?
+ *   POST /api/v1/cases/sync           — R2 full case data for <= 20 visit ids
+ *   POST /api/v1/cases/sync-by-period — R3 same, for a visit-date window
+ *   GET  /api/v1/catalog/icd10|icd9   — R4/R5 the hospital's code masters
+ *   POST /api/v1/contract/check       — R6 schema gate run before every sync
+ *
+ * R2/R3 answer with the contract's nested CASE OBJECT (a visit block plus nine
+ * data blocks), already ISO 8601, already blank-collapsed to null, cancelled
+ * code rows already excluded — so this client does no reshaping. This replaced
+ * the 12 per-table GETs on 2026-08-19: one call per 20 cases, not 12 per case.
  *
  * Failures surface as exceptions → 500 to our caller. For writes our own DB
  * transaction has already committed by then (see ApprovalService); the
@@ -98,77 +105,55 @@ public class ImedApiClient {
         }
     }
 
-    // ---- read direction (sync) — GET /api/cases and the per-visit tables ----
+    // ---- read direction: the contract's R1-R6 --------------------------------
 
-    /** GET /api/cases — all hospital visits (medhack_patient). */
-    public List<Map<String, Object>> cases() {
-        return cases(null, null);
+    /**
+     * R1 — which visits changed at or after {@code changedSince} (ISO 8601).
+     * New visits count as changed. Answers {has_changes, visit_ids}; no
+     * clinical data, so this is cheap enough to poll.
+     */
+    public Map<String, Object> checkChanges(String changedSince) {
+        return postEnvelope("/api/v1/cases/check", Map.of("changed_since", changedSince));
     }
 
     /**
-     * GET /api/cases windowed on the visit datetime — the hospital resolves a
-     * visit's datetime as admissiondatetime, else the datetime encoded in the
-     * transaction number. Bounds are inclusive, passed through verbatim
-     * (normalization is the hospital's contract); null bound = unbounded.
+     * R2 — full case objects for these visit ids. The hospital caps a call at
+     * {@link #MAX_SYNC_BATCH} ids; callers must batch. Answers {cases,
+     * not_found} — unknown ids are reported, not an error for the request.
      */
-    public List<Map<String, Object>> cases(String from, String to) {
-        StringBuilder uri = new StringBuilder("/api/cases");
-        List<Object> vars = new ArrayList<>();
-        if (from != null) {
-            uri.append("?from={from}");
-            vars.add(from);
-        }
-        if (to != null) {
-            uri.append(from != null ? "&" : "?").append("to={to}");
-            vars.add(to);
-        }
-        return getRows(uri.toString(), vars.toArray());
+    public Map<String, Object> syncCases(List<String> visitIds) {
+        return postEnvelope("/api/v1/cases/sync", Map.of("visit_ids", visitIds));
     }
 
-    public List<Map<String, Object>> medicalRecords(String tn) {
-        return getRows("/api/cases/{tn}/medical-records", tn);
+    /**
+     * R3 — the same case objects for a visit-date window, both ends included.
+     * The hospital rejects a window longer than {@link #MAX_PERIOD_DAYS} days,
+     * so callers must chunk. Returns the cases directly (R3 has no not_found).
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> syncByPeriod(String from, String to) {
+        Object cases = postEnvelope("/api/v1/cases/sync-by-period",
+                Map.of("from", from, "to", to)).get("cases");
+        return cases instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
     }
 
-    public List<Map<String, Object>> medicalRecordResults(String tn) {
-        return getRows("/api/cases/{tn}/medical-record-results", tn);
+    /**
+     * R6 — the schema gate. Sends the block.field names we read and answers
+     * {valid, missing}. Run before every sync so a hospital-side field change
+     * stops the run cleanly instead of half-importing cases.
+     */
+    public Map<String, Object> contractCheck(List<String> requiredFields) {
+        return postEnvelope("/api/v1/contract/check", Map.of("required_fields", requiredFields));
     }
 
-    public List<Map<String, Object>> diagnoses(String tn) {
-        return getRows("/api/cases/{tn}/diagnoses", tn);
-    }
-
-    public List<Map<String, Object>> procedures(String tn) {
-        return getRows("/api/cases/{tn}/procedures", tn);
-    }
-
-    public List<Map<String, Object>> orderDrugs(String tn) {
-        return getRows("/api/cases/{tn}/orders/drugs", tn);
-    }
-
-    public List<Map<String, Object>> orderLabs(String tn) {
-        return getRows("/api/cases/{tn}/orders/labs", tn);
-    }
-
-    public List<Map<String, Object>> bedManagement(String tn) {
-        return getRows("/api/cases/{tn}/bed-management", tn);
-    }
-
-    public List<Map<String, Object>> vitalSigns(String tn) {
-        return getRows("/api/cases/{tn}/vital-signs", tn);
-    }
-
-    public List<Map<String, Object>> billingItems(String tn) {
-        return getRows("/api/cases/{tn}/billing-items", tn);
-    }
-
-    // ---- reference catalogs — the hospital's ICD code master tables ----
+    // ---- reference catalogs — the hospital's ICD code master tables (R4/R5) --
 
     public List<Map<String, Object>> icd10Codes() {
-        return getRows("/api/icd10-codes");
+        return getRows("/api/v1/catalog/icd10");
     }
 
     public List<Map<String, Object>> icd9Codes() {
-        return getRows("/api/icd9-codes");
+        return getRows("/api/v1/catalog/icd9");
     }
 
     // ---- demo tooling (mock-only endpoints, not the hospital contract) ----
@@ -186,6 +171,22 @@ public class ImedApiClient {
     public Map<String, Object> demoReset() {
         try {
             return http.post().uri("/api/demo/reset").retrieve().body(ENVELOPE);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** R2's batch cap and R3's window cap — the hospital enforces both. */
+    public static final int MAX_SYNC_BATCH = 20;
+    public static final int MAX_PERIOD_DAYS = 31;
+
+    /** POST a JSON body to a contract read endpoint; a null body degrades to {}. */
+    private Map<String, Object> postEnvelope(String uri, Map<String, Object> body) {
+        try {
+            Map<String, Object> out = http.post().uri(uri)
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
+                    .retrieve().body(ENVELOPE);
+            return out == null ? Map.of() : out;
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }
