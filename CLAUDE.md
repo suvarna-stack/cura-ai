@@ -693,6 +693,23 @@ Milestones (git log --oneline reads as this sequence):
   permanently marking cases incomplete. The `imed` database was restored from
   `~/medcode-backups/imed_live_2026-08-19.dump` (see the memory note) — which is
   exactly why that dump was taken before any of this started.
+- ✅ **Legacy per-table reads deleted (2026-08-19):** with medcode-api on the
+  contract and no caller left in any of the four repos, `imed-mock-api` dropped
+  `ImedCasesReadController` and its 12 GETs plus `/api/icd10-codes`/`icd9-codes`.
+  Only two pieces of `ImedReadRepository` survived — the VISIT_DT/LAST_CHANGED
+  SQL and `caseExists` (the write API's validation) — so they moved into
+  `ImedCaseSyncRepository` and the old class went too. Coverage was ported, not
+  dropped: the change-stamp test is now an R1 test, and the write round-trips
+  read their results back through R2. `openApiDocumentCoversEveryEndpoint`
+  asserts the removed paths are **absent**, so the old surface can't creep back.
+  Mock suite 24 → **19 green**. Two order-dependent failures surfaced and were
+  fixed on the medcode side: `AdminApiIntegrationTest` was picking whichever
+  open case came first (landing on the cases suite's fixture and stamping it
+  with its throwaway "History Guard" account) and now uses a dedicated case;
+  and the coder assertion now asks whether an account actually goes by that
+  name instead of hard-coding one — the rotated per-case fakes it guards
+  against would match no account at all. A full run now leaves the dataset
+  exactly as it found it.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
