@@ -81,35 +81,15 @@ The limits are real, not decorative: 21 ids → `422 too_many_visit_ids`, a
 `STATUS_BUSINESS_ERROR` envelope. A convenient shortcut here would only
 surface on cutover day.
 
-### READ (legacy) — one endpoint per extract table
+### Demo tooling (mock-only)
 
-**Superseded by R1–R6 above** and kept only until medcode-api's `SyncService`
-moves over. Unauthenticated, and responses are the rows verbatim: exact
-extract column names, all values as stored (TEXT — datetime formats are
-non-uniform in the source; parsing is the consumer's job).
-
-| Endpoint | Source table |
+| Endpoint | Purpose |
 |---|---|
-| `GET /api/cases` | MedHack_Patient (all visits; optional `from`/`to` window on the visit datetime — admissiondatetime, else the datetime encoded in the TN — and `changed_since` on the code rows' `updated_at`; bounds inclusive, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]`) |
-| `GET /api/cases/{tn}/medical-records` | MedHack_MedicalRecord |
-| `GET /api/cases/{tn}/medical-record-results` | MedHack_MedicalRecord_result |
-| `GET /api/cases/{tn}/diagnoses` | MedHack_Diagnosis(ICD10) |
-| `GET /api/cases/{tn}/procedures` | MedHack_Procedure(ICD9) |
-| `GET /api/cases/{tn}/orders/drugs` | MedHack_OrderDrug |
-| `GET /api/cases/{tn}/orders/labs` | MedHack_OrderLAB |
-| `GET /api/cases/{tn}/vital-signs` | MedHack_VitalSign |
-| `GET /api/cases/{tn}/bed-management` | MedHack_BedManagement |
-| `GET /api/cases/{tn}/billing-items` | MedHack_BillingItem |
-| `GET /api/icd10-codes` | imed.icd_10 — ICD-10 reference catalog (code master, not per-case) |
-| `GET /api/icd9-codes` | imed.icd_9 — ICD-9 procedure reference catalog (not per-case) |
-| `POST /api/demo/snapshot` | mock-only demo tooling: freeze every imed.* table into the `imed_baseline` schema |
-| `POST /api/demo/reset` | mock-only demo tooling: truncate + restore every imed.* table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
+| `POST /api/demo/snapshot` | freeze every `imed.*` table into the `imed_baseline` schema |
+| `POST /api/demo/reset` | truncate + restore every `imed.*` table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
 
-`{tn}` is the transaction number (visit number). Unknown `{tn}` → `404
-{"error":"not found"}`; a known case with no rows in a table → `[]`.
-Cancelled diagnosis/procedure rows (see DELETE below) are excluded — they
-stay in the tables for the audit trail but are invisible to reads, so a sync
-can never resurrect a code a coder removed.
+Not part of the hospital contract — the real iMed API has nothing like this,
+so never ask the hospital for it.
 
 ### WRITE — `/api/v1`, the hospital's real contract (mocked)
 

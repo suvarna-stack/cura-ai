@@ -2,7 +2,7 @@ package com.medcodeai.imedmock.web;
 
 import com.medcodeai.imedmock.repo.ImedApiV1Repository;
 import com.medcodeai.imedmock.repo.ImedApiV1Repository.DiagnosisIpdFields;
-import com.medcodeai.imedmock.repo.ImedReadRepository;
+import com.medcodeai.imedmock.repo.ImedCaseSyncRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -78,11 +78,11 @@ public class DiagnosisApiController {
     /** The coding-status extension's vocabulary; "open" stores NULL (cleared). */
     private static final Set<String> CODING_STATUSES = Set.of("approved", "open");
 
-    private final ImedReadRepository read;
+    private final ImedCaseSyncRepository read;
     private final ImedApiV1Repository repo;
     private final JsonMapper json = new JsonMapper();
 
-    public DiagnosisApiController(ImedReadRepository read, ImedApiV1Repository repo) {
+    public DiagnosisApiController(ImedCaseSyncRepository read, ImedApiV1Repository repo) {
         this.read = read;
         this.repo = repo;
     }

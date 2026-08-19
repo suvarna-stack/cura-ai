@@ -16,12 +16,12 @@ import java.util.Map;
  * MedCode AI asked the hospital to build, mocked here first so development
  * doesn't wait for the hospital's implementation.
  *
- * This is NOT the old extract read layer ({@link ImedReadRepository}, one
- * endpoint per table, columns verbatim). Here the same medhack_* tables are
- * re-shaped into the contract's nested CASE OBJECT: one visit block plus nine
- * data blocks, every key renamed to the contract's snake_case vocabulary
- * (transactionnumber → visit_id, icd → icd10_code, startdatetime →
- * operation_start, …).
+ * The medhack_* extract tables are re-shaped into the contract's nested CASE
+ * OBJECT: one visit block plus nine data blocks, every key renamed to the
+ * contract's snake_case vocabulary (transactionnumber → visit_id, icd →
+ * icd10_code, startdatetime → operation_start, …). This replaced the older
+ * one-endpoint-per-table read layer, which was removed once medcode-api
+ * stopped calling it.
  *
  * Three transport rules from the contract are enforced HERE rather than left
  * to the caller, because on the real API they are the hospital's job:
@@ -46,17 +46,54 @@ public class ImedCaseSyncRepository {
         this.jdbc = jdbc;
     }
 
+    /**
+     * A visit's datetime for the from/to filter: admissiondatetime when the
+     * extract filled it (IPD), else the YYMMDDHHMMSS the hospital encodes in
+     * positions 4-15 of the transaction number (matches the notes'
+     * recorddatetime on every seeded visit). NULL when neither parses — such
+     * rows never match a window filter.
+     */
+    private static final String VISIT_DT = """
+            COALESCE(
+              CASE WHEN p.admissiondatetime ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                   THEN p.admissiondatetime::timestamp END,
+              CASE WHEN p.transactionnumber ~ '^...[0-9]{12}'
+                   THEN to_timestamp(substring(p.transactionnumber from 4 for 12),
+                                     'YYMMDDHH24MISS')::timestamp END)""";
+
+    /**
+     * When the visit's data last changed: the newest updated_at across its
+     * code rows (stamped by every /api/v1 write, cancels included), floored
+     * at the visit datetime itself (seed rows carry no stamp — their change
+     * time is the visit).
+     */
+    private static final String LAST_CHANGED = """
+            GREATEST(""" + VISIT_DT + """
+            ,
+              (SELECT max(d.updated_at::timestamp) FROM imed.medhack_diagnosis_icd10 d
+                WHERE d.transactionnumber = p.transactionnumber
+                  AND d.updated_at ~ '^[0-9]{4}-'),
+              (SELECT max(pr.updated_at::timestamp) FROM imed.medhack_procedure_icd9 pr
+                WHERE pr.transactionnumber = p.transactionnumber
+                  AND pr.updated_at ~ '^[0-9]{4}-'))""";
+
+    /** Does the hospital know this visit? Used by the write API's validation. */
+    public boolean caseExists(String tn) {
+        return !jdbc.queryForList(
+                "SELECT 1 FROM imed.medhack_patient WHERE transactionnumber = ? LIMIT 1", tn).isEmpty();
+    }
+
     // ---- R1 / R3: which visits ---------------------------------------------
 
     /**
      * R1 — visits whose data changed at or after the bound. "Changed" is the
      * visit's own datetime (so a new visit counts) or any later write to its
-     * code rows; see {@link ImedReadRepository#LAST_CHANGED}.
+     * code rows; see {@link #LAST_CHANGED}.
      */
     public List<String> changedVisitIds(String changedSince) {
         return jdbc.queryForList("""
                 SELECT p.transactionnumber FROM imed.medhack_patient p
-                 WHERE """ + " " + ImedReadRepository.LAST_CHANGED + """
+                 WHERE """ + " " + LAST_CHANGED + """
                  >= ?::timestamp
                  ORDER BY p.transactionnumber""", String.class, changedSince);
     }
@@ -65,8 +102,8 @@ public class ImedCaseSyncRepository {
     public List<String> visitIdsInPeriod(String from, String to) {
         return jdbc.queryForList("""
                 SELECT p.transactionnumber FROM imed.medhack_patient p
-                 WHERE """ + " " + ImedReadRepository.VISIT_DT + """
-                 >= ?::timestamp AND """ + " " + ImedReadRepository.VISIT_DT + """
+                 WHERE """ + " " + VISIT_DT + """
+                 >= ?::timestamp AND """ + " " + VISIT_DT + """
                  <= ?::timestamp
                  ORDER BY p.transactionnumber""", String.class, from, to);
     }
@@ -232,7 +269,7 @@ public class ImedCaseSyncRepository {
                        p.ispregnant, p.admissiondatetime, p.dischargedatetime, p.dischargetype,
                        p.dischargestatus, p.healthcoverage, p.coding_status,
                        b.department, b.ward,
-                       to_char(""" + " " + ImedReadRepository.LAST_CHANGED + """
+                       to_char(""" + " " + LAST_CHANGED + """
                        , 'YYYY-MM-DD"T"HH24:MI:SS') AS last_changed_at
                   FROM imed.medhack_patient p
                   LEFT JOIN LATERAL (
