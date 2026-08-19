@@ -594,6 +594,43 @@ Milestones (git log --oneline reads as this sequence):
   its Dockerfile uses `--legacy-peer-deps` and the repo is untouched.
   This does NOT replace the native dev loop, and `RUN-ALL.md`'s manual path
   stays the documented route for anyone not using Docker.
+- ✅ **New iMed read contract (R1–R6) mocked — hospital-independent (2026-08-19):**
+  MedCode AI wrote its own build contract for the hospital's read side
+  ("MedCode AI Case Data API", `docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`,
+  v1 11 Aug 2026) and SENT it — the hospital builds R1–R6 from that document.
+  Rather than wait, the fake side was built to the contract first, so
+  development runs at full speed and cutover is an `IMED_API_BASE` + token
+  swap. **Write side W1–W4 needed ZERO change** — the contract states outright
+  that the request bodies are what we already send, `coding_status` extension
+  included. Only the READ side is new, and it replaces the 12 per-table GETs
+  with a nested **case object**: one `visit` block + nine data blocks
+  (`documents`, `record_results`, `diagnoses`, `procedures`, `drug_orders`,
+  `lab_results`, `vitals`, `ward_movements`, `billing_items`), every key
+  renamed to the contract's snake_case (`transactionnumber` → `visit_id`,
+  `icd` → `icd10_code`, `startdatetime` → `operation_start`). Built in
+  `../imed-mock-api` (new `web/CaseSyncApiController` + `repo/ImedCaseSyncRepository`,
+  `ApiExceptionHandler` gained a 422 `ImedUnprocessableException`), on
+  `/api/v1` so the existing Bearer gate covers it. **Faithfulness over
+  convenience was the explicit rule** — R2 refuses >20 ids (`422
+  too_many_visit_ids`), R3 refuses >31 days (`422 period_too_long`), both in
+  the hospital's `STATUS_BUSINESS_ERROR` envelope; datetimes are normalized to
+  ISO 8601 (the extract stores `YYYY-MM-DD HH:MM:SS`), `birth_date` is a plain
+  date, `age_year` is a number (extract stores `"70,2,9"`), blanks collapse to
+  null, cancelled rows still never appear. **No schema change was needed after
+  all** (contradicting the first read of the contract): `last_changed_at` and
+  `encounter_type` are DERIVED — the change stamp reuses the tested
+  `LAST_CHANGED` SQL (visit datetime raised by code-row writes) and IPD is
+  "has an admission number", per the contract's own "the internal mechanism is
+  the hospital's choice". R6 answers from a static `SUPPORTED_FIELDS` list of
+  every `block.field` served — it correctly reports the contract's own
+  Priority-2 wishes (`lab_results.reference_range`, doctor names) as missing.
+  Verified live against the seeded demo data plus 8 new tests (mock suite
+  16 → **24/24 green**), including a create → read → cancel → read round trip.
+  Trap worth remembering: **Java text blocks strip trailing whitespace**, so
+  `"""… WHERE """ + FRAGMENT` concatenated to `WHEREGREATEST(` — the SQL
+  joins now add `+ " " +` explicitly. NOT done yet: medcode-api still calls the
+  12 legacy GETs; `ImedApiClient` + `SyncService` move over next, and the old
+  endpoints stay until then.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
