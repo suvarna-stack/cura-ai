@@ -46,6 +46,10 @@ class AdminApiIntegrationTest {
     @Autowired
     private MockMvc mvc;
 
+    /** Only for tidying up the throwaway guard account the delete test creates. */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final JsonMapper json = new JsonMapper();
 
     @Test
@@ -247,6 +251,16 @@ class AdminApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error")
                         .value("this account has coding history and cannot be deleted — deactivate it instead"));
+
+        // Tidy up behind the assertion. The guard is a throwaway actor, but its
+        // code_assigned rows survive reopen by design, so without this every run
+        // left two more of them on a real case — and "History Guard" then showed
+        // up in the dashboard's coder facet. Direct SQL on purpose: the API
+        // refuses this delete, which is the very thing just asserted.
+        jdbc.update("DELETE FROM auth_sessions WHERE user_id = ?", guardId);
+        jdbc.update("DELETE FROM coding_history WHERE user_id = ?", guardId);
+        jdbc.update("UPDATE case_codes SET assigned_by = NULL WHERE assigned_by = ?", guardId);
+        jdbc.update("DELETE FROM users WHERE user_id = ?", guardId);
     }
 
     // ---- helpers ----
