@@ -50,7 +50,7 @@ public class ImedReadRepository {
      * recorddatetime on every seeded visit). NULL when neither parses — such
      * rows never match a window filter.
      */
-    private static final String VISIT_DT = """
+    static final String VISIT_DT = """
             COALESCE(
               CASE WHEN p.admissiondatetime ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                    THEN p.admissiondatetime::timestamp END,
@@ -64,7 +64,7 @@ public class ImedReadRepository {
      * at the visit datetime itself (seed rows carry no stamp — their change
      * time is the visit).
      */
-    private static final String LAST_CHANGED = """
+    static final String LAST_CHANGED = """
             GREATEST(""" + VISIT_DT + """
             ,
               (SELECT max(d.updated_at::timestamp) FROM imed.medhack_diagnosis_icd10 d

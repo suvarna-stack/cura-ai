@@ -50,6 +50,27 @@ public class ApiExceptionHandler {
         }
     }
 
+    /**
+     * 422 in the real API's envelope, with the contract's own message word:
+     * too_many_visit_ids (R2 batch cap) and period_too_long (R3 window cap).
+     * Unlike the 400 above, the message is the CALLER's diagnostic, so no
+     * mock-only detail key is added.
+     */
+    public static class ImedUnprocessableException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private final transient String messageTh;
+
+        public ImedUnprocessableException(String message, String messageTh) {
+            super(message);
+            this.messageTh = messageTh;
+        }
+
+        public String messageTh() {
+            return messageTh;
+        }
+    }
+
     /** 409 DIAGNOSIS_CODE_ALREADY_EXIST, verbatim from the PDF. */
     public static class DuplicateDiagnosisException extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -63,6 +84,15 @@ public class ApiExceptionHandler {
         m.put("message_th", "ข้อมูลไม่ครบหรือไม่ถูกต้อง");
         m.put("detail", e.getMessage()); // mock-only aid; absent from the real API
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(m);
+    }
+
+    @ExceptionHandler(ImedUnprocessableException.class)
+    public ResponseEntity<Map<String, Object>> imedUnprocessable(ImedUnprocessableException e) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("status", "STATUS_BUSINESS_ERROR");
+        m.put("message", e.getMessage());
+        m.put("message_th", e.messageTh());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(m);
     }
 
     @ExceptionHandler(DuplicateDiagnosisException.class)

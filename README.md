@@ -37,10 +37,55 @@ their contract field-for-field.
 
 ## The API
 
-### READ — "give us your case data"
+### READ — `/api/v1`, the MedCode AI Case Data API contract (R1–R6)
 
-One endpoint per hospital extract table. Responses are the rows verbatim:
-exact extract column names, all values as stored (TEXT — datetime formats are
+The read surface MedCode AI **asked the hospital to build** — see
+`../medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. It is
+mocked here first so development doesn't wait for the hospital's
+implementation; when the real API lands, medcode-api swaps `IMED_API_BASE`
+and nothing else changes.
+
+Bearer-authenticated like the write side (same `IMED_API_TOKEN`).
+
+| # | Endpoint | Purpose |
+|---|---|---|
+| R1 | `POST /api/v1/cases/check` | Did anything change after `changed_since`? → `{has_changes, visit_ids}`. The cheap poll; no clinical data |
+| R2 | `POST /api/v1/cases/sync` | Full case data for up to **20** `visit_ids` → `{cases, not_found}` |
+| R3 | `POST /api/v1/cases/sync-by-period` | Same data for a visit-date window (`from`/`to`, both ends included, max **31 days**) → `{cases}` |
+| R4 | `GET /api/v1/catalog/icd10` | ICD-10 code master → `[{code, description, edition}]` |
+| R5 | `GET /api/v1/catalog/icd9` | ICD-9 code master, same shape |
+| R6 | `POST /api/v1/contract/check` | Schema gate: send `required_fields` as `block.field` names → `{valid}` or `{valid:false, missing:[…]}` |
+
+R2/R3 answer with the contract's nested **case object** — one `visit` block
+plus nine data blocks (`documents`, `record_results`, `diagnoses`,
+`procedures`, `drug_orders`, `lab_results`, `vitals`, `ward_movements`,
+`billing_items`). Blocks with no rows are `[]`, never absent.
+
+Three transport rules are enforced here because on the real API they are the
+hospital's job:
+
+- **Date-times are ISO 8601** (`2026-04-01T06:45:00`). The extract stores
+  `2026-04-01 06:45:00`, so every datetime is normalized on the way out;
+  `birth_date` is served as a plain date.
+- **Missing values are `null`** — never `""`, never an absent key. The
+  extract uses both `NULL` and `''` for "nothing", so blanks collapse.
+- **Cancelled code rows never appear**, same rule as the older reads.
+
+Two visit fields are DERIVED, not stored: `encounter_type` (IPD when the
+visit has an admission number, else OPD) and `last_changed_at` (the visit
+datetime, raised by any later write to its code rows). The contract leaves
+the change-timestamp mechanism to the hospital, so no column was added.
+
+The limits are real, not decorative: 21 ids → `422 too_many_visit_ids`, a
+32-day window → `422 period_too_long`, both in the hospital's
+`STATUS_BUSINESS_ERROR` envelope. A convenient shortcut here would only
+surface on cutover day.
+
+### READ (legacy) — one endpoint per extract table
+
+**Superseded by R1–R6 above** and kept only until medcode-api's `SyncService`
+moves over. Unauthenticated, and responses are the rows verbatim: exact
+extract column names, all values as stored (TEXT — datetime formats are
 non-uniform in the source; parsing is the consumer's job).
 
 | Endpoint | Source table |
