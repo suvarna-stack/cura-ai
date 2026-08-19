@@ -19,7 +19,7 @@ type OrderRow = ApiCaseDetail["orders"][number];
 function byPanel(rows: OrderRow[]): Map<string, OrderRow[]> {
   const panels = new Map<string, OrderRow[]>();
   for (const r of rows) {
-    const panel = r.detail?.panelname || r.order_name || "—";
+    const panel = r.detail?.panel_name || r.detail?.panelname || r.order_name || "—";
     const list = panels.get(panel);
     if (list) list.push(r);
     else panels.set(panel, [r]);
@@ -55,17 +55,20 @@ export function LabResults({ detail, embedded }: {
             <div className="px-2.5 py-1.5 flex items-center justify-between gap-2"
               style={{ background: `rgba(${gl.accentRgb},0.08)` }}>
               <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: gl.accent }}>{panel}</span>
-              {rows[0].detail?.reportdatetime && (
+              {(rows[0].detail?.reported_at ?? rows[0].detail?.reportdatetime) && (
                 <span className="text-[12px] font-normal shrink-0" style={{ color: gl.muted }}>
-                  {rows[0].detail.reportdatetime}
+                  {rows[0].detail?.reported_at ?? rows[0].detail?.reportdatetime}
                 </span>
               )}
             </div>
             <div>
               {rows.map((r, i) => {
-                const name = r.detail?.itemname || r.order_name || "—";
-                const value = r.detail?.itemvalue;
-                const unit = r.detail?.itemuom;
+                // The backend stores the hospital row verbatim, and the
+                // hospital renamed these with the R1-R6 contract (2026-08-19).
+                // Rows synced before that still carry the old extract names.
+                const name = r.detail?.item_name || r.detail?.itemname || r.order_name || "—";
+                const value = r.detail?.value ?? r.detail?.itemvalue;
+                const unit = r.detail?.unit ?? r.detail?.itemuom;
                 return (
                   <div key={i} className="px-2.5 py-1 flex items-baseline gap-2"
                     style={i > 0 ? { borderTop: gl.borderSm } : undefined}>
