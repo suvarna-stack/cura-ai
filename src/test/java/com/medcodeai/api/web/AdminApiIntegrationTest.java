@@ -224,7 +224,9 @@ class AdminApiIntegrationTest {
         // real coding history via approve, then reopen to leave the case as it
         // was; the code_assigned history rows survive reopen, so the account
         // stays referenced — and thus protected from deletion
-        String openId = getJson(token, "/api/cases").get("complete").get(0).get("id").asString();
+        // complete + reopened: an approved-then-reopened case leaves `complete`
+        // for good, so this must not hard-code complete[0]
+        String openId = anOpenCaseId(getJson(token, "/api/cases"));
         mvc.perform(post("/api/cases/approve").header("Authorization", "Bearer " + coderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ids\":[\"" + openId + "\"]}"))
@@ -275,6 +277,17 @@ class AdminApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body);
+    }
+
+    /** Any open case from the dashboard payload, whichever queue holds it. */
+    private String anOpenCaseId(JsonNode root) {
+        for (String bucket : java.util.List.of("complete", "reopened")) {
+            JsonNode arr = root.get(bucket);
+            if (arr != null && !arr.isEmpty()) {
+                return arr.get(0).get("id").asString();
+            }
+        }
+        throw new AssertionError("no open case in the dashboard payload");
     }
 
     private JsonNode getJson(String token, String url) throws Exception {

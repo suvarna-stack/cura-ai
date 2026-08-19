@@ -410,7 +410,8 @@ Milestones (git log --oneline reads as this sequence):
   now holds the curated July demo dataset (empty-start-state era), so every
   test needing an approved/known case fails regardless of this change
   (verified identical red set on a clean checkout). The suite needs re-basing
-  onto the new demo data.
+  onto the new demo data. **(DONE 2026-08-19 — see the re-basing entry below;
+  the suite is 46/46 green.)**
 - ✅ **Analytics live + local `dev_all.sh` gains RAG (2026-08-07):** two
   things landed the same day. (1) **`GET /api/analytics`** arrived from remote
   (`AnalyticsController` / `AnalyticsService` / `AnalyticsRepository`, plus a
@@ -462,7 +463,8 @@ Milestones (git log --oneline reads as this sequence):
   `unselectedCodeEditsAreKeptButNotApproved` test sits in
   `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
   the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
-  known 13-failure problem, unrelated to this change).
+  known 13-failure problem, unrelated to this change). **(Re-based and passing
+  since 2026-08-19.)**
 - ✅ **Coding status on the hospital visit row (2026-08-07):** the hospital now
   has an "approved" flag of its own — `imed.medhack_patient.coding_status`
   (`'approved'` / NULL), the twin of our `cases.case_status`. It replaces the
@@ -631,6 +633,66 @@ Milestones (git log --oneline reads as this sequence):
   joins now add `+ " " +` explicitly. NOT done yet: medcode-api still calls the
   12 legacy GETs; `ImedApiClient` + `SyncService` move over next, and the old
   endpoints stay until then.
+- ✅ **medcode-api moved onto the R1–R6 contract (2026-08-19):** the second half
+  of the same day's work — this backend now READS the hospital through the new
+  contract instead of the 12 per-table GETs. `ImedApiClient`'s read half is
+  replaced (`checkChanges`/`syncCases`/`syncByPeriod`/`contractCheck` + the
+  `/api/v1/catalog/*` masters); `SyncService` consumes the nested case object,
+  and — since the contract has NO "download everything" endpoint by design —
+  the fetch strategy is now: **windowed sync → R3 in ≤31-day chunks** (long
+  windows are split client-side), **unwindowed → R1 from the epoch, then R2 in
+  ≤20-id batches**. Every run is preceded by the **R6 contract check** (a
+  `REQUIRED_FIELDS` list of the block.fields we actually depend on; failure is
+  a 500 naming the missing fields, before any fetch or write). Our own API
+  shape is UNCHANGED — `POST /api/sync`, its `{from,to}` body, the response and
+  the case detail all behave as before.
+  Three things this shook out, none obvious from the contract:
+  - **`SyncRules.parseDt` silently dropped the time** off an ISO datetime (its
+    regex expected `\s*` between date and time, so `…T09:14:23` matched only
+    the date). Every synced datetime would have collapsed to midnight. The
+    separator is now `[\sT]*`.
+  - **`ImedWritebackService` also read the hospital** (`liveRows` for the diff).
+    It now reads R2, but translates the rows BACK to the extract's key names
+    (`id`/`icd`/`name`/`startdatetime`…) at that one boundary — deliberately,
+    because those names are also the shape of the before-images in
+    `imed_write_ops`, and a journal written before today must stay replayable
+    by a reopen running after it.
+  - **`order_detail` JSONB now holds the contract's key names** (`panel_name`,
+    `item_name`, `value`, `unit`) because it stores the hospital row verbatim.
+    The frontend's lab table and order chips read those keys, so
+    `../audit-chart-frontend` (`LabResults.tsx`, `ReportOrders.tsx`) now reads
+    **new-or-old** — rows synced before today keep the old names until
+    re-synced. `HospitalPanels.tsx` needed nothing (`name`/`value`/`quantity`
+    survived the rename). Contract doc + `docs/types.ts` say so.
+  Section and order datetimes were raw pass-throughs; they now go through
+  `parseDt` like every other stored datetime, so the TEXT columns keep the
+  `YYYY-MM-DD HH:MM:SS` form the frontend renders.
+- ✅ **CasesApiIntegrationTest re-based onto the July demo data (2026-08-19):**
+  the long-standing "13 pre-existing failures" are GONE — the suite is **46/46
+  green**, verified stable over three consecutive runs with the dataset
+  unchanged after (4 complete / 17 incomplete, all open). The old
+  `KNOWN_CASE_ID`/`APPROVABLE_CASE_ID` were April TNs from the retired dataset,
+  present in NEITHER database. Fixtures are now explicitly split by role, which
+  is the part worth keeping: `APPROVABLE_CASE_ID` (87026072711124400801) is the
+  **sacrificial** visit the write tests approve/reopen — those churn the
+  hospital's own rows, so no test asserting exact hospital values may share it;
+  `KNOWN_CASE_ID` (…413210500101, the richest visit) and
+  `TIMED_PROCEDURE_CASE_ID` (…209142300201, the 49.46 window) are READ-ONLY.
+  Tests that wanted "an approved case from the seed" now approve one themselves
+  and reopen it in a `finally` (the July data is an empty start state), and
+  nothing hard-codes `complete[0]` any more — **an approved-then-reopened case
+  moves to the `reopened` queue permanently**, so `complete` drains as the suite
+  runs. Two expectations changed on real grounds, not to go green: the lab
+  50-row cap can only be an upper bound (no July case has >50 labs), and the
+  round-trip's `mcai_code_rows` is 2, not 0 — one PUT because our catalog's
+  L02.4 description differs from the hospital's, one CANCEL because "no saved
+  edits" re-confirms the imported PRINCIPAL only, so the visit's ICD-9 is not in
+  the coder's final list. Reopen re-creates it, which is what keeps that stable.
+  **Data hazard confirmed and repaired the same day:** running the write tests
+  against a shared fixture had cancelled real seed procedures at the hospital,
+  permanently marking cases incomplete. The `imed` database was restored from
+  `~/medcode-backups/imed_live_2026-08-19.dump` (see the memory note) — which is
+  exactly why that dump was taken before any of this started.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

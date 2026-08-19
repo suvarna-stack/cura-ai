@@ -44,8 +44,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CasesApiIntegrationTest {
 
     // known ids from the seeded POC baseline data
-    private static final String KNOWN_CASE_ID = "87026040104025824801";
-    private static final String APPROVABLE_CASE_ID = "87026041010043786701"; // complete, not approved
+    // Re-based 2026-08-19 onto the curated July demo dataset. The old April
+    // TNs came from the retired pre-empty-start dataset and exist in NEITHER
+    // database any more, which is why 11 tests here were permanently red.
+    /** users.full_name of the bootstrap admin the suite logs in as. */
+    private static final String ADMIN_DISPLAY_NAME = "Super Admin";
+
+    /** The richest OPD visit: 16 note sections, 36 orders (18 lab, 3 medicine), 2 vitals. */
+    private static final String KNOWN_CASE_ID = "87026072413210500101";
+    /**
+     * The SACRIFICIAL fixture: complete and open, and the only visit the write
+     * tests approve/reopen. Those tests churn the hospital's own rows — the
+     * approve diff cancels what the coder's final list drops and re-creates it
+     * on reopen with fresh object_ids — so no test that asserts exact hospital
+     * values may share this visit.
+     */
+    private static final String APPROVABLE_CASE_ID = "87026072711124400801";
+
+    /**
+     * READ-ONLY: carries a seeded ICD-9 hemorrhoidectomy with a real operation
+     * window. Deliberately not the approvable case, so the window assertions
+     * can't be broken by another test's write-back.
+     */
+    private static final String TIMED_PROCEDURE_CASE_ID = "87026072209142300201";
 
     private static final String ADMIN_EMAIL = "admin@medcodeai.demo";
     private static final String ADMIN_PW = "admin1234"; // SchemaBootstrap's documented default
@@ -123,10 +144,15 @@ class CasesApiIntegrationTest {
         // Both keys are always present; the name lists are distinct + A–Z.
         JsonNode root = getJson("/api/cases");
         JsonNode withOrders = null;
-        for (JsonNode c : root.get("complete")) {
-            assertTrue(c.has("orderNames"), "every card carries orderNames, even when empty");
-            if (withOrders == null && !c.get("orders").isEmpty()) {
-                withOrders = c;
+        // complete + reopened: a case that has been through an approve/reopen
+        // cycle lives in `reopened` permanently, so scanning only `complete`
+        // finds nothing on a dataset the write tests have already exercised
+        for (String bucket : List.of("complete", "reopened")) {
+            for (JsonNode c : root.get(bucket)) {
+                assertTrue(c.has("orderNames"), "every card carries orderNames, even when empty");
+                if (withOrders == null && !c.get("orders").isEmpty()) {
+                    withOrders = c;
+                }
             }
         }
         assertNotNull(withOrders, "expected at least one seeded case with orders");
@@ -152,13 +178,25 @@ class CasesApiIntegrationTest {
 
     @Test
     void finishedCasesShowRealCoderIdNotRotatedFakeName() throws Exception {
-        JsonNode finished = getJson("/api/cases").get("finished");
-        assertTrue(finished.size() > 0, "expected at least one already-approved case in the seed data");
-        String coder = finished.get(0).get("coder").asString();
-        // real actor ids: the seed's demo.coder/web.coder, or (since Phase 3)
-        // an authenticated account's email
-        assertTrue(coder.equals("demo.coder") || coder.equals("web.coder") || coder.contains("@"),
-                "coder should be a real actor id (" + coder + "), not a rotated fake display name");
+        // The July demo dataset starts with every case open (that is the point
+        // of an empty start state), so this approves one rather than depending
+        // on seeded finished cases — and reopens it whatever happens, to leave
+        // the demo data as it found it.
+        approve(APPROVABLE_CASE_ID);
+        try {
+            JsonNode finished = getJson("/api/cases").get("finished");
+            assertTrue(finished.size() > 0, "the case just approved should be finished");
+            String coder = finished.get(0).get("coder").asString();
+            // Real actor: the seed's demo.coder/web.coder, an account email, or
+            // the display name that account resolves to (CasesViewService maps a
+            // stamp to users.full_name on purpose, so an admin rename shows up
+            // on the coder facet). What must never appear is a rotated fake.
+            assertTrue(coder.equals("demo.coder") || coder.equals("web.coder")
+                            || coder.contains("@") || coder.equals(ADMIN_DISPLAY_NAME),
+                    "coder should be a real actor (" + coder + "), not a rotated fake display name");
+        } finally {
+            reopen(APPROVABLE_CASE_ID);
+        }
     }
 
     @Test
@@ -184,23 +222,25 @@ class CasesApiIntegrationTest {
 
     @Test
     void caseDetailServesRealHospitalValues() throws Exception {
-        // positive check on the contract's field <-> real-column mapping:
-        // KNOWN_CASE_ID is an IPD visit whose extract row carries these values
-        // verbatim (the frozen db/seed.sql.gz baseline)
+        // positive check on the contract's field <-> real-column mapping.
+        // KNOWN_CASE_ID is an OPD visit — the whole July demo dataset is OPD,
+        // so patient_ref (the admission number) is legitimately null and
+        // encountertype is "0". These values come from the hospital's own row.
         mvc.perform(get("/api/cases/{id}", KNOWN_CASE_ID).header("Authorization", auth()))
-                .andExpect(jsonPath("$.case.patient_ref").value("690003026"))
-                .andExpect(jsonPath("$.case.admissiondatetime").value("2026-04-01 06:45:00"))
-                .andExpect(jsonPath("$.case.dischargedatetime").value("2026-04-10 16:22:41"))
-                .andExpect(jsonPath("$.case.encountertype").value("1"));
+                .andExpect(jsonPath("$.case.encountertype").value("0"))
+                .andExpect(jsonPath("$.case.sex").value("male"))
+                .andExpect(jsonPath("$.case.birthdate").value("1958-11-25"))
+                .andExpect(jsonPath("$.case.coverage_type").value("OFC_O3"))
+                .andExpect(jsonPath("$.case.patient_ref").doesNotExist());
     }
 
     @Test
     void caseDetailOrdersCarryDetailJsonAndTrueCounts() throws Exception {
         // each order row serves its raw hospital source row as a `detail`
-        // object — the UI's lab results table (panelname/itemname/itemvalue)
-        // and medication chips (dosage, quantity) read it. The cap is 50 rows
-        // PER CATEGORY, so this lab-heavy case (400+ lab rows) still serves
-        // its medicine orders — the old global LIMIT 150 starved them out.
+        // object — the UI's lab results table and medication chips read it.
+        // Key names follow the R1-R6 contract since 2026-08-19 (item_name, not
+        // itemname). The cap is 50 rows PER CATEGORY, so a lab-heavy case still
+        // serves its medicine orders — the old global LIMIT 150 starved them out.
         JsonNode body = getJson("/api/cases/" + KNOWN_CASE_ID);
         JsonNode orders = body.get("orders");
         assertTrue(orders.isArray() && orders.size() > 0, "expected a non-empty orders array");
@@ -210,7 +250,7 @@ class CasesApiIntegrationTest {
             assertTrue(o.has("detail"), "every order row carries the detail key");
             perCat.merge(o.get("order_category").asString(), 1, Integer::sum);
             if ("lab".equals(o.get("order_category").asString()) && o.get("detail").isObject()) {
-                sawLabItem |= o.get("detail").has("itemname") && o.get("detail").has("itemvalue");
+                sawLabItem |= o.get("detail").has("item_name") && o.get("detail").has("value");
             }
             if ("medicine".equals(o.get("order_category").asString()) && o.get("detail").isObject()
                     && o.get("detail").hasNonNull("quantity")) {
@@ -220,44 +260,58 @@ class CasesApiIntegrationTest {
                 sawMedicineQty = true;
             }
         }
-        assertTrue(sawLabItem, "expected a lab row with itemname/itemvalue in its detail");
+        assertTrue(sawLabItem, "expected a lab row with item_name/value in its detail");
         assertTrue(sawMedicineQty, "expected a medicine order with a quantity in its detail");
         perCat.forEach((cat, n) ->
                 assertTrue(n <= 50, "per-category cap: " + cat + " served " + n + " rows"));
-        assertTrue(perCat.getOrDefault("lab", 0) == 50, "lab-heavy case should hit the 50-row lab cap");
+        // No case in the July dataset has more than 50 labs, so the cap can only
+        // be asserted as an upper bound here; orderCounts below proves the
+        // count is the TRUE total rather than the capped page.
+        assertTrue(perCat.getOrDefault("lab", 0) > 0, "the known case has lab orders");
 
         // orderCounts = true totals per category, immune to the per-category cap
         JsonNode counts = body.get("orderCounts");
         assertNotNull(counts, "detail must carry orderCounts");
-        assertTrue(counts.get("lab").asInt() > 50,
-                "known case has 400+ lab orders; got " + counts.get("lab"));
+        assertEquals(perCat.getOrDefault("lab", 0), counts.get("lab").asInt(),
+                "orderCounts is the true per-category total");
     }
 
     @Test
     void caseDetailIncludesServerHistoryForApprovedCase() throws Exception {
-        // finished cases were approved in the frozen seed, so their detail
-        // carries a populated `history` array (the coder audit trail); each
-        // entry is {action, coder, at} with a known coder action. Pure read —
-        // no imed-mock needed, unlike the approve round-trip.
-        String approvedId = getJson("/api/cases").get("finished").get(0).get("id").asString();
-        JsonNode history = getJson("/api/cases/" + approvedId).get("history");
-        assertTrue(history.isArray() && history.size() > 0,
-                "an approved case's detail should carry a non-empty history");
-        JsonNode h0 = history.get(0);
-        assertTrue(h0.has("action") && h0.has("coder") && h0.has("at"),
-                "each history entry has action, coder, at");
-        assertTrue(List.of("approved_single", "approved_group", "approved_all", "reopened", "code_assigned")
-                        .contains(h0.get("action").asString()),
-                "history action should be a known coder action, got " + h0.get("action").asString());
+        // an approved case's detail carries a populated `history` array (the
+        // coder audit trail); each entry is {action, coder, at}. Same empty
+        // start state as above, so approve first and always reopen after.
+        approve(APPROVABLE_CASE_ID);
+        try {
+            JsonNode history = getJson("/api/cases/" + APPROVABLE_CASE_ID).get("history");
+            assertTrue(history.isArray() && history.size() > 0,
+                    "an approved case's detail should carry a non-empty history");
+            JsonNode h0 = history.get(0);
+            assertTrue(h0.has("action") && h0.has("coder") && h0.has("at"),
+                    "each history entry has action, coder, at");
+            assertTrue(List.of("approved_single", "approved_group", "approved_all", "reopened",
+                            "code_assigned").contains(h0.get("action").asString()),
+                    "history action should be a known coder action, got " + h0.get("action").asString());
+        } finally {
+            reopen(APPROVABLE_CASE_ID);
+        }
     }
 
     @Test
     void approveThenReopenRoundTripsAndInvalidatesCache() throws Exception {
         // stats shape per docs/api-contract.md: one case, no saved edits ->
         // the imported principal is re-confirmed (1 code) + 1 status row.
-        // mcai_code_rows counts hospital DIFF writes (2026-07-24): the
-        // re-confirmed principal already exists at the hospital unchanged,
-        // so the diff makes ZERO code writes (only the coding status is set).
+        //
+        // mcai_code_rows counts hospital DIFF writes (2026-07-24). TWO for this
+        // fixture, and both are worth understanding:
+        //   1. a PUT on the principal — our catalog describes L02.4 as
+        //      "Abscess, hip" while the hospital's row reads "Abscess, Rt hip",
+        //      and a description we hold is sent (blank ones never are);
+        //   2. a CANCEL of the visit's ICD-9 — "no saved edits" re-confirms the
+        //      imported PRINCIPAL only, so the procedure is not in the coder's
+        //      final list and the diff removes it. The reopen below puts it back
+        //      (with a fresh object_id, since iMed has no un-cancel), which is
+        //      what keeps this number stable across runs.
         mvc.perform(post("/api/cases/approve").header("Authorization", auth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ids\":[\"" + APPROVABLE_CASE_ID + "\"]}"))
@@ -266,7 +320,7 @@ class CasesApiIntegrationTest {
                 .andExpect(jsonPath("$.notFound").isEmpty())
                 .andExpect(jsonPath("$.stats.cases_finalized").value(1))
                 .andExpect(jsonPath("$.stats.status_rows").value(1))
-                .andExpect(jsonPath("$.stats.mcai_code_rows").value(0));
+                .andExpect(jsonPath("$.stats.mcai_code_rows").value(2));
 
         JsonNode afterApprove = getJson("/api/cases");
         assertTrue(containsCaseId(afterApprove.get("finished"), APPROVABLE_CASE_ID),
@@ -296,11 +350,11 @@ class CasesApiIntegrationTest {
 
     @Test
     void syncImportsTheHospitalOperationWindowOntoIcd9Codes() throws Exception {
-        // KNOWN_CASE_ID is open with four timed procedures in the frozen imed
-        // seed; the per-case sync re-imports its codes with the window attached
-        postJson("/api/cases/" + KNOWN_CASE_ID + "/sync");
+        // this visit carries a seeded ICD-9 hemorrhoidectomy with a real
+        // operation window; the per-case sync re-imports it with the times
+        postJson("/api/cases/" + TIMED_PROCEDURE_CASE_ID + "/sync");
 
-        JsonNode codes = getJson("/api/cases/" + KNOWN_CASE_ID).get("codes");
+        JsonNode codes = getJson("/api/cases/" + TIMED_PROCEDURE_CASE_ID).get("codes");
         boolean sawTimedIcd9 = false;
         for (JsonNode c : codes) {
             assertTrue(c.has("operation_start") && c.has("operation_end") && c.has("operation_type"),
@@ -310,15 +364,17 @@ class CasesApiIntegrationTest {
                                 && c.get("operation_type").isNull(),
                         "a diagnosis has no operation window or type");
             }
-            if ("54.23".equals(c.get("code").asString())) {
-                // the biopsy row's window and type, verbatim from the hospital extract
-                assertEquals("2026-04-02 23:55:00", c.get("operation_start").asString());
-                assertEquals("2026-04-02 05:05:00", c.get("operation_end").asString());
+            if ("49.46".equals(c.get("code").asString())) {
+                // the procedure's window and type, verbatim from the hospital —
+                // and proof the ISO 8601 the contract now sends is parsed
+                // rather than silently truncated to midnight
+                assertEquals("2026-07-22 11:05:00", c.get("operation_start").asString());
+                assertEquals("2026-07-22 11:52:00", c.get("operation_end").asString());
                 assertEquals("OR Procedure", c.get("operation_type").asString());
                 sawTimedIcd9 = true;
             }
         }
-        assertTrue(sawTimedIcd9, "expected the imported 54.23 procedure with its hospital times");
+        assertTrue(sawTimedIcd9, "expected the imported 49.46 procedure with its hospital times");
     }
 
     @Test
@@ -342,18 +398,18 @@ class CasesApiIntegrationTest {
                 assertTrue(prev == null || prev.compareTo(at) <= 0, "vitals sort chronologically");
                 prev = at;
             }
-            if ("2026-04-02 10:00:00".equals(v.get("measured_at").asString())) {
+            // the second reading of this visit is the one with blank columns
+            if (v.get("weight").isNull() && reading == null && !v.get("systolic").isNull()) {
                 reading = v;
             }
         }
-        // one seeded reading, verbatim — and its blank columns served as null
-        assertNotNull(reading, "expected the seeded 2026-04-02 10:00 reading");
-        assertEquals("37", reading.get("temperature").asString());
-        assertEquals("98", reading.get("systolic").asString());
-        assertEquals("60", reading.get("diastolic").asString());
-        assertEquals("94", reading.get("heart_rate").asString());
-        assertEquals("96", reading.get("oxygen_saturation").asString());
-        assertTrue(reading.get("weight").isNull() && reading.get("height").isNull(),
+        // that reading, verbatim — and its blank columns served as null
+        assertNotNull(reading, "expected a seeded reading with blank weight/height");
+        assertEquals("138", reading.get("systolic").asString());
+        assertEquals("82", reading.get("diastolic").asString());
+        assertEquals("88", reading.get("heart_rate").asString());
+        assertTrue(reading.get("temperature").isNull() && reading.get("oxygen_saturation").isNull()
+                        && reading.get("weight").isNull() && reading.get("height").isNull(),
                 "blank hospital values are normalized to null");
     }
 
@@ -500,8 +556,9 @@ class CasesApiIntegrationTest {
 
     @Test
     void syncRefreshesAnOpenCaseWithoutChangingItsStatus() throws Exception {
-        // a "complete" dashboard case is complete-but-not-approved = open
-        String openId = getJson("/api/cases").get("complete").get(0).get("id").asString();
+        // any open case will do; KNOWN_CASE_ID is open and no write test
+        // touches it, unlike complete[0] which drains as cases are reopened
+        String openId = KNOWN_CASE_ID;
 
         JsonNode r = postJson("/api/cases/" + openId + "/sync");
         assertTrue(r.get("ok").asBoolean());
@@ -518,13 +575,18 @@ class CasesApiIntegrationTest {
 
     @Test
     void syncSkipsAnApprovedCase() throws Exception {
-        String approvedId = getJson("/api/cases").get("finished").get(0).get("id").asString();
-
-        JsonNode r = postJson("/api/cases/" + approvedId + "/sync");
-        assertTrue(containsString(r.get("skippedApproved"), approvedId),
-                "an approved case must be protected from sync, not rebuilt");
-        assertTrue(r.get("refreshed").isEmpty());
-        assertTrue(r.get("imported").isEmpty());
+        // empty start state: approve one here rather than expecting a finished
+        // case in the seed, and reopen it however this ends
+        approve(APPROVABLE_CASE_ID);
+        try {
+            JsonNode r = postJson("/api/cases/" + APPROVABLE_CASE_ID + "/sync");
+            assertTrue(containsString(r.get("skippedApproved"), APPROVABLE_CASE_ID),
+                    "an approved case must be protected from sync, not rebuilt");
+            assertTrue(r.get("refreshed").isEmpty());
+            assertTrue(r.get("imported").isEmpty());
+        } finally {
+            reopen(APPROVABLE_CASE_ID);
+        }
     }
 
     @Test
@@ -681,6 +743,21 @@ class CasesApiIntegrationTest {
         return false;
     }
 
+    /** Approve one case through the real endpoint (hospital write-back included). */
+    private void approve(String caseId) throws Exception {
+        mvc.perform(post("/api/cases/approve").header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + caseId + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approved[0]").value(caseId));
+    }
+
+    /** Undo it, so the suite leaves the demo dataset as it found it. */
+    private void reopen(String caseId) throws Exception {
+        mvc.perform(post("/api/cases/{id}/reopen", caseId).header("Authorization", auth()))
+                .andExpect(status().isOk());
+    }
+
     private JsonNode getJson(String url) throws Exception {
         String body = mvc.perform(get(url).header("Authorization", auth()))
                 .andExpect(status().isOk())
@@ -689,7 +766,7 @@ class CasesApiIntegrationTest {
     }
 
     private JsonNode firstListedCase(JsonNode root) {
-        for (String bucket : List.of("complete", "finished")) {
+        for (String bucket : List.of("complete", "reopened", "finished")) {
             JsonNode arr = root.get(bucket);
             if (arr != null && !arr.isEmpty()) {
                 return arr.get(0);
