@@ -47,9 +47,6 @@ class CasesApiIntegrationTest {
     // Re-based 2026-08-19 onto the curated July demo dataset. The old April
     // TNs came from the retired pre-empty-start dataset and exist in NEITHER
     // database any more, which is why 11 tests here were permanently red.
-    /** users.full_name of the bootstrap admin the suite logs in as. */
-    private static final String ADMIN_DISPLAY_NAME = "Super Admin";
-
     /** The richest OPD visit: 16 note sections, 36 orders (18 lab, 3 medicine), 2 vitals. */
     private static final String KNOWN_CASE_ID = "87026072413210500101";
     /**
@@ -187,12 +184,15 @@ class CasesApiIntegrationTest {
             JsonNode finished = getJson("/api/cases").get("finished");
             assertTrue(finished.size() > 0, "the case just approved should be finished");
             String coder = finished.get(0).get("coder").asString();
-            // Real actor: the seed's demo.coder/web.coder, an account email, or
-            // the display name that account resolves to (CasesViewService maps a
-            // stamp to users.full_name on purpose, so an admin rename shows up
-            // on the coder facet). What must never appear is a rotated fake.
+            // The guard this test exists for: `coder` must trace to a REAL
+            // actor. CasesViewService maps a stamp to users.full_name on
+            // purpose (an admin rename shows up on the coder facet), so the
+            // check is "does an account actually go by this name" rather than
+            // a hard-coded one — any test in the suite may have been the last
+            // to touch a case. What must never appear is a per-case rotated
+            // fake, which is what the deleted DeterministicFakes used to serve.
             assertTrue(coder.equals("demo.coder") || coder.equals("web.coder")
-                            || coder.contains("@") || coder.equals(ADMIN_DISPLAY_NAME),
+                            || coder.contains("@") || isRealAccount(coder),
                     "coder should be a real actor (" + coder + "), not a rotated fake display name");
         } finally {
             reopen(APPROVABLE_CASE_ID);
@@ -737,6 +737,17 @@ class CasesApiIntegrationTest {
     private boolean containsString(JsonNode arr, String value) {
         for (JsonNode n : arr) {
             if (value.equals(n.asString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Does any account actually go by this display name or email? */
+    private boolean isRealAccount(String name) throws Exception {
+        for (JsonNode a : getJson("/api/admin/accounts")) {   // a bare array
+            if (name.equals(a.path("fullName").asString(null))
+                    || name.equals(a.path("email").asString(null))) {
                 return true;
             }
         }
