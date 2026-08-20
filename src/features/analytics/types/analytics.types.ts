@@ -22,6 +22,49 @@ export interface AnalyticsData {
     system: 'ICD-10' | 'ICD-9'
     description: string | null
   }[]
+  /** What incomplete cases are missing — per item (a case missing two things
+   *  counts in both rows) and per disease group. */
+  documentationGaps: {
+    items: { key: string; label: string; count: number }[]
+    byGroup: { label: string; incomplete: number; total: number }[]
+  }
+  /** Coder actions per day from the audit trail, zero-filled like
+   *  casesOverTime, dated by when the action happened (not the visit date). */
+  codingActivity: {
+    iso: string
+    approved: number
+    coded: number
+    reopened: number
+  }[]
+  /** Sync-to-first-approval; both percentiles null with cases = 0 until
+   *  something has been approved. */
+  turnaround: {
+    medianMinutes: number | null
+    p90Minutes: number | null
+    cases: number
+  }
+  /** Codes-per-case distribution (always the five buckets 0/1/2/3-5/6+, in
+   *  order), the uncoded backlog, and the code-role mix. */
+  codingDepth: {
+    uncoded: number
+    avgCodesPerCase: number | null
+    distribution: { bucket: string; cases: number }[]
+    roleMix: { role: string; label: string; count: number }[]
+  }
+  /** Disease group × severity (low+medium+high+other = total), plus sex and
+   *  age-band splits. */
+  caseMix: {
+    groups: {
+      label: string
+      low: number
+      medium: number
+      high: number
+      other: number
+      total: number
+    }[]
+    sex: { label: string; count: number }[]
+    age: { label: string; count: number }[]
+  }
 }
 
 /** Shown while the first request is in flight — never as a fallback. */
@@ -30,4 +73,14 @@ export const EMPTY_ANALYTICS: AnalyticsData = {
   coverageCounts: [],
   casesOverTime: [],
   topCodes: [],
+  documentationGaps: { items: [], byGroup: [] },
+  codingActivity: [],
+  turnaround: { medianMinutes: null, p90Minutes: null, cases: 0 },
+  codingDepth: {
+    uncoded: 0,
+    avgCodesPerCase: null,
+    distribution: [],
+    roleMix: [],
+  },
+  caseMix: { groups: [], sex: [], age: [] },
 }
