@@ -450,6 +450,75 @@ export interface AnalyticsTopCode {
   description: string | null;
 }
 
+/** One bar of the what's-missing list: incomplete cases per missing item.
+ *  A case missing two things counts in both rows. */
+export interface AnalyticsGapItem {
+  /** Raw missing_detail token — "icd10" / "icd9" under the 2026-08-05 rule,
+   *  documentation keys ("exam", …) on rows synced before it. */
+  key: string;
+  /** Same human wording the case list's `missing` field uses; an unknown key
+   *  serves raw rather than being dropped. */
+  label: string;
+  count: number;
+}
+
+/** Incomplete vs total per disease group, most incomplete first. */
+export interface AnalyticsGapGroup {
+  /** Disease group; the blank group reads "Ungrouped". */
+  label: string;
+  incomplete: number;
+  total: number;
+}
+
+/** One day of coder actions from the audit trail — dated by when the action
+ *  happened, NOT the visit date. Same zero-fill contract as casesOverTime. */
+export interface AnalyticsActivityPoint {
+  /** Local midnight, NO zone suffix — same convention as AnalyticsDayPoint. */
+  iso: string;
+  /** approved_single + approved_group + approved_all, as one number. */
+  approved: number;
+  /** code_assigned actions. */
+  coded: number;
+  reopened: number;
+}
+
+/** Sync-to-FIRST-approval turnaround (a reopened-and-re-approved case keeps
+ *  its original figure). Both percentiles null with cases = 0 until
+ *  something has been approved. */
+export interface AnalyticsTurnaround {
+  medianMinutes: number | null;
+  p90Minutes: number | null;
+  /** OPD cases with both a sync and an approval event. */
+  cases: number;
+}
+
+/** How thoroughly cases are coded. */
+export interface AnalyticsCodingDepth {
+  /** Cases with zero codes — the needs-coding backlog (= the "0" bucket). */
+  uncoded: number;
+  /** Average over ALL OPD cases, uncoded included; null only with no cases. */
+  avgCodesPerCase: number | null;
+  /** Always exactly five buckets — "0" | "1" | "2" | "3-5" | "6+", in that
+   *  order, zero-filled. */
+  distribution: { bucket: string; cases: number }[];
+  /** case_codes rows per role, biggest first. `role` is the enum word,
+   *  `label` the display name ("principal_diagnosis" → "Principal diagnosis"). */
+  roleMix: { role: string; label: string; count: number }[];
+}
+
+/** The [POC] disease-group × severity table plus demographic splits. */
+export interface AnalyticsCaseMix {
+  /** Every group, biggest first — the client decides how many rows fit.
+   *  low + medium + high + other = total always holds (`other` catches
+   *  severity values outside low/medium/high). */
+  groups: { label: string; low: number; medium: number; high: number; other: number; total: number }[];
+  /** Visits by patient sex; blank reads "unspecified". */
+  sex: { label: string; count: number }[];
+  /** Visits by age band ("0-14" | "15-39" | "40-59" | "60+"), age from
+   *  birthdate as of today; rows with no birthdate are absent. */
+  age: { label: string; count: number }[];
+}
+
 /**
  * GET /api/analytics?days=…&topCodes=… — the whole Analytics page in one
  * request. Every figure covers OPD visits only, the same population
@@ -458,6 +527,10 @@ export interface AnalyticsTopCode {
  * `summary` is the dashboard payload's `stats` verbatim, so the tiles cannot
  * drift from the Dashboard. `casesOverTime` always has exactly `days` points,
  * oldest first, zero-filled — an empty window is all-zero, never empty.
+ *
+ * documentationGaps / codingActivity / turnaround / codingDepth / caseMix are
+ * the Analytics-v2 cards (2026-08-20); the first four keys are the original
+ * payload, unchanged.
  */
 export interface AnalyticsResponse {
   /** Same shape and numbers as CasesResponse["stats"]. */
@@ -465,6 +538,12 @@ export interface AnalyticsResponse {
   casesOverTime: AnalyticsDayPoint[];
   coverageCounts: AnalyticsCoverageSlice[];
   topCodes: AnalyticsTopCode[];
+  documentationGaps: { items: AnalyticsGapItem[]; byGroup: AnalyticsGapGroup[] };
+  /** Same `days` window and zero-fill as casesOverTime. */
+  codingActivity: AnalyticsActivityPoint[];
+  turnaround: AnalyticsTurnaround;
+  codingDepth: AnalyticsCodingDepth;
+  caseMix: AnalyticsCaseMix;
 }
 
 /** 400 / 404 body. 500s return Spring's default error body — the triggering

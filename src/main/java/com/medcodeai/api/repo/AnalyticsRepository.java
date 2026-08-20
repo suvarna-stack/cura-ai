@@ -95,4 +95,185 @@ public class AnalyticsRepository {
                  ORDER BY n DESC, code
                  LIMIT ?""", limit);
     }
+
+    /**
+     * How often each missing item appears across incomplete OPD cases.
+     * `missing_detail` is a comma-joined key list ("icd10,icd9" under the
+     * 2026-08-05 rule; documentation keys on rows synced before it), so one
+     * case counts once per missing item, not once overall.
+     */
+    public List<Map<String, Object>> missingDetailCounts() {
+        return jdbc.queryForList("""
+                SELECT trim(t) AS key, count(*) AS n
+                  FROM cases c,
+                       unnest(string_to_array(c.missing_detail, ',')) AS t
+                 WHERE c.encountertype = '0'
+                   AND c.completeness_status = 'incomplete'
+                   AND COALESCE(c.missing_detail, '') <> ''
+                 GROUP BY 1
+                 ORDER BY n DESC, key""");
+    }
+
+    /**
+     * Incomplete vs total per disease group, most incomplete first. The blank
+     * group folds into 'Ungrouped' — the same word the sync rules write — so
+     * the card never shows an unlabeled bar.
+     */
+    public List<Map<String, Object>> completenessByGroup() {
+        return jdbc.queryForList("""
+                SELECT COALESCE(NULLIF(c.disease_group, ''), 'Ungrouped') AS grp,
+                       count(*) FILTER (WHERE c.completeness_status = 'incomplete') AS incomplete,
+                       count(*) AS total
+                  FROM cases c
+                 WHERE c.encountertype = '0'
+                 GROUP BY 1
+                 ORDER BY 2 DESC, 3 DESC, grp""");
+    }
+
+    /**
+     * Coder actions per calendar day within [from, to] inclusive, from the
+     * audit trail. Approvals count the three approve variants as one thing —
+     * the card asks "how many cases got approved", not which button did it.
+     * Days with no action are absent; the service zero-fills.
+     */
+    public List<Map<String, Object>> activityPerDay(LocalDate from, LocalDate to) {
+        return jdbc.queryForList("""
+                SELECT ch.created_at::date AS day,
+                       count(*) FILTER (WHERE ch.action_type IN
+                           ('approved_single', 'approved_group', 'approved_all')) AS approved,
+                       count(*) FILTER (WHERE ch.action_type = 'code_assigned') AS coded,
+                       count(*) FILTER (WHERE ch.action_type = 'reopened') AS reopened
+                  FROM coding_history ch
+                  JOIN cases c ON c.case_id = ch.case_id AND c.encountertype = '0'
+                 WHERE ch.created_at >= ?::date
+                   AND ch.created_at < (?::date + 1)
+                 GROUP BY 1
+                 ORDER BY 1""", from.toString(), to.toString());
+    }
+
+    /**
+     * Sync-to-approval turnaround over every OPD case that has both events,
+     * as median / p90 minutes. First sync to FIRST approval: a case reopened
+     * and re-approved keeps its original turnaround rather than improving it.
+     * All-null row (n = 0) when nothing has been approved yet.
+     */
+    public Map<String, Object> turnaround() {
+        return jdbc.queryForMap("""
+                SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY mins) AS median_minutes,
+                       percentile_cont(0.9) WITHIN GROUP (ORDER BY mins) AS p90_minutes,
+                       count(*) AS n
+                  FROM (SELECT extract(epoch FROM
+                                   min(ch.created_at) FILTER (WHERE ch.action_type IN
+                                       ('approved_single', 'approved_group', 'approved_all'))
+                                 - min(ch.created_at) FILTER (WHERE ch.action_type = 'case_synced')
+                               ) / 60 AS mins
+                          FROM coding_history ch
+                          JOIN cases c ON c.case_id = ch.case_id AND c.encountertype = '0'
+                         GROUP BY ch.case_id) t
+                 WHERE t.mins IS NOT NULL AND t.mins >= 0""");
+    }
+
+    /**
+     * OPD cases bucketed by how many codes they carry. Buckets are labeled
+     * here (single source of truth for the boundaries); `ord` carries the
+     * display order so the service never re-parses the labels.
+     */
+    public List<Map<String, Object>> codesPerCaseBuckets() {
+        return jdbc.queryForList("""
+                SELECT CASE WHEN t.n = 0 THEN '0'
+                            WHEN t.n = 1 THEN '1'
+                            WHEN t.n = 2 THEN '2'
+                            WHEN t.n <= 5 THEN '3-5'
+                            ELSE '6+' END AS bucket,
+                       min(CASE WHEN t.n = 0 THEN 0
+                                WHEN t.n = 1 THEN 1
+                                WHEN t.n = 2 THEN 2
+                                WHEN t.n <= 5 THEN 3
+                                ELSE 4 END) AS ord,
+                       count(*) AS cases
+                  FROM (SELECT c.case_id, count(cc.case_code_id) AS n
+                          FROM cases c
+                          LEFT JOIN case_codes cc ON cc.case_id = c.case_id
+                         WHERE c.encountertype = '0'
+                         GROUP BY c.case_id) t
+                 GROUP BY 1
+                 ORDER BY 2""");
+    }
+
+    /** Average codes per OPD case, uncoded cases included in the denominator. */
+    public Map<String, Object> codesPerCaseAvg() {
+        return jdbc.queryForMap("""
+                SELECT round(avg(t.n), 1) AS avg_codes,
+                       count(*) FILTER (WHERE t.n = 0) AS uncoded
+                  FROM (SELECT count(cc.case_code_id) AS n
+                          FROM cases c
+                          LEFT JOIN case_codes cc ON cc.case_id = c.case_id
+                         WHERE c.encountertype = '0'
+                         GROUP BY c.case_id) t""");
+    }
+
+    /** case_codes rows per role across OPD cases, biggest first. */
+    public List<Map<String, Object>> roleMix() {
+        return jdbc.queryForList("""
+                SELECT cc.code_role::text AS role, count(*) AS n
+                  FROM case_codes cc
+                  JOIN cases c ON c.case_id = cc.case_id AND c.encountertype = '0'
+                 WHERE cc.code_role IS NOT NULL
+                 GROUP BY 1
+                 ORDER BY n DESC, role""");
+    }
+
+    /**
+     * OPD cases per disease group, split by severity. severity_level is
+     * free-ish text but the sync rules only ever write low/medium/high;
+     * anything else lands in `other` so the row total always adds up.
+     */
+    public List<Map<String, Object>> caseMixByGroup() {
+        return jdbc.queryForList("""
+                SELECT COALESCE(NULLIF(c.disease_group, ''), 'Ungrouped') AS grp,
+                       count(*) FILTER (WHERE c.severity_level = 'low') AS low,
+                       count(*) FILTER (WHERE c.severity_level = 'medium') AS medium,
+                       count(*) FILTER (WHERE c.severity_level = 'high') AS high,
+                       count(*) FILTER (WHERE c.severity_level IS NULL
+                           OR c.severity_level NOT IN ('low', 'medium', 'high')) AS other,
+                       count(*) AS total
+                  FROM cases c
+                 WHERE c.encountertype = '0'
+                 GROUP BY 1
+                 ORDER BY total DESC, grp""");
+    }
+
+    /** OPD visits by patient sex, biggest first; blank groups under NULL. */
+    public List<Map<String, Object>> sexCounts() {
+        return jdbc.queryForList("""
+                SELECT NULLIF(c.sex, '') AS sex, count(*) AS n
+                  FROM cases c
+                 WHERE c.encountertype = '0'
+                 GROUP BY 1
+                 ORDER BY n DESC""");
+    }
+
+    /**
+     * OPD visits by patient age band, age taken from birthdate as of today
+     * (ageyear is a "y,m,d" string frozen at extract time — not arithmetic-
+     * friendly and staler than the birthdate it was derived from).
+     */
+    public List<Map<String, Object>> ageBands() {
+        return jdbc.queryForList("""
+                SELECT CASE WHEN t.years < 15 THEN '0-14'
+                            WHEN t.years < 40 THEN '15-39'
+                            WHEN t.years < 60 THEN '40-59'
+                            ELSE '60+' END AS band,
+                       min(CASE WHEN t.years < 15 THEN 0
+                                WHEN t.years < 40 THEN 1
+                                WHEN t.years < 60 THEN 2
+                                ELSE 3 END) AS ord,
+                       count(*) AS n
+                  FROM (SELECT date_part('year', age(current_date, c.birthdate)) AS years
+                          FROM cases c
+                         WHERE c.encountertype = '0'
+                           AND c.birthdate IS NOT NULL) t
+                 GROUP BY 1
+                 ORDER BY 2""");
+    }
 }
