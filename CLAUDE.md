@@ -743,8 +743,14 @@ Milestones (git log --oneline reads as this sequence):
   6, row counts identical across `cases`/`case_codes`/`case_vitals`/`users`/
   `coding_history`), and a schema diff of Flyway's output against the real
   database showing **no difference except `flyway_schema_history` itself**. Suite
-  46/46 green. Not done here: `imed-mock-api` has the identical pattern (201 lines
-  of the same duplication) — same fix, separate repo, separate commit.
+  46/46 green. `imed-mock-api` got the same treatment the same day, in its own
+  commit: there the runner was deleted **outright** rather than trimmed, because
+  nothing had to stay in Java — its five mirror files were already faithful (and
+  in two places better than the Java), and the ICD catalog seed became `V6`,
+  since a re-seed drops that reference data along with the schema history and so
+  replays it exactly as the old emptiness check did. It sets
+  `spring.flyway.schemas: imed` so the history table lands beside the tables it
+  describes. Mock 19/19, and our 46/46 re-verified against that build.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
