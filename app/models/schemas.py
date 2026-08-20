@@ -38,6 +38,8 @@ class DocumentInfo(BaseModel):
     error: str | None = None
     doc_type: str | None = None      # e.g. icd10 | icd9cm | drg | billing
     edition: str | None = None       # e.g. "2024"
+    # read-first priority inside its upload box (1 = read first); None = unranked
+    rank: int | None = None
     uploaded_at: str = ""
 
 
@@ -47,8 +49,20 @@ class RebuildResponse(BaseModel):
 
 
 class RenameRequest(BaseModel):
-    """Change a document's display filename (source id and index untouched)."""
-    filename: str = Field(..., min_length=1, max_length=255)
+    """PATCH a document: display filename and/or its upload-box tag.
+
+    Both optional, at least one required. Changing doc_type rewrites the tag
+    on every indexed chunk in place (no re-embedding), so retrieval's box
+    filter follows immediately.
+    """
+    filename: str | None = Field(None, min_length=1, max_length=255)
+    doc_type: Literal["icd10", "icd9cm"] | None = None
+
+
+class OrderRequest(BaseModel):
+    """Read-first priority for one upload box: sources in reading order."""
+    doc_type: Literal["icd10", "icd9cm"]
+    sources: list[str] = Field(..., min_length=1)
 
 
 # --------------------------- Query -------------------------------
@@ -90,6 +104,9 @@ class QueryResponse(BaseModel):
     # Codes the answer cites that appear in NO retrieved chunk — the UI warns
     # instead of trusting them (medical grounding guard).
     unverified_codes: list[str] = Field(default_factory=list)
+    # Which upload box retrieval was routed to ("icd10" | "icd9cm"), or None
+    # when the question named no system and every chunk was searched.
+    code_system: str | None = None
 
 
 class RetrieveRequest(BaseModel):
@@ -103,6 +120,8 @@ class RetrieveResponse(BaseModel):
     question: str
     mode: str
     hits: list[RetrievedChunk]
+    # Which upload box retrieval was routed to ("icd10" | "icd9cm"), or None.
+    code_system: str | None = None
 
 
 # --------------------------- Misc --------------------------------

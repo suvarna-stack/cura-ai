@@ -27,10 +27,14 @@ router = APIRouter(tags=["chat"])
 @router.post("/retrieve", response_model=RetrieveResponse)
 def retrieve(req: RetrieveRequest) -> RetrieveResponse:
     """Retrieval only — instant answer to "which chunks match?", no LLM."""
-    mode, hits = rag.retrieve_chunks(req.question, top_k=req.top_k, mode=req.mode)
+    system = rag.detect_code_system(req.question)
+    wanted = system if system in ("icd10", "icd9cm") else None
+    mode, hits = rag.retrieve_chunks(req.question, top_k=req.top_k, mode=req.mode,
+                                     code_system=wanted)
     return RetrieveResponse(
         question=req.question,
         mode=mode,
+        code_system=wanted,
         hits=[
             RetrievedChunk(**{k: v for k, v in h.items() if k != "id"})
             for h in hits
@@ -72,6 +76,7 @@ def query(req: QueryRequest) -> QueryResponse:
             for c in result["contexts"]
         ],
         unverified_codes=result["unverified_codes"],
+        code_system=result["code_system"],
     )
 
 
@@ -108,7 +113,8 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
                         for c in payload["contexts"]
                     ]
                     yield _sse({"type": "meta", "mode": payload["mode"],
-                                "contexts": contexts})
+                                "contexts": contexts,
+                                "code_system": payload.get("code_system")})
                 else:
                     yield _sse({"type": "done", **payload})
         except Exception as exc:  # after headers are sent, errors must be events

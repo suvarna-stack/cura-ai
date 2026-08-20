@@ -152,6 +152,26 @@ class VectorStore:
             )
         return hits
 
+    def set_doc_type(self, source: str, doc_type: str | None) -> int:
+        """Rewrite doc_type on every chunk of one document IN PLACE — no
+        re-embedding. Retrieval's upload-box filter reads chunk metadata, so
+        a re-tag takes effect immediately. Returns chunks updated."""
+        collection = self._ensure_collection()
+        res = collection.get(where={"source": source}, include=["metadatas"])
+        ids = res.get("ids", [])
+        if not ids:
+            return 0
+        metadatas = []
+        for meta in res.get("metadatas", []):
+            meta = dict(meta or {})
+            if doc_type:
+                meta["doc_type"] = doc_type
+            else:
+                meta.pop("doc_type", None)  # Chroma rejects None values
+            metadatas.append(meta)
+        collection.update(ids=ids, metadatas=metadatas)
+        return len(ids)
+
     def count(self) -> int:
         return self._ensure_collection().count()
 

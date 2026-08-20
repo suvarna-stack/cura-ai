@@ -155,6 +155,48 @@ _ICD9_RE = re.compile(r"\b\d{2,3}\.\d{1,2}\b")
 # cap the union so the prompt stays small enough for CPU-budget latency.
 _MAX_CONTEXT_CHUNKS = 8
 
+# Read-first priority: score bonus for rank-1 documents (halves per rank).
+# Small on purpose — it breaks relevance ties, it does not override them.
+_RANK_BOOST = 0.04
+
+# Explicit "ICD-10" / "ICD-9" mentions (any spacing/dash, optional "-CM").
+_ICD10_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*10\b", re.IGNORECASE)
+_ICD9_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*9(?:[\s\-]*cm)?\b", re.IGNORECASE)
+
+
+def detect_code_system(text: str) -> str | None:
+    """Which upload box a question is about (2026-08-20 two-box split).
+
+    Returns "icd10" / "icd9cm" when the question names one system — explicitly
+    ("ICD-9", "icd10") or by code shape ("A09" is ICD-10, "93.27" is ICD-9) —
+    "mixed" when it names both, and None when it names neither. Explicit
+    mentions outrank code shapes so "what's the ICD-9 code for A09's disease?"
+    routes to ICD-9.
+    """
+    ten = bool(_ICD10_MENTION_RE.search(text))
+    nine = bool(_ICD9_MENTION_RE.search(text))
+    if not (ten or nine):
+        ten = bool(_ICD10_RE.search(text))
+        nine = bool(_ICD9_RE.search(text))
+    if ten and nine:
+        return "mixed"
+    if ten:
+        return "icd10"
+    if nine:
+        return "icd9cm"
+    return None
+
+
+def _system_filter(hits: list[dict[str, Any]], code_system: str | None,
+                   ) -> list[dict[str, Any]]:
+    """Keep chunks from the wanted upload box. Untagged chunks (uploads from
+    before the two-box split) serve BOTH systems, so legacy references keep
+    answering until they are re-uploaded through a box."""
+    if code_system not in ("icd10", "icd9cm"):
+        return hits
+    return [h for h in hits
+            if h.get("metadata", {}).get("doc_type") in (None, "", code_system)]
+
 
 def _codes_in(text: str) -> list[str]:
     """ICD-shaped tokens in reading order, deduplicated."""
@@ -225,23 +267,58 @@ def retrieve_chunks(
     question: str,
     top_k: int | None = None,
     mode: str | None = None,
+    code_system: str | None = "auto",
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Retrieval only — no LLM generation. Returns (resolved_mode, hits)."""
+    """Retrieval only — no LLM generation. Returns (resolved_mode, hits).
+
+    code_system routes retrieval to one upload box: "icd10" / "icd9cm" keep
+    only that box's chunks (plus untagged legacy ones), None searches every
+    chunk, and the default "auto" detects the system from the question.
+    """
     settings = get_settings()
     mode = (mode or settings.retrieval_mode).lower()
+    if code_system == "auto":
+        code_system = detect_code_system(question)
+    wanted = code_system if code_system in ("icd10", "icd9cm") else None
 
     if mode == "graph":
         hits = _graph_hits(question)
     else:
-        hits = _plain_hits(question, top_k or settings.top_k)
+        # fetch extra when filtering — the other box's chunks get discarded
+        k = top_k or settings.top_k
+        hits = _plain_hits(question, k * 2 if wanted else k)
+    if wanted:
+        hits = _system_filter(hits, wanted)[: top_k or settings.top_k]
+
+    # Admin-set read-first priority (rank 1 = first). A small score boost
+    # keeps top-ranked documents' chunks in the running when relevance ties.
+    ranks = {d["source"]: d["rank"] for d in registry.all_documents()
+             if d.get("rank")}
+    if ranks:
+        for h in hits:
+            r = ranks.get(h.get("source"))
+            if r:
+                h["score"] = h.get("score", 0.0) + _RANK_BOOST / r
+        hits.sort(key=lambda h: -h.get("score", 0.0))
 
     # Exact code matches outrank semantic hits: they ARE the answer for
     # dictionary-style questions, and they anchor the model on real entries.
-    code_hits = _code_hits(question)
+    code_hits = _system_filter(_code_hits(question), wanted)
     if code_hits:
         seen_ids = {h["id"] for h in code_hits}
         hits = code_hits + [h for h in hits if h.get("id") not in seen_ids]
-    return mode, _attach_display_names(hits[:_MAX_CONTEXT_CHUNKS])
+    hits = hits[:_MAX_CONTEXT_CHUNKS]
+
+    # Context reading order: exact code matches stay first, then chunks
+    # grouped by their document's priority — the top-ranked document is
+    # literally what the model reads first.
+    if ranks:
+        exact = [h for h in hits if str(h.get("via", "")).startswith("exact")]
+        rest = [h for h in hits if not str(h.get("via", "")).startswith("exact")]
+        rest.sort(key=lambda h: (ranks.get(h.get("source"), 10 ** 6),
+                                 -h.get("score", 0.0)))
+        hits = exact + rest
+    return mode, _attach_display_names(hits)
 
 
 _EMPTY_INDEX_MSG = ("I don't have any indexed documents to answer from yet. "
@@ -253,10 +330,12 @@ def _prepare(
     top_k: int | None,
     mode: str | None,
     history: list[dict[str, str]],
-) -> tuple[str, list[dict[str, Any]], list[dict[str, str]] | None]:
+) -> tuple[str, list[dict[str, Any]], list[dict[str, str]] | None, str | None]:
     """Shared retrieval + prompt assembly for the blocking and streaming paths.
 
-    Returns (mode, hits, messages); messages is None when the index is empty.
+    Returns (mode, hits, messages, code_system); messages is None when the
+    index is empty; code_system is the upload box retrieval was routed to
+    ("icd10" / "icd9cm") or None when both were searched.
     """
     # Follow-up questions ("what about for children?") are meaningless to the
     # retriever alone — prepend the previous user turn so the vector query
@@ -267,9 +346,17 @@ def _prepare(
     if prev_user:
         retrieval_query = f"{prev_user}\n{question}"
 
-    mode, hits = retrieve_chunks(retrieval_query, top_k=top_k, mode=mode)
+    # Route to one upload box when the question names a system; the CURRENT
+    # question wins, the previous turn only fills in for bare follow-ups.
+    system = detect_code_system(question)
+    if system is None and prev_user:
+        system = detect_code_system(prev_user)
+    wanted = system if system in ("icd10", "icd9cm") else None
+
+    mode, hits = retrieve_chunks(retrieval_query, top_k=top_k, mode=mode,
+                                 code_system=wanted)
     if not hits:
-        return mode, [], None
+        return mode, [], None, wanted
 
     context = _build_context(hits)
     keep = get_settings().chat_history_turns
@@ -290,7 +377,7 @@ def _prepare(
             "content": f"Context:\n{context}\n\nQuestion: {question}{lang_note}",
         },
     ]
-    return mode, hits, messages
+    return mode, hits, messages, wanted
 
 
 def answer_question(
@@ -301,16 +388,18 @@ def answer_question(
     mode: str | None = None,
     history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    mode, hits, messages = _prepare(question, top_k, mode, history or [])
+    mode, hits, messages, system = _prepare(question, top_k, mode, history or [])
     if messages is None:
         return {"question": question, "answer": _EMPTY_INDEX_MSG,
-                "mode": mode, "contexts": [], "unverified_codes": []}
+                "mode": mode, "contexts": [], "unverified_codes": [],
+                "code_system": system}
 
     answer = get_llm().generate(
         messages, max_new_tokens=max_new_tokens, temperature=temperature
     )
     return {"question": question, "answer": answer, "mode": mode,
-            "contexts": hits, "unverified_codes": _verify_codes(answer, hits)}
+            "contexts": hits, "unverified_codes": _verify_codes(answer, hits),
+            "code_system": system}
 
 
 def answer_stream(
@@ -327,8 +416,8 @@ def answer_stream(
     LLM generates, then ("done", {unverified_codes}) — contexts go out first so
     the UI can show sources while the answer is still typing.
     """
-    mode, hits, messages = _prepare(question, top_k, mode, history or [])
-    yield "meta", {"mode": mode, "contexts": hits}
+    mode, hits, messages, system = _prepare(question, top_k, mode, history or [])
+    yield "meta", {"mode": mode, "contexts": hits, "code_system": system}
     if messages is None:
         yield "delta", _EMPTY_INDEX_MSG
         yield "done", {"unverified_codes": []}

@@ -29,6 +29,7 @@ from app.models.schemas import (
     ExtractedCodesResponse,
     IngestResponse,
     IngestTextRequest,
+    OrderRequest,
     RebuildResponse,
     RenameRequest,
     UploadResponse,
@@ -239,16 +240,33 @@ def delete_source(source: str) -> DeleteResponse:
 
 
 @router.patch("/{source}", response_model=DocumentInfo)
-def rename_document(source: str, req: RenameRequest) -> DocumentInfo:
-    """Rename a document's display filename.
+def update_document(source: str, req: RenameRequest) -> DocumentInfo:
+    """Update a document's display filename and/or upload-box tag.
 
-    Display-only: the source id, saved file, chunk ids and index entries are
-    untouched, so no re-embedding is needed. The extension is preserved —
-    it drives text extraction on rebuild.
+    Renaming is display-only (source id, saved file, chunk ids untouched).
+    Re-tagging rewrites doc_type on every indexed chunk IN PLACE — no
+    re-embedding — so retrieval's box filter follows immediately; the doc
+    lands at the END of its new box's reading order.
     """
     entry = registry.get(source)
     if entry is None:
         raise HTTPException(status_code=404, detail=f"Unknown document '{source}'")
+    if req.filename is None and req.doc_type is None:
+        raise HTTPException(status_code=400,
+                            detail="Provide filename and/or doc_type")
+
+    fields: dict = {}
+    if req.doc_type is not None and req.doc_type != entry.get("doc_type"):
+        get_store().set_doc_type(source, req.doc_type)
+        fields["doc_type"] = req.doc_type
+        # newcomer reads last in its new box until the admin reorders
+        peers = [d.get("rank") or 0 for d in registry.all_documents()
+                 if d.get("doc_type") == req.doc_type and d["source"] != source]
+        fields["rank"] = (max(peers) + 1) if peers else 1
+    if req.filename is None:
+        updated = registry.upsert(source, **fields) if fields else entry
+        return DocumentInfo(**{k: v for k, v in updated.items()
+                               if k in DocumentInfo.model_fields})
 
     # Strip path components and characters that could confuse the UI/exports.
     new_name = req.filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
@@ -259,9 +277,34 @@ def rename_document(source: str, req: RenameRequest) -> DocumentInfo:
     ext = entry.get("ext") or _ext_of(entry.get("filename", "")) or ".pdf"
     if not new_name.lower().endswith(ext):
         new_name += ext
-    updated = registry.upsert(source, filename=new_name)
+    fields["filename"] = new_name
+    updated = registry.upsert(source, **fields)
     return DocumentInfo(**{k: v for k, v in updated.items()
                            if k in DocumentInfo.model_fields})
+
+
+@router.put("/order", response_model=list[DocumentInfo])
+def order_documents(req: OrderRequest) -> list[DocumentInfo]:
+    """Set the read-first priority inside one upload box.
+
+    Sources listed in reading order get rank 1..n. Rank orders the context
+    handed to the LLM (top document first) and gives its chunks a small
+    retrieval boost — see rag.retrieve_chunks.
+    """
+    for src in req.sources:
+        entry = registry.get(src)
+        if entry is None:
+            raise HTTPException(status_code=404,
+                                detail=f"Unknown document '{src}'")
+        if entry.get("doc_type") != req.doc_type:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{src}' is not in the {req.doc_type} box")
+    updated = [registry.upsert(src, rank=i)
+               for i, src in enumerate(req.sources, 1)]
+    return [DocumentInfo(**{k: v for k, v in u.items()
+                            if k in DocumentInfo.model_fields})
+            for u in updated]
 
 
 @router.post("/rebuild", response_model=RebuildResponse, status_code=202)
