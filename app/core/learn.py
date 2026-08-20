@@ -20,6 +20,8 @@ the regex path alone still produces a usable draft.
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import re
@@ -29,6 +31,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.config import get_settings
+from app.core import registry
 from app.core.vectorstore import get_store
 
 logger = logging.getLogger(__name__)
@@ -54,7 +57,8 @@ _TEACH_CUES = (
     "always code", "always use", "never code", "never use", "do not code",
     "don't code", "do not use", "don't use", "should be coded", "must be coded",
     "remember that", "note that", "rule:", "our hospital", "we code", "we use",
-    "learn this", "from now on", "instead of", "code first", "avoid coding",
+    "learn this", "learn that", "from now on", "instead of", "code first",
+    "avoid coding",
     "ให้ลง", "ต้องลง", "ไม่ต้องลง", "ห้ามลง", "ให้ใช้", "ต้องใช้", "ไม่ต้องใช้",
     "ห้ามใช้", "จำไว้", "จดจำ", "กฎ", "ที่โรงพยาบาล", "เราลง", "เราใช้",
     "ตามด้วย", "เป็นหลัก", "แทนที่จะ", "สอน",
@@ -135,6 +139,7 @@ def save_note(draft: dict[str, Any], created_by: str = "") -> dict[str, Any]:
         _save(data)
 
     _index(note)
+    export_reference_csvs()
     logger.info("Learned note %s saved (%d codes, doc_type=%s).",
                 note_id, len(note["codes"]), note.get("doc_type"))
     return note
@@ -151,6 +156,7 @@ def set_active(note_id: str, active: bool) -> dict[str, Any] | None:
         note["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         _save(data)
     _index(note)
+    export_reference_csvs()
     return note
 
 
@@ -162,6 +168,7 @@ def delete_note(note_id: str) -> bool:
         del data[note_id]
         _save(data)
     get_store().delete_by_source(LEARNED_PREFIX + note_id)
+    export_reference_csvs()
     return True
 
 
@@ -183,6 +190,102 @@ def bump_hits(note_ids: list[str]) -> None:
 def _new_id() -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
     return f"ln_{stamp}_{uuid.uuid4().hex[:6]}"
+
+
+# --------------------------- admin-page CSV export ---------------------------
+# What the AI learned must be visible where the admin already looks: every
+# change to the taught rules regenerates one CSV per code system in the
+# uploads folder and registers it in the document registry under the matching
+# upload box, so "Learned rules ICD-10.csv" sits in the ICD-10 box of the
+# AI Training page next to the uploaded references. The file is a generated
+# VIEW of learned_notes.json — never the source of truth, always safe to
+# delete (it comes back on the next taught rule). Because it is a real
+# registered upload, "Train AI" re-ingests it and "Sync codes to system DB"
+# reads taught codes like any other reference.
+
+_EXPORT_HEADER = ("code", "description", "role", "scenario", "rule", "reason",
+                  "taught_by", "taught_on")
+_EXPORTS = {
+    "ICD-10": {"doc_type": "icd10", "source": "Learned rules ICD-10",
+               "filename": "Learned rules ICD-10.csv"},
+    "ICD-9": {"doc_type": "icd9cm", "source": "Learned rules ICD-9",
+              "filename": "Learned rules ICD-9.csv"},
+}
+_EXPORT_ROWS_PER_PAGE = 50   # keep in sync with documents._CSV_ROWS_PER_PAGE
+
+
+def export_reference_csvs() -> None:
+    """Regenerate the per-system learned-rules CSVs. Never raises — a failed
+    export must not break saving the note itself (the JSON store already has
+    it, and the next save retries the export)."""
+    try:
+        _export_reference_csvs()
+    except Exception:
+        logger.exception("Learned-rules CSV export failed (notes are safe)")
+
+
+def _export_reference_csvs() -> None:
+    notes = all_notes(include_inactive=False)
+    for system, spec in _EXPORTS.items():
+        rows: list[list[str]] = []
+        # oldest first: a reference file grows at the bottom, like a logbook
+        for note in reversed(notes):
+            for c in note.get("codes", []):
+                if c.get("system") != system:
+                    continue
+                rows.append([
+                    c.get("code", ""),
+                    c.get("description", ""),
+                    c.get("role", "secondary"),
+                    note.get("scenario", ""),
+                    note.get("rule", ""),
+                    note.get("reason", ""),
+                    note.get("created_by", ""),
+                    (note.get("created_at") or "")[:10],
+                ])
+        _write_export(spec, rows)
+
+
+def _write_export(spec: dict[str, str], rows: list[list[str]]) -> None:
+    source = spec["source"]
+    path = get_settings().upload_dir / spec["filename"]
+
+    if not rows:
+        # last rule of this system gone -> the generated file goes with it
+        if registry.get(source) is not None:
+            registry.remove(source)
+        if path.exists():
+            path.unlink()
+        try:                     # chunks only exist if a rebuild ingested it
+            get_store().delete_by_source(source)
+        except Exception:
+            pass
+        return
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(_EXPORT_HEADER)
+    writer.writerows(rows)
+    raw = buf.getvalue().encode("utf-8-sig")   # BOM: Excel opens Thai correctly
+    path.write_bytes(raw)
+
+    entry = registry.get(source) or {}
+    fields: dict[str, Any] = {
+        "filename": spec["filename"],
+        "ext": ".csv",
+        "size_bytes": len(raw),
+        "pages": (len(rows) + _EXPORT_ROWS_PER_PAGE - 1) // _EXPORT_ROWS_PER_PAGE,
+        "chunks": len(rows),
+        "status": "indexed",     # each note is embedded individually on save
+        "progress": 100,
+        "error": None,
+        "doc_type": spec["doc_type"],
+    }
+    if not entry.get("rank"):    # newcomer reads last in its box
+        peers = [d.get("rank") or 0 for d in registry.all_documents()
+                 if d.get("doc_type") == spec["doc_type"] and d["source"] != source]
+        fields["rank"] = (max(peers) + 1) if peers else 1
+    registry.upsert(source, **fields)
 
 
 def _index(note: dict[str, Any]) -> None:
@@ -314,6 +417,16 @@ def _is_thai(text: str) -> bool:
 
 # --------------------------- intent ---------------------------
 
+# An instruction verb aimed directly at a code is teaching even without a
+# global cue word — "post-op wound infection: use T81.4, not R50.9". So is a
+# declarative fact ("the code for game addiction is F63.8"). Lowercase
+# because classify_intent matches on the lowercased text.
+_CODE_SHAPE = r"(?:[a-z]\d{2}(?:\.\d{1,4})?|\d{2,3}\.\d{1,2})"
+_INSTRUCT_CODE_RE = re.compile(rf"\b(?:use|code|add|ลง|ใช้)\s+{_CODE_SHAPE}")
+_NOT_CODE_RE = re.compile(rf"\b(?:not|ไม่ใช่)\s+{_CODE_SHAPE}")
+_IS_CODE_RE = re.compile(rf"\b(?:is|=|คือ)\s*{_CODE_SHAPE}")
+
+
 def classify_intent(text: str) -> dict[str, Any]:
     """Is the coder ASKING a question or TEACHING a rule?
 
@@ -326,6 +439,8 @@ def classify_intent(text: str) -> dict[str, Any]:
         return {"intent": "ask", "confidence": 0}
 
     teach = sum(1 for cue in _TEACH_CUES if cue in low)
+    teach += sum(1 for pat in (_INSTRUCT_CODE_RE, _NOT_CODE_RE, _IS_CODE_RE)
+                 if pat.search(low))
     ask = sum(1 for cue in _ASK_CUES if cue in low)
     has_code = bool(_ICD10_RE.search(text) or _ICD9_RE.search(text))
 
@@ -486,6 +601,11 @@ def _regex_extract(text: str) -> dict[str, Any]:
                       "system": "ICD-10" if code[0].isalpha() else "ICD-9",
                       "description": "",
                       "role": roles.get(code, "secondary")})
+    # "the code for X is Y": a single declared code is the principal answer
+    if len(codes) == 1 and codes[0]["role"] == "secondary" \
+            and _IS_CODE_RE.search(text.lower()):
+        codes[0]["role"] = "principal"
+
     # Codes keep the order they were typed in; the coder's order IS the
     # sequencing instruction ("E11.22 then N17.9").
     return {
@@ -554,12 +674,25 @@ def _occurrences(haystack: str, needle: str) -> list[int]:
 _INSTRUCTION_CUES = ("code ", "add ", "use ", "ลง ", "ใช้ ")
 
 
+# "…code for <condition> is <CODE>" — the condition sits between the two.
+_FACT_SCENARIO_RE = re.compile(
+    r"(?:\bfor|ของ|สำหรับ)\s*(.+?)\s*(?:\bis\b|คือ|=)", re.IGNORECASE)
+
+
 def _scenario_of(text: str) -> str:
     """The clinical half of the sentence — everything before the instruction.
 
     Coders write "situation: what to do", in both languages, so a colon wins
     outright; otherwise the first instruction word marks the boundary.
     """
+    # Declarative fact — "icd 10 code for game addiction is F63.8": the
+    # scenario is the condition, not the boilerplate around it.
+    m = _FACT_SCENARIO_RE.search(text)
+    if m:
+        head = _trim(_ICD10_RE.sub("", _ICD9_RE.sub("", m.group(1))), 240)
+        if len(head) >= 3:
+            return head
+
     colon = text.find(":")
     if 8 <= colon <= 160:
         return _trim(_ICD10_RE.sub("", _ICD9_RE.sub("", text[:colon])), 240)

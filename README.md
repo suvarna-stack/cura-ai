@@ -157,6 +157,14 @@ scenario comes back: `/chat` cites it as "Coder note — {author}" and returns
 it in `learned_notes`, and `/suggest` puts its codes at the top of a case's
 suggestions and **removes** any code it marked `exclude`.
 
+Every change to the taught rules also regenerates one CSV per code system —
+`Learned rules ICD-10.csv` / `Learned rules ICD-9.csv` in `data/uploads/` —
+registered in the document registry under the matching upload box, so the
+learned knowledge shows up on the admin AI Training page next to the uploaded
+references. The CSV is a generated view of `learned_notes.json` (safe to
+delete — it comes back on the next taught rule); being a real registered
+upload, "Train AI" re-ingests it and code sync reads taught codes from it.
+
 Two properties this deliberately keeps:
 
 - **Nothing is trained.** Learning is retrieval-time. Every rule is listed,

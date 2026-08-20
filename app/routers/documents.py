@@ -449,15 +449,23 @@ _CSV_CODE_RE = re.compile(r"^[A-Z]\d{2}(?:\.\d{1,2})?$")
 
 def _codes_from_csv(raw: bytes) -> list[tuple[str, str]]:
     """(code, title) pairs from a CSV: per row, the first cell that looks like
-    an ICD code + the longest other text cell as its title."""
-    _, rows = _csv_rows(raw)
+    an ICD code + its title — the description/title column when the header
+    names one (e.g. the generated learned-rules CSVs), else the longest other
+    text cell."""
+    header, rows = _csv_rows(raw)
+    title_col = next((i for i, h in enumerate(header)
+                      if h.lower() in ("description", "title", "name")), None)
     out: list[tuple[str, str]] = []
     for row in rows:
         code = next((c for c in row if _CSV_CODE_RE.match(c)), None)
         if not code:
             continue
-        title = max((c for c in row if c != code and not _CSV_CODE_RE.match(c)),
-                    key=len, default="")
+        title = ""
+        if title_col is not None and title_col < len(row):
+            title = row[title_col]
+        if not title or _CSV_CODE_RE.match(title):
+            title = max((c for c in row if c != code and not _CSV_CODE_RE.match(c)),
+                        key=len, default="")
         title = _clean_title(title) if title else None
         if title:
             out.append((code, title))

@@ -5,15 +5,17 @@ forced down its deterministic path, which is exactly the path that has to work
 when the model is missing or too small to produce JSON.
 """
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from app.core import learn
+from app.core import learn, registry
 
 
 @pytest.fixture
 def store(monkeypatch, tmp_path):
-    """Isolated note file + a fake vector store that records what was indexed."""
+    """Isolated note file + registry/uploads + a fake vector store that
+    records what was indexed."""
     calls = {"added": [], "deleted": []}
 
     class FakeStore:
@@ -29,9 +31,16 @@ def store(monkeypatch, tmp_path):
         def find_text(self, needle, limit=2):
             return []
 
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir()
+    settings = SimpleNamespace(data_dir=tmp_path, upload_dir=upload_dir,
+                               registry_path=tmp_path / "documents.json")
+    monkeypatch.setattr(learn, "get_settings", lambda: settings)
+    monkeypatch.setattr(registry, "get_settings", lambda: settings)
     monkeypatch.setattr(learn, "get_store", lambda: FakeStore())
     monkeypatch.setattr(learn, "_path", lambda: tmp_path / "learned_notes.json")
     monkeypatch.setattr(learn, "_llm_extract", lambda text: None)
+    calls["upload_dir"] = upload_dir
     return calls
 
 
@@ -40,6 +49,10 @@ def store(monkeypatch, tmp_path):
 @pytest.mark.parametrize("text", [
     "Always code E11.22 as principal for diabetic AKI",
     "For post-op wound infection do not code R50.9, use T81.4 instead",
+    # instruction verb aimed at a code — no global cue word at all
+    "Post-op fever with wound infection after appendectomy: use T81.4, not R50.9.",
+    # declarative fact: "the code for X is Y"
+    "icd 10 code for game addiction is F63.8",
     "ผู้ป่วยเบาหวานที่มี AKI ให้ลง E11.22 เป็นหลัก ตามด้วย N17.9",
 ])
 def test_teaching_is_detected(text):
@@ -49,6 +62,12 @@ def test_teaching_is_detected(text):
 @pytest.mark.parametrize("text", [
     "What does code A09 cover?",
     "Which ICD-10 code applies to chest pain?",
+    "Can I use T81.4 for post-op fever?",
+    "What is I33?",
+    "What is the icd 10 code for cholera?",
+    "Patient has chest pain and ST elevation on ECG. What ICD codes apply?",
+    "Diabetic patient with acute kidney injury. Suggest primary and comorbidity codes.",
+    "Post-op fever after appendectomy. Chief complaint: abdominal pain.",
     "รหัส A09 ครอบคลุมอะไรบ้าง?",
 ])
 def test_questions_are_not_teaching(text):
@@ -96,6 +115,14 @@ def test_thai_rule_extracts_and_marks_language(store):
 def test_scenario_stops_before_the_instruction(store, text, expected):
     """WHEN describes the patient; what to do belongs in RULE."""
     assert learn.extract_note(text)["scenario"].lower() == expected
+
+
+def test_declarative_fact_extracts_scenario_and_principal(store):
+    """"the code for X is Y" — Y is THE code, X is the scenario."""
+    draft = learn.extract_note("icd 10 code for game addiction is F63.8")
+    assert draft["scenario"] == "game addiction"
+    assert [(c["code"], c["role"]) for c in draft["codes"]] == [
+        ("F63.8", "principal")]
 
 
 def test_use_x_not_y_phrasing(store):
@@ -275,3 +302,58 @@ def test_hits_are_counted_when_a_rule_fires(store):
     learn.bump_hits([note["id"]])
     learn.bump_hits([note["id"]])
     assert learn.get_note(note["id"])["hits"] == 2
+
+
+# --------------------------- admin-page CSV export ---------------------------
+
+def _csv_lines(store, filename):
+    path = store["upload_dir"] / filename
+    return path.read_text(encoding="utf-8-sig").splitlines() if path.exists() else None
+
+
+def test_saved_rule_lands_in_the_icd10_box_as_csv(store):
+    learn.save_note(learn.extract_note(
+        "Diabetic patient with acute kidney injury: code E11.22 as principal, "
+        "add N17.9, do not code N18.9."), created_by="Frank")
+
+    lines = _csv_lines(store, "Learned rules ICD-10.csv")
+    assert lines[0].startswith("code,description,role")
+    assert len(lines) == 4                               # header + 3 codes
+    assert lines[1].startswith("E11.22,") and ",principal," in lines[1]
+    assert ",Frank," in lines[1]
+
+    entry = registry.get("Learned rules ICD-10")
+    assert entry["doc_type"] == "icd10"
+    assert entry["status"] == "indexed" and entry["chunks"] == 3
+    # nothing taught for ICD-9 -> no ICD-9 file, no registry entry
+    assert _csv_lines(store, "Learned rules ICD-9.csv") is None
+    assert registry.get("Learned rules ICD-9") is None
+
+
+def test_icd9_rule_lands_in_the_icd9_box(store):
+    learn.save_note(learn.extract_note(
+        "Always code 45.13 for diagnostic small-bowel endoscopy."))
+    assert registry.get("Learned rules ICD-9")["doc_type"] == "icd9cm"
+    assert _csv_lines(store, "Learned rules ICD-9.csv")[1].startswith("45.13,")
+
+
+def test_muting_and_deleting_shrink_the_csv(store):
+    a = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."))
+    learn.save_note(learn.extract_note("Always code J18.9 for pneumonia NOS."))
+    assert len(_csv_lines(store, "Learned rules ICD-10.csv")) == 3
+
+    learn.set_active(a["id"], False)                     # muted -> out of the file
+    lines = _csv_lines(store, "Learned rules ICD-10.csv")
+    assert len(lines) == 2 and lines[1].startswith("J18.9,")
+
+    for n in learn.all_notes():
+        learn.delete_note(n["id"])                       # last rule gone -> file gone
+    assert _csv_lines(store, "Learned rules ICD-10.csv") is None
+    assert registry.get("Learned rules ICD-10") is None
+
+
+def test_export_failure_never_breaks_saving(monkeypatch, store):
+    monkeypatch.setattr(learn, "_export_reference_csvs",
+                        lambda: (_ for _ in ()).throw(OSError("disk full")))
+    note = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."))
+    assert learn.get_note(note["id"]) is not None
