@@ -229,6 +229,58 @@ public class RagApiClient {
         return postJson("/suggest", body);
     }
 
+    // --- Suggest & Learn: coder-taught rules layered over the references ---
+
+    /** POST /learn/classify — is this chat message a question or a rule? */
+    public Map<String, Object> classifyIntent(Map<String, Object> body) {
+        return postJson("/learn/classify", body);
+    }
+
+    /** POST /learn/extract — free text -> draft note. Stores nothing. */
+    public Map<String, Object> extractNote(Map<String, Object> body) {
+        return postJson("/learn/extract", body);
+    }
+
+    /** POST /learn/notes — save a confirmed draft and index it for retrieval. */
+    public Map<String, Object> saveNote(Map<String, Object> body) {
+        return postJson("/learn/notes", body);
+    }
+
+    /** GET /learn/notes — every taught rule, newest first. */
+    public Map<String, Object> notes() {
+        try {
+            return http.get().uri("/learn/notes").retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** PATCH /learn/notes/{id}?active= — mute or un-mute a rule. */
+    public Map<String, Object> toggleNote(String noteId, boolean active) {
+        try {
+            return http.patch()
+                    .uri(uriBuilder -> uriBuilder.path("/learn/notes/{id}")
+                            .queryParam("active", active).build(noteId))
+                    .retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** DELETE /learn/notes/{id} — forget a rule (note + indexed chunk). */
+    public Map<String, Object> deleteNote(String noteId) {
+        try {
+            return http.delete().uri("/learn/notes/{id}", noteId).retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** POST /learn/match — which taught rules apply to this narrative? */
+    public Map<String, Object> matchNotes(Map<String, Object> body) {
+        return postJson("/learn/match", body);
+    }
+
     private Map<String, Object> postJson(String uri, Map<String, Object> body) {
         try {
             return http.post().uri(uri)

@@ -47,6 +47,7 @@ class OpenApiDocsTest {
             "/api/sync",
             "/api/cases/{caseId}/sync",
             "/api/icd-codes",
+            "/api/icd-codes/lookup",
             "/api/analytics",
             "/api/auth/login",
             "/api/auth/logout",
@@ -57,13 +58,22 @@ class OpenApiDocsTest {
             "/api/admin/dashboard",
             "/api/admin/knowledge/docs",
             "/api/admin/knowledge/docs/{source}",
+            "/api/admin/knowledge/docs/order",
             "/api/admin/knowledge/stats",
             "/api/admin/knowledge/train",
             "/api/admin/knowledge/sync-codes",
             "/api/admin/knowledge/retrieve",
             "/api/admin/knowledge/chat",
             "/api/agent/chat",
-            "/api/agent/chat/stream");
+            "/api/agent/chat/stream",
+            "/api/agent/conversations",
+            "/api/agent/conversations/{id}",
+            "/api/agent/conversations/{id}/messages",
+            "/api/agent/learn/classify",
+            "/api/agent/learn/extract",
+            "/api/agent/learn/match",
+            "/api/agent/learn/notes",
+            "/api/agent/learn/notes/{noteId}");
 
     @Autowired
     private MockMvc mvc;

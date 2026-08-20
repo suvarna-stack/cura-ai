@@ -727,6 +727,65 @@ Latency: the answer comes from a local CPU LLM — tens of seconds normally,
 minutes on the first-ever call while the model downloads and loads. Frontends
 should show a progress/typing state and must not retry on a slow response.
 
+Answers also carry `learned_notes` (and the SSE `meta` event does too) — the
+coder-taught rules that matched the question and were pinned into the
+context. See below.
+
+### /api/agent/learn/** — Suggest & Learn (coder-taught rules)
+
+The coder teaches a coding rule in plain language (English or Thai) and it
+becomes an extra layer retrieval reads **on top of** the uploaded ICD
+references. Nothing is fine-tuned: a rule is a stored note, embedded as one
+chunk in the same index as the reference PDFs, listed, attributed, mutable
+and deletable. **Any valid token** (either role); `created_by` is taken from
+the token, never from the body.
+
+```jsonc
+POST /api/agent/learn/classify   { "text": "..." }
+  -> { "intent": "teach" | "ask", "confidence": 86 }
+
+POST /api/agent/learn/extract    { "text": "Diabetic patient with AKI: code
+                                            E11.22 as principal, add N17.9,
+                                            do not code N18.9." }
+  -> {                                    // a DRAFT — nothing is stored yet
+       "scenario": "Diabetic patient with acute kidney injury",
+       "codes": [ { "code": "E11.22", "system": "ICD-10",
+                    "description": "", "role": "principal" },
+                  { "code": "N17.9", "role": "secondary", ... },
+                  { "code": "N18.9", "role": "exclude", ... } ],
+       "rule": "code E11.22 as principal; add N17.9; do not code N18.9",
+       "reason": "", "language": "en", "doc_type": "icd10",
+       "extraction": "llm" | "rules"      // which path produced it
+     }
+
+POST /api/agent/learn/notes      { "note": { ...the confirmed draft... } }
+  -> the stored note (`id`, `created_by`, `created_at`, `hits`)
+GET  /api/agent/learn/notes      -> { "notes": [ ... ] }   // incl. muted
+PATCH  /api/agent/learn/notes/{id}?active=false            // mute, keep
+DELETE /api/agent/learn/notes/{id}  -> { "deleted": 1 }
+POST /api/agent/learn/match      { "text": "...", "limit": 3 }
+  -> { "notes": [ { "id", "summary", "scenario", "rule", "codes",
+                    "created_by", "via" } ] }
+```
+
+Extract and save are **separate calls on purpose**: nothing enters the
+knowledge layer until a human has confirmed what the AI understood. Grounding
+guards: codes the model proposes are dropped unless they appear in the
+coder's own text, prompt-echo prose is discarded, and a `reason` is recorded
+only when the coder actually gave one.
+
+Effects once a rule is stored:
+
+- `/api/agent/chat[/stream]` — the rule is pinned above the general
+  references, cited as `Coder note — {author}`, and returned in
+  `learned_notes` for the UI callout.
+- `POST /api/cases/{caseId}/suggest-codes` — response gains `notes`
+  (`{id, summary, scenario, rule, codes, createdBy, via}`) for the
+  "Learned note applies" callout; the rule's codes lead the suggestion list
+  (`confidence` 99 principal / 96 secondary, `source: "coder note (Frank)"`),
+  and any code it marked `exclude` is **removed** from the suggestions even
+  when the reference PDFs offered it.
+
 ## Downstream: the hospital iMed API
 
 On approve/reopen this backend calls the hospital's REAL write contract —

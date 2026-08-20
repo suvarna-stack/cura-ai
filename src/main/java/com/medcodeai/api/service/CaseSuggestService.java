@@ -84,6 +84,10 @@ public class CaseSuggestService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("caseId", caseId);
         out.put("codes", codes);
+        // Suggest & Learn: rules a coder taught that match THIS narrative. They
+        // ride along with the suggestions so the case page can point them out
+        // above the machine's own guesses.
+        out.put("notes", notes(ragOut.get("notes")));
         out.put("mode", ragOut.getOrDefault("mode", "plain"));
         out.put("hitsUsed", ragOut.getOrDefault("hits_used", 0));
         out.put("clinicalChars", clinical.length());
@@ -123,6 +127,29 @@ public class CaseSuggestService {
             }
         }
         return false;
+    }
+
+    /** Whitelist the fields the case page renders; drop anything unshaped. */
+    private static List<Map<String, Object>> notes(Object raw) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!(raw instanceof List<?> list)) {
+            return out;
+        }
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m) || !(m.get("id") instanceof String id)) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", id);
+            row.put("summary", str(m.get("summary")));
+            row.put("scenario", str(m.get("scenario")));
+            row.put("rule", str(m.get("rule")));
+            row.put("codes", m.get("codes") instanceof List<?> c ? c : List.of());
+            row.put("createdBy", str(m.get("created_by")));
+            row.put("via", str(m.get("via")));
+            out.add(row);
+        }
+        return out;
     }
 
     private static String str(Object o) {

@@ -394,6 +394,10 @@ export interface SuggestedCode {
 export interface SuggestCodesResponse {
   caseId: string;
   codes: SuggestedCode[];
+  /** Coder-taught rules (Suggest & Learn) matching this case's narrative —
+   *  render as a "Learned note applies" callout above the suggestions. Their
+   *  codes already lead `codes`, and codes they exclude are already gone. */
+  notes: AppliedNote[];
   /** RAG retrieval mode; "none" when there was no clinical text to send. */
   mode: "graph" | "plain" | "none";
   /** Retrieved chunks the suggester saw. */
@@ -691,6 +695,8 @@ export interface AgentChatResponse {
   contexts: AgentChatContext[];
   /** ICD codes the answer cites that appear in NO retrieved chunk — warn, don't trust */
   unverified_codes: string[];
+  /** coder-taught rules that matched this question and shaped the answer */
+  learned_notes: AppliedNote[];
 }
 
 // POST /api/agent/chat/stream — same request body, answered as
@@ -698,7 +704,102 @@ export interface AgentChatResponse {
 // order: one "meta" (sources first), many "delta", then a terminal "done" —
 // or a terminal "error" (mid-stream failures can't use an HTTP status).
 export type AgentChatStreamEvent =
-  | { type: "meta"; mode: string; contexts: AgentChatContext[] }
+  | { type: "meta"; mode: string; contexts: AgentChatContext[];
+      learned_notes: AppliedNote[] }
   | { type: "delta"; text: string }
   | { type: "done"; unverified_codes: string[] }
   | { type: "error"; message: string };
+
+// ---------- Suggest & Learn: /api/agent/learn/** ----------
+//
+// A coder teaches a coding rule in plain language (English or Thai); it is
+// extracted into a structured note, confirmed on screen, then stored AND
+// embedded into the same index as the reference PDFs. Nothing is fine-tuned:
+// the rule is listed, attributed, mutable and deletable. Any valid token;
+// `created_by` comes from the token, never the body.
+
+/** One ICD code inside a taught rule, with the job the coder gave it. */
+export interface LearnedCode {
+  code: string;
+  system: "ICD-10" | "ICD-9";
+  description: string;
+  /** principal = code first · secondary = add alongside · exclude = do NOT code */
+  role: "principal" | "secondary" | "exclude";
+}
+
+/** POST /api/agent/learn/extract (draft) and /notes (stored). */
+export interface LearnedNote {
+  /** "" on a draft; "ln_<yyyymmdd>_<hex>" once stored. */
+  id: string;
+  /** WHEN the rule applies — the clinical half of the coder's sentence. */
+  scenario: string;
+  codes: LearnedCode[];
+  /** what to do, one sentence, built from the codes and their roles */
+  rule: string;
+  /** only ever the coder's own justification — never the model's */
+  reason: string;
+  /** exactly what the coder typed */
+  raw_text: string;
+  language: string;
+  /** "icd10" | "icd9cm" | null (mixed) — which upload box it belongs to */
+  doc_type: string | null;
+  /** false = muted: kept in the list, pulled out of the index */
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  /** times this rule has fired in an answer or a case suggestion */
+  hits: number;
+  /** "llm" when the model parsed the sentence, "rules" when the fallback did */
+  extraction: string;
+}
+
+/** Compact form returned with an answer / suggestion, for the UI callout. */
+export interface AppliedNote {
+  id: string;
+  /** one-line rendering: scenario → codes (not excluded) · rule */
+  summary: string;
+  scenario: string;
+  rule: string;
+  codes: LearnedCode[];
+  /** snake_case on the agent chat routes, camelCase on suggest-codes */
+  created_by?: string;
+  createdBy?: string;
+  created_at?: string;
+  /** why it fired, e.g. "learned note (80% match)" */
+  via: string;
+}
+
+/** POST /api/agent/learn/classify — advisory; it never stores anything. */
+export interface ClassifyIntentResponse {
+  intent: "teach" | "ask";
+  /** 0-100; 0 when the intent is "ask" */
+  confidence: number;
+}
+
+/** POST /api/agent/learn/extract — plain language in, DRAFT out (no write). */
+export interface ExtractNoteRequest {
+  text: string;
+}
+
+/** POST /api/agent/learn/notes — save the draft the coder confirmed/edited.
+ *  Passing an existing `note.id` edits that rule in place. */
+export interface SaveNoteRequest {
+  note: LearnedNote;
+}
+
+/** GET /api/agent/learn/notes — includes muted rules. */
+export interface NotesResponse {
+  notes: LearnedNote[];
+}
+
+/** POST /api/agent/learn/match — which rules apply to this narrative? */
+export interface MatchNotesRequest {
+  text: string;
+  /** 1-10, default 3 */
+  limit?: number;
+}
+
+export interface MatchNotesResponse {
+  notes: AppliedNote[];
+}
