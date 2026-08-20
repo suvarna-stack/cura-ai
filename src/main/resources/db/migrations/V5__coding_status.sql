@@ -1,6 +1,4 @@
--- Manual mirror of config/SchemaBootstrap.java (the runner applies this
--- idempotently at every startup; this file exists for reference and for
--- environments where you want to run the DDL by hand).
+-- V5 — coding_status on the visit row.
 --
 -- Context: coding_status is the visit's MEDICAL-CODING workflow state, the
 -- hospital-side twin of medcode's own cases.case_status. MedCode AI sets it

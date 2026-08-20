@@ -1,6 +1,4 @@
--- Manual mirror of config/SchemaBootstrap.java (the runner applies this
--- idempotently at every startup; this file exists for reference and for
--- environments where you want to run the DDL by hand).
+-- V3 — updated_at, backing the changed_since filter.
 --
 -- Context: updated_at backs GET /api/cases?changed_since= — the visit-level
 -- "changed since" filter MedCode AI asked for (open question 16 in

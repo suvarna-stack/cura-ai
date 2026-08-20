@@ -65,90 +65,39 @@ class ImedMockApiIntegrationTest {
     }
 
     @Test
-    void casesListsAllPatientsVerbatim() throws Exception {
-        JsonNode cases = getJson("/api/cases");
-        assertTrue(cases.isArray() && cases.size() > 0);
-        assertTrue(cases.get(0).has("transactionnumber"), "extract column names served verbatim");
-        assertTrue(cases.get(0).has("healthcoverage"));
-    }
+    void updateCheckSeesApiWrites() throws Exception {
+        assertEquals(0, changedSince("2100-01-01").size(), "nothing changed after the far future");
 
-    @Test
-    void casesListWindowsOnVisitDatetime() throws Exception {
-        // from/to filter on the visit datetime (TN positions 4-15, since the
-        // extract's admissiondatetime is blank); whole-day bounds, inclusive
-        JsonNode windowed = getJson("/api/cases?from=2026-07-24&to=2026-07-25");
-        assertTrue(windowed.size() > 0, "seeded visits exist on 2026-07-24/25");
-        JsonNode all = getJson("/api/cases");
-        assertTrue(windowed.size() < all.size(), "window must actually filter");
-        for (JsonNode c : windowed) {
-            String day = c.get("transactionnumber").asString().substring(3, 9);
-            assertTrue(day.equals("260724") || day.equals("260725"),
-                    "visit outside window served: " + c.get("transactionnumber"));
-        }
-        // datetime bounds narrow within a day; out-of-range is empty, not an error
-        String afternoon = mvc.perform(get("/api/cases")
-                        .param("from", "2026-07-24 14:00").param("to", "2026-07-24T23:59"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        assertTrue(json.readTree(afternoon).size() > 0, "T and space datetime forms both accepted");
-        assertEquals(0, getJson("/api/cases?from=2030-01-01").size());
-        mvc.perform(get("/api/cases").param("from", "tuesday"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void casesListChangedSinceSeesApiWrites() throws Exception {
-        String farFuture = "2100-01-01";
-        assertEquals(0, getJson("/api/cases?changed_since=" + farFuture).size());
-
-        // a write through /api/v1 stamps updated_at → the case (visit dated
-        // 2026-07-24) surfaces for a changed_since long after its visit
+        // a write through /api/v1 stamps the visit → it surfaces for a
+        // changed_since long after its own visit date (2026-07-24)
         String today = java.time.LocalDate.now().toString();
         JsonNode created = postDiagnosis(rid(), "Z01.8", "Other specified special examinations",
                 null, null);
         String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         try {
-            assertTrue(containsTn(getJson("/api/cases?changed_since=" + today), KNOWN_TN),
-                    "written case must match changed_since");
+            assertTrue(contains(changedSince(today), KNOWN_TN),
+                    "a written visit must be reported as changed");
         } finally {
             mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
                     .header("Authorization", AUTH)).andExpect(status().isOk());
         }
-        // a cancel is a change too — the case still matches after cleanup
-        assertTrue(containsTn(getJson("/api/cases?changed_since=" + today), KNOWN_TN));
+        // a cancel is a change too — the visit still matches after cleanup
+        assertTrue(contains(changedSince(today), KNOWN_TN));
     }
 
-    private static boolean containsTn(JsonNode cases, String tn) {
-        for (JsonNode c : cases) {
-            if (tn.equals(c.get("transactionnumber").asString())) {
+    /** R1's visit_ids for a bound. */
+    private JsonNode changedSince(String bound) throws Exception {
+        return postV1Json("/api/v1/cases/check", "{\"changed_since\":\"" + bound + "\"}")
+                .get("visit_ids");
+    }
+
+    private static boolean contains(JsonNode ids, String tn) {
+        for (JsonNode id : ids) {
+            if (tn.equals(id.asString())) {
                 return true;
             }
         }
         return false;
-    }
-
-    @Test
-    void perCaseTablesServeRowsForKnownCase() throws Exception {
-        // The demo dataset starts UNCODED (2026-08-05 empty-start-state prep):
-        // diagnoses/procedures are empty until a write-back lands, so assert
-        // the clinical tables that do ship rows.
-        JsonNode notes = getJson("/api/cases/" + KNOWN_TN + "/medical-records");
-        assertTrue(notes.size() > 0, "known case has clinical note rows");
-        assertTrue(notes.get(0).has("recorddatetime"), "extract column names served verbatim");
-        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/orders/labs").size() > 0);
-        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/vital-signs").size() > 0);
-        assertTrue(getJson("/api/cases/" + KNOWN_TN + "/diagnoses").isArray(),
-                "uncoded case serves [] (not an error) for diagnoses");
-    }
-
-    @Test
-    void icdCatalogsServeReferenceRows() throws Exception {
-        JsonNode ten = getJson("/api/icd10-codes");
-        JsonNode nine = getJson("/api/icd9-codes");
-        assertTrue(ten.isArray() && ten.size() > 0, "ICD-10 catalog seeded at bootstrap");
-        assertTrue(nine.isArray() && nine.size() > 0, "ICD-9 catalog seeded at bootstrap");
-        assertTrue(ten.get(0).has("code") && ten.get(0).has("description"));
-        assertTrue(nine.get(0).has("code") && nine.get(0).has("description"));
     }
 
     // ---- demo baseline (mock-only tooling) ----------------------------------
@@ -171,17 +120,17 @@ class ImedMockApiIntegrationTest {
         try {
             mvc.perform(post("/api/demo/snapshot")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.ok").value(true));
-            int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
+            int diagsBefore = caseObject(KNOWN_TN).get("diagnoses").size();
 
             // a write-back lands...
             postDiagnosis(rid(), "Z00.0", "General medical examination", "89.7",
                     "General physical examination");
-            assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+            assertEquals(diagsBefore + 1, caseObject(KNOWN_TN).get("diagnoses").size());
 
             // ...and reset restores the snapshotted hospital state
             mvc.perform(post("/api/demo/reset")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.ok").value(true));
-            assertEquals(diagsBefore, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
+            assertEquals(diagsBefore, caseObject(KNOWN_TN).get("diagnoses").size());
         } finally {
             restoreParkedBaseline(parked);
         }
@@ -203,12 +152,6 @@ class ImedMockApiIntegrationTest {
         }
         jdbc.execute("DROP SCHEMA IF EXISTS imed_baseline CASCADE");
         jdbc.execute("ALTER SCHEMA imed_baseline_parked RENAME TO imed_baseline");
-    }
-
-    @Test
-    void unknownCaseIs404() throws Exception {
-        mvc.perform(get("/api/cases/does-not-exist/medical-records")).andExpect(status().isNotFound());
-        mvc.perform(get("/api/cases/does-not-exist/diagnoses")).andExpect(status().isNotFound());
     }
 
     // ---- /api/v1 auth -------------------------------------------------------
@@ -266,10 +209,10 @@ class ImedMockApiIntegrationTest {
 
     @Test
     void diagnosisCreateEditCancelRoundTrip() throws Exception {
-        int diagsBefore = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
-        int procsBefore = getJson("/api/cases/" + KNOWN_TN + "/procedures").size();
+        int diagsBefore = caseObject(KNOWN_TN).get("diagnoses").size();
+        int procsBefore = caseObject(KNOWN_TN).get("procedures").size();
         // the doctor's clinical discharge outcome — no /api/v1 write may touch it
-        String dischargeBefore = String.valueOf(patient(KNOWN_TN).get("dischargestatus"));
+        String dischargeBefore = String.valueOf(patient(KNOWN_TN).get("discharge_status"));
 
         // POST: one diagnosis + one procedure + IPD discharge, ids generated
         JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "93.90", "CPAP therapy",
@@ -285,15 +228,15 @@ class ImedMockApiIntegrationTest {
         assertEquals("approved", created.get("result").get("coding_status").asString());
         // …and the doctor's discharge column is untouched (it lives in
         // doctor_discharge_ipd now, not on the patient row)
-        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("dischargestatus")));
+        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("discharge_status")));
 
         // created rows are visible through the extract reads
-        assertEquals(diagsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
-        assertEquals(procsBefore + 1, getJson("/api/cases/" + KNOWN_TN + "/procedures").size());
-        JsonNode row = findById(getJson("/api/cases/" + KNOWN_TN + "/diagnoses"), dxId);
-        assertNotNull(row, "created diagnosis served by the extract read");
-        assertEquals("U07.1", row.get("icd").asString());
-        assertEquals("PRIMARY_DIAGNOSIS", row.get("diagnosistype").asString());
+        assertEquals(diagsBefore + 1, caseObject(KNOWN_TN).get("diagnoses").size());
+        assertEquals(procsBefore + 1, caseObject(KNOWN_TN).get("procedures").size());
+        JsonNode row = findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), dxId);
+        assertNotNull(row, "created diagnosis is served by the contract read");
+        assertEquals("U07.1", row.get("icd10_code").asString());
+        assertEquals("PRIMARY_DIAGNOSIS", row.get("diagnosis_type").asString());
 
         // PUT: edit the diagnosis by its object_id (code + type change)
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
@@ -307,9 +250,9 @@ class ImedMockApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("STATUS_SUCCESS"))
                 .andExpect(jsonPath("$.result.diagnosis_icd10[0].object_id").value(dxId));
-        row = findById(getJson("/api/cases/" + KNOWN_TN + "/diagnoses"), dxId);
-        assertEquals("U07.2", row.get("icd").asString());
-        assertEquals("COMORBIDITY", row.get("diagnosistype").asString());
+        row = findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), dxId);
+        assertEquals("U07.2", row.get("icd10_code").asString());
+        assertEquals("COMORBIDITY", row.get("diagnosis_type").asString());
 
         // PUT of the discharge object edits the discharge row only — the visit
         // row's clinical column still isn't ours to write
@@ -322,7 +265,7 @@ class ImedMockApiIntegrationTest {
                            "fix_ipd_discharge_status_id":"IPD_STATUS_2"}}"""
                         .formatted(rid(), KNOWN_TN, dcId)))
                 .andExpect(status().isOk());
-        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("dischargestatus")));
+        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("discharge_status")));
 
         // a body carrying nothing but coding_status clears the mark (reopen)
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
@@ -361,8 +304,8 @@ class ImedMockApiIntegrationTest {
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd9/{id}", KNOWN_TN, pxId)
                 .header("Authorization", AUTH))
                 .andExpect(status().isOk());
-        assertEquals(diagsBefore, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size());
-        assertEquals(procsBefore, getJson("/api/cases/" + KNOWN_TN + "/procedures").size());
+        assertEquals(diagsBefore, caseObject(KNOWN_TN).get("diagnoses").size());
+        assertEquals(procsBefore, caseObject(KNOWN_TN).get("procedures").size());
 
         // cancel is idempotent
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
@@ -393,11 +336,11 @@ class ImedMockApiIntegrationTest {
         JsonNode first = postDiagnosis(requestId, "B34.9", "Viral infection", null, null);
         String dxId = first.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         try {
-            int after = getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size();
+            int after = caseObject(KNOWN_TN).get("diagnoses").size();
             // same request_id replayed: same body back, nothing inserted twice
             JsonNode second = postDiagnosis(requestId, "B34.9", "Viral infection", null, null);
             assertEquals(first, second, "replay must return the stored response verbatim");
-            assertEquals(after, getJson("/api/cases/" + KNOWN_TN + "/diagnoses").size(),
+            assertEquals(after, caseObject(KNOWN_TN).get("diagnoses").size(),
                     "replay must not re-execute the insert");
         } finally {
             mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
@@ -412,19 +355,22 @@ class ImedMockApiIntegrationTest {
     void openApiDocumentCoversEveryEndpoint() throws Exception {
         JsonNode doc = getJson("/v3/api-docs");
         JsonNode paths = doc.get("paths");
-        for (String p : new String[]{"/api/cases", "/api/cases/{tn}/medical-records",
-                "/api/cases/{tn}/medical-record-results", "/api/cases/{tn}/diagnoses",
-                "/api/cases/{tn}/procedures", "/api/cases/{tn}/orders/drugs",
-                "/api/cases/{tn}/orders/labs", "/api/cases/{tn}/vital-signs",
-                "/api/cases/{tn}/bed-management", "/api/cases/{tn}/billing-items",
-                "/api/icd10-codes", "/api/icd9-codes",
+        for (String p : new String[]{
+                "/api/v1/cases/check", "/api/v1/cases/sync", "/api/v1/cases/sync-by-period",
+                "/api/v1/catalog/icd10", "/api/v1/catalog/icd9", "/api/v1/contract/check",
                 "/api/demo/snapshot", "/api/demo/reset",
                 "/api/v1/diagnosis", "/api/v1/diagnosis/{visit_id}",
                 "/api/v1/diagnosis/{visit_id}/icd10/{diagnosis_icd10_id}",
                 "/api/v1/diagnosis/{visit_id}/icd9/{diagnosis_icd9_id}"}) {
             assertTrue(paths.has(p), "OpenAPI document is missing " + p);
         }
-        // superseded/withdrawn surfaces must not be published
+        // superseded/withdrawn surfaces must not be published — the one-endpoint
+        // -per-extract-table read layer was removed 2026-08-19, replaced by R1-R6
+        for (String gone : new String[]{"/api/cases", "/api/cases/{tn}/medical-records",
+                "/api/cases/{tn}/diagnoses", "/api/cases/{tn}/orders/labs",
+                "/api/icd10-codes", "/api/icd9-codes"}) {
+            assertTrue(paths.get(gone) == null, "removed legacy read endpoint is still published: " + gone);
+        }
         assertTrue(paths.get("/api/cases/{tn}/coding-result") == null,
                 "superseded coding-result endpoint must not be published");
         assertTrue(paths.get("/api/v1/coding-status/{visit_id}") == null,
@@ -507,6 +453,141 @@ class ImedMockApiIntegrationTest {
         return json.readTree(resp);
     }
 
+    // ---- contract reads (R1-R6) ---------------------------------------------
+
+    @Test
+    void updateCheckReportsChangedVisits() throws Exception {
+        JsonNode all = postV1Json("/api/v1/cases/check", "{\"changed_since\":\"2000-01-01T00:00:00\"}");
+        assertTrue(all.get("has_changes").asBoolean(), "every seeded visit changed after 2000");
+        assertTrue(all.get("visit_ids").size() > 0);
+
+        JsonNode none = postV1Json("/api/v1/cases/check", "{\"changed_since\":\"2999-01-01T00:00:00\"}");
+        assertEquals(false, none.get("has_changes").asBoolean());
+        assertEquals(0, none.get("visit_ids").size(), "empty array, not a missing key");
+
+        // a bare date is widened to the start of that day rather than rejected
+        mvc.perform(post("/api/v1/cases/check").header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changed_since\":\"2000-01-01\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/cases/check").header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changed_since\":\"yesterday\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+    }
+
+    @Test
+    void syncByIdsServesTheWholeCaseObject() throws Exception {
+        JsonNode body = postV1Json("/api/v1/cases/sync",
+                "{\"visit_ids\":[\"" + KNOWN_TN + "\",\"NO-SUCH-VISIT\"]}");
+        assertEquals(1, body.get("cases").size());
+        assertEquals("NO-SUCH-VISIT", body.get("not_found").get(0).asString(),
+                "unknown ids are reported, not an error for the whole request");
+
+        JsonNode c = body.get("cases").get(0);
+        for (String block : new String[]{"visit", "documents", "record_results", "diagnoses",
+                "procedures", "drug_orders", "lab_results", "vitals", "ward_movements",
+                "billing_items"}) {
+            assertTrue(c.has(block), "case object is missing block " + block);
+        }
+        JsonNode visit = c.get("visit");
+        assertEquals(KNOWN_TN, visit.get("visit_id").asString(), "renamed from transactionnumber");
+        assertEquals("OPD", visit.get("encounter_type").asString(), "derived: no admission number");
+        assertTrue(visit.get("age_year").isNumber(), "age_year is a number, not the extract's y,m,d text");
+        assertTrue(visit.has("coding_status") && visit.has("last_changed_at"),
+                "the two requested additions are served (null is fine, absent is not)");
+        assertEquals(10, visit.get("birth_date").asString().length(), "birth_date is a plain date");
+
+        // ISO 8601 on the wire; the extract stores "YYYY-MM-DD HH:MM:SS"
+        String recordedAt = c.get("documents").get(0).get("recorded_at").asString();
+        assertEquals('T', recordedAt.charAt(10), "date-times are ISO 8601: " + recordedAt);
+        assertTrue(c.get("lab_results").get(0).has("panel_name"), "lab rows keep the panel fields");
+    }
+
+    @Test
+    void syncByIdsRefusesMoreThanTheBatchCap() throws Exception {
+        StringBuilder ids = new StringBuilder();
+        for (int i = 0; i <= 20; i++) { // one over the cap
+            ids.append(i == 0 ? "" : ",").append("\"V").append(i).append("\"");
+        }
+        mvc.perform(post("/api/v1/cases/sync").header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"visit_ids\":[" + ids + "]}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.message").value("too_many_visit_ids"));
+    }
+
+    @Test
+    void syncByPeriodWindowsOnTheVisitDatetimeAndCapsTheWindow() throws Exception {
+        JsonNode day = postV1Json("/api/v1/cases/sync-by-period",
+                "{\"from\":\"2026-07-24T00:00:00\",\"to\":\"2026-07-24T23:59:59\"}");
+        assertTrue(day.get("cases").size() > 0, "seeded visits exist on 2026-07-24");
+        for (JsonNode c : day.get("cases")) {
+            assertTrue(c.get("visit").get("visit_id").asString().startsWith("870260724"),
+                    "the window selects on the visit datetime encoded in the TN");
+        }
+        // R3 answers with cases only — not_found belongs to the id-based R2
+        assertTrue(day.get("not_found") == null);
+
+        mvc.perform(post("/api/v1/cases/sync-by-period").header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from\":\"2026-07-01T00:00:00\",\"to\":\"2026-08-02T00:00:01\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.message").value("period_too_long"));
+    }
+
+    @Test
+    void contractCheckNamesTheFieldsItCannotServe() throws Exception {
+        JsonNode ok = postV1Json("/api/v1/contract/check",
+                "{\"required_fields\":[\"visit.visit_id\",\"documents.text\","
+                        + "\"diagnoses.icd10_code\",\"procedures.operation_start\"]}");
+        assertTrue(ok.get("valid").asBoolean());
+        assertTrue(ok.get("missing") == null, "missing is absent when valid");
+
+        // the contract's own Priority-2 wishes are exactly what this must catch
+        JsonNode gap = postV1Json("/api/v1/contract/check",
+                "{\"required_fields\":[\"visit.visit_id\",\"lab_results.reference_range\"]}");
+        assertEquals(false, gap.get("valid").asBoolean());
+        assertEquals("lab_results.reference_range", gap.get("missing").get(0).asString());
+    }
+
+    @Test
+    void contractCatalogsCarryTheEditionKey() throws Exception {
+        JsonNode ten = getV1Json("/api/v1/catalog/icd10");
+        JsonNode nine = getV1Json("/api/v1/catalog/icd9");
+        assertTrue(ten.size() > 0 && nine.size() > 0);
+        for (String field : new String[]{"code", "description", "edition"}) {
+            assertTrue(ten.get(0).has(field), "R4 row is missing " + field);
+        }
+        assertTrue(ten.get(0).get("edition").isNull(),
+                "edition is null until the hospital's catalogue carries one");
+    }
+
+    @Test
+    void contractReadsRequireBearerToken() throws Exception {
+        mvc.perform(post("/api/v1/cases/check").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changed_since\":\"2000-01-01\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/catalog/icd10")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cancelledCodeRowsNeverComeBackThroughTheContractRead() throws Exception {
+        String rid = rid();
+        String created = postDiagnosis(rid, "J18.9", "Pneumonia probe", null, null)
+                .get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
+
+        assertNotNull(findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), created),
+                "a created row is visible to R2");
+
+        mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, created)
+                .header("Authorization", AUTH)).andExpect(status().isOk());
+
+        assertTrue(findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), created) == null,
+                "a cancelled row must never reappear — it would resurrect a code the coder removed");
+    }
+
     private String icd10Body(String requestId, String icd10, String dxName) {
         return """
                 {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
@@ -518,23 +599,37 @@ class ImedMockApiIntegrationTest {
                 .formatted(requestId, KNOWN_TN, icd10, dxName);
     }
 
-    /** The visit's row from the case-list read (medhack_patient, verbatim). */
+    /** The visit block of the contract read, for the write tests' assertions. */
     private JsonNode patient(String tn) throws Exception {
-        for (JsonNode c : getJson("/api/cases")) {
-            if (tn.equals(c.get("transactionnumber").asString())) {
-                return c;
-            }
-        }
-        throw new AssertionError("visit " + tn + " missing from /api/cases");
+        return caseObject(tn).get("visit");
     }
 
-    private JsonNode findById(JsonNode rows, String id) {
+    /** The R2 case object for one visit. */
+    private JsonNode caseObject(String tn) throws Exception {
+        return postV1Json("/api/v1/cases/sync", "{\"visit_ids\":[\"" + tn + "\"]}")
+                .get("cases").get(0);
+    }
+
+    private JsonNode findByObjectId(JsonNode rows, String objectId) {
         for (JsonNode r : rows) {
-            if (r.get("id") != null && id.equals(r.get("id").asString())) {
+            if (r.get("object_id") != null && objectId.equals(r.get("object_id").asString())) {
                 return r;
             }
         }
         return null;
+    }
+
+    private JsonNode postV1Json(String url, String body) throws Exception {
+        return json.readTree(mvc.perform(post(url).header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    private JsonNode getV1Json(String url) throws Exception {
+        return json.readTree(mvc.perform(get(url).header("Authorization", AUTH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
     }
 
     private JsonNode getJson(String url) throws Exception {

@@ -1,6 +1,4 @@
--- Manual mirror of config/SchemaBootstrap.java (the runner applies this
--- idempotently at every startup; this file exists for reference and for
--- environments where you want to run the SQL by hand).
+-- V4 — demo data: five seed visits that arrive already coded on both systems.
 --
 -- Context: demo data. Five OPD seed visits arrive from the "hospital"
 -- already coded on BOTH systems — each already carries a seed ICD-9

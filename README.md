@@ -37,34 +37,59 @@ their contract field-for-field.
 
 ## The API
 
-### READ — "give us your case data"
+### READ — `/api/v1`, the MedCode AI Case Data API contract (R1–R6)
 
-One endpoint per hospital extract table. Responses are the rows verbatim:
-exact extract column names, all values as stored (TEXT — datetime formats are
-non-uniform in the source; parsing is the consumer's job).
+The read surface MedCode AI **asked the hospital to build** — see
+`../medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. It is
+mocked here first so development doesn't wait for the hospital's
+implementation; when the real API lands, medcode-api swaps `IMED_API_BASE`
+and nothing else changes.
 
-| Endpoint | Source table |
+Bearer-authenticated like the write side (same `IMED_API_TOKEN`).
+
+| # | Endpoint | Purpose |
+|---|---|---|
+| R1 | `POST /api/v1/cases/check` | Did anything change after `changed_since`? → `{has_changes, visit_ids}`. The cheap poll; no clinical data |
+| R2 | `POST /api/v1/cases/sync` | Full case data for up to **20** `visit_ids` → `{cases, not_found}` |
+| R3 | `POST /api/v1/cases/sync-by-period` | Same data for a visit-date window (`from`/`to`, both ends included, max **31 days**) → `{cases}` |
+| R4 | `GET /api/v1/catalog/icd10` | ICD-10 code master → `[{code, description, edition}]` |
+| R5 | `GET /api/v1/catalog/icd9` | ICD-9 code master, same shape |
+| R6 | `POST /api/v1/contract/check` | Schema gate: send `required_fields` as `block.field` names → `{valid}` or `{valid:false, missing:[…]}` |
+
+R2/R3 answer with the contract's nested **case object** — one `visit` block
+plus nine data blocks (`documents`, `record_results`, `diagnoses`,
+`procedures`, `drug_orders`, `lab_results`, `vitals`, `ward_movements`,
+`billing_items`). Blocks with no rows are `[]`, never absent.
+
+Three transport rules are enforced here because on the real API they are the
+hospital's job:
+
+- **Date-times are ISO 8601** (`2026-04-01T06:45:00`). The extract stores
+  `2026-04-01 06:45:00`, so every datetime is normalized on the way out;
+  `birth_date` is served as a plain date.
+- **Missing values are `null`** — never `""`, never an absent key. The
+  extract uses both `NULL` and `''` for "nothing", so blanks collapse.
+- **Cancelled code rows never appear**, same rule as the older reads.
+
+Two visit fields are DERIVED, not stored: `encounter_type` (IPD when the
+visit has an admission number, else OPD) and `last_changed_at` (the visit
+datetime, raised by any later write to its code rows). The contract leaves
+the change-timestamp mechanism to the hospital, so no column was added.
+
+The limits are real, not decorative: 21 ids → `422 too_many_visit_ids`, a
+32-day window → `422 period_too_long`, both in the hospital's
+`STATUS_BUSINESS_ERROR` envelope. A convenient shortcut here would only
+surface on cutover day.
+
+### Demo tooling (mock-only)
+
+| Endpoint | Purpose |
 |---|---|
-| `GET /api/cases` | MedHack_Patient (all visits; optional `from`/`to` window on the visit datetime — admissiondatetime, else the datetime encoded in the TN — and `changed_since` on the code rows' `updated_at`; bounds inclusive, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM[:SS]`) |
-| `GET /api/cases/{tn}/medical-records` | MedHack_MedicalRecord |
-| `GET /api/cases/{tn}/medical-record-results` | MedHack_MedicalRecord_result |
-| `GET /api/cases/{tn}/diagnoses` | MedHack_Diagnosis(ICD10) |
-| `GET /api/cases/{tn}/procedures` | MedHack_Procedure(ICD9) |
-| `GET /api/cases/{tn}/orders/drugs` | MedHack_OrderDrug |
-| `GET /api/cases/{tn}/orders/labs` | MedHack_OrderLAB |
-| `GET /api/cases/{tn}/vital-signs` | MedHack_VitalSign |
-| `GET /api/cases/{tn}/bed-management` | MedHack_BedManagement |
-| `GET /api/cases/{tn}/billing-items` | MedHack_BillingItem |
-| `GET /api/icd10-codes` | imed.icd_10 — ICD-10 reference catalog (code master, not per-case) |
-| `GET /api/icd9-codes` | imed.icd_9 — ICD-9 procedure reference catalog (not per-case) |
-| `POST /api/demo/snapshot` | mock-only demo tooling: freeze every imed.* table into the `imed_baseline` schema |
-| `POST /api/demo/reset` | mock-only demo tooling: truncate + restore every imed.* table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
+| `POST /api/demo/snapshot` | freeze every `imed.*` table into the `imed_baseline` schema |
+| `POST /api/demo/reset` | truncate + restore every `imed.*` table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
 
-`{tn}` is the transaction number (visit number). Unknown `{tn}` → `404
-{"error":"not found"}`; a known case with no rows in a table → `[]`.
-Cancelled diagnosis/procedure rows (see DELETE below) are excluded — they
-stay in the tables for the audit trail but are invisible to reads, so a sync
-can never resurrect a code a coder removed.
+Not part of the hospital contract — the real iMed API has nothing like this,
+so never ask the hospital for it.
 
 ### WRITE — `/api/v1`, the hospital's real contract (mocked)
 
@@ -184,7 +209,46 @@ Consequences, all of them ordinary once you know:
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <app_role>;
   ```
 
-  (The last line covers tables `SchemaBootstrap` creates at startup.)
+  (The last line covers tables the Flyway migrations create at startup. The
+  role also needs `CREATE` on the schema, since Flyway writes its own
+  `imed.flyway_schema_history` table there.)
+
+## Schema changes
+
+Everything the `/api/v1` write surface needs on top of the frozen extract dump
+lives in `src/main/resources/db/migrations/V*.sql` and is applied by **Flyway**
+at startup, into the `imed` schema. Pull and boot:
+
+```bash
+git pull
+./mvnw spring-boot:run     # Flyway applies anything missing
+```
+
+The dump is version 0; a database that already has content but no history table
+is adopted automatically (`baseline-on-migrate`). Every migration is guarded
+(`IF NOT EXISTS` / `ON CONFLICT DO NOTHING` / `WHERE NOT EXISTS`), so one that
+already had these applied by the old startup runner takes them as no-ops.
+
+| Version | Change |
+|---|---|
+| `V1` | `is_cancelled`, `imed_request_log`, `doctor_discharge_opd` / `_ipd` |
+| `V2` | `icd_10` / `icd_9` catalog tables |
+| `V3` | `updated_at`, backing the `changed_since` filter |
+| `V4` | the five pre-coded demo visits |
+| `V5` | `coding_status` on the visit row |
+| `V6` | the ~1000 ICD catalog rows |
+
+```bash
+psql -d imed -c "SELECT version, description, success FROM imed.flyway_schema_history ORDER BY installed_rank"
+```
+
+A re-seed drops all of it — the dump predates every migration — along with the
+history table, so booting the app replays the lot from version 0.
+
+**Adding a change:** add one `V<n>__<name>.sql` file, and do NOT also write the
+DDL in Java. Until 2026-08-20 every statement lived in `config/SchemaBootstrap`
+AND in a `db/migrations` file that nothing ran; on the medcode side the same
+duplication silently cost two tables their foreign keys.
 
 ## Environment variables
 

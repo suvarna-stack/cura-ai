@@ -1,6 +1,4 @@
--- Manual mirror of config/SchemaBootstrap.java (the runner applies this
--- idempotently at every startup; this file exists for reference and for
--- environments where you want to run the DDL by hand).
+-- V1 — the DDL the /api/v1 write surface needs on top of the frozen extract.
 --
 -- Context: the /api/v1 write surface (real iMed diagnosis/discharge contract
 -- + our proposed coding-status extension) needs these on top of the frozen

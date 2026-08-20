@@ -45,6 +45,29 @@
 			<version>3.0.3</version>
 		</dependency>
 
+		<!-- Schema migrations. db/migrations/V*.sql on the classpath is the ONLY
+		     definition of everything the /api/v1 write surface needs on top of the
+		     frozen extract dump; before Flyway the same statements were also
+		     hand-written in Java (config/SchemaBootstrap) with these files kept
+		     alongside as a "manual mirror" that nothing ever ran.
+		     spring-boot-flyway is what actually WIRES Flyway on Boot 4 — the
+		     autoconfigurations moved out of spring-boot-autoconfigure into
+		     per-technology modules, so flyway-core alone puts the library on the
+		     classpath and nothing calls it. flyway-database-postgresql is required
+		     separately since Flyway 10. All versions managed by Boot's BOM. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
