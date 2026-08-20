@@ -8,6 +8,8 @@ export type AgentMessage = {
   sources?: string[]
   /** ICD codes the answer cites that its sources never contained */
   unverifiedCodes?: string[]
+  /** which upload box retrieval searched, when the question named a system */
+  searchedSystem?: 'icd10' | 'icd9cm' | null
   time: string
 }
 

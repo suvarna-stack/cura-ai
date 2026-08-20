@@ -3,10 +3,11 @@
 // Checkbox facets with live counts + active-filter chips.
 // ============================================================
 import { useState } from "react";
-import { ChevronDown, FilterX, Search, SlidersHorizontal, X, ArrowUpDown } from "lucide-react";
+import { ChevronDown, FilterX, ListFilter, Search, SlidersHorizontal, X, ArrowUpDown } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import type { CaseFilters, Facet, SortMode } from "../../hooks/useCaseFilters";
+import { IcdFilterDialog, type IcdTab } from "./IcdFilterDialog";
 
 // how many unticked studies are visible at once inside one order type;
 // the search box exists precisely so this cap never blocks anyone
@@ -22,6 +23,9 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
   const isOpen = (key: string) => open[key] ?? true;
   // per-order-type search text over the nested Study/Item list (can be 100s)
   const [childQuery, setChildQuery] = useState<Record<string, string>>({});
+  // which ICD system the filter dialog is open on (null = closed) — the
+  // sidebar shows only selected chips; the full code list lives in the dialog
+  const [icdDialog, setIcdDialog] = useState<IcdTab | null>(null);
   const bar = gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
 
   return (
@@ -286,7 +290,31 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
                     <ChevronDown size={11}
                       style={{ color: gl.muted, transform: sectionOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
                   </button>
-                  {sectionOpen && searchableList(ef)}
+                  {/* the sidebar shows ONLY the picked codes as removable
+                      chips — the full (hundreds-long) list lives in the
+                      dialog, where there is room for search + descriptions */}
+                  {sectionOpen && (
+                    <div className="space-y-1 pb-1">
+                      {ef.options.some((o) => o.selected) && (
+                        <div className="flex flex-wrap gap-1">
+                          {ef.options.filter((o) => o.selected).map((o) => (
+                            <button key={o.value} onClick={() => f.toggle(ef.key, o.value)}
+                              title={f.codeDesc[o.value] ?? o.label}
+                              className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 hover:opacity-80 transition-all"
+                              style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
+                              {o.label} <X size={8} />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button onClick={() => setIcdDialog(ef.key as IcdTab)}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-semibold hover:opacity-80 transition-all"
+                        style={{ background: gl.inputBg, border: gl.borderSm, color: gl.muted }}>
+                        <ListFilter size={11} style={{ color: gl.accent }} />
+                        {t("filter.icd.select", { n: ef.options.length })}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 );
               })}
@@ -296,6 +324,10 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         ));
       })()}
       {/* the date bar at the top of the Dashboard picks the SYNC period, not a filter */}
+
+      {icdDialog && (
+        <IcdFilterDialog f={f} initialTab={icdDialog} onClose={() => setIcdDialog(null)} />
+      )}
     </div>
   );
 }

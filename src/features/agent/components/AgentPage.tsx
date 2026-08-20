@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Bot, User, Send, Sparkles, BookOpen, Brain, Lightbulb } from 'lucide-react'
+import {
+  Bot,
+  User,
+  Send,
+  Sparkles,
+  BookOpen,
+  Brain,
+  Lightbulb,
+  History,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
 import {
   agentErrorMessage,
+  appendMessages,
+  createConversation,
+  deleteConversation,
+  getConversation,
+  listConversations,
   sendAgentMessage,
   streamAgentMessage,
+  type AgentReply,
+  type ConversationSummary,
 } from '../api/agentService'
 import type {
   AgentChatTurn,
@@ -22,6 +40,14 @@ const msg = (
   text: string,
   sources?: string[],
 ): AgentMessage => ({ id: uid++, role, text, sources, time: now() })
+
+/** Sidebar timestamp: HH:mm for today, else the date (server "yyyy-MM-dd HH:mm:ss"). */
+function listTime(ts: string): string {
+  if (!ts || ts.length < 10) return ''
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return ts.slice(0, 10) === today ? ts.slice(11, 16) : ts.slice(0, 10)
+}
 
 function RichText({ text }: { text: string }) {
   const parts = text.split(/\*\*(.+?)\*\*/g)
@@ -48,6 +74,28 @@ export function AgentPage() {
   const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // --- history sidebar state -------------------------------------------
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [activeId, setActiveId] = useState<number | null>(null)
+  const [loadingId, setLoadingId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+  // persistExchange runs after an async reply; a ref never reads stale state
+  const activeIdRef = useRef<number | null>(null)
+  // true from send() start to settle — `pending` drops on the FIRST delta, so
+  // it alone can't stop the user switching conversations mid-stream
+  const sendingRef = useRef(false)
+  const setActive = (id: number | null) => {
+    activeIdRef.current = id
+    setActiveId(id)
+  }
+
+  useEffect(() => {
+    listConversations()
+      .then(setConversations)
+      .catch((err) => console.warn('agent history unavailable', err))
+  }, [])
+
   const headerMsgs = useMemo<AgentMessage[]>(
     () => [{ id: -1, role: 'agent', text: t(`agent.welcome.${mode}`), time: '' }],
     [mode, t],
@@ -62,10 +110,97 @@ export function AgentPage() {
   }, [convo, pending, mode])
 
   function switchMode(next: ChatMode) {
-    if (next === mode || pending) return
+    if (next === mode || pending || sendingRef.current) return
     setMode(next)
     setConvo([])
+    setActive(null)
     setShowSuggestions(true)
+  }
+
+  /** Fresh empty chat; the old one stays reachable from the sidebar. */
+  function newChat() {
+    if (pending || sendingRef.current) return
+    setConvo([])
+    setActive(null)
+    setShowSuggestions(true)
+  }
+
+  /** Reopen a stored conversation (restores its mode too). */
+  async function openConversation(id: number) {
+    if (pending || sendingRef.current || loadingId !== null || id === activeId)
+      return
+    setLoadingId(id)
+    try {
+      const detail = await getConversation(id)
+      setMode(detail.mode)
+      setActive(id)
+      setConvo(
+        detail.messages.map((m) => ({
+          id: uid++,
+          role: m.role === 'user' ? ('coder' as const) : ('agent' as const),
+          text: m.content,
+          sources: m.sources.length > 0 ? m.sources : undefined,
+          unverifiedCodes:
+            m.unverified_codes.length > 0 ? m.unverified_codes : undefined,
+          time: m.created_at ? m.created_at.slice(11, 16) : '',
+        })),
+      )
+      setShowSuggestions(false)
+    } catch (err) {
+      console.warn('failed to open conversation', err)
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  async function removeConversation(id: number) {
+    setConfirmId(null)
+    try {
+      await deleteConversation(id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (activeIdRef.current === id) newChat()
+    } catch (err) {
+      console.warn('failed to delete conversation', err)
+    }
+  }
+
+  /**
+   * Persist one successful Q/A pair. First exchange of a chat creates the
+   * conversation (title = the question). Failures only warn — the visible
+   * chat already has the answer, history is best-effort.
+   */
+  async function persistExchange(
+    chatMode: ChatMode,
+    question: string,
+    reply: AgentReply,
+  ) {
+    try {
+      let id = activeIdRef.current
+      if (id === null) {
+        const title =
+          question.length > 60 ? question.slice(0, 57) + '…' : question
+        const created = await createConversation(chatMode, title)
+        id = created.id
+        setActive(id)
+        setConversations((prev) => [created, ...prev])
+      }
+      await appendMessages(id, [
+        { role: 'user', content: question },
+        {
+          role: 'assistant',
+          content: reply.answer,
+          sources: reply.sources,
+          unverified_codes: reply.unverifiedCodes,
+        },
+      ])
+      // bump the touched conversation to the top of the sidebar
+      setConversations((prev) => {
+        const hit = prev.find((c) => c.id === id)
+        return hit ? [hit, ...prev.filter((c) => c.id !== id)] : prev
+      })
+    } catch (err) {
+      console.warn('agent history save failed', err)
+    }
   }
 
   async function send(textOverride?: string) {
@@ -78,7 +213,9 @@ export function AgentPage() {
     }))
     setInput('')
     setPending(true)
+    sendingRef.current = true
     setConvo((prev) => [...prev, msg('coder', text)])
+    const modeAtSend = mode // mode can switch while the answer streams
 
     // Streaming: the agent bubble appears on the first delta and grows as
     // the model types. Dictionary answers are capped shorter — they should
@@ -108,8 +245,10 @@ export function AgentPage() {
         text: reply.answer,
         sources: reply.sources,
         unverifiedCodes: reply.unverifiedCodes,
+        searchedSystem: reply.searchedSystem,
         time: now(),
       })
+      void persistExchange(modeAtSend, text, reply)
     } catch (err) {
       if (streamed) {
         // Mid-answer failure: keep the partial text, append the error note.
@@ -128,8 +267,10 @@ export function AgentPage() {
             text: reply.answer,
             sources: reply.sources,
             unverifiedCodes: reply.unverifiedCodes,
+            searchedSystem: reply.searchedSystem,
             time: now(),
           })
+          void persistExchange(modeAtSend, text, reply)
         } catch (err2) {
           setConvo((prev) => [
             ...prev,
@@ -139,6 +280,7 @@ export function AgentPage() {
       }
     } finally {
       setPending(false)
+      sendingRef.current = false
     }
   }
 
@@ -149,8 +291,123 @@ export function AgentPage() {
 
   return (
     // The shell locks itself to the viewport on this route (CasesLayout), so
-    // the messages list below is the only thing that scrolls.
-    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    // the messages list and the history sidebar are the only things that
+    // scroll. Row layout: [history sidebar] [chat column].
+    <main className="flex min-h-0 flex-1 overflow-hidden">
+      {sidebarOpen && (
+        <aside
+          className="flex w-64 shrink-0 flex-col overflow-hidden"
+          style={{
+            background: gl.headerBg,
+            backdropFilter: gl.blur20,
+            WebkitBackdropFilter: gl.blur20,
+            borderRight: gl.borderSm,
+          }}
+        >
+          <div className="flex shrink-0 items-center justify-between px-4 py-3">
+            <span
+              className="text-[12px] font-bold tracking-wide"
+              style={{ color: gl.text }}
+            >
+              {t('agent.history.title')}
+            </span>
+            <button
+              type="button"
+              onClick={newChat}
+              disabled={pending}
+              title={t('agent.history.new')}
+              aria-label={t('agent.history.new')}
+              className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+              style={{
+                background: `rgba(${gl.accentRgb},0.15)`,
+                border: `1px solid rgba(${gl.accentRgb},0.25)`,
+                color: gl.accent,
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+            {conversations.length === 0 && (
+              <p
+                className="px-2 pt-2 text-[11px]"
+                style={{ color: gl.muted }}
+              >
+                {t('agent.history.empty')}
+              </p>
+            )}
+            {conversations.map((c) => {
+              const active = c.id === activeId
+              const ModeIcon = c.mode === 'dict' ? BookOpen : Brain
+              return (
+                <div
+                  key={c.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void openConversation(c.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void openConversation(c.id)
+                  }}
+                  className="group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 transition-all hover:opacity-90"
+                  style={
+                    active
+                      ? {
+                          background: `rgba(${gl.accentRgb},0.14)`,
+                          border: `1px solid rgba(${gl.accentRgb},0.24)`,
+                        }
+                      : { border: '1px solid transparent' }
+                  }
+                >
+                  <ModeIcon
+                    size={13}
+                    className="shrink-0"
+                    style={{ color: active ? gl.accent : gl.muted }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-[12px] font-medium"
+                      style={{ color: gl.text }}
+                      title={c.title}
+                    >
+                      {loadingId === c.id ? t('agent.history.loading') : c.title}
+                    </p>
+                    <p className="text-[10px]" style={{ color: gl.muted }}>
+                      {listTime(c.updated_at)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={`${t('agent.history.confirm')} ${c.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirmId === c.id) {
+                        void removeConversation(c.id)
+                      } else {
+                        setConfirmId(c.id)
+                      }
+                    }}
+                    onBlur={() => setConfirmId(null)}
+                    className="shrink-0 rounded-md p-1 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100 hover:opacity-100"
+                    style={{
+                      color: confirmId === c.id ? gl.warning : gl.muted,
+                    }}
+                  >
+                    {confirmId === c.id ? (
+                      <span className="text-[10px] font-bold">
+                        {t('agent.history.confirm')}
+                      </span>
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </aside>
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header
         className="flex shrink-0 items-center gap-3 px-6 py-2.5"
         style={{
@@ -160,6 +417,25 @@ export function AgentPage() {
           borderBottom: gl.borderSm,
         }}
       >
+        <button
+          type="button"
+          aria-label={t('agent.history.title')}
+          aria-expanded={sidebarOpen}
+          title={t('agent.history.title')}
+          onClick={() => setSidebarOpen((s) => !s)}
+          className="flex h-9 w-9 items-center justify-center rounded-2xl transition-all hover:opacity-80"
+          style={
+            sidebarOpen
+              ? {
+                  background: `rgba(${gl.accentRgb},0.15)`,
+                  border: `1px solid rgba(${gl.accentRgb},0.28)`,
+                  color: gl.accent,
+                }
+              : { background: gl.card, border: gl.border, color: gl.muted }
+          }
+        >
+          <History size={16} />
+        </button>
         <div
           className="flex h-9 w-9 items-center justify-center rounded-2xl"
           style={{
@@ -306,6 +582,15 @@ export function AgentPage() {
                     title={m.sources.join(' · ')}
                   >
                     {t('agent.sources')}: {m.sources.join(' · ')}
+                  </span>
+                )}
+
+                {m.searchedSystem && (
+                  <span
+                    className="px-1 text-[10px] font-medium"
+                    style={{ color: gl.accent, opacity: 0.85 }}
+                  >
+                    {t(`agent.searched.${m.searchedSystem}`)}
                   </span>
                 )}
 
@@ -526,6 +811,7 @@ export function AgentPage() {
           {t('agent.shiftEnter')}
         </p>
         )}
+      </div>
       </div>
       </div>
     </main>

@@ -63,10 +63,20 @@ export async function createAccount(
 /** Pushes the account's full desired state: profile fields via PUT
  *  /admin/accounts/{id}, then active/inactive via the status endpoint
  *  (deactivation also revokes the account's live sessions server-side). */
-export async function updateAccount(account: Account): Promise<Account> {
+/** newPassword re-hashes the account's password when provided — omitted or
+ *  empty leaves the current password untouched (the API treats blank as
+ *  "no change"). Sent exactly as typed, like account creation. */
+export async function updateAccount(
+  account: Account,
+  newPassword?: string,
+): Promise<Account> {
   const { data } = await apiClient.put<ServerAccount>(
     `/admin/accounts/${account.id}`,
-    { fullName: account.name, email: account.email },
+    {
+      fullName: account.name,
+      email: account.email,
+      ...(newPassword ? { password: newPassword } : {}),
+    },
   )
   const desired = account.status === 'Active' ? 'active' : 'inactive'
   if (data.status !== desired) {

@@ -45,7 +45,7 @@ export interface FinishedCase {
   coverageFamily?: string | null;
   encountertype?: string | null;
   orders?: Record<string, number>;
-  codes?: { code: string; system: string; role: string }[];
+  codes?: { code: string; system: string; role: string; desc?: string | null }[];
   revenue_impact?: "high" | "medium" | "low";
 }
 

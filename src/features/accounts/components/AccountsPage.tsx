@@ -63,8 +63,8 @@ export function AccountsPage() {
     setCreating(false)
   }
 
-  const handleEdit = async (next: Account) => {
-    const saved = await updateAccount(next)
+  const handleEdit = async (next: Account, newPassword?: string) => {
+    const saved = await updateAccount(next, newPassword)
     setAccounts((prev) =>
       prev.map((a) => (a.id === saved.id ? saved : a)).sort(byName),
     )

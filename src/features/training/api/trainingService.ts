@@ -2,6 +2,7 @@ import { apiClient } from '../../../lib/axios'
 import type {
   ChatAnswer,
   KbDoc,
+  KbDocType,
   KnowledgeStats,
   RetrievalHit,
 } from '../types/training.types'
@@ -23,6 +24,8 @@ interface RagDocument {
   status: KbDoc['status']
   progress: number
   error?: string | null
+  doc_type?: string | null
+  rank?: number | null
   uploaded_at: string
 }
 
@@ -70,6 +73,9 @@ function toKbDoc(d: RagDocument): KbDoc {
     progress: d.progress,
     uploadedAt: d.uploaded_at,
     error: d.error ?? undefined,
+    docType:
+      d.doc_type === 'icd10' || d.doc_type === 'icd9cm' ? d.doc_type : null,
+    rank: d.rank ?? null,
   }
 }
 
@@ -102,11 +108,17 @@ export async function fetchKnowledgeStats(): Promise<KnowledgeStats> {
   }
 }
 
-/** Upload files (PDF/CSV) one by one; the RAG service ingests each in the background. */
-export async function uploadKnowledgeDocs(files: File[]): Promise<void> {
+/** Upload files (PDF/CSV) one by one; the RAG service ingests each in the
+ *  background. docType records which upload box they came through
+ *  (icd10 | icd9cm) and ends up in every chunk's metadata. */
+export async function uploadKnowledgeDocs(
+  files: File[],
+  docType: KbDocType,
+): Promise<void> {
   for (const file of files) {
     const form = new FormData()
     form.append('file', file)
+    form.append('doc_type', docType)
     await apiClient.post('/admin/knowledge/docs', form)
   }
 }
@@ -126,6 +138,31 @@ export async function renameKnowledgeDoc(
     { filename },
   )
   return toKbDoc(data)
+}
+
+/** Move a document to the other upload box (or tag an untagged one). The
+ *  RAG side re-tags its indexed chunks in place — retrieval routing follows
+ *  immediately, no retrain needed. */
+export async function setKnowledgeDocType(
+  id: string,
+  docType: KbDocType,
+): Promise<KbDoc> {
+  const { data } = await apiClient.patch<RagDocument>(
+    `/admin/knowledge/docs/${encodeURIComponent(id)}`,
+    { doc_type: docType },
+  )
+  return toKbDoc(data)
+}
+
+/** Set one box's read-first order: ids in reading order get priority 1..n. */
+export async function reorderKnowledgeDocs(
+  docType: KbDocType,
+  ids: string[],
+): Promise<void> {
+  await apiClient.post('/admin/knowledge/docs/order', {
+    doc_type: docType,
+    sources: ids,
+  })
 }
 
 /** Kick off a full index rebuild; poll fetchKnowledgeDocs() for progress. */

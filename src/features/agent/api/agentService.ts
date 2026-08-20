@@ -29,10 +29,13 @@ interface AgentChatResponse {
   contexts: AgentContext[]
   /** codes the answer cites that appear in no retrieved chunk */
   unverified_codes?: string[]
+  /** which upload box retrieval was routed to, when the question named one */
+  code_system?: 'icd10' | 'icd9cm' | null
 }
 
 type AgentStreamEvent =
-  | { type: 'meta'; mode: string; contexts: AgentContext[] }
+  | { type: 'meta'; mode: string; contexts: AgentContext[]
+      code_system?: 'icd10' | 'icd9cm' | null }
   | { type: 'delta'; text: string }
   | { type: 'done'; unverified_codes?: string[] }
   | { type: 'error'; message: string }
@@ -43,6 +46,8 @@ export interface AgentReply {
   sources: string[]
   /** ICD codes the answer cites that its sources never contained */
   unverifiedCodes: string[]
+  /** the upload box retrieval was routed to, or null when both were searched */
+  searchedSystem: 'icd10' | 'icd9cm' | null
 }
 
 function sourceLabels(contexts: AgentContext[]): string[] {
@@ -68,6 +73,7 @@ export async function sendAgentMessage(
     answer: data.answer,
     sources: sourceLabels(data.contexts),
     unverifiedCodes: data.unverified_codes ?? [],
+    searchedSystem: data.code_system ?? null,
   }
 }
 
@@ -110,6 +116,7 @@ export async function streamAgentMessage(
   let answer = ''
   let sources: string[] = []
   let unverifiedCodes: string[] = []
+  let searchedSystem: 'icd10' | 'icd9cm' | null = null
 
   const handle = (ev: AgentStreamEvent) => {
     if (ev.type === 'delta') {
@@ -117,6 +124,7 @@ export async function streamAgentMessage(
       onDelta(answer)
     } else if (ev.type === 'meta') {
       sources = sourceLabels(ev.contexts)
+      searchedSystem = ev.code_system ?? null
     } else if (ev.type === 'done') {
       unverifiedCodes = ev.unverified_codes ?? []
     } else {
@@ -138,7 +146,7 @@ export async function streamAgentMessage(
       if (data) handle(JSON.parse(data.slice(6)) as AgentStreamEvent)
     }
   }
-  return { answer: answer.trim(), sources, unverifiedCodes }
+  return { answer: answer.trim(), sources, unverifiedCodes, searchedSystem }
 }
 
 /** Human-readable message from an Axios error (the API's {"error": ...}). */
@@ -149,4 +157,71 @@ export function agentErrorMessage(err: unknown, fallback: string): string {
     if (data?.error) return data.error
   }
   return fallback
+}
+
+// ---------------------------------------------------------------------------
+// Conversation history — /api/agent/conversations (per-user, DB-backed).
+// The chat call above stays stateless; these endpoints only persist what the
+// user already saw, one user+assistant pair after each successful exchange.
+
+export interface ConversationSummary {
+  id: number
+  mode: 'dict' | 'learn'
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StoredMessage {
+  role: 'user' | 'assistant'
+  content: string
+  sources: string[]
+  unverified_codes: string[]
+  /** "yyyy-MM-dd HH:mm:ss" server time */
+  created_at: string
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: StoredMessage[]
+}
+
+export async function listConversations(): Promise<ConversationSummary[]> {
+  const { data } = await apiClient.get<{ conversations: ConversationSummary[] }>(
+    '/agent/conversations',
+  )
+  return data.conversations
+}
+
+export async function getConversation(id: number): Promise<ConversationDetail> {
+  const { data } = await apiClient.get<ConversationDetail>(
+    `/agent/conversations/${id}`,
+  )
+  return data
+}
+
+export async function createConversation(
+  mode: 'dict' | 'learn',
+  title: string,
+): Promise<ConversationSummary> {
+  const { data } = await apiClient.post<ConversationSummary>(
+    '/agent/conversations',
+    { mode, title },
+  )
+  return data
+}
+
+export async function appendMessages(
+  id: number,
+  messages: Array<{
+    role: 'user' | 'assistant'
+    content: string
+    sources?: string[]
+    unverified_codes?: string[]
+  }>,
+): Promise<void> {
+  await apiClient.post(`/agent/conversations/${id}/messages`, { messages })
+}
+
+export async function deleteConversation(id: number): Promise<void> {
+  await apiClient.delete(`/agent/conversations/${id}`)
 }

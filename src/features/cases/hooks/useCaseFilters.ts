@@ -59,8 +59,9 @@ export interface FacetableCase {
   orders?: Record<string, number>;
   /** category -> the distinct order names on this case (the second filter level) */
   orderNames?: Record<string, string[]>;
-  /** the case's codes — the ICD-10 / ICD-9 facets filter on these */
-  codes?: { code: string; system?: string }[];
+  /** the case's codes — the ICD-10 / ICD-9 facets filter on these; desc
+   *  (when the row carries it) feeds the ICD filter dialog's descriptions */
+  codes?: { code: string; system?: string; desc?: string | null }[];
 }
 
 /** A case that can also be counted into the facet pool — adds the fields the
@@ -137,6 +138,9 @@ function matchesExcept(c: FacetableCase, sel: Record<FacetKey, Set<string>>, exc
 export interface CaseFilters {
   facets: Facet[];
   chips: { key: FacetKey; value: string; label: string }[];
+  /** ICD code -> catalog description, harvested from the loaded cases' code
+   *  previews — lets the ICD filter dialog show meanings with no extra fetch */
+  codeDesc: Record<string, string>;
   filteredComplete: RichCase[];
   filteredGroups: RichIncompleteGroup[];
   totalComplete: number;
@@ -368,12 +372,18 @@ export function useCaseFilters(
     const chips = FACET_DEFS.flatMap(({ key, labelOf }) =>
       [...sel[key]].map((value) => ({ key, value, label: labelOf ? labelOf(value) : value })));
 
+    // code -> description, for the ICD filter dialog (first non-empty wins)
+    const codeDesc: Record<string, string> = {};
+    for (const c of allCases)
+      for (const k of c.codes ?? [])
+        if (k.desc && !codeDesc[k.code]) codeDesc[k.code] = k.desc;
+
     const clearDateFilter = () => {
       setDateMode(null); setSpecificDate(null); setDateFrom(null); setDateTo(null); setQuickFilter(null);
     };
 
     return {
-      facets, chips, filteredComplete, filteredGroups,
+      facets, chips, codeDesc, filteredComplete, filteredGroups,
       totalComplete: filteredComplete.length,
       totalIncomplete: filteredGroups.reduce((n, g) => n + g.cases.length, 0),
       sortMode, setSortMode,

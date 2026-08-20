@@ -1,8 +1,9 @@
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import {
   BrainCircuit,
   CloudUpload,
+  GripVertical,
   FileSpreadsheet,
   FileText,
   Pencil,
@@ -12,7 +13,6 @@ import {
   Search,
   Sparkles,
   RefreshCw,
-  ListTree,
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react'
@@ -27,6 +27,8 @@ import {
   fetchKnowledgeStats,
   removeKnowledgeDoc,
   renameKnowledgeDoc,
+  reorderKnowledgeDocs,
+  setKnowledgeDocType,
   startTrainingRun,
   syncCodesToSystem,
   testChat,
@@ -37,6 +39,7 @@ import type { CodeSyncResult } from '../api/trainingService'
 import type {
   ChatAnswer,
   KbDoc,
+  KbDocType,
   KnowledgeStats,
   RetrievalHit,
   TrainingRun,
@@ -45,6 +48,52 @@ import { formatSize } from '../types/training.types'
 
 const POLL_MS = 2500
 const LAST_RUN_KEY = 'medcode:lastTrainingRun'
+
+/** The two upload boxes — every document is ICD-10 or ICD-9, never untyped.
+ *  Mirrors the coder Add Code modal: pick the box, not a dropdown. */
+const UPLOAD_BOXES: { type: KbDocType; label: string; hint: string }[] = [
+  { type: 'icd10', label: 'ICD-10 references',
+    hint: 'Diagnosis code lists & guidelines — PDF or CSV' },
+  { type: 'icd9cm', label: 'ICD-9 references',
+    hint: 'Procedure code lists & guidelines — PDF or CSV' },
+]
+
+/** Per-row box control: the active box is filled, clicking the other moves
+ *  the document there (chunks re-tag in place — routing follows immediately). */
+function BoxPills({
+  doc, disabled, onSet,
+}: {
+  doc: KbDoc
+  disabled: boolean
+  onSet: (docType: KbDocType) => void
+}) {
+  return (
+    <div className="flex gap-1">
+      {(['icd10', 'icd9cm'] as KbDocType[]).map((type) => {
+        const active = doc.docType === type
+        const filled = type === 'icd10'
+          ? 'bg-primary/15 text-primary border-primary/40'
+          : 'bg-info/15 text-info border-info/40'
+        return (
+          <button
+            key={type}
+            type="button"
+            disabled={disabled || active}
+            title={active ? undefined
+              : `Move to the ${type === 'icd10' ? 'ICD-10' : 'ICD-9'} box`}
+            onClick={() => onSet(type)}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-bold whitespace-nowrap transition-colors disabled:cursor-default ${
+              active ? filled
+                : 'border-border text-muted opacity-60 hover:opacity-100 disabled:opacity-30'
+            }`}
+          >
+            {type === 'icd10' ? 'ICD-10' : 'ICD-9'}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', {
@@ -170,11 +219,17 @@ export function TrainingPage() {
   const [ragError, setRagError] = useState<string | null>(null)
   const [lastRun, setLastRun] = useState<TrainingRun | null>(loadLastRun)
 
-  const [dragging, setDragging] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  // which box is being dragged over / uploaded into (null = neither)
+  const [dragging, setDragging] = useState<KbDocType | null>(null)
+  const [uploading, setUploading] = useState<KbDocType | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<KbDoc | null>(null)
   const [renaming, setRenaming] = useState<KbDoc | null>(null)
+  // row-level mutation (re-tag / reorder) in flight — disables row controls
+  const [mutatingId, setMutatingId] = useState<string | null>(null)
+  // drag-and-drop reranking: the row being dragged and the row hovered over
+  const [drag, setDrag] = useState<{ docType: KbDocType; id: string } | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   const [training, setTraining] = useState(false)
   const [log, setLog] = useState<string[]>([])
@@ -191,6 +246,8 @@ export function TrainingPage() {
   const [answer, setAnswer] = useState<ChatAnswer | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
+  // which box the shared hidden file input is picking for (set on click/focus)
+  const pickingFor = useRef<KbDocType>('icd10')
   const logEnd = useRef<HTMLDivElement>(null)
   const prevStatus = useRef<Map<string, KbDoc['status']>>(new Map())
   const trainStart = useRef(0)
@@ -293,7 +350,7 @@ export function TrainingPage() {
       : 0
     : 100
 
-  const addFiles = (files: FileList | null) => {
+  const addFiles = (files: FileList | null, docType: KbDocType) => {
     if (!files?.length || uploading) return
     const fileList = Array.from(files)
     const isAccepted = (f: File) => {
@@ -313,18 +370,72 @@ export function TrainingPage() {
       return
     }
     setUploadError(null)
-    setUploading(true)
+    setUploading(docType)
     void (async () => {
       try {
-        await uploadKnowledgeDocs(fileList)
+        await uploadKnowledgeDocs(fileList, docType)
         await refresh()
       } catch (err) {
         setUploadError(apiErrorMessage(err, 'Upload failed.'))
       } finally {
-        setUploading(false)
+        setUploading(null)
       }
     })()
   }
+
+  /** Move a document into a box (tag it / re-tag it); routing follows at once. */
+  const retag = (d: KbDoc, docType: KbDocType) => {
+    if (mutatingId) return
+    setMutatingId(d.id)
+    setUploadError(null)
+    void (async () => {
+      try {
+        await setKnowledgeDocType(d.id, docType)
+        await refresh()
+      } catch (err) {
+        setUploadError(apiErrorMessage(err, 'Could not move the document.'))
+      } finally {
+        setMutatingId(null)
+      }
+    })()
+  }
+
+  /** Drop the dragged document at another row's position (same box only). */
+  const reorderTo = (list: KbDoc[], docType: KbDocType, fromId: string, toId: string) => {
+    if (fromId === toId || mutatingId) return
+    const ids = list.map((d) => d.id)
+    const from = ids.indexOf(fromId)
+    const to = ids.indexOf(toId)
+    if (from === -1 || to === -1) return
+    ids.splice(to, 0, ...ids.splice(from, 1))
+    setMutatingId(fromId)
+    // optimistic: rewrite ranks locally so the row moves immediately
+    setDocs((prev) =>
+      prev.map((d) => {
+        const r = ids.indexOf(d.id)
+        return r === -1 ? d : { ...d, rank: r + 1 }
+      }),
+    )
+    void (async () => {
+      try {
+        await reorderKnowledgeDocs(docType, ids)
+      } catch (err) {
+        setUploadError(apiErrorMessage(err, 'Could not reorder the documents.'))
+        await refresh() // roll the optimistic order back to server truth
+      } finally {
+        setMutatingId(null)
+      }
+    })()
+  }
+
+  // the three table sections: each box sorted by read-first rank, plus the
+  // legacy untagged docs waiting to be assigned a box
+  const byRank = (a: KbDoc, b: KbDoc) =>
+    (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER) ||
+    a.name.localeCompare(b.name)
+  const icd10Docs = docs.filter((d) => d.docType === 'icd10').sort(byRank)
+  const icd9Docs = docs.filter((d) => d.docType === 'icd9cm').sort(byRank)
+  const untaggedDocs = docs.filter((d) => !d.docType)
 
   const startTraining = () => {
     if (training || busy || !docs.length) return
@@ -398,19 +509,6 @@ export function TrainingPage() {
     })()
   }
 
-  const tiles = [
-    {
-      label: 'Documents indexed',
-      value: String(stats?.documentsIndexed ?? indexed.length),
-      icon: FileText,
-    },
-    {
-      label: 'Chunks in index',
-      value: (stats?.chunksInIndex ?? totalChunks).toLocaleString(),
-      icon: ListTree,
-    },
-  ]
-
   return (
     <>
       <h1 className="mb-1 text-[19px] font-bold text-text">AI Training</h1>
@@ -426,79 +524,102 @@ export function TrainingPage() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {tiles.map((t) => (
-          <Card key={t.label} padded={false} className="p-5 shadow-none">
-            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
-              <t.icon size={16} className="text-primary" />
-            </div>
-            <p className="text-[19px] leading-tight font-bold break-words text-text">
-              {t.value}
-            </p>
-            <p className="mt-1 text-[12px] text-muted">{t.label}</p>
-          </Card>
-        ))}
-      </div>
-
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card padded={false} className="p-5 shadow-none lg:col-span-2">
-          <h2 className="mb-3 text-[14px] font-bold text-text">
+          <h2 className="mb-3 text-[16px] font-bold text-text">
             Knowledge base
           </h2>
-          {/* click/drag on the zone is a mouse convenience; the sr-only file
-              input inside is the keyboard/screen-reader path */}
-          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragging(false)
-              addFiles(e.dataTransfer.files)
-            }}
-            onClick={() => fileInput.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-9 text-center transition-colors focus-within:border-primary focus-within:bg-primary/5 ${
-              dragging
-                ? 'border-primary bg-primary/10'
-                : 'border-border hover:border-primary/60 hover:bg-primary/5'
-            }`}
-          >
-            {uploading ? (
-              <RefreshCw
-                size={26}
-                className="mx-auto mb-2 animate-spin text-primary"
-              />
-            ) : (
-              <CloudUpload size={26} className="mx-auto mb-2 text-primary" />
-            )}
-            <p role="status" className="text-[13px] font-semibold text-text">
-              {uploading
-                ? 'Uploading…'
-                : 'Drop PDFs or CSVs here, or click to browse'}
-            </p>
-            <p className="mt-1 text-[11px] text-muted">
-              Coding guidelines, grouper handbooks, hospital SOPs, code lists —
-              PDF or CSV
-            </p>
-            {/* sr-only (not display:none) keeps the input focusable — Tab to it,
-                Enter/Space opens the OS picker; the visual dropzone is decoration */}
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/pdf,text/csv,.csv"
-              multiple
-              aria-label="Upload PDF documents"
-              className="sr-only"
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                addFiles(e.target.files)
-                e.target.value = ''
-              }}
-            />
+          {/* two boxes, one per code system (user request 2026-08-20): the box
+              IS the doc_type tag — everything dropped in it uploads as that
+              system, mirroring the coder Add Code modal's two-box pattern.
+              click/drag on a zone is a mouse convenience; the sr-only file
+              inputs inside are the keyboard/screen-reader path */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {UPLOAD_BOXES.map((box) => {
+              const isIcd10 = box.type === 'icd10'
+              const accent = isIcd10 ? 'text-primary' : 'text-info'
+              const active = dragging === box.type
+              return (
+                // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+                <div
+                  key={box.type}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragging(box.type)
+                  }}
+                  onDragLeave={() => setDragging(null)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragging(null)
+                    addFiles(e.dataTransfer.files, box.type)
+                  }}
+                  onClick={() => {
+                    pickingFor.current = box.type
+                    fileInput.current?.click()
+                  }}
+                  className={`cursor-pointer rounded-xl border-2 border-dashed px-5 py-10 text-center transition-colors ${
+                    isIcd10
+                      ? `focus-within:border-primary focus-within:bg-primary/5 ${
+                          active
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/60 hover:bg-primary/5'
+                        }`
+                      : `focus-within:border-info focus-within:bg-info/5 ${
+                          active
+                            ? 'border-info bg-info/10'
+                            : 'border-border hover:border-info/60 hover:bg-info/5'
+                        }`
+                  }`}
+                >
+                  {uploading === box.type ? (
+                    <RefreshCw
+                      size={22}
+                      className={`mx-auto mb-1.5 animate-spin ${accent}`}
+                    />
+                  ) : (
+                    <CloudUpload
+                      size={22}
+                      className={`mx-auto mb-1.5 ${accent}`}
+                    />
+                  )}
+                  <p role="status" className="text-[13px] font-bold text-text">
+                    {uploading === box.type ? 'Uploading…' : box.label}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {uploading === box.type
+                      ? 'Indexing starts automatically'
+                      : box.hint}
+                  </p>
+                  {/* sr-only (not display:none) keeps the button focusable —
+                      Tab to it, Enter/Space opens the OS picker for THIS box */}
+                  <button
+                    type="button"
+                    aria-label={`Upload ${box.label} (PDF or CSV)`}
+                    className="sr-only"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      pickingFor.current = box.type
+                      fileInput.current?.click()
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
+          {/* one shared hidden input; pickingFor names the box that opened it */}
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/pdf,text/csv,.csv"
+            multiple
+            aria-hidden="true"
+            tabIndex={-1}
+            className="hidden"
+            onChange={(e) => {
+              addFiles(e.target.files, pickingFor.current)
+              e.target.value = ''
+            }}
+          />
           {uploadError && (
             <p role="alert" className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-error">
               <AlertTriangle size={12} className="mt-[1px] shrink-0" />
@@ -510,13 +631,13 @@ export function TrainingPage() {
             <table className="w-full text-left">
               <caption className="sr-only">Knowledge-base documents</caption>
               <thead>
-                <tr className="border-b border-border text-[12px] tracking-wide text-muted uppercase">
-                  {['Document', 'Size', 'Pages', 'Chunks', 'Status', 'Actions'].map(
+                <tr className="border-b border-border text-[13px] tracking-wide text-muted uppercase">
+                  {['Document', 'Box', 'Size', 'Pages', 'Chunks', 'Status', 'Actions'].map(
                     (h, i) => (
                       <th
                         key={i}
                         scope="col"
-                        className="px-2 py-2.5 font-semibold whitespace-nowrap"
+                        className="px-2 py-3 font-semibold whitespace-nowrap"
                       >
                         {/* the actions column header is visually blank by design */}
                         {h === 'Actions' ? <span className="sr-only">{h}</span> : h}
@@ -529,78 +650,221 @@ export function TrainingPage() {
                 {docs.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-2 py-6 text-center text-[12px] text-muted"
                     >
                       No documents yet — the AI has nothing to retrieve from.
                     </td>
                   </tr>
                 )}
-                {docs.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="border-b border-border/60 align-middle last:border-0"
-                  >
-                    <td className="px-2 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {d.name.toLowerCase().endsWith('.csv') ? (
-                          <FileSpreadsheet
-                            size={13}
-                            className="shrink-0 text-muted"
-                          />
-                        ) : (
-                          <FileText
-                            size={13}
-                            className="shrink-0 text-muted"
-                          />
-                        )}
-                        <div className="min-w-0">
-                          <p
-                            className="max-w-[19rem] truncate text-[13px] font-semibold text-text"
-                            title={d.name}
-                          >
-                            {d.name}
-                          </p>
-                          <p className="text-[12px] text-muted">
-                            {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2.5 text-[12px] whitespace-nowrap text-muted">
-                      {formatSize(d.sizeBytes)}
-                    </td>
-                    <td className="px-2 py-2.5 text-[12px] text-muted">
-                      {d.pages || '—'}
-                    </td>
-                    <td className="px-2 py-2.5 text-[12px] text-muted">
-                      {d.chunks || '—'}
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <StatusPill doc={d} />
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          title="Rename document"
-                          onClick={() => setRenaming(d)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Remove from knowledge base"
-                          onClick={() => setDeleting(d)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                {/* one section per upload box (rows in read-first order, with
+                    up/down controls), plus the legacy untagged docs awaiting a
+                    box. Shared column layout keeps sections aligned. */}
+                {docs.length > 0 && ([
+                  { key: 'icd10' as const, label: 'ICD-10 · read order', cls: 'text-primary', list: icd10Docs,
+                    empty: 'No ICD-10 documents yet — drop files in the ICD-10 box above.' },
+                  { key: 'icd9cm' as const, label: 'ICD-9 · read order', cls: 'text-info', list: icd9Docs,
+                    empty: 'No ICD-9 documents yet — drop files in the ICD-9 box above.' },
+                ]).map((sec) => (
+                  <Fragment key={sec.key}>
+                    <tr>
+                      <td colSpan={7} className="px-2 pt-4 pb-1.5">
+                        <span className={`text-[12px] font-bold tracking-wide uppercase ${sec.cls}`}>
+                          {sec.label} ({sec.list.length})
+                        </span>
+                      </td>
+                    </tr>
+                    {sec.list.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-2 pb-2 text-[12px] text-muted">
+                          {sec.empty}
+                        </td>
+                      </tr>
+                    )}
+                    {sec.list.map((d, i) => (
+                      <tr
+                        key={d.id}
+                        draggable={mutatingId === null}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move'
+                          e.dataTransfer.setData('text/plain', d.id)
+                          setDrag({ docType: sec.key, id: d.id })
+                        }}
+                        onDragOver={(e) => {
+                          if (drag?.docType !== sec.key) return
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = 'move'
+                          setDragOverId(d.id)
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverId === d.id) setDragOverId(null)
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          if (drag?.docType === sec.key) {
+                            reorderTo(sec.list, sec.key, drag.id, d.id)
+                          }
+                          setDrag(null)
+                          setDragOverId(null)
+                        }}
+                        onDragEnd={() => {
+                          setDrag(null)
+                          setDragOverId(null)
+                        }}
+                        className={`border-b border-border/60 align-middle transition-colors last:border-0 ${
+                          drag?.id === d.id ? 'opacity-40' : ''
+                        } ${
+                          dragOverId === d.id && drag?.id !== d.id
+                            ? 'bg-primary/5 [box-shadow:inset_0_2px_0_var(--color-primary)]'
+                            : ''
+                        }`}
+                      >
+                        <td className="px-2 py-3.5">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <GripVertical
+                              size={15}
+                              aria-hidden="true"
+                              className="shrink-0 cursor-grab text-muted/60"
+                            />
+                            <span className="w-5 shrink-0 text-right text-[12px] font-bold text-muted">
+                              {i + 1}.
+                            </span>
+                            {d.name.toLowerCase().endsWith('.csv') ? (
+                              <FileSpreadsheet size={15} className="shrink-0 text-muted" />
+                            ) : (
+                              <FileText size={15} className="shrink-0 text-muted" />
+                            )}
+                            <div className="min-w-0">
+                              <p
+                                className="max-w-[19rem] truncate text-[14px] font-semibold text-text"
+                                title={d.name}
+                              >
+                                {d.name}
+                              </p>
+                              <p className="text-[12px] text-muted">
+                                {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <BoxPills doc={d} disabled={mutatingId !== null}
+                            onSet={(type) => retag(d, type)} />
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] whitespace-nowrap text-muted">
+                          {formatSize(d.sizeBytes)}
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] text-muted">
+                          {d.pages || '—'}
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] text-muted">
+                          {d.chunks || '—'}
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <StatusPill doc={d} />
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              title="Rename document"
+                              onClick={() => setRenaming(d)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Remove from knowledge base"
+                              onClick={() => setDeleting(d)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
+                {untaggedDocs.length > 0 && (
+                  <Fragment>
+                    <tr>
+                      <td colSpan={7} className="px-2 pt-4 pb-1.5">
+                        <span className="text-[12px] font-bold tracking-wide text-muted uppercase">
+                          Not tagged yet ({untaggedDocs.length})
+                        </span>
+                        <span className="ml-2 text-[12px] font-normal text-muted">
+                          — pick a box so the AI knows which system each file covers
+                        </span>
+                      </td>
+                    </tr>
+                    {untaggedDocs.map((d) => (
+                      <tr
+                        key={d.id}
+                        className="border-b border-border/60 align-middle last:border-0"
+                      >
+                        <td className="px-2 py-3.5">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="w-[35px] shrink-0" />
+                            {d.name.toLowerCase().endsWith('.csv') ? (
+                              <FileSpreadsheet size={15} className="shrink-0 text-muted" />
+                            ) : (
+                              <FileText size={15} className="shrink-0 text-muted" />
+                            )}
+                            <div className="min-w-0">
+                              <p
+                                className="max-w-[19rem] truncate text-[14px] font-semibold text-text"
+                                title={d.name}
+                              >
+                                {d.name}
+                              </p>
+                              <p className="text-[12px] text-muted">
+                                {d.uploadedAt ? fmtDate(d.uploadedAt) : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <BoxPills doc={d} disabled={mutatingId !== null}
+                            onSet={(type) => retag(d, type)} />
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] whitespace-nowrap text-muted">
+                          {formatSize(d.sizeBytes)}
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] text-muted">
+                          {d.pages || '—'}
+                        </td>
+                        <td className="px-2 py-3.5 text-[13px] text-muted">
+                          {d.chunks || '—'}
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <StatusPill doc={d} />
+                        </td>
+                        <td className="px-2 py-3.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              title="Rename document"
+                              onClick={() => setRenaming(d)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Remove from knowledge base"
+                              onClick={() => setDeleting(d)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/15"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                )}
               </tbody>
             </table>
           </div>
@@ -618,7 +882,7 @@ export function TrainingPage() {
 
           <Button
             onClick={startTraining}
-            disabled={training || busy || uploading || !docs.length}
+            disabled={training || busy || uploading !== null || !docs.length}
             fullWidth
           >
             {training ? (

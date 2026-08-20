@@ -258,6 +258,14 @@ export const dict: Record<string, { en: string; th: string }> = {
   // filter by the case's diagnosis / procedure codes
   "facet.icd10":     { en: "ICD-10", th: "ICD-10" },
   "facet.icd9":      { en: "ICD-9",  th: "ICD-9" },
+  "filter.icd.select":      { en: "Select codes… ({n})", th: "เลือกรหัส… ({n})" },
+  "filter.icd.dialogTitle": { en: "Filter by ICD code", th: "กรองตามรหัส ICD" },
+  "filter.icd.search":      { en: "Search code or description…", th: "ค้นหารหัสหรือคำอธิบาย…" },
+  "filter.icd.clear":       { en: "Clear {s}", th: "ล้าง {s}" },
+  "filter.icd.show":        { en: "Show {n} cases", th: "แสดง {n} เคส" },
+  "filter.icd.noMatch":     { en: "No codes match \"{q}\"", th: "ไม่มีรหัสที่ตรงกับ \"{q}\"" },
+  "filter.icd.empty":       { en: "No codes on the current cases", th: "ไม่มีรหัสในเคสปัจจุบัน" },
+  "filter.icd.more":        { en: "{n} more — refine your search", th: "อีก {n} รหัส — พิมพ์ค้นหาเพื่อดูเพิ่มเติม" },
   // a case can have many coders (item 16); the row names the latest one
   "coder.plusOthers": { en: "+{n} more", th: "+อีก {n}" },
   "coder.all":        { en: "Coders",    th: "ผู้ให้รหัส" },
@@ -304,6 +312,13 @@ export const dict: Record<string, { en: string; th: string }> = {
   "agent.chip.dict.0":    { en: "What does code A09 cover?", th: "รหัส A09 ครอบคลุมอะไรบ้าง?" },
   "agent.chip.dict.1":    { en: "What's the difference between principal diagnosis and comorbidity?", th: "การวินิจฉัยหลักกับโรคร่วมต่างกันอย่างไร?" },
   "agent.chip.dict.2":    { en: "When should an external cause code be added?", th: "ควรเพิ่มรหัสสาเหตุภายนอกเมื่อใด?" },
+  "agent.history.title":  { en: "Chat history", th: "ประวัติแชท" },
+  "agent.history.new":    { en: "New chat", th: "แชทใหม่" },
+  "agent.history.empty":  { en: "No conversations yet", th: "ยังไม่มีบทสนทนา" },
+  "agent.history.loading": { en: "Loading…", th: "กำลังโหลด…" },
+  "agent.history.confirm": { en: "Delete?", th: "ลบ?" },
+  "agent.searched.icd10":  { en: "Searched ICD-10 references only", th: "ค้นหาจากเอกสาร ICD-10 เท่านั้น" },
+  "agent.searched.icd9cm": { en: "Searched ICD-9 references only", th: "ค้นหาจากเอกสาร ICD-9 เท่านั้น" },
 };
 
 type LanguageCtxValue = {

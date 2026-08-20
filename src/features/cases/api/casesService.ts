@@ -108,6 +108,19 @@ export interface IcdCatalogHit {
   description: string
 }
 
+/** Bulk code -> description across both catalogs (ICD filter dialog).
+ *  POST because the dialog sends every code on the loaded cases at once. */
+export async function lookupIcdDescriptions(
+  codes: string[],
+): Promise<Record<string, string>> {
+  if (codes.length === 0) return {}
+  const { data } = await apiClient.post<Record<string, string>>(
+    '/icd-codes/lookup',
+    { codes: codes.slice(0, 1000) },
+  )
+  return data ?? {}
+}
+
 /** Search the shared icd_codes catalog (ICD-10 / ICD-9). */
 export async function searchIcdCatalog(
   q: string,

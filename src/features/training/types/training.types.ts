@@ -1,5 +1,9 @@
 export type KbStatus = 'queued' | 'processing' | 'indexed' | 'failed'
 
+/** Which upload box a document came through (RAG `doc_type`). The tag is
+ *  stamped into every indexed chunk's metadata. */
+export type KbDocType = 'icd10' | 'icd9cm'
+
 /** One document in the RAG knowledge base (id == RAG `source`). */
 export interface KbDoc {
   id: string
@@ -11,6 +15,10 @@ export interface KbDoc {
   progress: number
   uploadedAt: string
   error?: string
+  /** null/undefined = legacy upload from before the two-box split */
+  docType?: KbDocType | null
+  /** read-first priority inside its box (1 = the AI reads it first) */
+  rank?: number | null
 }
 
 /** Live index stats from the RAG service (GET /admin/knowledge/stats). */
