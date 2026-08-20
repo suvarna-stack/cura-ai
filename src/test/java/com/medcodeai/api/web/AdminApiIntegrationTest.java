@@ -301,13 +301,6 @@ class AdminApiIntegrationTest {
         return json.readTree(body);
     }
 
-    private JsonNode getJson(String token, String url) throws Exception {
-        String body = mvc.perform(get(url).header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return json.readTree(body);
-    }
-
     private static boolean containsEmail(JsonNode accounts, String email) {
         for (JsonNode a : accounts) {
             if (email.equals(a.get("email").asString())) {
