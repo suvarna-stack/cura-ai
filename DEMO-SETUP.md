@@ -12,7 +12,7 @@ Three services + one React frontend, two Postgres databases:
 | Hospital mock API ("iMed") | `imed-mock-api` (this repo) | 8003 | `imed` (schema `imed`) |
 | MedCode AI backend | `medcode-api` | 8001 | `medcode` (schema `public`) |
 | RAG suggestion service | `RAG` | 8000 | — (own local index) |
-| Coder webapp (React/Vite) | `coder-webapp` | 5173 | — |
+| Audit chart frontend (React/Vite) | `audit-chart-frontend` | 5173 | — |
 
 Demo flow: the webapp opens EMPTY → **Sync** pulls the hospital's ICD catalogs
 (649 ICD-10 + 332 ICD-9) and 21 uncoded OPD cases into medcode → the coder
@@ -87,7 +87,7 @@ python main.py   # or the repo's documented uvicorn command
 
 **Terminal 4 — webapp, port 5173:**
 ```powershell
-cd coder-webapp
+cd audit-chart-frontend
 npm install
 npm run dev
 ```
