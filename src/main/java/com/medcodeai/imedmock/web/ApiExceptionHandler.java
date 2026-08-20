@@ -92,7 +92,7 @@ public class ApiExceptionHandler {
         m.put("status", "STATUS_BUSINESS_ERROR");
         m.put("message", e.getMessage());
         m.put("message_th", e.messageTh());
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(m);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(m);
     }
 
     @ExceptionHandler(DuplicateDiagnosisException.class)
@@ -132,7 +132,7 @@ public class ApiExceptionHandler {
 
     /** Unparseable JSON, or a value of the wrong shape (object where text is expected). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> unreadableBody(HttpMessageNotReadableException e) {
+    public ResponseEntity<Map<String, Object>> unreadableBody() {
         return body(HttpStatus.BAD_REQUEST, "malformed request body");
     }
 

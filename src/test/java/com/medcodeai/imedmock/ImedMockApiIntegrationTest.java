@@ -514,7 +514,7 @@ class ImedMockApiIntegrationTest {
         mvc.perform(post("/api/v1/cases/sync").header("Authorization", AUTH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"visit_ids\":[" + ids + "]}"))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.message").value("too_many_visit_ids"));
     }
 
@@ -533,7 +533,7 @@ class ImedMockApiIntegrationTest {
         mvc.perform(post("/api/v1/cases/sync-by-period").header("Authorization", AUTH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"from\":\"2026-07-01T00:00:00\",\"to\":\"2026-08-02T00:00:01\"}"))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.message").value("period_too_long"));
     }
 
