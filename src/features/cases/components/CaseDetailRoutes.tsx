@@ -3,6 +3,8 @@ import { CaseDetailPage } from './CaseDetailPage'
 import { IncompleteCaseDetailPage } from './IncompleteCaseDetailPage'
 import { FinishedCaseDetailPage } from './FinishedCaseDetailPage'
 import { ViewHistoryPage } from './ViewHistoryPage'
+import { CaseLockedScreen } from './global/CaseLockedScreen'
+import { useCaseLock } from '../hooks/useCaseLock'
 import type {
   CompleteCase,
   FinishedCase,
@@ -40,6 +42,18 @@ export function CaseDetailRoute() {
   const caseData =
     (state?.caseData as CompleteCase | undefined) ?? fallbackComplete(id)
 
+  // One coder per case: the editor renders only while we hold the lock.
+  const lock = useCaseLock(id)
+  if (lock.status === 'acquiring') return null
+  if (lock.status === 'held')
+    return (
+      <CaseLockedScreen
+        caseId={id}
+        holderName={lock.holder?.name ?? '—'}
+        onBack={() => navigate('/cases')}
+      />
+    )
+
   return (
     <CaseDetailPage
       caseData={caseData}
@@ -63,6 +77,17 @@ export function IncompleteCaseDetailRoute() {
   const { state } = useLocation() as { state?: LocState }
   const caseData =
     (state?.caseData as IncompleteCase | undefined) ?? fallbackIncomplete(id)
+
+  const lock = useCaseLock(id)
+  if (lock.status === 'acquiring') return null
+  if (lock.status === 'held')
+    return (
+      <CaseLockedScreen
+        caseId={id}
+        holderName={lock.holder?.name ?? '—'}
+        onBack={() => navigate('/cases?tab=incomplete')}
+      />
+    )
 
   return (
     <IncompleteCaseDetailPage

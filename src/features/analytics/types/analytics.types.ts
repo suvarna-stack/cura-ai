@@ -36,6 +36,9 @@ export interface AnalyticsData {
     coded: number
     reopened: number
   }[]
+  /** Finished (approved) cases per coder, biggest first. `coder` is the
+   *  account's display name, `coderId` the raw audit stamp behind it. */
+  finishedByCoder: { coder: string; coderId: string; cases: number }[]
   /** Sync-to-first-approval; both percentiles null with cases = 0 until
    *  something has been approved. */
   turnaround: {
@@ -75,6 +78,7 @@ export const EMPTY_ANALYTICS: AnalyticsData = {
   topCodes: [],
   documentationGaps: { items: [], byGroup: [] },
   codingActivity: [],
+  finishedByCoder: [],
   turnaround: { medianMinutes: null, p90Minutes: null, cases: 0 },
   codingDepth: {
     uncoded: 0,

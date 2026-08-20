@@ -43,6 +43,14 @@ import { LearnedNoteCard } from './LearnedNoteCard'
 import { LearnedRulesPanel } from './LearnedRulesPanel'
 
 let uid = 1
+
+/** Bare "teach my previous message" commands — "learn that", "remember it",
+ *  Thai "จำไว้" — sent as a follow-up after the agent answered. */
+const LEARN_BACK_RE =
+  /^(please\s+)?(learn|remember|save|note)(\s+(that|this|it))?\s*[.!]*$/i
+const LEARN_BACK_TH_RE =
+  /^(ช่วย)?(จำ|จดจำ|เรียนรู้|บันทึก|สอน)(ไว้|อันนี้|สิ่งนี้|เลย)?(ด้วย)?(นะ|สิ|ครับ|ค่ะ|คะ)?$/
+
 const now = () =>
   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 const msg = (
@@ -85,11 +93,9 @@ export function AgentPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // --- Suggest & Learn state -------------------------------------------
-  // `teaching` flips the composer from "ask me" to "teach me". The nudge is
-  // the auto-detect half: a message that reads like a rule still gets its
-  // normal answer, and the offer to save it appears alongside.
-  const [teaching, setTeaching] = useState(false)
-  const [nudge, setNudge] = useState<string | null>(null)
+  // There is no separate "teach mode": the Suggest & Learn tab IS it. Every
+  // message is classified — one that reads like a rule goes straight to the
+  // extractor (the confirm card), a question gets its normal answer.
   const [savingNote, setSavingNote] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [notes, setNotes] = useState<LearnedNote[]>([])
@@ -148,9 +154,6 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
-    // Teaching only exists in Suggest & Learn; the dictionary tab is read-only.
-    setTeaching(false)
-    setNudge(null)
   }
 
   /** Fresh empty chat; the old one stays reachable from the sidebar. */
@@ -159,8 +162,6 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
-    setTeaching(false)
-    setNudge(null)
   }
 
   /** Reopen a stored conversation (restores its mode too). */
@@ -251,7 +252,6 @@ export function AgentPage() {
     const text = (textOverride ?? input).trim()
     if (!text || pending) return
     setInput('')
-    setNudge(null)
     setShowSuggestions(false)
     setPending(true)
     sendingRef.current = true
@@ -353,18 +353,32 @@ export function AgentPage() {
 
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
-    if (!text || pending) return
-    if (teaching) return teach(text)
-    setNudge(null)
-    // Auto-detect: answer the question either way, but if the message reads
-    // like a rule, offer to learn it. Runs alongside the answer so it costs
-    // the coder nothing; a wrong guess is one dismissed chip.
+    if (!text || pending || sendingRef.current) return
+    // Suggest & Learn is one surface: the classifier routes each message. A
+    // rule ("always code X…") goes to the extractor and comes back as the
+    // confirm card; anything else is answered normally. Classification is a
+    // fast deterministic call — if it fails, answering is the safe default.
+    // A wrong "teach" guess costs one Discard click on the draft card.
     if (mode === 'learn') {
-      void classifyIntent(text)
-        .then((r) => {
-          if (r.intent === 'teach') setNudge(text)
-        })
-        .catch(() => undefined)
+      // "learn that" after an answer is a back-reference: the thing to teach
+      // is the claim the coder just made, not the two-word command itself.
+      if (LEARN_BACK_RE.test(text) || LEARN_BACK_TH_RE.test(text)) {
+        const prev = [...convo]
+          .reverse()
+          .find(
+            (m) =>
+              m.role === 'coder' &&
+              !LEARN_BACK_RE.test(m.text.trim()) &&
+              !LEARN_BACK_TH_RE.test(m.text.trim()),
+          )
+        if (prev) return teach(prev.text)
+      }
+      sendingRef.current = true // held through the classify round-trip
+      const intent = await classifyIntent(text)
+        .then((r) => r.intent)
+        .catch(() => 'ask' as const)
+      sendingRef.current = false
+      if (intent === 'teach') return teach(text)
     }
     // The visible conversation IS the history — map to API roles.
     const history: AgentChatTurn[] = convo
@@ -940,49 +954,6 @@ export function AgentPage() {
         }}
       >
       <div className="relative shrink-0 px-6 pt-3 pb-3">
-        {nudge && !teaching && (
-          <div
-            className="mb-2 flex items-center gap-2 rounded-2xl px-3.5 py-2"
-            style={{
-              background: `rgba(${gl.accentRgb},0.10)`,
-              border: `1px solid rgba(${gl.accentRgb},0.26)`,
-            }}
-            role="note"
-          >
-            <GraduationCap
-              size={13}
-              className="shrink-0"
-              style={{ color: gl.accent }}
-            />
-            <span className="text-[11px]" style={{ color: gl.text }}>
-              {t('agent.learn.nudge')}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                const text = nudge
-                setNudge(null)
-                void teach(text)
-              }}
-              className="ml-auto shrink-0 rounded-xl px-3 py-1 text-[11px] font-bold transition-all hover:opacity-90"
-              style={{
-                background: gl.accentGrad,
-                color: gl.isDark ? '#1a0a00' : '#fff',
-              }}
-            >
-              {t('agent.learn.nudge.yes')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setNudge(null)}
-              className="shrink-0 rounded-xl px-2.5 py-1 text-[11px] font-medium transition-all hover:opacity-80"
-              style={{ color: gl.muted }}
-            >
-              {t('agent.learn.nudge.no')}
-            </button>
-          </div>
-        )}
-
         {showSuggestions && (
           <div
             className="absolute inset-x-6 bottom-full z-10 mb-2 flex flex-wrap gap-2 rounded-2xl p-3"
@@ -994,7 +965,10 @@ export function AgentPage() {
               boxShadow: gl.shadow,
             }}
           >
-            {(teaching ? TEACH_CHIP_KEYS : CHIP_KEYS[mode]).map((key) => {
+            {(mode === 'learn'
+              ? [...CHIP_KEYS.learn, ...TEACH_CHIP_KEYS]
+              : CHIP_KEYS.dict
+            ).map((key) => {
               const p = t(key)
               return (
                 <button
@@ -1025,12 +999,8 @@ export function AgentPage() {
           style={{
             background: gl.card,
             backdropFilter: gl.blur20,
-            // Teaching writes to the knowledge layer, asking does not — the
-            // composer has to look different while it is armed.
-            border: teaching ? `1.5px solid ${gl.accent}` : gl.border,
-            boxShadow: teaching
-              ? `0 2px 16px rgba(${gl.accentRgb},0.28)`
-              : gl.shadow,
+            border: gl.border,
+            boxShadow: gl.shadow,
           }}
         >
           <div
@@ -1040,23 +1010,12 @@ export function AgentPage() {
               border: `1px solid rgba(${gl.accentRgb},0.32)`,
             }}
           >
-            {teaching ? (
+            {mode === 'learn' ? (
               <GraduationCap size={12} style={{ color: gl.accent }} />
             ) : (
               <User size={12} style={{ color: gl.accent }} />
             )}
           </div>
-          {teaching && (
-            <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wider"
-              style={{
-                background: `rgba(${gl.accentRgb},0.18)`,
-                color: gl.accent,
-              }}
-            >
-              {t('agent.learn.teaching')}
-            </span>
-          )}
           <textarea
             aria-label="Message the AI agent"
             value={input}
@@ -1067,44 +1026,11 @@ export function AgentPage() {
                 void send()
               }
             }}
-            placeholder={
-              teaching ? t('agent.learn.placeholder') : t(`agent.placeholder.${mode}`)
-            }
+            placeholder={t(`agent.placeholder.${mode}`)}
             rows={1}
             className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none"
             style={{ color: gl.text }}
           />
-          <button
-            type="button"
-            aria-label={t('agent.learn.teach')}
-            aria-pressed={teaching}
-            title={t('agent.learn.teach.hint')}
-            onClick={() => {
-              const next = !teaching
-              setTeaching(next)
-              setNudge(null)
-              // Teaching belongs to the Suggest & Learn tab, so the tab
-              // follows the composer — but switchMode() clears the chat, and
-              // pressing Teach must never cost the coder their conversation.
-              if (next && mode !== 'learn') setMode('learn')
-            }}
-            className="flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[11px] font-bold transition-all hover:opacity-80"
-            style={
-              teaching
-                ? {
-                    background: gl.accentGrad,
-                    color: gl.isDark ? '#1a0a00' : '#fff',
-                  }
-                : {
-                    background: gl.row,
-                    border: gl.borderSm,
-                    color: gl.muted,
-                  }
-            }
-          >
-            <GraduationCap size={13} />
-            {t('agent.learn.teach')}
-          </button>
           <button
             type="button"
             aria-label="Toggle suggested questions"

@@ -8,73 +8,19 @@ import {
   BarChart3,
   ShieldQuestion,
   Tags,
-  Activity,
-  Clock3,
-  Gauge,
-  FileWarning,
-  Hash,
+  UserCheck,
   ClipboardList,
   Grid3x3,
 } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { GlassCard } from '../../cases/components/global/GlassCard'
 import { EmptyState } from '../../cases/components/global/EmptyState'
-import { formatDate } from '../../cases/utils/formatDate'
 import { fetchAnalytics } from '../api/analyticsService'
 import type { AnalyticsData } from '../types/analytics.types'
 import { EMPTY_ANALYTICS } from '../types/analytics.types'
 
-/** polyline() against a caller-supplied max, so several series drawn on the
- *  same chart share one vertical scale and stay comparable. */
-function polylineShared(
-  data: number[],
-  max: number,
-  w: number,
-  h: number,
-  pad = 6,
-) {
-  const range = max || 1
-  return data
-    .map((v, i) => {
-      const x = pad + (i / Math.max(data.length - 1, 1)) * (w - pad * 2)
-      const y = h - pad - (v / range) * (h - pad * 2)
-      return `${x},${y}`
-    })
-    .join(' ')
-}
-
-function polyline(data: number[], w: number, h: number, pad = 6) {
-  const min = 0
-  const max = Math.max(...data, 1)
-  const range = max - min || 1
-  return data
-    .map((v, i) => {
-      const x = pad + (i / Math.max(data.length - 1, 1)) * (w - pad * 2)
-      const y = h - pad - ((v - min) / range) * (h - pad * 2)
-      return `${x},${y}`
-    })
-    .join(' ')
-}
-
-function areaPath(data: number[], w: number, h: number, pad = 6) {
-  const pts = polyline(data, w, h, pad)
-  const first = pts.split(' ')[0]
-  const last = pts.split(' ').slice(-1)[0]
-  const [lx] = last.split(',')
-  const [fx] = first.split(',')
-  return `M ${fx},${h - pad} L ${pts} L ${lx},${h - pad} Z`
-}
-
 const truncate = (s: string, n: number) =>
   s.length > n ? s.slice(0, n - 1) + '…' : s
-
-/** "95 min" / "2.4 h" / "3.1 d" — the server sends whole minutes. */
-function humanizeMinutes(m: number | null): string {
-  if (m == null) return '—'
-  if (m < 60) return `${m} min`
-  if (m < 48 * 60) return `${(m / 60).toFixed(1)} h`
-  return `${(m / 1440).toFixed(1)} d`
-}
 
 function ChartSkeleton({ height }: { height: number }) {
   const { gl } = useTheme()
@@ -302,14 +248,6 @@ export function AnalyticsPage() {
     }
   }, [])
 
-  const W = 900
-  const H = 170
-  const pad = 12
-  const timeCounts = data.casesOverTime.map((d) => d.count)
-  // The series is zero-filled server-side, so "all zero" — not "no points" —
-  // is what an empty window looks like.
-  const noVisits = timeCounts.every((c) => c === 0)
-
   const DONUT_R = 54
   const DONUT_CX = 80
   const DONUT_CY = 80
@@ -370,43 +308,11 @@ export function AnalyticsPage() {
     },
   ]
 
-  // Second KPI row — how the coding work itself is going. Turnaround is
-  // sync→first-approval; "—" until anything has been approved.
-  const statRow2 = [
-    {
-      label: `Median Time to Code${
-        data.turnaround.cases ? ` (${data.turnaround.cases} cases)` : ''
-      }`,
-      value: humanizeMinutes(data.turnaround.medianMinutes),
-      icon: Clock3,
-    },
-    {
-      label: 'P90 Time to Code',
-      value: humanizeMinutes(data.turnaround.p90Minutes),
-      icon: Gauge,
-    },
-    {
-      label: 'Uncoded Cases',
-      value: String(data.codingDepth.uncoded),
-      icon: FileWarning,
-    },
-    {
-      label: 'Avg Codes per Case',
-      value:
-        data.codingDepth.avgCodesPerCase == null
-          ? '—'
-          : data.codingDepth.avgCodesPerCase.toFixed(1),
-      icon: Hash,
-    },
-  ]
-
-  // Coding-activity series (same zero-fill contract as casesOverTime).
-  const approvedSeries = data.codingActivity.map((d) => d.approved)
-  const codedSeries = data.codingActivity.map((d) => d.coded)
-  const reopenedSeries = data.codingActivity.map((d) => d.reopened)
-  const activityMax = Math.max(...approvedSeries, ...codedSeries, ...reopenedSeries, 0)
-  const noActivity = activityMax === 0
-  const anyReopened = reopenedSeries.some((v) => v > 0)
+  // Finished (approved) cases per coder, biggest first — server-sorted.
+  const coderBars = data.finishedByCoder.map((c) => ({
+    label: c.coder,
+    count: c.cases,
+  }))
 
   const gapItems = data.documentationGaps.items.map((g) => ({
     label: g.label,
@@ -505,253 +411,23 @@ export function AnalyticsPage() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <ChartSkeleton key={i} height={44} />
-            ))}
-          </div>
-        ) : failed ? null : (
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            {statRow2.map((s) => (
-              <GlassCard key={s.label} className="p-4">
-                <div
-                  className="mb-3 flex h-8 w-8 items-center justify-center rounded-xl"
-                  style={{
-                    background: `rgba(${gl.accentRgb},0.15)`,
-                    border: `1px solid rgba(${gl.accentRgb},0.25)`,
-                  }}
-                >
-                  <s.icon size={14} style={{ color: gl.accent }} />
-                </div>
-                <p className="text-[21px] font-bold" style={{ color: gl.text }}>
-                  {s.value}
-                </p>
-                <p
-                  className="mt-0.5 text-[12px] font-semibold"
-                  style={{ color: gl.muted }}
-                >
-                  {s.label}
-                </p>
-              </GlassCard>
-            ))}
-          </div>
-        )}
-
-        {loading ? (
-          <ChartSkeleton height={H} />
+          <ChartSkeleton height={200} />
         ) : failed ? null : (
           <GlassCard className="p-5">
             <p className="mb-1 text-[15px] font-bold" style={{ color: gl.text }}>
-              Cases Over Time
+              Finished by Coder
             </p>
             <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
-              New cases per day ·{' '}
-              {formatDate(data.casesOverTime[0]?.iso ?? new Date())} –{' '}
-              {formatDate(data.casesOverTime.at(-1)?.iso ?? new Date())}
+              Approved cases per coder, from the audit trail
             </p>
-            {noVisits ? (
+            {coderBars.length === 0 ? (
               <EmptyState
-                icon={BarChart3}
-                title="No visits in this window"
-                subtext="No OPD visit in the last 30 days carries a date. Run a sync to pull more."
+                icon={UserCheck}
+                title="Nothing approved yet"
+                subtext="Each coder's finished-case count shows up here after their first approval."
               />
             ) : (
-            <div>
-              <svg
-                viewBox={`0 0 ${W} ${H + 14}`}
-                preserveAspectRatio="xMidYMid meet"
-                style={{ display: 'block', width: '100%', height: 'auto' }}
-              >
-                {[0.25, 0.5, 0.75, 1].map((f) => (
-                  <line
-                    key={f}
-                    x1={pad}
-                    y1={pad + (1 - f) * (H - pad * 2)}
-                    x2={W - pad}
-                    y2={pad + (1 - f) * (H - pad * 2)}
-                    stroke={`rgba(${gl.accentRgb},0.08)`}
-                    strokeWidth={1}
-                  />
-                ))}
-                {data.casesOverTime.map(
-                  (d, i) =>
-                    i % 5 === 0 && (
-                      <text
-                        key={d.iso}
-                        x={
-                          pad +
-                          (i / Math.max(data.casesOverTime.length - 1, 1)) *
-                            (W - pad * 2)
-                        }
-                        y={H + 10}
-                        textAnchor="middle"
-                        fontSize={8}
-                        fill={`rgba(${gl.accentRgb},0.55)`}
-                      >
-                        {formatDate(d.iso)}
-                      </text>
-                    ),
-                )}
-                <path
-                  d={areaPath(timeCounts, W, H, pad)}
-                  fill={`rgba(${gl.accentRgb},0.08)`}
-                />
-                <polyline
-                  points={polyline(timeCounts, W, H, pad)}
-                  fill="none"
-                  stroke={gl.accent}
-                  strokeWidth={2}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {data.casesOverTime.map((d, i) => {
-                  const max = Math.max(...timeCounts, 1)
-                  const x =
-                    pad +
-                    (i / Math.max(data.casesOverTime.length - 1, 1)) *
-                      (W - pad * 2)
-                  const y = H - pad - (d.count / max) * (H - pad * 2)
-                  return (
-                    <circle key={d.iso} cx={x} cy={y} r={2.5} fill={gl.accent}>
-                      <title>{`${formatDate(d.iso)} · ${d.count}`}</title>
-                    </circle>
-                  )
-                })}
-              </svg>
-            </div>
-            )}
-          </GlassCard>
-        )}
-
-        {loading ? (
-          <ChartSkeleton height={H} />
-        ) : failed ? null : (
-          <GlassCard className="p-5">
-            <div className="mb-1 flex items-center justify-between">
-              <p className="text-[15px] font-bold" style={{ color: gl.text }}>
-                Coding Activity
-              </p>
-              {!noActivity && (
-                <div className="flex items-center gap-3">
-                  {[
-                    { label: 'Approved', dash: undefined, opacity: 1 },
-                    { label: 'Codes assigned', dash: '4 3', opacity: 0.45 },
-                    ...(anyReopened
-                      ? [{ label: 'Reopened', dash: '1.5 3', opacity: 0.7 }]
-                      : []),
-                  ].map((s) => (
-                    <span
-                      key={s.label}
-                      className="flex items-center gap-1.5 text-[11px] font-semibold"
-                      style={{ color: gl.muted }}
-                    >
-                      <svg width={18} height={4} aria-hidden="true">
-                        <line
-                          x1={0}
-                          y1={2}
-                          x2={18}
-                          y2={2}
-                          stroke={gl.accent}
-                          strokeWidth={2}
-                          strokeOpacity={s.opacity}
-                          strokeDasharray={s.dash}
-                        />
-                      </svg>
-                      {s.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
-              Approvals and code assignments per day, from the audit trail
-            </p>
-            {noActivity ? (
-              <EmptyState
-                icon={Activity}
-                title="No coder activity in this window"
-                subtext="Approvals, code assignments and reopens show up here as they happen."
-              />
-            ) : (
-              <svg
-                viewBox={`0 0 ${W} ${H + 14}`}
-                preserveAspectRatio="xMidYMid meet"
-                style={{ display: 'block', width: '100%', height: 'auto' }}
-              >
-                {[0.25, 0.5, 0.75, 1].map((f) => (
-                  <line
-                    key={f}
-                    x1={pad}
-                    y1={pad + (1 - f) * (H - pad * 2)}
-                    x2={W - pad}
-                    y2={pad + (1 - f) * (H - pad * 2)}
-                    stroke={`rgba(${gl.accentRgb},0.08)`}
-                    strokeWidth={1}
-                  />
-                ))}
-                {data.codingActivity.map(
-                  (d, i) =>
-                    i % 5 === 0 && (
-                      <text
-                        key={d.iso}
-                        x={
-                          pad +
-                          (i / Math.max(data.codingActivity.length - 1, 1)) *
-                            (W - pad * 2)
-                        }
-                        y={H + 10}
-                        textAnchor="middle"
-                        fontSize={8}
-                        fill={`rgba(${gl.accentRgb},0.55)`}
-                      >
-                        {formatDate(d.iso)}
-                      </text>
-                    ),
-                )}
-                <polyline
-                  points={polylineShared(codedSeries, activityMax, W, H, pad)}
-                  fill="none"
-                  stroke={gl.accent}
-                  strokeOpacity={0.45}
-                  strokeWidth={2}
-                  strokeDasharray="4 3"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {anyReopened && (
-                  <polyline
-                    points={polylineShared(reopenedSeries, activityMax, W, H, pad)}
-                    fill="none"
-                    stroke={gl.accent}
-                    strokeOpacity={0.7}
-                    strokeWidth={2}
-                    strokeDasharray="1.5 3"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
-                )}
-                <polyline
-                  points={polylineShared(approvedSeries, activityMax, W, H, pad)}
-                  fill="none"
-                  stroke={gl.accent}
-                  strokeWidth={2}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {data.codingActivity.map((d, i) => {
-                  const x =
-                    pad +
-                    (i / Math.max(data.codingActivity.length - 1, 1)) *
-                      (W - pad * 2)
-                  const y =
-                    H - pad - (d.approved / Math.max(activityMax, 1)) * (H - pad * 2)
-                  return (
-                    <circle key={d.iso} cx={x} cy={y} r={2.5} fill={gl.accent}>
-                      <title>{`${formatDate(d.iso)} · approved ${d.approved} · coded ${d.coded}${d.reopened ? ` · reopened ${d.reopened}` : ''}`}</title>
-                    </circle>
-                  )
-                })}
-              </svg>
+              <BarList rows={coderBars} />
             )}
           </GlassCard>
         )}

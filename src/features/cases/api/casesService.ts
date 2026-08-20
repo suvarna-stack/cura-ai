@@ -47,6 +47,32 @@ async function send(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Case working locks — one coder per case at a time. The detail page acquires
+// on open and heartbeats with the same POST; `acquired: false` means another
+// coder holds the case and the UI shows who instead of the editor.
+
+export interface CaseLockState {
+  acquired: boolean
+  holder: { name: string; email: string }
+  since: string
+  ttlSeconds: number
+}
+
+/** POST /api/cases/{id}/lock — acquire or renew the working lock. */
+export async function acquireCaseLock(id: string): Promise<CaseLockState> {
+  const { data } = await apiClient.post<CaseLockState>(
+    `/cases/${encodeURIComponent(id)}/lock`,
+  )
+  return data
+}
+
+/** DELETE /api/cases/{id}/lock — release on leaving the page (best-effort:
+ *  an unrenewed lock expires server-side on its own). */
+export async function releaseCaseLock(id: string): Promise<void> {
+  await apiClient.delete(`/cases/${encodeURIComponent(id)}/lock`)
+}
+
 /** POST /api/cases/approve — the server records the logged-in coder. */
 export const approveCases = (ids: string[]) =>
   send('/cases/approve', 'POST', { ids })

@@ -6,7 +6,12 @@ COPY package.json package-lock.json ./
 # eslint-plugin-jsx-a11y@6.10.2 peer-requires eslint <=9, but devDependencies
 # pin eslint 10. It affects lint only — vite and tsc build fine — so the flag
 # accepts the same tree a local install produces instead of changing versions.
-RUN npm ci --legacy-peer-deps
+# The explicit binding install works around npm's optional-deps bug (npm/cli
+# #4828): npm ci can skip platform-specific optional packages, and alpine needs
+# the musl build of rolldown's native binding or `npm run build` dies with
+# MODULE_NOT_FOUND. Version must match the lockfile's @rolldown entries.
+RUN npm ci --legacy-peer-deps \
+    && npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-musl@1.1.5
 COPY . .
 # Vite inlines env vars at BUILD time, so this is an ARG, not a runtime ENV.
 # The default "/api" makes the bundle call its own origin, which nginx below
