@@ -1,3 +1,16 @@
+-- V6 — the ICD-10 / ICD-9 catalog rows (code master data).
+--
+-- Was src/main/resources/db/icd_catalog_seed.sql, loaded by
+-- config/SchemaBootstrap.seedIcdCatalogsIfEmpty() whenever both tables were
+-- empty. It is reference data outside the frozen dump, so a re-seed drops it
+-- along with the whole database — and with the schema history, which is what
+-- makes replaying it as a migration equivalent to the old emptiness check.
+--
+-- Every statement is ON CONFLICT (code) DO NOTHING, so a partially loaded
+-- catalog is repaired rather than rejected. Tables come from V2.
+--
+-- MedCode AI reads these through the /api/v1 catalog endpoints during sync.
+
 INSERT INTO imed.icd_10 (code, description) VALUES ('A02.1', 'Salmonella sepsis') ON CONFLICT (code) DO NOTHING;
 INSERT INTO imed.icd_10 (code, description) VALUES ('A05.9', 'Food poisoning') ON CONFLICT (code) DO NOTHING;
 INSERT INTO imed.icd_10 (code, description) VALUES ('A07.3', 'Isosporiasis') ON CONFLICT (code) DO NOTHING;

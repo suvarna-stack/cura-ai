@@ -209,7 +209,46 @@ Consequences, all of them ordinary once you know:
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <app_role>;
   ```
 
-  (The last line covers tables `SchemaBootstrap` creates at startup.)
+  (The last line covers tables the Flyway migrations create at startup. The
+  role also needs `CREATE` on the schema, since Flyway writes its own
+  `imed.flyway_schema_history` table there.)
+
+## Schema changes
+
+Everything the `/api/v1` write surface needs on top of the frozen extract dump
+lives in `src/main/resources/db/migrations/V*.sql` and is applied by **Flyway**
+at startup, into the `imed` schema. Pull and boot:
+
+```bash
+git pull
+./mvnw spring-boot:run     # Flyway applies anything missing
+```
+
+The dump is version 0; a database that already has content but no history table
+is adopted automatically (`baseline-on-migrate`). Every migration is guarded
+(`IF NOT EXISTS` / `ON CONFLICT DO NOTHING` / `WHERE NOT EXISTS`), so one that
+already had these applied by the old startup runner takes them as no-ops.
+
+| Version | Change |
+|---|---|
+| `V1` | `is_cancelled`, `imed_request_log`, `doctor_discharge_opd` / `_ipd` |
+| `V2` | `icd_10` / `icd_9` catalog tables |
+| `V3` | `updated_at`, backing the `changed_since` filter |
+| `V4` | the five pre-coded demo visits |
+| `V5` | `coding_status` on the visit row |
+| `V6` | the ~1000 ICD catalog rows |
+
+```bash
+psql -d imed -c "SELECT version, description, success FROM imed.flyway_schema_history ORDER BY installed_rank"
+```
+
+A re-seed drops all of it — the dump predates every migration — along with the
+history table, so booting the app replays the lot from version 0.
+
+**Adding a change:** add one `V<n>__<name>.sql` file, and do NOT also write the
+DDL in Java. Until 2026-08-20 every statement lived in `config/SchemaBootstrap`
+AND in a `db/migrations` file that nothing ran; on the medcode side the same
+duplication silently cost two tables their foreign keys.
 
 ## Environment variables
 

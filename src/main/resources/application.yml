@@ -5,6 +5,31 @@ server:
 spring:
   application:
     name: imed-mock-api
+  # Schema migrations, applied at startup before any bean touches the database.
+  #
+  # schemas: this database keeps every table in a schema named "imed", NOT
+  # public — frozen into its dump from the pre-split era. Naming it here puts
+  # flyway_schema_history in imed alongside the tables it describes, instead of
+  # creating a stray public schema just for Flyway's bookkeeping. The migrations
+  # are schema-qualified anyway (imed.*, imed_baseline.*), so they do not depend
+  # on the search path this sets.
+  #
+  # locations: on the CLASSPATH, not the repo's db/ folder — the Dockerfile
+  # copies only pom.xml and src/, so a filesystem: location would silently find
+  # nothing in every container.
+  #
+  # baseline-*: db/seed.sql.gz is a plain pg_dump of the hospital extract with no
+  # version of its own, so it IS version 0. baseline-on-migrate adopts a database
+  # that already has content but no history table — every imed database that
+  # exists today. All migrations are guarded (IF NOT EXISTS / ON CONFLICT DO
+  # NOTHING / WHERE NOT EXISTS), so one that already had them applied by the old
+  # SchemaBootstrap runner takes them as no-ops.
+  flyway:
+    enabled: true
+    schemas: imed
+    locations: classpath:db/migrations
+    baseline-on-migrate: true
+    baseline-version: 0
 
 # Swagger UI / OpenAPI — this app IS the integration spec, so the doc is
 # generated from the running code (README tables drift, /v3/api-docs cannot).
