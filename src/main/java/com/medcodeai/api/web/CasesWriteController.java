@@ -4,6 +4,7 @@ import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
 import com.medcodeai.api.service.ApprovalService;
 import com.medcodeai.api.service.AuthService;
+import com.medcodeai.api.service.CaseLockService;
 import com.medcodeai.api.service.CaseSuggestService;
 import com.medcodeai.api.service.WriteGate;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +49,7 @@ public class CasesWriteController {
     private final WriteGate writeGate;
     private final ApprovalService approvals;
     private final CaseSuggestService suggest;
+    private final CaseLockService caseLocks;
     private final JsonMapper json = new JsonMapper();
     // POST /api/demo/reset is a public bulk write; DEMO_TOOLS_ENABLED gates it
     // (default on locally, forced off in the Docker image — same posture as
@@ -59,14 +61,26 @@ public class CasesWriteController {
 
     public CasesWriteController(CasesRepository cases, WorkingStateRepository workingState,
                                 WriteGate writeGate, ApprovalService approvals,
-                                CaseSuggestService suggest,
+                                CaseSuggestService suggest, CaseLockService caseLocks,
                                 com.medcodeai.api.service.DemoBaselineService demoBaseline) {
         this.cases = cases;
         this.workingState = workingState;
         this.writeGate = writeGate;
         this.approvals = approvals;
         this.suggest = suggest;
+        this.caseLocks = caseLocks;
         this.demoBaseline = demoBaseline;
+    }
+
+    /** One coder per case: refuse the write when another coder holds it.
+     *  The UI's lock screen makes this near-unreachable; it exists so a
+     *  stale tab or a scripted client can't overwrite live work. */
+    private void requireUnlocked(String caseId, AuthService.Principal p) {
+        CaseLockService.Lock holder = caseLocks.heldByOther(caseId, p.email());
+        if (holder != null) {
+            throw new ApiExceptionHandler.ConflictException(
+                    "case " + caseId + " is being worked on by " + holder.name());
+        }
     }
 
     // app.py:299 approve() — {ids} -> finalize + iMed write-back. The coder
@@ -117,6 +131,9 @@ public class CasesWriteController {
         AuthService.Principal p = principal(request);
         @SuppressWarnings("unchecked")
         List<String> caseIds = (List<String>) idList;
+        for (String id : caseIds) {
+            requireUnlocked(id, p);
+        }
         return approvals.approve(caseIds, p.userId(), p.email());
     }
 
@@ -139,7 +156,9 @@ public class CasesWriteController {
                             schema = @Schema(type = "object"),
                             examples = @ExampleObject(value = "{}")))
             @RequestBody(required = false) byte[] body) {
-        return approvals.reopen(caseId, principal(request).email());
+        AuthService.Principal p = principal(request);
+        requireUnlocked(caseId, p);
+        return approvals.reopen(caseId, p.email());
     }
 
     // Settings demo tools: freeze the demo-start state of BOTH databases
@@ -208,7 +227,7 @@ public class CasesWriteController {
     @ApiResponse(responseCode = "404", description = "Unknown case",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
-    public Map<String, Object> putCodes(@PathVariable String caseId,
+    public Map<String, Object> putCodes(HttpServletRequest request, @PathVariable String caseId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(type = "array"),
@@ -218,6 +237,7 @@ public class CasesWriteController {
                                     ]
                                     """)))
             @RequestBody(required = false) byte[] body) {
+        requireUnlocked(caseId, principal(request));
         Object payload = parseSilent(body);
         if (!(payload instanceof List)) {
             throw new ApiExceptionHandler.BadRequestException("expected a JSON array of codes");

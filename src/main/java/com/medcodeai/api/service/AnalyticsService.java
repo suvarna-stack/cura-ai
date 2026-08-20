@@ -31,11 +31,14 @@ public class AnalyticsService {
     private final AnalyticsRepository repo;
     private final CasesCache cache;
     private final CasesViewService views;
+    private final com.medcodeai.api.repo.UsersRepository users;
 
-    public AnalyticsService(AnalyticsRepository repo, CasesCache cache, CasesViewService views) {
+    public AnalyticsService(AnalyticsRepository repo, CasesCache cache, CasesViewService views,
+                            com.medcodeai.api.repo.UsersRepository users) {
         this.repo = repo;
         this.cache = cache;
         this.views = views;
+        this.users = users;
     }
 
     public Map<String, Object> build(int days, int topCodes, LocalDate today) {
@@ -46,6 +49,7 @@ public class AnalyticsService {
         out.put("topCodes", topCodes(topCodes));
         out.put("documentationGaps", documentationGaps());
         out.put("codingActivity", codingActivity(days, today));
+        out.put("finishedByCoder", finishedByCoder());
         out.put("turnaround", turnaround());
         out.put("codingDepth", codingDepth());
         out.put("caseMix", caseMix());
@@ -155,6 +159,25 @@ public class AnalyticsService {
             series.add(point);
         }
         return series;
+    }
+
+    /**
+     * Finished (approved) cases per coder, biggest first. The audit stamp is
+     * an email or bare username; map it to the account's display name the
+     * same way the Dashboard's finished queue does.
+     */
+    private List<Map<String, Object>> finishedByCoder() {
+        Map<String, String> names = users.displayNameByStamp();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : repo.finishedByCoder()) {
+            String stamp = (String) r.get("stamp");
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("coder", names.getOrDefault(stamp, stamp));
+            row.put("coderId", stamp);
+            row.put("cases", ((Number) r.get("n")).longValue());
+            out.add(row);
+        }
+        return out;
     }
 
     /**

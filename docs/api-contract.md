@@ -269,6 +269,33 @@ logged-in account). Reverses an approve on both sides; the coder's saved
 edits are KEPT. Response `{"ok": true}` · `404` unknown case. Same
 500-then-retry semantics as approve.
 
+### POST /api/cases/{caseId}/lock — one coder per case
+
+Acquire or renew the case's working lock (the identity is the logged-in
+account; no body). The detail page calls this on open and every 30s while it
+stays open; the same call is both acquire and heartbeat. Always `200`:
+
+```jsonc
+{ "acquired": true,                       // false → someone else holds it
+  "holder": { "name": "Somchai", "email": "somchai@h.test" },
+  "since": "2026-08-21T05:40:00Z",
+  "ttlSeconds": 90 }
+```
+
+A lease not renewed within `ttlSeconds` expires on its own (a closed laptop
+never strands a case). Re-acquiring your own case (second tab) succeeds.
+Locks are in-memory — correct because this backend runs as exactly one
+instance (same constraint as the cases cache / WriteGate).
+
+While another coder holds a case, `PUT /codes`, `POST /approve` (any listed
+id) and `POST /reopen` on it fail `409 {"error": "case <id> is being worked
+on by <name>"}` — the lock is enforced at the writes, not just in the UI.
+
+### DELETE /api/cases/{caseId}/lock
+
+Release the working lock when leaving the page. Only the caller's own lock
+is released (a stale release is a harmless no-op). Response `{"ok": true}`.
+
 ### POST /api/demo/snapshot
 
 No request body. Freezes the CURRENT state of both databases as the demo

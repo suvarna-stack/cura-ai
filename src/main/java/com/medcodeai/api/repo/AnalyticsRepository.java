@@ -224,6 +224,28 @@ public class AnalyticsRepository {
     }
 
     /**
+     * Approved (finished) OPD cases per coder, biggest first. The coder is
+     * the `by` stamp of each case's LATEST approval action (history_id
+     * order, same rule as the dashboard's finished queue) — a case reopened
+     * and re-approved by someone else counts for its current approver only.
+     */
+    public List<Map<String, Object>> finishedByCoder() {
+        return jdbc.queryForList("""
+                SELECT COALESCE(NULLIF(t.by, ''), '—') AS stamp, count(*) AS n
+                  FROM (SELECT DISTINCT ON (ch.case_id)
+                               ch.case_id, ch.action_detail->>'by' AS by
+                          FROM coding_history ch
+                          JOIN cases c ON c.case_id = ch.case_id
+                           AND c.encountertype = '0'
+                           AND c.case_status = 'approved'
+                         WHERE ch.action_type IN
+                               ('approved_single', 'approved_group', 'approved_all')
+                         ORDER BY ch.case_id, ch.history_id DESC) t
+                 GROUP BY 1
+                 ORDER BY n DESC, stamp""");
+    }
+
+    /**
      * OPD cases per disease group, split by severity. severity_level is
      * free-ish text but the sync rules only ever write low/medium/high;
      * anything else lands in `other` so the row total always adds up.
