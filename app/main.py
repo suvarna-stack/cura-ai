@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import chat, documents, health
+from app.routers import chat, documents, health, learn
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +38,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(learn.router)
 
 
 @app.get("/", tags=["health"])

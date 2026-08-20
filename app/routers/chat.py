@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from app.core import rag
 from app.core.suggest import suggest_codes
 from app.models.schemas import (
+    AppliedNote,
     QueryRequest,
     QueryResponse,
     RetrievedChunk,
@@ -54,6 +55,7 @@ def suggest(req: SuggestRequest) -> SuggestResponse:
         codes=[SuggestedCode(**c) for c in result["codes"]],
         mode=result["mode"],
         hits_used=result["hits_used"],
+        notes=[AppliedNote(**n) for n in result.get("notes", [])],
     )
 
 
@@ -77,6 +79,7 @@ def query(req: QueryRequest) -> QueryResponse:
         ],
         unverified_codes=result["unverified_codes"],
         code_system=result["code_system"],
+        learned_notes=[AppliedNote(**n) for n in result.get("learned_notes", [])],
     )
 
 
@@ -114,7 +117,8 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
                     ]
                     yield _sse({"type": "meta", "mode": payload["mode"],
                                 "contexts": contexts,
-                                "code_system": payload.get("code_system")})
+                                "code_system": payload.get("code_system"),
+                                "learned_notes": payload.get("learned_notes", [])})
                 else:
                     yield _sse({"type": "done", **payload})
         except Exception as exc:  # after headers are sent, errors must be events

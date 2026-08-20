@@ -10,6 +10,7 @@ import logging
 import re
 from typing import Any
 
+from app.core import learn
 from app.core.rag import retrieve_chunks
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,12 @@ def suggest_codes(
     """Return structured ICD suggestions grounded in the knowledge index."""
     text = (clinical_text or "").strip()
     if len(text) < 20:
-        return {"codes": [], "mode": "none", "hits_used": 0}
+        return {"codes": [], "mode": "none", "hits_used": 0, "notes": []}
+
+    # Suggest & Learn: rules this hospital's coder taught for this scenario.
+    # They ride along with the suggestions so the case page can point them out
+    # ("Learned note applies") above the machine's own guesses.
+    notes = learn.match_notes(text, limit=3)
 
     # Ask the index like a coder would — diagnosis + procedure angles.
     query = (
@@ -50,9 +56,18 @@ def suggest_codes(
     if not hits:
         mode, hits = retrieve_chunks(query, top_k=top_k or 12, mode="graph")
 
+    # Codes the coder taught NOT to use here. Whatever the references say,
+    # this list wins — an excluded code must never reach the suggestions.
+    banned = {c["code"] for n in notes for c in n.get("codes", [])
+              if c.get("role") == "exclude"}
+
     # code -> {system, description, confidence, source}
     found: dict[str, dict[str, Any]] = {}
     for h in hits:
+        # A coder rule is not a code list: scraping it would harvest the very
+        # codes it forbids. Its codes are added deliberately below.
+        if (h.get("metadata") or {}).get("kind") == learn.LEARNED_KIND:
+            continue
         chunk = h.get("text") or ""
         score = float(h.get("score") or 0.0)
         conf = _score_to_confidence(score)
@@ -66,10 +81,25 @@ def suggest_codes(
         for code in _ICD9_RE.findall(chunk):
             _offer(found, code, None, conf, source)
 
-    # Prefer codes whose titles we actually saw; then by confidence.
+    # The taught codes themselves, above anything the references suggested:
+    # principal first, and never the excluded ones.
+    for note in notes:
+        for c in note.get("codes", []):
+            if c.get("role") == "exclude":
+                continue
+            _offer(found, c["code"], c.get("description") or None,
+                   99 if c.get("role") == "principal" else 96,
+                   f"coder note ({note.get('created_by') or 'coder'})")
+
+    for code in banned:
+        found.pop(code, None)
+
+    # Taught codes first (the hospital's own instruction outranks a guess),
+    # then codes whose titles we actually saw, then by confidence.
     ranked = sorted(
         found.values(),
         key=lambda c: (
+            0 if str(c.get("source", "")).startswith("coder note") else 1,
             0 if c["description"] and c["description"] != c["code"] else 1,
             -c["confidence"],
             c["code"],
@@ -84,10 +114,24 @@ def suggest_codes(
             continue
         bucket.append(row)
 
+    learn.bump_hits([n["id"] for n in notes])
     return {
         "codes": icd10 + icd9,
         "mode": mode,
         "hits_used": len(hits),
+        "notes": [
+            {
+                "id": n["id"],
+                "summary": learn.note_summary(n),
+                "scenario": n.get("scenario", ""),
+                "rule": n.get("rule", ""),
+                "codes": n.get("codes", []),
+                "created_by": n.get("created_by", ""),
+                "created_at": n.get("created_at", ""),
+                "via": f"learned note ({int(n.get('match', 0) * 100)}% match)",
+            }
+            for n in notes
+        ],
     }
 
 

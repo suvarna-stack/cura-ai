@@ -101,6 +101,9 @@ class QueryResponse(BaseModel):
     answer: str
     mode: str
     contexts: list[RetrievedChunk]
+    # Coder-taught rules (Suggest & Learn) that matched this question and were
+    # pinned into the answer's context — the UI shows them as a callout.
+    learned_notes: list["AppliedNote"] = Field(default_factory=list)
     # Codes the answer cites that appear in NO retrieved chunk — the UI warns
     # instead of trusting them (medical grounding guard).
     unverified_codes: list[str] = Field(default_factory=list)
@@ -185,3 +188,86 @@ class SuggestResponse(BaseModel):
     codes: list[SuggestedCode]
     mode: str
     hits_used: int = 0
+    # Coder rules that apply to this narrative — shown above the suggestions.
+    notes: list["AppliedNote"] = Field(default_factory=list)
+
+
+# --------------------------- Suggest & Learn ---------------------------
+# A coder teaches a rule in plain language; it is extracted into this shape,
+# confirmed on screen, then stored and indexed so retrieval can point it out
+# whenever the scenario comes back.
+
+class LearnedCode(BaseModel):
+    code: str
+    system: Literal["ICD-10", "ICD-9"] = "ICD-10"
+    description: str = ""
+    # principal = code first, secondary = add alongside, exclude = do NOT code
+    role: Literal["principal", "secondary", "exclude"] = "secondary"
+
+
+class LearnedNote(BaseModel):
+    id: str = ""
+    scenario: str = ""               # WHEN the rule applies
+    codes: list[LearnedCode] = Field(default_factory=list)
+    rule: str = ""                   # what to do, one sentence
+    reason: str = ""                 # why (optional)
+    raw_text: str = ""               # exactly what the coder typed
+    language: str = "en"
+    doc_type: str | None = None      # icd10 | icd9cm | None (mixed)
+    active: bool = True
+    created_by: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    hits: int = 0                    # times this rule fired in an answer
+    # "llm" when the model parsed it, "rules" when the regex fallback did
+    extraction: str = ""
+    # 0-1 relevance, only present on match results
+    match: float | None = None
+
+
+class AppliedNote(BaseModel):
+    """Compact form sent with an answer / suggestion for the UI callout."""
+    id: str
+    summary: str
+    scenario: str = ""
+    rule: str = ""
+    codes: list[LearnedCode] = Field(default_factory=list)
+    created_by: str = ""
+    created_at: str = ""
+    via: str = "learned note"
+
+
+class ExtractNoteRequest(BaseModel):
+    """Free-text rule -> draft note. Nothing is stored by this call."""
+    text: str = Field(..., min_length=1, max_length=2000)
+    created_by: str = ""
+
+
+class SaveNoteRequest(BaseModel):
+    """Save a draft the coder confirmed (or edited) on the card."""
+    note: LearnedNote
+    created_by: str = ""
+
+
+class ClassifyRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+
+
+class ClassifyResponse(BaseModel):
+    """Teaching or asking? Drives the "looks like you're teaching me" nudge."""
+    intent: Literal["teach", "ask"]
+    confidence: int = 0
+
+
+class NotesResponse(BaseModel):
+    notes: list[LearnedNote]
+
+
+class MatchNotesRequest(BaseModel):
+    """Which taught rules apply to this case narrative?"""
+    text: str = Field(..., min_length=1)
+    limit: int = Field(3, ge=1, le=10)
+
+
+class MatchNotesResponse(BaseModel):
+    notes: list[AppliedNote]

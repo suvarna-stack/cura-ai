@@ -28,10 +28,12 @@ RAG/
 │   │   ├── embeddings.py   # bge-m3 wrapper (lazy)
 │   │   ├── vectorstore.py  # Chroma wrapper
 │   │   ├── llm.py          # Qwen wrapper (lazy)
+│   │   ├── learn.py        # Suggest & Learn: coder-taught rules
 │   │   └── rag.py          # ingest + retrieve + generate orchestration
 │   └── routers/
 │       ├── health.py       # GET /health
 │       ├── documents.py    # POST /documents/text, /documents/upload, DELETE
+│       ├── learn.py        # POST /learn/extract, /learn/notes, /learn/match
 │       └── chat.py         # POST /chat
 ├── scripts/ingest.py       # CLI bulk ingestion
 ├── data/                   # chroma db, uploads, sample corpus (gitignored)
@@ -127,6 +129,43 @@ Response shape:
 | PATCH | `/documents/{source}` | rename the display filename (index untouched) |
 | DELETE | `/documents/{source}` | remove all chunks from one source |
 | POST | `/chat` | ask a question (RAG) |
+| POST | `/suggest` | ICD-9/10 suggestions for a case narrative |
+| POST | `/learn/classify` | is this message a coding rule or a question? |
+| POST | `/learn/extract` | plain-language rule → structured draft (stores nothing) |
+| POST | `/learn/notes` | save a confirmed draft + index it for retrieval |
+| GET | `/learn/notes` | list taught rules (incl. muted) |
+| PATCH | `/learn/notes/{id}?active=` | mute / un-mute a rule |
+| DELETE | `/learn/notes/{id}` | forget a rule |
+| POST | `/learn/match` | which taught rules apply to this narrative? |
+
+## Suggest & Learn (coder-taught rules)
+
+A coder types a rule in the Agent chat, in Thai or English:
+
+> "Diabetic patient with acute kidney injury: code E11.22 as principal, add
+> N17.9, do not code N18.9."
+
+`/learn/extract` turns that into a structured note — scenario, codes with
+roles (`principal` / `secondary` / `exclude`), rule, reason — the coder
+confirms it on screen, and `/learn/notes` stores it in
+`data/learned_notes.json` **and** embeds it as a one-chunk document
+(`source: learned:{id}`, `metadata.kind: learned`) in the same Chroma
+collection as the reference PDFs.
+
+From then on the rule is pinned above the general references whenever its
+scenario comes back: `/chat` cites it as "Coder note — {author}" and returns
+it in `learned_notes`, and `/suggest` puts its codes at the top of a case's
+suggestions and **removes** any code it marked `exclude`.
+
+Two properties this deliberately keeps:
+
+- **Nothing is trained.** Learning is retrieval-time. Every rule is listed,
+  attributed, mutable and deletable — the audit trail a hospital needs.
+- **Nothing is invented.** Codes the model proposes are dropped unless the
+  coder typed them; prose that echoes the prompt or shares no words with the
+  coder's sentence is discarded; a reason is recorded only when the coder
+  actually gave one. With no LLM at all (or a 0.5B one), the deterministic
+  extractor alone still produces a usable draft.
 
 ## Tests
 

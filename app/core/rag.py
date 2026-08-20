@@ -12,7 +12,7 @@ import re
 from typing import Any, Callable, Iterator
 
 from app.config import get_settings
-from app.core import registry
+from app.core import learn, registry
 from app.core.chunking import chunk_text
 from app.core.graphstore import get_graphstore
 from app.core.llm import get_llm
@@ -24,6 +24,9 @@ SYSTEM_PROMPT = (
     "You are MedCode, a careful assistant for medical-coding questions. "
     "Answer ONLY using the provided context. "
     "If the context does not contain the answer, say you don't know. "
+    "A context block marked CODER RULE was taught by this hospital's own "
+    "coder: it overrides the general references, so follow it and say that "
+    "it is a coder rule. "
     "Be concise — at most about 120 words — and cite the source name(s) "
     "and page(s) in square brackets. "
     "Always answer in the same language the question was asked in — "
@@ -191,11 +194,14 @@ def _system_filter(hits: list[dict[str, Any]], code_system: str | None,
                    ) -> list[dict[str, Any]]:
     """Keep chunks from the wanted upload box. Untagged chunks (uploads from
     before the two-box split) serve BOTH systems, so legacy references keep
-    answering until they are re-uploaded through a box."""
+    answering until they are re-uploaded through a box. Coder-taught notes
+    always survive the filter — a rule the hospital taught must not be hidden
+    by which box the question happened to route to."""
     if code_system not in ("icd10", "icd9cm"):
         return hits
     return [h for h in hits
-            if h.get("metadata", {}).get("doc_type") in (None, "", code_system)]
+            if h.get("metadata", {}).get("kind") == learn.LEARNED_KIND
+            or h.get("metadata", {}).get("doc_type") in (None, "", code_system)]
 
 
 def _codes_in(text: str) -> list[str]:
@@ -241,6 +247,10 @@ def _attach_display_names(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     names = {d["source"]: d.get("filename") or d["source"]
              for d in registry.all_documents()}
     for h in hits:
+        # Learned notes carry their own label ("Coder note — Frank") and are
+        # not in the document registry; never overwrite it with a raw id.
+        if h.get("display_name"):
+            continue
         h["display_name"] = names.get(h["source"], h["source"])
     return hits
 
@@ -307,22 +317,63 @@ def retrieve_chunks(
     if code_hits:
         seen_ids = {h["id"] for h in code_hits}
         hits = code_hits + [h for h in hits if h.get("id") not in seen_ids]
+
+    # Suggest & Learn: a rule this hospital's coder taught for exactly this
+    # scenario is the most specific context there is — pin it above both the
+    # semantic hits and the exact code lookups.
+    note_hits = learn.matching_chunks(question, limit=2)
+    if note_hits:
+        seen_ids = {h["id"] for h in note_hits}
+        hits = note_hits + [h for h in hits if h.get("id") not in seen_ids]
+
     hits = hits[:_MAX_CONTEXT_CHUNKS]
 
     # Context reading order: exact code matches stay first, then chunks
     # grouped by their document's priority — the top-ranked document is
     # literally what the model reads first.
     if ranks:
-        exact = [h for h in hits if str(h.get("via", "")).startswith("exact")]
-        rest = [h for h in hits if not str(h.get("via", "")).startswith("exact")]
+        def _pinned(h: dict[str, Any]) -> bool:
+            return (str(h.get("via", "")).startswith(("exact", "learned"))
+                    or h.get("metadata", {}).get("kind") == learn.LEARNED_KIND)
+
+        pinned = [h for h in hits if _pinned(h)]
+        rest = [h for h in hits if not _pinned(h)]
         rest.sort(key=lambda h: (ranks.get(h.get("source"), 10 ** 6),
                                  -h.get("score", 0.0)))
-        hits = exact + rest
+        hits = pinned + rest
     return mode, _attach_display_names(hits)
 
 
 _EMPTY_INDEX_MSG = ("I don't have any indexed documents to answer from yet. "
                     "Please ingest documents first.")
+
+
+def applied_notes(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Coder rules present in this answer's context, for the UI's callout.
+
+    Also counts the firing: the learned-notes list sorts by how often a rule
+    actually got used, which is how a coder sees their teaching pay off.
+    """
+    out: list[dict[str, Any]] = []
+    for h in hits:
+        meta = h.get("metadata") or {}
+        if meta.get("kind") != learn.LEARNED_KIND:
+            continue
+        note = learn.get_note(str(meta.get("note_id") or ""))
+        if not note:
+            continue
+        out.append({
+            "id": note["id"],
+            "summary": learn.note_summary(note),
+            "scenario": note.get("scenario", ""),
+            "rule": note.get("rule", ""),
+            "codes": note.get("codes", []),
+            "created_by": note.get("created_by", ""),
+            "created_at": note.get("created_at", ""),
+            "via": h.get("via", "learned note"),
+        })
+    learn.bump_hits([n["id"] for n in out])
+    return out
 
 
 def _prepare(
@@ -392,14 +443,15 @@ def answer_question(
     if messages is None:
         return {"question": question, "answer": _EMPTY_INDEX_MSG,
                 "mode": mode, "contexts": [], "unverified_codes": [],
-                "code_system": system}
+                "code_system": system, "learned_notes": []}
 
+    notes = applied_notes(hits)
     answer = get_llm().generate(
         messages, max_new_tokens=max_new_tokens, temperature=temperature
     )
     return {"question": question, "answer": answer, "mode": mode,
             "contexts": hits, "unverified_codes": _verify_codes(answer, hits),
-            "code_system": system}
+            "code_system": system, "learned_notes": notes}
 
 
 def answer_stream(
@@ -417,7 +469,8 @@ def answer_stream(
     the UI can show sources while the answer is still typing.
     """
     mode, hits, messages, system = _prepare(question, top_k, mode, history or [])
-    yield "meta", {"mode": mode, "contexts": hits, "code_system": system}
+    yield "meta", {"mode": mode, "contexts": hits, "code_system": system,
+                   "learned_notes": applied_notes(hits)}
     if messages is None:
         yield "delta", _EMPTY_INDEX_MSG
         yield "done", {"unverified_codes": []}
