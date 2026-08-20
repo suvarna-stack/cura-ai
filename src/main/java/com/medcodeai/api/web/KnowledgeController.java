@@ -70,10 +70,17 @@ public class KnowledgeController {
 
     @PostMapping("/api/admin/knowledge/docs")
     @Operation(summary = "Upload a knowledge document (PDF or CSV)",
-            description = "Multipart `file`. Accepted immediately; chunking + embedding run in "
-                    + "the background on the RAG service — poll the docs list for progress. "
-                    + "Scanned/image-only PDFs and empty CSVs are rejected with 400.")
-    public Map<String, Object> upload(@RequestParam("file") MultipartFile file) {
+            description = "Multipart `file` + optional `doc_type` (`icd10`|`icd9cm` — the AI "
+                    + "Training page's two upload boxes). Accepted immediately; chunking + "
+                    + "embedding run in the background on the RAG service — poll the docs list "
+                    + "for progress. Scanned/image-only PDFs and empty CSVs are rejected with 400.")
+    public Map<String, Object> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "doc_type", required = false) String docType) {
+        if (docType != null && !docType.isBlank()
+                && !docType.equals("icd10") && !docType.equals("icd9cm")) {
+            throw new ApiExceptionHandler.BadRequestException("doc_type must be icd10 or icd9cm");
+        }
         String filename = file.getOriginalFilename();
         byte[] bytes;
         try {
@@ -82,7 +89,7 @@ public class KnowledgeController {
             throw new UncheckedIOException(e);
         }
         return forward(() -> rag.upload(
-                (filename == null || filename.isBlank()) ? "upload.pdf" : filename, bytes));
+                (filename == null || filename.isBlank()) ? "upload.pdf" : filename, bytes, docType));
     }
 
     @DeleteMapping("/api/admin/knowledge/docs/{source}")
@@ -94,18 +101,58 @@ public class KnowledgeController {
     }
 
     @PatchMapping("/api/admin/knowledge/docs/{source}")
-    @Operation(summary = "Rename a knowledge document",
-            description = "`{\"filename\": \"...\"}`. Display-only: the source id, saved file "
-                    + "and index entries are untouched, so no re-embedding happens. The file "
-                    + "extension is preserved (appended when missing from the new name).")
-    public Map<String, Object> renameDoc(@PathVariable String source,
+    @Operation(summary = "Update a knowledge document (rename / re-tag)",
+            description = "`{\"filename\": \"...\", \"doc_type\": \"icd10\"|\"icd9cm\"}` — either "
+                    + "field alone is fine. Renaming is display-only. Re-tagging moves the "
+                    + "document to the other upload box: the RAG side rewrites doc_type on its "
+                    + "indexed chunks in place (no re-embedding), so retrieval routing follows "
+                    + "immediately.")
+    public Map<String, Object> updateDoc(@PathVariable String source,
                                          @RequestBody(required = false) byte[] body) {
         Map<?, ?> in = parseObject(body);
-        Object filename = in.get("filename");
-        if (!(filename instanceof String f) || f.isBlank()) {
-            throw new ApiExceptionHandler.BadRequestException("filename is required");
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (in.get("filename") instanceof String f && !f.isBlank()) {
+            out.put("filename", f.trim());
         }
-        return forward(() -> rag.renameDocument(source, f.trim()));
+        if (in.get("doc_type") instanceof String dt && !dt.isBlank()) {
+            if (!dt.equals("icd10") && !dt.equals("icd9cm")) {
+                throw new ApiExceptionHandler.BadRequestException("doc_type must be icd10 or icd9cm");
+            }
+            out.put("doc_type", dt);
+        }
+        if (out.isEmpty()) {
+            throw new ApiExceptionHandler.BadRequestException("provide filename and/or doc_type");
+        }
+        return forward(() -> rag.updateDocument(source, out));
+    }
+
+    @PostMapping("/api/admin/knowledge/docs/order")
+    @Operation(summary = "Set the read-first order of one upload box",
+            description = "`{\"doc_type\": \"icd10\"|\"icd9cm\", \"sources\": [\"a\", \"b\", ...]}` — "
+                    + "sources in reading order get priority 1..n. The top document's chunks are "
+                    + "read first by the AI and get a small retrieval boost.")
+    public Object orderDocs(@RequestBody(required = false) byte[] body) {
+        Map<?, ?> in = parseObject(body);
+        Object docType = in.get("doc_type");
+        if (!(docType instanceof String dt) || !(dt.equals("icd10") || dt.equals("icd9cm"))) {
+            throw new ApiExceptionHandler.BadRequestException("doc_type must be icd10 or icd9cm");
+        }
+        if (!(in.get("sources") instanceof List<?> raw) || raw.isEmpty()) {
+            throw new ApiExceptionHandler.BadRequestException("sources is required");
+        }
+        List<String> sources = new java.util.ArrayList<>();
+        for (Object o : raw) {
+            if (o instanceof String s && !s.isBlank()) {
+                sources.add(s);
+            }
+        }
+        if (sources.isEmpty()) {
+            throw new ApiExceptionHandler.BadRequestException("sources is required");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("doc_type", dt);
+        out.put("sources", sources);
+        return forward(() -> rag.orderDocuments(out));
     }
 
     @PostMapping("/api/admin/knowledge/train")

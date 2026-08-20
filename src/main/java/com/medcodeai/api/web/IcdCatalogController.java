@@ -5,9 +5,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -46,5 +49,28 @@ public class IcdCatalogController {
             sys = sys.equalsIgnoreCase("ICD-9") ? "ICD-9" : "ICD-10";
         }
         return catalog.search(q, sys, limit);
+    }
+
+    // POST, not GET: the ICD filter dialog looks up every code on the loaded
+    // cases at once — hundreds of codes, far past any sane URL length
+    @PostMapping("/api/icd-codes/lookup")
+    @Operation(summary = "Bulk code → description lookup",
+            description = "`{\"codes\": [\"A09\", \"93.27\", ...]}` (≤1000) → `{code: description}` "
+                    + "across both catalogs; codes with no known description are omitted.")
+    public Map<String, String> lookup(@RequestBody(required = false) Map<String, Object> body) {
+        Object raw = body == null ? null : body.get("codes");
+        if (!(raw instanceof List<?> list) || list.isEmpty()) {
+            throw new ApiExceptionHandler.BadRequestException("codes is required");
+        }
+        if (list.size() > 1000) {
+            throw new ApiExceptionHandler.BadRequestException("too many codes (max 1000)");
+        }
+        List<String> codes = new ArrayList<>();
+        for (Object o : list) {
+            if (o instanceof String s && !s.isBlank() && !codes.contains(s.strip())) {
+                codes.add(s.strip());
+            }
+        }
+        return catalog.descriptionsFor(codes);
     }
 }

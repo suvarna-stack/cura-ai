@@ -91,8 +91,10 @@ public class RagApiClient {
         }
     }
 
-    /** POST /documents/upload (multipart) — 202, ingest continues in background. */
-    public Map<String, Object> upload(String filename, byte[] bytes) {
+    /** POST /documents/upload (multipart) — 202, ingest continues in background.
+     *  docType tags the document (icd10 | icd9cm); the RAG side stamps it into
+     *  every chunk's metadata. Null = untagged (legacy uploads). */
+    public Map<String, Object> upload(String filename, byte[] bytes, String docType) {
         ByteArrayResource resource = new ByteArrayResource(bytes) {
             @Override
             public String getFilename() {
@@ -101,6 +103,9 @@ public class RagApiClient {
         };
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("file", resource);
+        if (docType != null && !docType.isBlank()) {
+            form.add("doc_type", docType);
+        }
         try {
             return http.post().uri("/documents/upload")
                     .contentType(MediaType.MULTIPART_FORM_DATA).body(form)
@@ -119,12 +124,25 @@ public class RagApiClient {
         }
     }
 
-    /** PATCH /documents/{source} — rename the display filename (index untouched). */
-    public Map<String, Object> renameDocument(String source, String filename) {
+    /** PATCH /documents/{source} — filename and/or doc_type ({"filename": ...,
+     *  "doc_type": ...}, either may be absent; a doc_type change re-tags the
+     *  indexed chunks in place on the RAG side). */
+    public Map<String, Object> updateDocument(String source, Map<String, Object> body) {
         try {
             return http.patch().uri("/documents/{source}", source)
-                    .contentType(MediaType.APPLICATION_JSON).body(Map.of("filename", filename))
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
                     .retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /** PUT /documents/order — read-first priority for one upload box. */
+    public Object orderDocuments(Map<String, Object> body) {
+        try {
+            return http.put().uri("/documents/order")
+                    .contentType(MediaType.APPLICATION_JSON).body(body)
+                    .retrieve().body(Object.class);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }

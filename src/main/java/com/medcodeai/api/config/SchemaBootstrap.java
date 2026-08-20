@@ -94,6 +94,8 @@ public class SchemaBootstrap implements ApplicationRunner {
                 )""");
         jdbc.execute("CREATE INDEX IF NOT EXISTS case_vitals_case_idx ON case_vitals (case_id)");
 
+        agentChatTables();
+
         Long admins = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM users WHERE role = 'admin'", Long.class);
         if (admins != null && admins > 0) {
@@ -187,6 +189,41 @@ public class SchemaBootstrap implements ApplicationRunner {
                 END $$""");
         jdbc.execute("CREATE INDEX IF NOT EXISTS case_codes_icd_10_idx ON case_codes (icd_10_id)");
         jdbc.execute("CREATE INDEX IF NOT EXISTS case_codes_icd_9_idx  ON case_codes (icd_9_id)");
+    }
+
+    /**
+     * Agent chat history (2026-08-20): the AI Agent page's conversations,
+     * per user. The RAG call stays stateless — these tables are only the
+     * persistence/browsing layer. Mirrored in
+     * db/migrations/0006_agent_chat_history.sql.
+     */
+    private void agentChatTables() {
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS agent_conversations (
+                    conversation_id serial PRIMARY KEY,
+                    user_id         int NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                    mode            text NOT NULL,
+                    title           text NOT NULL,
+                    created_at      text,
+                    updated_at      text
+                )""");
+        jdbc.execute("""
+                CREATE INDEX IF NOT EXISTS agent_conversations_user_idx
+                    ON agent_conversations (user_id)""");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS agent_messages (
+                    message_id       serial PRIMARY KEY,
+                    conversation_id  int NOT NULL
+                        REFERENCES agent_conversations(conversation_id) ON DELETE CASCADE,
+                    role             text NOT NULL,
+                    content          text NOT NULL,
+                    sources          text,
+                    unverified_codes text,
+                    created_at       text
+                )""");
+        jdbc.execute("""
+                CREATE INDEX IF NOT EXISTS agent_messages_convo_idx
+                    ON agent_messages (conversation_id)""");
     }
 
     private static String env(String name, String fallback) {

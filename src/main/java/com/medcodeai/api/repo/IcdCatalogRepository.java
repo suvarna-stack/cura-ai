@@ -28,6 +28,29 @@ public class IcdCatalogRepository {
         this.jdbc = jdbc;
     }
 
+    /** code -> description for the given codes, across BOTH catalogs. Queried
+     *  icd_9 first so an ICD-10 description wins the (rare) code collision —
+     *  the ICD filter dialog shows mostly diagnosis codes. */
+    public Map<String, String> descriptionsFor(List<String> codes) {
+        Map<String, String> out = new HashMap<>();
+        if (codes.isEmpty()) {
+            return out;
+        }
+        String in = String.join(",", java.util.Collections.nCopies(codes.size(), "?"));
+        Object[] args = codes.toArray();
+        for (String sql : List.of(
+                "SELECT code, description FROM icd_9 WHERE code IN (" + in + ")",
+                "SELECT code, description FROM icd_10 WHERE code IN (" + in + ")")) {
+            jdbc.query(sql, rs -> {
+                String d = rs.getString("description");
+                if (d != null && !d.isBlank()) {
+                    out.put(rs.getString("code"), d);
+                }
+            }, args);
+        }
+        return out;
+    }
+
     /** "code|system" -> current description ("" for null) for every known code. */
     public Map<String, String> existingDescriptions() {
         Map<String, String> out = new HashMap<>();
