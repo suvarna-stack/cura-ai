@@ -91,11 +91,11 @@ password, roles `coder`/`admin`, opaque Bearer tokens stored server-side in
 `auth_sessions`. Full endpoint shapes: [docs/api-contract.md](docs/api-contract.md)
 (Authentication section) / [docs/types.ts](docs/types.ts).
 
-- The `password_hash` column and a bootstrap admin are created **at startup**,
-  idempotently (`config/SchemaBootstrap`) — the frozen seed dump predates auth
-  and there is no migration tool. The same DDL is in
-  `db/migrations/0001_add_password_hash.sql` for manual/prod application. A
-  re-seed drops the column; the next boot re-adds it (and re-creates the admin).
+- The `password_hash` column is created by Flyway migration
+  `V1__add_password_hash.sql`, and the bootstrap admin by `config/AdminBootstrap`
+  at startup (hashing a password needs the `PasswordEncoder`, so it cannot be a
+  `.sql` file). The frozen seed dump predates auth, so a re-seed drops both; the
+  next boot re-applies the migration and re-creates the admin.
 - Log in against `admin@medcodeai.demo` / `admin1234` locally (or your
   `ADMIN_BOOTSTRAP_*` overrides), then send `Authorization: Bearer <token>`.
 - Implemented with `spring-security-crypto` (BCrypt only) plus a small
@@ -104,43 +104,59 @@ password, roles `coder`/`admin`, opaque Bearer tokens stored server-side in
 
 ## Updating an existing database (pulling changes)
 
-There is no migration tool. Schema changes made after the frozen `db/seed.sql.gz`
-dump are applied **at startup**, idempotently, by `config/SchemaBootstrap`. So on
-a machine that already has a working `medcode` database:
+Schema changes made after the frozen `db/seed.sql.gz` dump live in
+`src/main/resources/db/migrations/V*.sql` and are applied by **Flyway** at
+startup. So on a machine that already has a working `medcode` database:
 
 ```bash
 git pull
-./mvnw spring-boot:run     # applies anything missing on boot
+./mvnw spring-boot:run     # Flyway applies anything missing on boot
 ```
 
 That is the whole procedure — no psql, no re-seed, and **your local data is kept**
 (rows are moved, never recreated). Stop the app before pulling: old code against
 a new schema errors, whereas new code against an old schema fixes itself.
 
-Applied on boot today:
+The dump itself is Flyway's **version 0**. A database that already has content
+but no `flyway_schema_history` table — every database that existed before
+2026-08-20 — is adopted automatically (`baseline-on-migrate`), then brought up to
+the latest version. Every migration is written `IF NOT EXISTS`, so a database
+that already had these changes applied by the old `SchemaBootstrap` runner takes
+them as no-ops.
 
-| Change | Also committed as |
+| Version | Change |
 |---|---|
-| `users.password_hash` + bootstrap admin | `db/migrations/0001_add_password_hash.sql` |
-| `imed_write_ops` revert journal | `db/migrations/0002_imed_write_ops.sql` |
-| `icd_codes` split into `icd_10` + `icd_9` (2026-07-28) | `db/migrations/0003_split_icd_codes.sql` |
+| `V1` | `users.password_hash` |
+| `V2` | `imed_write_ops` revert journal |
+| `V3` | `icd_codes` split into `icd_10` + `icd_9` (2026-07-28) |
+| `V4` | `case_codes.operation_start` / `_end` (2026-07-30) |
+| `V5` | `case_codes.operation_type` + `case_vitals` (2026-07-30) |
+| `V6` | the `cases` foreign keys `case_vitals` / `imed_write_ops` were missing (2026-08-20) |
 
-Check it worked — `icd_codes` should be gone, replaced by two tables:
+Ask any database what it has:
 
 ```bash
-psql -d medcode -c "\dt" | grep icd
+psql -d medcode -c "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank"
 ```
 
 For a database you can't boot the app against (prod, or a shared server), apply
-the migration files by hand instead; each is safe to run twice:
+the files by hand; each is guarded and safe to run twice:
 
 ```bash
-psql -d medcode -f db/migrations/0003_split_icd_codes.sql
+psql -d medcode -f src/main/resources/db/migrations/V3__split_icd_codes.sql
 ```
 
-**A re-seed undoes these.** `scripts/seed_local_pg.sh` restores the frozen dump,
-which predates all three changes — so `icd_codes` comes back and the admin
-disappears. Just start the app again and they re-apply.
+**A re-seed undoes all of them.** `scripts/seed_local_pg.sh` restores the frozen
+dump, which predates every migration — so `icd_codes` comes back, the admin
+disappears, and the schema history goes with it. Start the app again and Flyway
+re-applies the lot from version 0.
+
+**Adding a schema change:** add one `V<n>__<name>.sql` file. That file is the
+only place the change is written down — do NOT also add the DDL to Java. Before
+Flyway, every statement lived in `config/SchemaBootstrap` AND in a `db/migrations`
+file that nothing ever ran, and the two had silently drifted: `case_vitals` and
+`imed_write_ops` were created without the foreign key that every other case-keyed
+table carries (fixed in `V6`).
 
 ## The API
 

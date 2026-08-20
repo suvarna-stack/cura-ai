@@ -16,7 +16,7 @@ import java.util.Map;
  * column-order-preserving {@link CasesRepository#ROW} mapper (numbers stay
  * numbers). The service layer shapes these raw rows into the API contract.
  *
- * Note the password_hash column is added at startup by SchemaBootstrap (the
+ * Note the password_hash column is added by Flyway migration V1 (the
  * frozen seed dump predates auth), so every SELECT that reads it assumes that
  * runner has already executed.
  */

@@ -1,5 +1,4 @@
--- Manual mirror of the imed_write_ops DDL in config/SchemaBootstrap.java
--- (the runner applies it idempotently at every startup).
+-- V2 — the hospital write-back revert journal.
 --
 -- Context: the diff-based hospital write-back (2026-07-24). On approve,
 -- medcode-api diffs the coder's final codes against the hospital's live rows

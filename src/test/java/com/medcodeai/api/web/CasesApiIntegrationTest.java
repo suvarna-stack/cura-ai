@@ -66,7 +66,7 @@ class CasesApiIntegrationTest {
     private static final String TIMED_PROCEDURE_CASE_ID = "87026072209142300201";
 
     private static final String ADMIN_EMAIL = "admin@medcodeai.demo";
-    private static final String ADMIN_PW = "admin1234"; // SchemaBootstrap's documented default
+    private static final String ADMIN_PW = "admin1234"; // AdminBootstrap's documented default
 
     @Autowired
     private MockMvc mvc;

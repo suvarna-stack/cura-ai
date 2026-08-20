@@ -710,6 +710,41 @@ Milestones (git log --oneline reads as this sequence):
   name instead of hard-coding one — the rotated per-case fakes it guards
   against would match no account at all. A full run now leaves the dataset
   exactly as it found it.
+- ✅ **Flyway — one source of truth for the schema (2026-08-20):** every DDL
+  statement added after the frozen dump existed TWICE — as Java in
+  `config/SchemaBootstrap` (which ran) and as `db/migrations/000N.sql` (which
+  **nothing ever ran**; grep found it referenced only from Java comments). Nothing
+  compared the copies and they had drifted: `case_vitals` and `imed_write_ops`
+  were created by hand-written Java **without the `cases` foreign key** that all
+  six other case-keyed child tables carry, so deleting a case orphaned its vitals
+  and its write-back journal forever. Nobody decided that; the convention was just
+  forgotten in a place no test could see. Now Flyway runs the SQL files and they
+  are the only definition. The files moved to `src/main/resources/db/migrations/`
+  and became `V1__`…`V6__` — **classpath, not the repo's `db/` folder**, because
+  the Dockerfile copies only `pom.xml` and `src/`, so a `filesystem:` location
+  would have found nothing in every container. `SchemaBootstrap` became
+  `AdminBootstrap`: 196 lines → 75, keeping only the bootstrap admin (it needs the
+  `PasswordEncoder`, so it cannot be a `.sql` file). New `V6` adds the two missing
+  keys, deleting any orphans first so it can't fail on a database that
+  accumulated them. Three traps worth remembering:
+  - **Boot 4 split the autoconfigurations into per-technology modules**, so
+    `flyway-core` alone puts the library on the classpath and *nothing calls it* —
+    the app boots, migrates nothing, and only fails later on the first missing
+    column. `org.springframework.boot:spring-boot-flyway` is the piece that
+    actually wires it. (On Boot 3, `flyway-core` was enough.)
+  - **`V3` had explicit `BEGIN;`/`COMMIT;`** from its hand-apply days. Flyway
+    already wraps each migration in a transaction, and that `COMMIT` would end
+    *Flyway's* transaction mid-file, before the history row is written. Removed.
+  - Demo reset refills tables in `DemoBaselineService.TABLES` order, so the new
+    keys make that order load-bearing — it was already parent-first (`cases`
+    before both), verified rather than assumed.
+  Verified on three databases before the suite: a **fresh seed** (6 migrations
+  from scratch), a **copy of the live dev database** (baselined at 0, migrated to
+  6, row counts identical across `cases`/`case_codes`/`case_vitals`/`users`/
+  `coding_history`), and a schema diff of Flyway's output against the real
+  database showing **no difference except `flyway_schema_history` itself**. Suite
+  46/46 green. Not done here: `imed-mock-api` has the identical pattern (201 lines
+  of the same duplication) — same fix, separate repo, separate commit.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -752,19 +787,20 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   provisioning needs `GRANT USAGE ON SCHEMA imed` for any non-owner app role
   or it fails with "permission denied for schema imed". Details in
   `../imed-mock-api/README.md`.
-- The **ICD catalog split is also outside the seed dump** (same trap as auth):
-  `db/seed.sql.gz` still ships the pre-split single `icd_codes` table, so a fresh
-  re-seed resurrects it and `config/SchemaBootstrap.splitIcdCatalog()` re-applies
-  the split on the next boot (idempotent, mirrored in
-  `db/migrations/0003_split_icd_codes.sql`). Don't "fix" a re-appeared
-  `icd_codes` by editing the dump — just boot the app. Note the runner returns
-  early once a bootstrap admin exists, so **any new DDL must go ABOVE that
-  return**, as the split does.
-- Auth schema lives OUTSIDE the seed dump: `config/SchemaBootstrap` adds the
-  `users.password_hash` column + the bootstrap admin at every startup
-  (idempotent). So a fresh re-seed drops them and the next boot restores them —
-  don't "fix" a missing `password_hash` by editing the dump. `@SpringBootTest`
-  runs the runner too, so the test DB self-heals.
+- **Schema changes go in ONE place: a new `src/main/resources/db/migrations/
+  V<n>__<name>.sql` file** (Flyway, since 2026-08-20). Never also write the DDL
+  in Java — that duplication is exactly what drifted for a year. The seed dump is
+  version 0; `baseline-on-migrate` adopts any database that predates the history
+  table.
+- Everything after the dump is outside it, so **a fresh re-seed drops all of it**
+  — `icd_codes` comes back, `password_hash` and the admin vanish, and
+  `flyway_schema_history` goes too. The fix is always to boot the app (Flyway
+  replays from 0), never to edit the dump. `@SpringBootTest` boots it too, so the
+  test DB self-heals.
+- The **bootstrap admin is NOT a migration** — hashing `ADMIN_BOOTSTRAP_PASSWORD`
+  needs the `PasswordEncoder`, so it stays an `ApplicationRunner`
+  (`config/AdminBootstrap`, renamed from `SchemaBootstrap` when its DDL left).
+  It runs after Flyway and does nothing once any admin exists.
 - Auth covers the WHOLE case surface since 2026-07-25 (Phase 3 — the earlier
   "admin-only, never gate case routes" scope is OVER): the interceptor guards
   /api/cases/**, /api/sync and /api/demo/reset (any valid token), and

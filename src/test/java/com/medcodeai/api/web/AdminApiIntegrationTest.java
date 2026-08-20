@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Drives the auth + admin-account endpoints against the local seeded "medcode"
  * Postgres (same MockMvc, no-mocks style as CasesApiIntegrationTest). The
- * bootstrap admin is created by SchemaBootstrap at startup from the default
+ * bootstrap admin is created by AdminBootstrap at startup from the default
  * ADMIN_BOOTSTRAP_* values, so these tests log in with that known default.
  *
  * Create/delete tests use a unique email per run (self-cleaning). The one test
@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminApiIntegrationTest {
 
     private static final String ADMIN_EMAIL = "admin@medcodeai.demo";
-    private static final String ADMIN_PW = "admin1234"; // SchemaBootstrap's documented default
+    private static final String ADMIN_PW = "admin1234"; // AdminBootstrap's documented default
 
     /**
      * Complete and open, and touched by no other suite — this test approves and

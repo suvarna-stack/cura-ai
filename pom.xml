@@ -59,6 +59,33 @@
 			<version>3.0.3</version>
 		</dependency>
 
+		<!-- Schema migrations. db/migrations/V*.sql on the classpath is the ONLY
+		     definition of every DDL change made after the frozen seed dump; before
+		     Flyway the same statements were also hand-written in Java
+		     (config/SchemaBootstrap), and the two copies had already drifted —
+		     case_vitals and imed_write_ops lost the FK to cases that every other
+		     child table carries.
+		     THREE artifacts, all needed, all version-managed by Boot's BOM:
+		      - spring-boot-flyway: Boot 4 split the autoconfigurations out of
+		        spring-boot-autoconfigure into per-technology modules, so on Boot 4
+		        flyway-core alone puts the LIBRARY on the classpath and nothing ever
+		        calls it — the app boots, migrates nothing, and only fails later on
+		        the first missing column. (Boot 3 needed only flyway-core.)
+		      - flyway-core: the engine.
+		      - flyway-database-postgresql: required separately since Flyway 10. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
