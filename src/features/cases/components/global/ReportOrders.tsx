@@ -28,6 +28,17 @@ const PREVIEW = 6;
 /** iMed field name -> what a coder calls it. Unknown keys fall back to the raw
  *  name, so a new iMed field shows up instead of silently disappearing. */
 const FIELD_LABEL: Record<string, string> = {
+  // Both vocabularies on purpose: the hospital renamed every field with the
+  // R1-R6 contract (2026-08-19), but order rows synced before that still carry
+  // the old extract names, and unlabelled keys fall through to the raw key.
+  dosage_signature: "Dosage", dosage_instruction: "Instruction",
+  received_at: "Received", panel_name: "Panel", item_name: "Item",
+  unit: "Unit", collected_at: "Collected", reported_at: "Reported",
+  document_type: "Document", field_name: "Field", subfield_name: "Section",
+  recorded_at: "Recorded", operation_type: "Type",
+  operation_start: "Start", operation_end: "End",
+  icd10_code: "ICD-10", icd9_code: "ICD-9", description: "Description",
+  tmt_code: "TMT", panel_tmlt: "TMT", item_tmlt: "TMT", fee_schedule: "Fee",
   dosagesignature: "Dosage", dosageinstruction: "Instruction", quantity: "Qty",
   remark: "Remark", receiveddatetime: "Received",
   panelname: "Panel", itemname: "Item", itemvalue: "Result", itemuom: "Unit",
@@ -39,7 +50,7 @@ const FIELD_LABEL: Record<string, string> = {
   cgd: "CGD", panelcgd: "CGD", itemcgd: "CGD",
 };
 // shown as the row title instead of repeated in the field list
-const TITLE_KEYS = ["name", "panelname"];
+const TITLE_KEYS = ["name", "panel_name", "panelname"];
 
 export function ReportOrders({ detail }: { detail: ApiCaseDetail | null }) {
   const { gl } = useTheme();
