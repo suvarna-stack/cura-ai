@@ -11,7 +11,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
-import { suggestCodes } from "../api/casesService";
+import { suggestCodes, type SuggestedNote } from "../api/casesService";
 import { fillEmptySystems, isIcd9Type, codeTypeFromRole, hasIcd10Primary } from "../utils/aiSuggestions";
 import { AddCodeModal, CODE_TYPE_PRIMARY, CODE_TYPE_COMORBIDITY,
          CODE_TYPE_ICD10_PRIMARY, CODE_TYPE_ICD10_COMORBIDITY,
@@ -374,6 +374,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
 
   // Fill empty ICD-9 / ICD-10 columns from the RAG knowledge index.
   const [suggesting, setSuggesting] = useState(false);
+  // Coder-taught rules (Suggest & Learn) that match this case's narrative.
+  const [aiNotes, setAiNotes] = useState<SuggestedNote[]>([]);
   useEffect(() => {
     if (status !== "ready" || !c.id) return;
     let cancelled = false;
@@ -381,9 +383,11 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     void (async () => {
       try {
         const ai = await suggestCodes(c.id);
-        if (cancelled || !ai.length) return;
+        if (cancelled) return;
+        setAiNotes(ai.notes);
+        if (!ai.codes.length) return;
         setCodes((prev) => {
-          const next = fillEmptySystems(prev, ai);
+          const next = fillEmptySystems(prev, ai.codes);
           if (next.length !== prev.length) saveCodeEdits(c.id, next);
           return next;
         });
@@ -572,6 +576,7 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
           return (
             <CodesColumn key={sys} system={sys}
               codes={codes}
+              notes={aiNotes}
               loading={loadingCodes || (suggesting && !filled)}
               onReorder={persistCodes}
               onEdit={setEditingIdx}

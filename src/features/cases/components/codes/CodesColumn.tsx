@@ -30,6 +30,7 @@ import { isPickable, isPicked } from "../../utils/codeSelection";
 import { ORIGIN_ORDER, originOf, isAiSuggested, avgAiConfidence } from "../../utils/codeOrigin";
 import type { CodeOrigin } from "../../utils/codeOrigin";
 import { formatWindow } from "../../utils/operationTime";
+import type { SuggestedNote } from "../../api/casesService";
 
 /** Which column a code belongs in. Procedure systems (ICD-9, *-PCS) are ICD-9;
  *  everything else (ICD-10, DRG, legacy "Comorbidities") is ICD-10. */
@@ -54,12 +55,24 @@ export interface CodesColumnProps {
   /** tick / untick every pickable code in THIS column at once */
   onToggleAll?: (indices: number[], next: boolean) => void;
   loading?: boolean;
+  /** Coder-taught rules (Suggest & Learn) matching this case. The column
+   *  shows the ones that talk about ITS system, above the codes — a rule the
+   *  hospital taught should be read before the model's guesses, not after. */
+  notes?: SuggestedNote[];
 }
 
 export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
-                             onToggle, onToggleAll, loading }: CodesColumnProps) {
+                             onToggle, onToggleAll, loading, notes }: CodesColumnProps) {
   const { gl } = useTheme();
   const { t } = useLang();
+
+  // A rule belongs in this column when it names a code of this system;
+  // rules that name no code at all are guidance and sit with the diagnoses.
+  const columnNotes = (notes ?? []).filter((n) =>
+    n.codes.length === 0
+      ? system === "icd10"
+      : n.codes.some((c) => /icd[- ]?9|pcs/i.test(c.system) === (system === "icd9")),
+  );
 
   // drag state, all in column positions: which card is in flight, which card
   // is "armed" (drag may only start from the grip handle — otherwise selecting
@@ -405,6 +418,24 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             {t("code.pickHint")}
           </p>
         )}
+        {columnNotes.map((n) => (
+          <div key={n.id} className="mt-2 rounded-xl px-3 py-2"
+            style={{
+              background: `rgba(${gl.accentRgb},0.10)`,
+              border: `1px solid rgba(${gl.accentRgb},0.26)`,
+            }}
+            role="note" title={n.via}>
+            <p className="text-[12px] font-bold" style={{ color: gl.accent }}>
+              💡 {t("agent.learn.applies")}
+            </p>
+            <p className="text-[12px] font-normal mt-0.5 leading-relaxed" style={{ color: gl.text }}>
+              {n.summary}
+            </p>
+            <p className="text-[11px] font-normal mt-1" style={{ color: gl.muted }}>
+              {n.createdBy || t("agent.learn.aCoder")}
+            </p>
+          </div>
+        ))}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1.5 scroll-thin"

@@ -1,6 +1,10 @@
 import { apiClient } from '../../../lib/axios'
 import { API_BASE_URL } from '../../../config/env'
-import type { AgentChatTurn } from '../types/agent.types'
+import type {
+  AgentChatTurn,
+  AppliedNote,
+  LearnedNote,
+} from '../types/agent.types'
 
 /**
  * The coder AI Agent — POST /api/agent/chat[/stream] (any authenticated role).
@@ -31,11 +35,14 @@ interface AgentChatResponse {
   unverified_codes?: string[]
   /** which upload box retrieval was routed to, when the question named one */
   code_system?: 'icd10' | 'icd9cm' | null
+  /** coder-taught rules (Suggest & Learn) that matched and shaped this answer */
+  learned_notes?: AppliedNote[]
 }
 
 type AgentStreamEvent =
   | { type: 'meta'; mode: string; contexts: AgentContext[]
-      code_system?: 'icd10' | 'icd9cm' | null }
+      code_system?: 'icd10' | 'icd9cm' | null
+      learned_notes?: AppliedNote[] }
   | { type: 'delta'; text: string }
   | { type: 'done'; unverified_codes?: string[] }
   | { type: 'error'; message: string }
@@ -48,13 +55,17 @@ export interface AgentReply {
   unverifiedCodes: string[]
   /** the upload box retrieval was routed to, or null when both were searched */
   searchedSystem: 'icd10' | 'icd9cm' | null
+  /** coder rules that fired for this answer — rendered as a 💡 callout */
+  learnedNotes: AppliedNote[]
 }
 
 function sourceLabels(contexts: AgentContext[]): string[] {
   const sources: string[] = []
   for (const c of contexts) {
     const page = c.metadata?.page
-    const name = (c.display_name || c.source).replace(/\.[^.]+$/, '')
+    const name = c.source.startsWith('learned:')
+      ? c.display_name || 'Coder note'
+      : (c.display_name || c.source).replace(/\.[^.]+$/, '')
     const label = typeof page === 'number' ? `${name} p.${page}` : name
     if (!sources.includes(label)) sources.push(label)
   }
@@ -74,6 +85,7 @@ export async function sendAgentMessage(
     sources: sourceLabels(data.contexts),
     unverifiedCodes: data.unverified_codes ?? [],
     searchedSystem: data.code_system ?? null,
+    learnedNotes: data.learned_notes ?? [],
   }
 }
 
@@ -117,6 +129,7 @@ export async function streamAgentMessage(
   let sources: string[] = []
   let unverifiedCodes: string[] = []
   let searchedSystem: 'icd10' | 'icd9cm' | null = null
+  let learnedNotes: AppliedNote[] = []
 
   const handle = (ev: AgentStreamEvent) => {
     if (ev.type === 'delta') {
@@ -125,6 +138,7 @@ export async function streamAgentMessage(
     } else if (ev.type === 'meta') {
       sources = sourceLabels(ev.contexts)
       searchedSystem = ev.code_system ?? null
+      learnedNotes = ev.learned_notes ?? []
     } else if (ev.type === 'done') {
       unverifiedCodes = ev.unverified_codes ?? []
     } else {
@@ -146,7 +160,8 @@ export async function streamAgentMessage(
       if (data) handle(JSON.parse(data.slice(6)) as AgentStreamEvent)
     }
   }
-  return { answer: answer.trim(), sources, unverifiedCodes, searchedSystem }
+  return { answer: answer.trim(), sources, unverifiedCodes, searchedSystem,
+           learnedNotes }
 }
 
 /** Human-readable message from an Axios error (the API's {"error": ...}). */
@@ -224,4 +239,72 @@ export async function appendMessages(
 
 export async function deleteConversation(id: number): Promise<void> {
   await apiClient.delete(`/agent/conversations/${id}`)
+}
+
+// ---------------------------------------------------------------------------
+// Suggest & Learn — /api/agent/learn/**.
+// The coder teaches a rule in plain language; the AI extracts it, the coder
+// confirms it, and it becomes an extra layer the RAG retrieval reads on top
+// of the uploaded ICD references. Nothing here trains model weights: every
+// rule stays visible, attributable, mutable and deletable.
+
+/** Does this chat message read as a rule, or as a question? Advisory only. */
+export async function classifyIntent(
+  text: string,
+): Promise<{ intent: 'teach' | 'ask'; confidence: number }> {
+  const { data } = await apiClient.post<{
+    intent: 'teach' | 'ask'
+    confidence: number
+  }>('/agent/learn/classify', { text })
+  return data
+}
+
+/** Plain language -> draft rule for the confirm card. Stores nothing. */
+export async function extractNote(text: string): Promise<LearnedNote> {
+  const { data } = await apiClient.post<LearnedNote>('/agent/learn/extract', {
+    text,
+  })
+  return data
+}
+
+/** Save a confirmed (or edited) draft; it starts affecting answers at once. */
+export async function saveNote(note: LearnedNote): Promise<LearnedNote> {
+  const { data } = await apiClient.post<LearnedNote>('/agent/learn/notes', {
+    note,
+  })
+  return data
+}
+
+export async function listNotes(): Promise<LearnedNote[]> {
+  const { data } = await apiClient.get<{ notes: LearnedNote[] }>(
+    '/agent/learn/notes',
+  )
+  return data.notes
+}
+
+/** Mute (or un-mute) a rule without losing it. */
+export async function toggleNote(
+  id: string,
+  active: boolean,
+): Promise<LearnedNote> {
+  const { data } = await apiClient.patch<LearnedNote>(
+    `/agent/learn/notes/${id}?active=${active}`,
+  )
+  return data
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  await apiClient.delete(`/agent/learn/notes/${id}`)
+}
+
+/** Which taught rules apply to this narrative? (case page callout) */
+export async function matchNotes(
+  text: string,
+  limit = 3,
+): Promise<AppliedNote[]> {
+  const { data } = await apiClient.post<{ notes: AppliedNote[] }>(
+    '/agent/learn/match',
+    { text, limit },
+  )
+  return data.notes
 }

@@ -6,6 +6,7 @@ import {
   Sparkles,
   BookOpen,
   Brain,
+  GraduationCap,
   Lightbulb,
   History,
   Plus,
@@ -16,12 +17,18 @@ import { useLang } from '../../cases/context/LanguageContext'
 import {
   agentErrorMessage,
   appendMessages,
+  classifyIntent,
   createConversation,
   deleteConversation,
+  deleteNote,
+  extractNote,
   getConversation,
   listConversations,
+  listNotes,
+  saveNote,
   sendAgentMessage,
   streamAgentMessage,
+  toggleNote,
   type AgentReply,
   type ConversationSummary,
 } from '../api/agentService'
@@ -29,8 +36,11 @@ import type {
   AgentChatTurn,
   AgentMessage,
   ChatMode,
+  LearnedNote,
 } from '../types/agent.types'
-import { CHIP_KEYS } from '../types/agent.types'
+import { CHIP_KEYS, TEACH_CHIP_KEYS } from '../types/agent.types'
+import { LearnedNoteCard } from './LearnedNoteCard'
+import { LearnedRulesPanel } from './LearnedRulesPanel'
 
 let uid = 1
 const now = () =>
@@ -74,6 +84,18 @@ export function AgentPage() {
   const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // --- Suggest & Learn state -------------------------------------------
+  // `teaching` flips the composer from "ask me" to "teach me". The nudge is
+  // the auto-detect half: a message that reads like a rule still gets its
+  // normal answer, and the offer to save it appears alongside.
+  const [teaching, setTeaching] = useState(false)
+  const [nudge, setNudge] = useState<string | null>(null)
+  const [savingNote, setSavingNote] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [notes, setNotes] = useState<LearnedNote[]>([])
+  const [notesLoading, setNotesLoading] = useState(false)
+  const [busyNoteId, setBusyNoteId] = useState<string | null>(null)
+
   // --- history sidebar state -------------------------------------------
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
@@ -96,6 +118,17 @@ export function AgentPage() {
       .catch((err) => console.warn('agent history unavailable', err))
   }, [])
 
+  /** The taught-rules list, loaded once and refreshed after every change. */
+  function refreshNotes() {
+    setNotesLoading(true)
+    listNotes()
+      .then(setNotes)
+      .catch((err) => console.warn('learned rules unavailable', err))
+      .finally(() => setNotesLoading(false))
+  }
+
+  useEffect(refreshNotes, [])
+
   const headerMsgs = useMemo<AgentMessage[]>(
     () => [{ id: -1, role: 'agent', text: t(`agent.welcome.${mode}`), time: '' }],
     [mode, t],
@@ -115,6 +148,9 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
+    // Teaching only exists in Suggest & Learn; the dictionary tab is read-only.
+    setTeaching(false)
+    setNudge(null)
   }
 
   /** Fresh empty chat; the old one stays reachable from the sidebar. */
@@ -123,6 +159,8 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
+    setTeaching(false)
+    setNudge(null)
   }
 
   /** Reopen a stored conversation (restores its mode too). */
@@ -203,14 +241,138 @@ export function AgentPage() {
     }
   }
 
+  /**
+   * The teaching half of Suggest & Learn: the coder's sentence goes to the
+   * extractor, and what comes back is a CARD, not an answer — nothing is
+   * stored until they confirm it. A failed extraction is a normal agent
+   * message explaining what was missing, so the chat never dead-ends.
+   */
+  async function teach(textOverride?: string) {
+    const text = (textOverride ?? input).trim()
+    if (!text || pending) return
+    setInput('')
+    setNudge(null)
+    setShowSuggestions(false)
+    setPending(true)
+    sendingRef.current = true
+    setConvo((prev) => [...prev, msg('coder', text)])
+    try {
+      const draft = await extractNote(text)
+      setConvo((prev) => [
+        ...prev,
+        { id: uid++, role: 'agent', text: '', kind: 'note-draft',
+          note: draft, time: now() },
+      ])
+    } catch (err) {
+      setConvo((prev) => [
+        ...prev,
+        msg('agent', agentErrorMessage(err, t('agent.learn.error'))),
+      ])
+    } finally {
+      setPending(false)
+      sendingRef.current = false
+    }
+  }
+
+  /**
+   * Confirmed draft -> stored rule. From here the rule is part of what
+   * retrieval reads, so the receipt says so plainly. The exchange is
+   * persisted as text, which is what a reopened conversation can render.
+   */
+  async function confirmNote(cardId: number, draft: LearnedNote) {
+    setSavingNote(true)
+    try {
+      const saved = await saveNote(draft)
+      setConvo((prev) =>
+        prev.map((m) =>
+          m.id === cardId
+            ? { ...m, kind: 'note-saved' as const, note: saved,
+                text: t('agent.learn.saved'), time: now() }
+            : m,
+        ),
+      )
+      refreshNotes()
+      const taught = draft.raw_text || draft.scenario
+      void persistExchange(mode, taught, {
+        answer: `${t('agent.learn.saved')} — ${noteLine(saved)}`,
+        sources: [],
+        unverifiedCodes: [],
+        searchedSystem: null,
+        learnedNotes: [],
+      })
+    } catch (err) {
+      setConvo((prev) => [
+        ...prev,
+        msg('agent', agentErrorMessage(err, t('agent.learn.error'))),
+      ])
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  /** One-line form of a rule, for receipts and persisted history. */
+  function noteLine(note: LearnedNote): string {
+    const use = note.codes.filter((c) => c.role !== 'exclude').map((c) => c.code)
+    const avoid = note.codes.filter((c) => c.role === 'exclude').map((c) => c.code)
+    return [
+      note.scenario,
+      use.length > 0 ? `→ ${use.join(', ')}` : '',
+      avoid.length > 0 ? `(${t('agent.learn.not')} ${avoid.join(', ')})` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
+
+  function discardNote(cardId: number) {
+    setConvo((prev) => prev.filter((m) => m.id !== cardId))
+  }
+
+  async function muteNote(note: LearnedNote) {
+    setBusyNoteId(note.id)
+    try {
+      const updated = await toggleNote(note.id, !note.active)
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? updated : n)))
+    } catch (err) {
+      console.warn('failed to toggle rule', err)
+    } finally {
+      setBusyNoteId(null)
+    }
+  }
+
+  async function forgetNote(note: LearnedNote) {
+    setBusyNoteId(note.id)
+    try {
+      await deleteNote(note.id)
+      setNotes((prev) => prev.filter((n) => n.id !== note.id))
+    } catch (err) {
+      console.warn('failed to delete rule', err)
+    } finally {
+      setBusyNoteId(null)
+    }
+  }
+
   async function send(textOverride?: string) {
     const text = (textOverride ?? input).trim()
     if (!text || pending) return
+    if (teaching) return teach(text)
+    setNudge(null)
+    // Auto-detect: answer the question either way, but if the message reads
+    // like a rule, offer to learn it. Runs alongside the answer so it costs
+    // the coder nothing; a wrong guess is one dismissed chip.
+    if (mode === 'learn') {
+      void classifyIntent(text)
+        .then((r) => {
+          if (r.intent === 'teach') setNudge(text)
+        })
+        .catch(() => undefined)
+    }
     // The visible conversation IS the history — map to API roles.
-    const history: AgentChatTurn[] = convo.map((m) => ({
-      role: m.role === 'coder' ? 'user' : 'assistant',
-      content: m.text,
-    }))
+    const history: AgentChatTurn[] = convo
+      .filter((m) => m.text.trim() !== '')
+      .map((m) => ({
+        role: m.role === 'coder' ? 'user' : 'assistant',
+        content: m.text,
+      }))
     setInput('')
     setPending(true)
     sendingRef.current = true
@@ -246,6 +408,7 @@ export function AgentPage() {
         sources: reply.sources,
         unverifiedCodes: reply.unverifiedCodes,
         searchedSystem: reply.searchedSystem,
+        learnedNotes: reply.learnedNotes,
         time: now(),
       })
       void persistExchange(modeAtSend, text, reply)
@@ -268,6 +431,7 @@ export function AgentPage() {
             sources: reply.sources,
             unverifiedCodes: reply.unverifiedCodes,
             searchedSystem: reply.searchedSystem,
+            learnedNotes: reply.learnedNotes,
             time: now(),
           })
           void persistExchange(modeAtSend, text, reply)
@@ -467,7 +631,25 @@ export function AgentPage() {
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRulesOpen((o) => !o)}
+            title={t('agent.learn.rules')}
+            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold transition-all hover:opacity-90"
+            style={
+              rulesOpen
+                ? {
+                    background: `rgba(${gl.accentRgb},0.18)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.30)`,
+                    color: gl.accent,
+                  }
+                : { background: gl.inputBg, color: gl.muted, border: gl.borderSm }
+            }
+          >
+            <Brain size={13} />
+            {notes.filter((n) => n.active).length}
+          </button>
           {modeTabs.map((tab) => {
             const active = tab.id === mode
             return (
@@ -521,6 +703,69 @@ export function AgentPage() {
 
         {messages.map((m) => {
           const isAgent = m.role === 'agent'
+
+          // Teaching turns are cards, not bubbles: the draft the coder has to
+          // confirm, and the receipt once the rule is stored.
+          if (m.kind === 'note-draft' && m.note) {
+            return (
+              <div key={m.id} className="flex gap-3">
+                <div
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: gl.card,
+                    backdropFilter: gl.blur16,
+                    border: gl.border,
+                  }}
+                >
+                  <GraduationCap size={14} style={{ color: gl.accent }} />
+                </div>
+                <LearnedNoteCard
+                  note={m.note}
+                  saving={savingNote}
+                  onSave={(draft) => void confirmNote(m.id, draft)}
+                  onDiscard={() => discardNote(m.id)}
+                />
+              </div>
+            )
+          }
+
+          if (m.kind === 'note-saved' && m.note) {
+            return (
+              <div key={m.id} className="flex gap-3">
+                <div
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: `rgba(${gl.accentRgb},0.18)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.30)`,
+                  }}
+                >
+                  <GraduationCap size={14} style={{ color: gl.accent }} />
+                </div>
+                <div
+                  className="flex max-w-[68%] flex-col gap-1 px-4 py-3"
+                  style={{
+                    background: `rgba(${gl.accentRgb},0.10)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.28)`,
+                    borderRadius: '4px 18px 18px 18px',
+                  }}
+                >
+                  <span
+                    className="text-[12px] font-bold"
+                    style={{ color: gl.accent }}
+                  >
+                    ✓ {t('agent.learn.saved')}
+                  </span>
+                  <span className="text-[12px]" style={{ color: gl.text }}>
+                    {noteLine(m.note)}
+                  </span>
+                  <span className="text-[10px]" style={{ color: gl.muted }}>
+                    {t('agent.learn.savedHint')}
+                  </span>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <div
               key={m.id}
@@ -574,6 +819,30 @@ export function AgentPage() {
                 >
                   <RichText text={m.text} />
                 </div>
+
+                {m.learnedNotes && m.learnedNotes.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {m.learnedNotes.map((n) => (
+                      <span
+                        key={n.id}
+                        className="rounded-xl px-3 py-1.5 text-[11px] leading-relaxed"
+                        style={{
+                          background: `rgba(${gl.accentRgb},0.10)`,
+                          border: `1px solid rgba(${gl.accentRgb},0.24)`,
+                          color: gl.text,
+                        }}
+                        title={n.via}
+                      >
+                        💡 <strong>{t('agent.learn.applies')}</strong>{' '}
+                        {n.summary}
+                        <span style={{ color: gl.muted }}>
+                          {' '}
+                          — {n.created_by || t('agent.learn.aCoder')}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {m.sources && m.sources.length > 0 && (
                   <span
@@ -671,6 +940,49 @@ export function AgentPage() {
         }}
       >
       <div className="relative shrink-0 px-6 pt-3 pb-3">
+        {nudge && !teaching && (
+          <div
+            className="mb-2 flex items-center gap-2 rounded-2xl px-3.5 py-2"
+            style={{
+              background: `rgba(${gl.accentRgb},0.10)`,
+              border: `1px solid rgba(${gl.accentRgb},0.26)`,
+            }}
+            role="note"
+          >
+            <GraduationCap
+              size={13}
+              className="shrink-0"
+              style={{ color: gl.accent }}
+            />
+            <span className="text-[11px]" style={{ color: gl.text }}>
+              {t('agent.learn.nudge')}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const text = nudge
+                setNudge(null)
+                void teach(text)
+              }}
+              className="ml-auto shrink-0 rounded-xl px-3 py-1 text-[11px] font-bold transition-all hover:opacity-90"
+              style={{
+                background: gl.accentGrad,
+                color: gl.isDark ? '#1a0a00' : '#fff',
+              }}
+            >
+              {t('agent.learn.nudge.yes')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setNudge(null)}
+              className="shrink-0 rounded-xl px-2.5 py-1 text-[11px] font-medium transition-all hover:opacity-80"
+              style={{ color: gl.muted }}
+            >
+              {t('agent.learn.nudge.no')}
+            </button>
+          </div>
+        )}
+
         {showSuggestions && (
           <div
             className="absolute inset-x-6 bottom-full z-10 mb-2 flex flex-wrap gap-2 rounded-2xl p-3"
@@ -682,7 +994,7 @@ export function AgentPage() {
               boxShadow: gl.shadow,
             }}
           >
-            {CHIP_KEYS[mode].map((key) => {
+            {(teaching ? TEACH_CHIP_KEYS : CHIP_KEYS[mode]).map((key) => {
               const p = t(key)
               return (
                 <button
@@ -713,8 +1025,12 @@ export function AgentPage() {
           style={{
             background: gl.card,
             backdropFilter: gl.blur20,
-            border: gl.border,
-            boxShadow: gl.shadow,
+            // Teaching writes to the knowledge layer, asking does not — the
+            // composer has to look different while it is armed.
+            border: teaching ? `1.5px solid ${gl.accent}` : gl.border,
+            boxShadow: teaching
+              ? `0 2px 16px rgba(${gl.accentRgb},0.28)`
+              : gl.shadow,
           }}
         >
           <div
@@ -724,8 +1040,23 @@ export function AgentPage() {
               border: `1px solid rgba(${gl.accentRgb},0.32)`,
             }}
           >
-            <User size={12} style={{ color: gl.accent }} />
+            {teaching ? (
+              <GraduationCap size={12} style={{ color: gl.accent }} />
+            ) : (
+              <User size={12} style={{ color: gl.accent }} />
+            )}
           </div>
+          {teaching && (
+            <span
+              className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wider"
+              style={{
+                background: `rgba(${gl.accentRgb},0.18)`,
+                color: gl.accent,
+              }}
+            >
+              {t('agent.learn.teaching')}
+            </span>
+          )}
           <textarea
             aria-label="Message the AI agent"
             value={input}
@@ -736,11 +1067,44 @@ export function AgentPage() {
                 void send()
               }
             }}
-            placeholder={t(`agent.placeholder.${mode}`)}
+            placeholder={
+              teaching ? t('agent.learn.placeholder') : t(`agent.placeholder.${mode}`)
+            }
             rows={1}
             className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none"
             style={{ color: gl.text }}
           />
+          <button
+            type="button"
+            aria-label={t('agent.learn.teach')}
+            aria-pressed={teaching}
+            title={t('agent.learn.teach.hint')}
+            onClick={() => {
+              const next = !teaching
+              setTeaching(next)
+              setNudge(null)
+              // Teaching belongs to the Suggest & Learn tab, so the tab
+              // follows the composer — but switchMode() clears the chat, and
+              // pressing Teach must never cost the coder their conversation.
+              if (next && mode !== 'learn') setMode('learn')
+            }}
+            className="flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[11px] font-bold transition-all hover:opacity-80"
+            style={
+              teaching
+                ? {
+                    background: gl.accentGrad,
+                    color: gl.isDark ? '#1a0a00' : '#fff',
+                  }
+                : {
+                    background: gl.row,
+                    border: gl.borderSm,
+                    color: gl.muted,
+                  }
+            }
+          >
+            <GraduationCap size={13} />
+            {t('agent.learn.teach')}
+          </button>
           <button
             type="button"
             aria-label="Toggle suggested questions"
@@ -814,6 +1178,17 @@ export function AgentPage() {
       </div>
       </div>
       </div>
+
+      {rulesOpen && (
+        <LearnedRulesPanel
+          notes={notes}
+          loading={notesLoading}
+          busyId={busyNoteId}
+          onToggle={(n) => void muteNote(n)}
+          onDelete={(n) => void forgetNote(n)}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
     </main>
   )
 }

@@ -94,11 +94,32 @@ export interface SuggestedCode {
   source?: string
 }
 
-export async function suggestCodes(caseId: string): Promise<SuggestedCode[]> {
-  const { data } = await apiClient.post<{ codes: SuggestedCode[] }>(
-    `/cases/${encodeURIComponent(caseId)}/suggest-codes`,
-  )
-  return data.codes ?? []
+/**
+ * A rule a coder taught the agent (Suggest & Learn) that matches this case.
+ * Shown as a callout above the AI suggestions — the hospital's own guidance
+ * outranks whatever the reference PDFs say around it.
+ */
+export interface SuggestedNote {
+  id: string
+  summary: string
+  scenario: string
+  rule: string
+  codes: { code: string; system: string; description: string; role: string }[]
+  createdBy: string
+  via: string
+}
+
+export interface CaseSuggestion {
+  codes: SuggestedCode[]
+  notes: SuggestedNote[]
+}
+
+export async function suggestCodes(caseId: string): Promise<CaseSuggestion> {
+  const { data } = await apiClient.post<{
+    codes: SuggestedCode[]
+    notes?: SuggestedNote[]
+  }>(`/cases/${encodeURIComponent(caseId)}/suggest-codes`)
+  return { codes: data.codes ?? [], notes: data.notes ?? [] }
 }
 
 /** One row from GET /api/icd-codes (catalog typeahead). */
