@@ -437,7 +437,28 @@ Query params:
   "coverageCounts": [ {"label": "OFC", "count": 5}, … ],
   "topCodes": [ {"label": "D17.1 · lipoma at back", "count": 2,
                  "code": "D17.1", "system": "ICD-10",
-                 "description": "lipoma at back"}, … ]
+                 "description": "lipoma at back"}, … ],
+  "documentationGaps": {
+    "items": [ {"key": "icd10", "label": "ICD-10 diagnosis codes", "count": 16}, … ],
+    "byGroup": [ {"label": "Cardiovascular", "incomplete": 4, "total": 6}, … ]
+  },
+  "codingActivity": [ {"iso": "2026-07-22T00:00:00", "approved": 2, "coded": 3, "reopened": 0}, … ],
+  "turnaround": {"medianMinutes": 95, "p90Minutes": 480, "cases": 5},
+  "codingDepth": {
+    "uncoded": 3,
+    "avgCodesPerCase": 2.2,
+    "distribution": [ {"bucket": "0", "cases": 3}, {"bucket": "1", "cases": 8},
+                      {"bucket": "2", "cases": 4}, {"bucket": "3-5", "cases": 5},
+                      {"bucket": "6+", "cases": 1} ],
+    "roleMix": [ {"role": "principal_diagnosis", "label": "Principal diagnosis", "count": 18}, … ]
+  },
+  "caseMix": {
+    "groups": [ {"label": "Cardiovascular", "low": 4, "medium": 1, "high": 1,
+                 "other": 0, "total": 6}, … ],
+    "sex": [ {"label": "female", "count": 12}, {"label": "male", "count": 9} ],
+    "age": [ {"label": "0-14", "count": 2}, {"label": "15-39", "count": 5},
+             {"label": "40-59", "count": 6}, {"label": "60+", "count": 8} ]
+  }
 }
 ```
 
@@ -462,6 +483,40 @@ Query params:
   falling back to the bare code when the catalog has no description;
   `code`/`system`/`description` are the same values unjoined, so a client can
   relabel without parsing.
+
+The five keys added 2026-08-20 (the Analytics-v2 cards; everything above is
+the original four-card payload, unchanged):
+
+- **`documentationGaps`** — what incomplete cases are missing. `items` counts
+  incomplete OPD cases per missing item (a case missing two things counts in
+  both rows); `key` is the raw `missing_detail` token (`icd10` / `icd9` under
+  the 2026-08-05 completeness rule, documentation keys on rows synced before
+  it), `label` the same human wording the case list's `missing` field uses —
+  an unknown key serves raw rather than being dropped. `byGroup` is incomplete
+  vs total per disease group, most incomplete first; the blank group reads
+  `Ungrouped`.
+- **`codingActivity`** — coder actions per day from the audit trail
+  (`coding_history`), same `days` window and zero-fill contract as
+  `casesOverTime`, dated by when the action happened (NOT the visit date).
+  `approved` counts the three approve variants as one; `coded` is
+  `code_assigned`; `reopened` is `reopened`.
+- **`turnaround`** — sync-to-**first**-approval time over every OPD case with
+  both events (a reopened-and-re-approved case keeps its original figure).
+  `medianMinutes` / `p90Minutes` are whole minutes, both `null` with
+  `cases: 0` until something has been approved.
+- **`codingDepth`** — `distribution` buckets every OPD case by how many
+  `case_codes` rows it carries: always exactly the five buckets `0` / `1` /
+  `2` / `3-5` / `6+`, in that order, zero-filled. `uncoded` is the `0`
+  bucket's count (the needs-coding backlog), `avgCodesPerCase` averages over
+  all OPD cases (uncoded included; null only when there are no cases at all),
+  and `roleMix` counts code rows per `code_role`, biggest first, with a
+  display `label` per role.
+- **`caseMix`** — the [POC] disease-group × severity table, every group,
+  biggest first (the client decides how many rows fit); `other` catches
+  severity values outside low/medium/high so `low + medium + high + other =
+  total` always holds. `sex` and `age` are visit counts by patient sex (blank
+  → `unspecified`) and by age band (`0-14` / `15-39` / `40-59` / `60+`, age
+  from `birthdate` as of today; rows with no birthdate are absent).
 
 `400 {"error": "days must be between 1 and 365"}` /
 `{"error": "topCodes must be between 1 and 50"}` outside those bounds.

@@ -38,7 +38,8 @@ public class CasesViewService {
     // views.py:89 MISSING_LABEL — missing-field key -> human label
     private static final Map<String, String> MISSING_LABEL = missingLabels();
 
-    private static Map<String, String> missingLabels() {
+    /** Package-visible: AnalyticsService labels the same keys the same way. */
+    static Map<String, String> missingLabels() {
         Map<String, String> m = new LinkedHashMap<>();
         // 2026-08-05 rule: complete = hospital data arrived already coded
         m.put("icd10", "ICD-10 diagnosis codes");

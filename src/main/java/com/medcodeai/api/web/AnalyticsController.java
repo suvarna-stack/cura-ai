@@ -49,7 +49,16 @@ public class AnalyticsController {
                     + "- `coverageCounts` — visits per สิทธิการรักษา scheme family (UCS / OFC / "
                     + "WEL / …), biggest first; blank coverage groups under `ไม่ระบุสิทธิ`.\n"
                     + "- `topCodes` — most-assigned codes across both catalogs, counting "
-                    + "imported-from-iMed and coder-assigned rows alike.\n\n"
+                    + "imported-from-iMed and coder-assigned rows alike.\n"
+                    + "- `documentationGaps` — what incomplete cases are missing, per item and "
+                    + "per disease group (incomplete vs total).\n"
+                    + "- `codingActivity` — approve / code-assign / reopen actions per day from "
+                    + "the audit trail, same `days` window, zero-filled.\n"
+                    + "- `turnaround` — sync-to-first-approval median and p90 in minutes; both "
+                    + "null with `cases: 0` until something is approved.\n"
+                    + "- `codingDepth` — codes-per-case distribution (buckets 0 / 1 / 2 / 3-5 / "
+                    + "6+), the uncoded backlog, the average, and the code-role mix.\n"
+                    + "- `caseMix` — disease group × severity, plus sex and age-band splits.\n\n"
                     + "`days` defaults to 30 (max 365), `topCodes` to 10 (max 50).")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = """

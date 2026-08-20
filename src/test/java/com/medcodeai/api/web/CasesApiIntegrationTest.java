@@ -665,6 +665,75 @@ class CasesApiIntegrationTest {
                 .andExpect(jsonPath("$.error").value("unauthorized"));
     }
 
+    @Test
+    void analyticsServesTheV2CardsWithTheirInvariants() throws Exception {
+        // The 2026-08-20 additions to GET /api/analytics. Assertions are the
+        // contract's dataset-independent invariants, so this passes on any
+        // seeded state — including a fresh empty-start-state demo baseline.
+        JsonNode root = getJson("/api/analytics");
+        for (String key : List.of("documentationGaps", "codingActivity", "turnaround",
+                "codingDepth", "caseMix")) {
+            assertTrue(root.has(key), "missing analytics key: " + key);
+        }
+
+        // codingActivity: same window/zero-fill contract as casesOverTime
+        assertEquals(root.get("casesOverTime").size(), root.get("codingActivity").size(),
+                "codingActivity must cover the same days window as casesOverTime");
+        for (JsonNode p : root.get("codingActivity")) {
+            assertTrue(p.get("iso").asString().endsWith("T00:00:00"));
+            assertTrue(p.get("approved").asLong() >= 0);
+            assertTrue(p.get("coded").asLong() >= 0);
+            assertTrue(p.get("reopened").asLong() >= 0);
+        }
+
+        // turnaround: both percentiles null exactly while cases = 0
+        JsonNode ta = root.get("turnaround");
+        if (ta.get("cases").asLong() == 0) {
+            assertTrue(ta.get("medianMinutes").isNull(), "median must be null with no approvals");
+            assertTrue(ta.get("p90Minutes").isNull(), "p90 must be null with no approvals");
+        } else {
+            assertTrue(ta.get("medianMinutes").asLong() >= 0);
+            assertTrue(ta.get("p90Minutes").asLong() >= ta.get("medianMinutes").asLong(),
+                    "p90 can never sit below the median");
+        }
+
+        // codingDepth: always exactly the five buckets, in order; uncoded IS
+        // the "0" bucket's count
+        JsonNode depth = root.get("codingDepth");
+        List<String> buckets = new ArrayList<>();
+        for (JsonNode b : depth.get("distribution")) {
+            buckets.add(b.get("bucket").asString());
+        }
+        assertEquals(List.of("0", "1", "2", "3-5", "6+"), buckets);
+        assertEquals(depth.get("distribution").get(0).get("cases").asLong(),
+                depth.get("uncoded").asLong(), "uncoded must equal the 0 bucket");
+
+        // caseMix: every group row reconciles — low+medium+high+other = total
+        for (JsonNode g : root.get("caseMix").get("groups")) {
+            assertEquals(g.get("total").asLong(),
+                    g.get("low").asLong() + g.get("medium").asLong()
+                            + g.get("high").asLong() + g.get("other").asLong(),
+                    "severity split must add up for group " + g.get("label").asString());
+        }
+
+        // documentationGaps: labeled items, each counting at least one case
+        for (JsonNode item : root.get("documentationGaps").get("items")) {
+            assertFalse(item.get("label").asString().isBlank());
+            assertTrue(item.get("count").asLong() >= 1);
+        }
+        for (JsonNode grp : root.get("documentationGaps").get("byGroup")) {
+            assertTrue(grp.get("incomplete").asLong() <= grp.get("total").asLong(),
+                    "a group can never have more incomplete cases than cases");
+        }
+    }
+
+    @Test
+    void analyticsRequiresAToken() throws Exception {
+        mvc.perform(get("/api/analytics"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("unauthorized"));
+    }
+
     private JsonNode postJson(String url) throws Exception {
         String body = mvc.perform(post(url).header("Authorization", auth()))
                 .andExpect(status().isOk())
