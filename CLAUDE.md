@@ -783,16 +783,42 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   spec from the controller annotations, so nothing else notices a new route.
   When it fails, the fix is to document the endpoint in `docs/api-contract.md`
   + `docs/types.ts` and *then* add the path, not to add the path alone.
-- The seed dumps are the frozen demo baseline — regenerating them requires
-  the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
-  build output.
+- **The seed dumps are the demo-start baseline, and they are NOT frozen**
+  (corrected 2026-08-21 — the old "regenerating needs the retired POC pipeline"
+  rule is what let them drift a month behind the working local databases, so
+  Docker booted 1150 stale April-2026 cases while the demo ran on 21 July-2026
+  visits). `db/seed.sql.gz` is data, not build output, but it is also the only
+  hospital/medcode data Docker ever sees — `medcode-stack` bind-mounts both
+  dumps into Postgres initdb. Change the demo data, regenerate the dump.
+  Ours holds schema + `coverage_types` + the `icd_10`/`icd_9` catalogs, with
+  every case table, `auth_sessions` AND `users` empty — that emptiness is what
+  makes the dashboard start empty, and an empty `users` is deliberate: it lets
+  `AdminBootstrap` create the admin from `ADMIN_BOOTSTRAP_EMAIL` /
+  `ADMIN_BOOTSTRAP_PASSWORD` at first boot. **Never ship an admin row in the
+  dump** — `AdminBootstrap` returns early once any admin exists, so a baked-in
+  hash would silently override the env password in prod. Take the dump from a
+  database already at demo start:
+
+  ```bash
+  psql -d medcode -c 'TRUNCATE cases, case_codes, case_code_edits, case_orders,
+      case_report_sections, case_vitals, coding_history, document_chunks,
+      imed_write_ops, knowledge_base, auth_sessions, users'
+  # then reset each serial with setval(..., 1, false)
+  pg_dump -d medcode -n public --no-owner --no-privileges \
+    -T public.flyway_schema_history | gzip -9 > db/seed.sql.gz
+  ```
+
+  Exclude `flyway_schema_history`, or `baseline-on-migrate` won't adopt the dump
+  as version 0 and replay V1–V6. `-n public` also leaves the `demo_baseline`
+  snapshot schema out. The hospital side has the same rule and its own recipe
+  in `../imed-mock-api/README.md` § *Regenerating the dump*.
 - The sibling `imed` database keeps every table in a schema named **`imed`**,
-  not `public` (a leftover from the pre-split single-database era, frozen into
-  its dump). Doesn't affect us — we only reach it over HTTP — but two things
-  follow for M7: the hospital-side SQL must stay schema-qualified, and
-  provisioning needs `GRANT USAGE ON SCHEMA imed` for any non-owner app role
-  or it fails with "permission denied for schema imed". Details in
-  `../imed-mock-api/README.md`.
+  not `public` (a leftover from the pre-split single-database era; the dump is
+  taken with `pg_dump -n imed`, so it carries the schema along). Doesn't affect
+  us — we only reach it over HTTP — but two things follow for M7: the
+  hospital-side SQL must stay schema-qualified, and provisioning needs
+  `GRANT USAGE ON SCHEMA imed` for any non-owner app role, or it fails with
+  "permission denied for schema imed". Details in `../imed-mock-api/README.md`.
 - **Schema changes go in ONE place: a new `src/main/resources/db/migrations/
   V<n>__<name>.sql` file** (Flyway, since 2026-08-20). Never also write the DDL
   in Java — that duplication is exactly what drifted for a year. The seed dump is

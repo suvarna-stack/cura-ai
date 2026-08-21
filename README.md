@@ -56,9 +56,15 @@ runbook for all four, on every OS, is `RUN-ALL.md`.
 
 Good to know:
 
-- `db/seed.sql.gz` is the frozen demo baseline (real sample data, dumped once
-  from the original POC pipeline). Restoring is plain `psql` — no Python, no
-  venv, no other repos or downloads needed.
+- `db/seed.sql.gz` is the demo-start baseline (real sample data). Restoring is
+  plain `psql` — no Python, no venv, no other repos or downloads needed. It
+  holds the schema plus `coverage_types` and the ICD catalogs; every case table
+  is EMPTY, which is what makes the dashboard start empty, and so is `users` —
+  the admin is created on first boot from `ADMIN_BOOTSTRAP_EMAIL` /
+  `ADMIN_BOOTSTRAP_PASSWORD` (defaults `admin@medcodeai.demo` / `admin1234`).
+  It is data, but **not frozen**: it is also the only data the Docker stack
+  boots from, so demo-data changes have to be dumped back into it. See
+  `CLAUDE.md` for the `pg_dump` recipe.
 - **Re-running a seed script wipes that database back to the baseline** —
   handy reset, but it discards local approvals/edits.
 - Java 21 required; `./mvnw` fetches Maven itself.
