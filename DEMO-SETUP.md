@@ -15,7 +15,7 @@ Three services + one React frontend, two Postgres databases:
 | Audit chart frontend (React/Vite) | `audit-chart-frontend` | 5173 | — |
 
 Demo flow: the webapp opens EMPTY → **Sync** pulls the hospital's ICD catalogs
-(650 ICD-10 + 332 ICD-9) and 21 OPD cases into medcode, 5 of them already
+(650 ICD-10 + 332 ICD-9) and 100 OPD cases into medcode, 50 of them already
 complete → the coder codes a case (AI suggestions from RAG) → **Approve** writes
 the codes + a medical discharge back to the hospital DB over
 `POST /api/v1/diagnosis` → **Settings → Reset** restores BOTH databases to the
@@ -107,9 +107,14 @@ Health checks: `http://localhost:8003/api/health`, `:8001/api/health` →
 1. Open `http://localhost:5173`, log in `admin@medcodeai.demo` / `admin1234`
    (coder accounts Austin / Pablo / Frank exist with their own passwords).
 2. Dashboard is EMPTY — correct; that's the demo opening.
-3. Click **Sync**. Expect: **total 21 · complete 6 · incomplete 15**
-   (medicine 5, ct-x-ray 4, other 3, surgery 3) and both ICD catalogs filled
-   on the medcode side.
+   (The **Finished** queue also starts empty and stays empty until step 5.
+   20 of the synced visits do carry `coding_status='approved'` from the
+   hospital, but medcode seeds every synced case as `open` on purpose —
+   workflow state is coder-owned — so they sit in *complete*, not *finished*.)
+3. Click **Sync**. Expect: **total 100 · complete 50 · incomplete 50**
+   (medicine 39, ct-x-ray 5, other 4, surgery 2) and both ICD catalogs filled
+   on the medcode side. The hospital also ships 10 IPD admissions; those are
+   deliberately absent from the dashboard, which serves OPD only.
 4. Open a case → AI suggestions appear (needs RAG on :8000; without it the
    code columns just stay empty — the demo still works, minus suggestions).
 5. Add/edit codes → **Approve** → the case moves to Finished, and on the
