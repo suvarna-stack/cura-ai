@@ -280,7 +280,7 @@ npm run dev
 
 1. เปิด <http://localhost:5173> ล็อกอินด้วยบัญชี admin ข้างบน
 2. Dashboard **ว่าง** — ถูกต้อง นี่คือจุดเริ่มเดโม
-3. กด **Sync** → ควรได้ **total 21 · complete 6 · incomplete 15** พร้อมดึง
+3. กด **Sync** → ควรได้ **total 100 · complete 50 · incomplete 50** พร้อมดึง
    ICD catalog (ICD-10 649 รหัส / ICD-9 332 รหัส) เข้ามา
 4. เปิดเคสหนึ่ง → มี AI suggestion โผล่ (ถ้าไม่มี RAG ช่องนี้จะว่าง แต่ที่เหลือใช้ได้ปกติ)
 5. เพิ่ม/แก้รหัส → **Approve** → เคสย้ายไป Finished และฝั่งโรงพยาบาลมีแถวใหม่
