@@ -165,9 +165,13 @@ scripts/seed_local_imed_pg.sh     # creates + seeds db "imed" from db/seed.sql.g
 
 Good to know:
 
-- `db/seed.sql.gz` is the frozen demo baseline — real hospital sample
-  extracts (73k rows across 11 tables), dumped once from the original POC
-  pipeline. Restoring is plain `psql`; no Python anywhere.
+- `db/seed.sql.gz` is the demo-start baseline — real hospital sample extracts,
+  **21 visits across the 10 `imed.medhack_*` tables**. Restoring is plain
+  `psql`; no Python anywhere. It is data, but it is **not frozen**: regenerate
+  it with `pg_dump` from a local `imed` that is already at demo start (see
+  *Regenerating the dump* below). The catalogs (`icd_10`, `icd_9`) and the
+  write-surface tables (`imed_request_log`, `doctor_discharge_*`) are NOT in
+  the dump — the Flyway migrations own those.
 - **Re-running the seed script wipes the database back to the baseline**
   (any coding results written by medcode-api are discarded).
 - The full stack needs the sibling repo `../medcode-api` too — see its README
@@ -182,9 +186,10 @@ Every table lives in a schema named **`imed`**, inside a database also named
 
 That is history, not design: the hospital extracts and medcode's own tables
 once shared a single database, where the `imed` schema kept the two apart.
-The 2026-07-22 repo split gave this side its own database, but `db/seed.sql.gz`
-is frozen baseline data (regenerating it needs the retired POC pipeline), so
-the dump's `CREATE SCHEMA imed` came along unchanged.
+The 2026-07-22 repo split gave this side its own database, but the dump is
+still taken with `pg_dump -n imed`, so its `CREATE SCHEMA imed` comes along
+unchanged — and renaming the schema now would be a migration across every
+statement in `repo/` for no gain.
 
 Consequences, all of them ordinary once you know:
 
@@ -215,9 +220,9 @@ Consequences, all of them ordinary once you know:
 
 ## Schema changes
 
-Everything the `/api/v1` write surface needs on top of the frozen extract dump
-lives in `src/main/resources/db/migrations/V*.sql` and is applied by **Flyway**
-at startup, into the `imed` schema. Pull and boot:
+Everything the `/api/v1` write surface needs on top of the extract dump lives in
+`src/main/resources/db/migrations/V*.sql` and is applied by **Flyway** at
+startup, into the `imed` schema. Pull and boot:
 
 ```bash
 git pull
@@ -249,6 +254,62 @@ history table, so booting the app replays the lot from version 0.
 DDL in Java. Until 2026-08-20 every statement lived in `config/SchemaBootstrap`
 AND in a `db/migrations` file that nothing ran; on the medcode side the same
 duplication silently cost two tables their foreign keys.
+
+## Regenerating the dump
+
+`db/seed.sql.gz` is the **only** source of hospital data Docker boots from
+(`medcode-stack/docker-compose.yml` bind-mounts it into the Postgres container's
+initdb), and `scripts/seed_local_imed_pg.sh` restores the same file locally. So
+when the demo data changes, it changes *here* — a database edited only in place
+reaches nobody else. That is exactly how the dump drifted a month behind the
+working local database before 2026-08-21.
+
+Regenerate from a local `imed` that is already at **demo start** — 21 visits, no
+approvals written back:
+
+```bash
+pg_dump -d imed -n imed --no-owner --no-privileges \
+  -T imed.flyway_schema_history \
+  -T imed.icd_10 -T imed.icd_9 \
+  -T imed.imed_request_log \
+  -T imed.doctor_discharge_opd -T imed.doctor_discharge_ipd \
+  | gzip -9 > db/seed.sql.gz
+```
+
+Why each exclusion:
+
+- **`flyway_schema_history`** — the dump must stay version 0 so
+  `baseline-on-migrate` adopts it and replays V1–V6. Ship the history table and
+  Flyway thinks the work is already done.
+- **`icd_10` / `icd_9` / `imed_request_log` / `doctor_discharge_*`** — created by
+  V1/V2 and filled by V6. The dump is the frozen hospital *extract*; everything
+  we added since belongs to the migrations.
+- **the `imed_baseline` schema** — a runtime snapshot taken by
+  `POST /api/demo/snapshot`, not seed data. `-n imed` already leaves it out.
+
+If the source database has served a demo, strip the write-back rows first — our
+own mock generates them, and they are not hospital data — and un-cancel any SEED
+row an approve/reopen cycle knocked out:
+
+```sql
+DELETE FROM imed.medhack_diagnosis_icd10 WHERE id !~ '^[0-9]+$';  -- DX10-*
+DELETE FROM imed.medhack_procedure_icd9  WHERE id !~ '^[0-9]+$';  -- PX9-*
+UPDATE imed.medhack_patient       SET coding_status = NULL;
+UPDATE imed.medhack_procedure_icd9  SET is_cancelled = NULL WHERE id ~ '^[0-9]+$';
+UPDATE imed.medhack_diagnosis_icd10 SET is_cancelled = NULL WHERE id ~ '^[0-9]+$';
+```
+
+The numeric-id rows are the hospital's own extract; only `DX10-*`/`PX9-*` are
+ours. That last pair matters: a cancelled seed procedure silently costs the demo
+a complete case, which is exactly what happened to `86.3` on visit
+`…813401900901` before 2026-08-21.
+
+Then verify a clean boot before committing: restore into a scratch database, run
+the six migrations, and check the counts — **21 patients, 5 active ICD-10, 6
+active ICD-9, 191 medical records, catalogs 650/332, and 5 visits carrying both
+codes** (those become the 5 complete cases after a Sync). Cross-check against
+`db-backups/imed_demo_ready_2026-08-02.dump`, which is the same demo start
+minus the V4 diagnoses.
 
 ## Environment variables
 
