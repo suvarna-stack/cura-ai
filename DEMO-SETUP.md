@@ -15,11 +15,17 @@ Three services + one React frontend, two Postgres databases:
 | Audit chart frontend (React/Vite) | `audit-chart-frontend` | 5173 | — |
 
 Demo flow: the webapp opens EMPTY → **Sync** pulls the hospital's ICD catalogs
-(649 ICD-10 + 332 ICD-9) and 21 uncoded OPD cases into medcode → the coder
-codes a case (AI suggestions from RAG) → **Approve** writes the codes + a
-medical discharge back to the hospital DB over `POST /api/v1/diagnosis` →
-**Settings → Reset** restores BOTH databases to the frozen demo baseline.
-Repeatable forever.
+(650 ICD-10 + 332 ICD-9) and 21 OPD cases into medcode, 5 of them already
+complete → the coder codes a case (AI suggestions from RAG) → **Approve** writes
+the codes + a medical discharge back to the hospital DB over
+`POST /api/v1/diagnosis` → **Settings → Reset** restores BOTH databases to the
+demo baseline. Repeatable forever.
+
+**Take the baseline snapshot first.** Reset restores to a snapshot, and a
+freshly seeded database has none — so it answers *409 no demo baseline* until
+you capture one. Right after seeding and **before** the first Sync, call
+`POST /api/demo/snapshot` on medcode-api (:8001). This is easy to miss on a
+brand-new Docker stack, where every database starts empty.
 
 ## Prerequisites
 
