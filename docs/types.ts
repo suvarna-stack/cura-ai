@@ -236,10 +236,15 @@ export interface DetailOrderRow {
   order_name: string | null;
   ordered_at: string | null;
   /** The raw hospital order row (order_detail JSONB) verbatim. Keys differ
-   *  per imed_source: drugs carry dosagesignature / dosageinstruction /
+   *  per imed_source: drugs carry dosage_signature / dosage_instruction /
    *  quantity (raw integer text, negative on return/credit rows), lab rows
-   *  carry panelname / itemname / itemvalue / itemuom, procedures carry
-   *  start/enddatetime… Null when sync stored no source row. */
+   *  carry panel_name / item_name / value / unit, procedures carry
+   *  operation_start / operation_end… Null when sync stored no source row.
+   *
+   *  These are the HOSPITAL's field names, so they changed when the R1-R6
+   *  case-data contract landed (2026-08-19). Rows synced before that still
+   *  hold the old extract names (panelname / itemname / itemvalue / itemuom)
+   *  until the case is re-synced, so consumers should read new-or-old. */
   detail: Record<string, string | null> | null;
 }
 

@@ -1,10 +1,15 @@
--- Agent chat history (2026-08-20): the coder AI Agent page keeps its
--- conversations server-side now — per user, survives refresh and re-login.
--- The RAG call itself stays stateless (history is still re-sent per request);
--- these tables are only the browsing/persistence layer.
+-- V7 — agent chat history (2026-08-20)
 --
--- Also applied idempotently at startup by SchemaBootstrap (the seed dump
--- predates this feature), like every other migration here.
+-- The coder AI Agent page keeps its conversations server-side — per user,
+-- surviving refresh and re-login. The RAG call itself stays stateless (history
+-- is still re-sent per request); these tables are only the browsing and
+-- persistence layer.
+--
+-- Arrived on main as db/migrations/0006_agent_chat_history.sql plus a
+-- SchemaBootstrap.agentChatTables() copy of the same statements — the last
+-- instance of the Java/SQL mirror this branch removes. The Java half is gone;
+-- this file is now the only definition. IF NOT EXISTS keeps it a no-op on
+-- databases where that startup code already created the tables.
 
 CREATE TABLE IF NOT EXISTS agent_conversations (
     conversation_id serial PRIMARY KEY,

@@ -10,6 +10,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -18,9 +19,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Inbound sync: pull the hospital's case data (ImedApiClient read endpoints) and
- * load it into medcode's DB. Port of the retired Python sync/sync.py, reshaped
- * to be NON-DESTRUCTIVE so it is safe to re-run against a live working DB:
+ * Inbound sync: pull the hospital's case data over the R1-R6 contract
+ * (ImedApiClient) and load it into medcode's DB. Port of the retired Python
+ * sync/sync.py, reshaped to be NON-DESTRUCTIVE so it is safe to re-run against
+ * a live working DB:
  *
  *   - new case (unknown to medcode)  → full import
  *   - existing OPEN case             → refresh hospital-sourced rows only
@@ -37,6 +39,17 @@ import java.util.Set;
  * lock (one writer), each case commits in its own transaction so a single bad
  * case doesn't roll back the batch, and the cases cache is invalidated once at
  * the end. Sync is READ-ONLY toward the hospital — no write-back calls.
+ *
+ * How the cases are FETCHED changed with the contract (2026-08-19). There is no
+ * "download everything" endpoint by design — every read is bounded by a
+ * timestamp, an id list, or a date window:
+ *
+ *   - windowed sync → R3 per <= 31-day chunk (long windows are split here)
+ *   - unwindowed    → R1 from the epoch for the id list, then R2 in <= 20-id
+ *                     batches; "everything" is just a very old timestamp
+ *
+ * Every run is preceded by the R6 contract check, so a hospital-side field
+ * change stops the sync before any data is touched rather than half-importing.
  */
 @Service
 public class SyncService {
@@ -64,6 +77,30 @@ public class SyncService {
         this.tx = new TransactionTemplate(txManager);
     }
 
+    /**
+     * The block.field names this service reads, sent to R6 before every run.
+     * Anything listed here is load-bearing: if the hospital stops serving it,
+     * the sync must stop rather than quietly write nulls. Fields we merely
+     * pass through (the raw order rows kept as order_detail JSONB) are NOT
+     * listed — losing one of those degrades a display, it doesn't corrupt data.
+     */
+    static final List<String> REQUIRED_FIELDS = List.of(
+            "visit.visit_id", "visit.admission_number", "visit.encounter_type", "visit.sex",
+            "visit.birth_date", "visit.age_year", "visit.is_pregnant",
+            "visit.admission_datetime", "visit.discharge_datetime", "visit.discharge_type",
+            "visit.discharge_status", "visit.health_coverage", "visit.department", "visit.ward",
+            "documents.document_type", "documents.section_name", "documents.text",
+            "documents.recorded_at",
+            "diagnoses.object_id", "diagnoses.icd10_code", "diagnoses.description",
+            "diagnoses.diagnosis_type",
+            "procedures.object_id", "procedures.icd9_code", "procedures.description",
+            "procedures.operation_type", "procedures.operation_start", "procedures.operation_end",
+            "vitals.measured_at", "vitals.temperature", "vitals.systolic", "vitals.diastolic",
+            "vitals.heart_rate", "vitals.oxygen_saturation", "vitals.weight", "vitals.height");
+
+    /** R1's bound when the caller wants everything: older than any real visit. */
+    private static final String EPOCH = "1970-01-01T00:00:00";
+
     /** Sync every case the hospital currently exposes. */
     public Map<String, Object> syncAll() {
         return syncAll(null, null);
@@ -71,13 +108,15 @@ public class SyncService {
 
     /**
      * Sync only the cases whose VISIT datetime falls in [from, to] — the
-     * hospital resolves a visit's datetime (admissiondatetime, else the
-     * datetime encoded in the transaction number) and filters its list
-     * server-side; a null bound leaves that side open. Same non-destructive
-     * per-case rules either way.
+     * hospital resolves a visit's datetime (admission_datetime, else the
+     * datetime encoded in the visit id) and filters server-side; a null bound
+     * leaves that side open. Same non-destructive per-case rules either way.
      */
     public Map<String, Object> syncAll(String from, String to) {
-        Map<String, Object> out = run(imed.cases(from, to));
+        preflight();
+        Map<String, Object> out = run(from == null && to == null
+                ? fetchAll()
+                : fetchWindow(from, to));
         if (from != null || to != null) {
             Map<String, Object> window = new LinkedHashMap<>();
             window.put("from", from);
@@ -87,22 +126,103 @@ public class SyncService {
         return out;
     }
 
-    /** Sync one case; 404 when the hospital doesn't expose that transaction number. */
+    /** Sync one case; 404 when the hospital doesn't expose that visit id. */
     public Map<String, Object> syncOne(String caseId) {
-        Map<String, Object> match = null;
-        for (Map<String, Object> p : imed.cases()) {
-            if (caseId.equals(str(p.get("transactionnumber")))) {
-                match = p;
-                break;
-            }
-        }
-        if (match == null) {
+        preflight();
+        List<Map<String, Object>> cases = casesByIds(List.of(caseId));
+        if (cases.isEmpty()) {
             throw new ApiExceptionHandler.NotFoundException();
         }
-        return run(List.of(match));
+        return run(cases);
     }
 
-    private Map<String, Object> run(List<Map<String, Object>> patients) {
+    /**
+     * R6 — refuse to start if the hospital no longer serves a field we depend
+     * on. This runs BEFORE any fetch or write, which is the whole point: a
+     * schema change should stop the sync cleanly, not surface as half-imported
+     * cases with silently-nulled columns. Failure is a 500 (a hospital-side
+     * dependency problem, like an unreachable API), naming the missing fields.
+     */
+    private void preflight() {
+        Map<String, Object> answer = imed.contractCheck(REQUIRED_FIELDS);
+        if (Boolean.TRUE.equals(answer.get("valid"))) {
+            return;
+        }
+        Object missing = answer.get("missing");
+        throw new IllegalStateException("hospital contract check failed — the iMed API no longer "
+                + "serves: " + (missing == null ? "(unspecified)" : missing)
+                + ". Sync stopped before touching any data.");
+    }
+
+    /**
+     * R1 → R2: ask which visits exist/changed since the epoch, then pull them
+     * in batches. The contract has no unlimited read, so "everything" is
+     * expressed as a timestamp older than any visit.
+     */
+    private List<Map<String, Object>> fetchAll() {
+        Object ids = imed.checkChanges(EPOCH).get("visit_ids");
+        List<String> visitIds = new ArrayList<>();
+        if (ids instanceof List<?> l) {
+            for (Object id : l) {
+                if (id != null) {
+                    visitIds.add(id.toString());
+                }
+            }
+        }
+        return casesByIds(visitIds);
+    }
+
+    /** R2 in batches of at most {@link ImedApiClient#MAX_SYNC_BATCH} ids. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> casesByIds(List<String> visitIds) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int i = 0; i < visitIds.size(); i += ImedApiClient.MAX_SYNC_BATCH) {
+            List<String> batch =
+                    visitIds.subList(i, Math.min(i + ImedApiClient.MAX_SYNC_BATCH, visitIds.size()));
+            Object cases = imed.syncCases(batch).get("cases");
+            if (cases instanceof List<?> l) {
+                out.addAll((List<Map<String, Object>>) l);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * R3, split into chunks the hospital will accept. An open bound is closed
+     * against the visit-id date encoding's own range rather than left unbounded,
+     * because R3 requires both ends.
+     */
+    private List<Map<String, Object>> fetchWindow(String from, String to) {
+        LocalDate start = date(from, LocalDate.of(2000, 1, 1));
+        LocalDate end = date(to, LocalDate.now());
+        if (end.isBefore(start)) {
+            return List.of();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (LocalDate cursor = start; !cursor.isAfter(end); ) {
+            // inclusive bounds, so a 31-day window spans cursor .. cursor+30
+            LocalDate chunkEnd = cursor.plusDays(ImedApiClient.MAX_PERIOD_DAYS - 1L);
+            if (chunkEnd.isAfter(end)) {
+                chunkEnd = end;
+            }
+            out.addAll(imed.syncByPeriod(cursor + "T00:00:00", chunkEnd + "T23:59:59"));
+            cursor = chunkEnd.plusDays(1);
+        }
+        return out;
+    }
+
+    private static LocalDate date(String bound, LocalDate fallback) {
+        if (bound == null || bound.length() < 10) {
+            return fallback;
+        }
+        try {
+            return LocalDate.parse(bound.substring(0, 10));
+        } catch (RuntimeException e) {
+            return fallback;
+        }
+    }
+
+    private Map<String, Object> run(List<Map<String, Object>> cases) {
         Map<String, Object> result = writeGate.locked(() -> {
             String now = ApprovalService.nowStr();
             List<String> imported = new ArrayList<>();
@@ -113,7 +233,7 @@ public class SyncService {
 
             // REF (doc B4): coverage reference from the hospital's own codes, first
             tx.execute(s -> {
-                loadCoverageTypes(patients, stats);
+                loadCoverageTypes(cases, stats);
                 return null;
             });
 
@@ -126,8 +246,9 @@ public class SyncService {
                 return null;
             });
 
-            for (Map<String, Object> p : patients) {
-                String tn = str(p.get("transactionnumber"));
+            for (Map<String, Object> c : cases) {
+                Map<String, Object> visit = block(c, "visit");
+                String tn = str(visit.get("visit_id"));
                 if (tn == null) {
                     continue;
                 }
@@ -138,9 +259,8 @@ public class SyncService {
                         continue;
                     }
                     boolean isNew = status == null;
-                    CaseBundle b = fetchBundle(tn);       // hospital reads, outside the tx
                     tx.execute(s -> {
-                        writeCase(tn, p, b, isNew, now, stats);
+                        writeCase(tn, visit, c, isNew, now, stats);
                         return null;
                     });
                     (isNew ? imported : refreshed).add(tn);
@@ -166,81 +286,90 @@ public class SyncService {
         return result;
     }
 
-    /** All per-visit hospital tables for one case, fetched over HTTP. */
-    private record CaseBundle(
-            List<Map<String, Object>> sections,
-            List<Map<String, Object>> results,
-            List<Map<String, Object>> diags,
-            List<Map<String, Object>> procs,
-            List<Map<String, Object>> drugs,
-            List<Map<String, Object>> labs,
-            List<Map<String, Object>> beds,
-            List<Map<String, Object>> bills,
-            List<Map<String, Object>> vitals) {
+    /**
+     * One data block of the contract's case object. Blocks are always present
+     * and always arrays ("blocks with no data are empty arrays"), but a missing
+     * or malformed one degrades to empty rather than failing the whole case.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> rows(Map<String, Object> caseObject, String block) {
+        Object v = caseObject.get(block);
+        return v instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
     }
 
-    private CaseBundle fetchBundle(String tn) {
-        return new CaseBundle(
-                imed.medicalRecords(tn),
-                imed.medicalRecordResults(tn),
-                imed.diagnoses(tn),
-                imed.procedures(tn),
-                imed.orderDrugs(tn),
-                imed.orderLabs(tn),
-                imed.bedManagement(tn),
-                imed.billingItems(tn),
-                imed.vitalSigns(tn));
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> block(Map<String, Object> caseObject, String name) {
+        Object v = caseObject.get(name);
+        return v instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
     }
 
-    // sync.py:147 the per-case body: derive CREATE fields, then load READ rows
-    private void writeCase(String tn, Map<String, Object> p, CaseBundle b,
+    // sync.py:147 the per-case body: derive CREATE fields, then load READ rows.
+    // Keys are the contract's (visit.visit_id, diagnoses.icd10_code, …), not the
+    // extract's — the hospital renames on its side now.
+    private void writeCase(String tn, Map<String, Object> visit, Map<String, Object> c,
                            boolean isNew, String now, Map<String, Integer> stats) {
-        String enc = SyncRules.encounterType(str(p.get("admissionnumber")));
+        List<Map<String, Object>> documents = rows(c, "documents");
+        List<Map<String, Object>> recordResults = rows(c, "record_results");
+        List<Map<String, Object>> diagnoses = rows(c, "diagnoses");
+        List<Map<String, Object>> procedures = rows(c, "procedures");
+        List<Map<String, Object>> drugOrders = rows(c, "drug_orders");
+        List<Map<String, Object>> labResults = rows(c, "lab_results");
+        List<Map<String, Object>> vitals = rows(c, "vitals");
+        List<Map<String, Object>> wardMovements = rows(c, "ward_movements");
+        List<Map<String, Object>> billingItems = rows(c, "billing_items");
+
+        // encounter_type arrives derived now ("OPD"/"IPD"); our column keeps the
+        // extract's 0/1, so translate rather than store the hospital's word.
+        String enc = "IPD".equals(str(visit.get("encounter_type"))) ? "1" : "0";
 
         Map<String, Object> primary = null;
         int comorbidities = 0;
         boolean hasIcd10 = false;
-        for (Map<String, Object> d : b.diags()) {
-            String dtype = str(d.get("diagnosistype"));
+        for (Map<String, Object> d : diagnoses) {
+            String dtype = str(d.get("diagnosis_type"));
             if (primary == null && "PRIMARY_DIAGNOSIS".equals(dtype)) {
                 primary = d;
             }
             if ("COMORBIDITY".equals(dtype)) {
                 comorbidities++;
             }
-            if (truthy(str(d.get("icd")))) {
+            if (truthy(str(d.get("icd10_code")))) {
                 hasIcd10 = true;
             }
         }
         boolean hasIcd9 = false;
-        for (Map<String, Object> pr : b.procs()) {
-            if (truthy(str(pr.get("icd")))) {
+        for (Map<String, Object> pr : procedures) {
+            if (truthy(str(pr.get("icd9_code")))) {
                 hasIcd9 = true;
             }
         }
         List<String> missing = SyncRules.missingCodes(hasIcd10, hasIcd9);
         String completeness = missing.isEmpty() ? "complete" : "incomplete";
         String missingDetail = missing.isEmpty() ? null : String.join(",", missing);
-        String group = SyncRules.diseaseGroup(primary == null ? null : str(primary.get("icd")));
+        String group = SyncRules.diseaseGroup(primary == null ? null : str(primary.get("icd10_code")));
         String severity = SyncRules.severity(comorbidities);
 
-        Map<String, Object> latestBed = b.beds().isEmpty() ? Map.of() : b.beds().get(b.beds().size() - 1);
-        String patientRef = str(p.get("admissionnumber"));
-        String birthdate = first10(str(p.get("birthdate")));
-        String coverage = trimOrNull(str(p.get("healthcoverage")));
-        String admission = SyncRules.parseDt(str(p.get("admissiondatetime")));
-        String discharge = SyncRules.parseDt(str(p.get("dischargedatetime")));
+        // department/ward: the visit block already carries the latest bed row's
+        // values, so ward_movements is only needed for its own detail rows.
+        String patientRef = str(visit.get("admission_number"));
+        String birthdate = first10(str(visit.get("birth_date")));
+        String coverage = trimOrNull(str(visit.get("health_coverage")));
+        String admission = SyncRules.parseDt(str(visit.get("admission_datetime")));
+        String discharge = SyncRules.parseDt(str(visit.get("discharge_datetime")));
+        String ageYear = trimOrNull(str(visit.get("age_year")));
+        String ward = trimOrNull(str(visit.get("ward")));
+        String department = trimOrNull(str(visit.get("department")));
 
         if (isNew) {
-            sync.insertCase(tn, patientRef, enc, str(p.get("sex")), birthdate, str(p.get("ageyear")),
-                    admission, discharge, str(p.get("dischargetype")), str(p.get("dischargestatus")),
-                    str(p.get("ispregnant")), str(latestBed.get("ward")), str(latestBed.get("department")),
-                    coverage, completeness, missingDetail, group, severity, now);
+            sync.insertCase(tn, patientRef, enc, str(visit.get("sex")), birthdate, ageYear,
+                    admission, discharge, str(visit.get("discharge_type")),
+                    str(visit.get("discharge_status")), str(visit.get("is_pregnant")),
+                    ward, department, coverage, completeness, missingDetail, group, severity, now);
         } else {
-            sync.updateCaseClinical(tn, patientRef, enc, str(p.get("sex")), birthdate, str(p.get("ageyear")),
-                    admission, discharge, str(p.get("dischargetype")), str(p.get("dischargestatus")),
-                    str(p.get("ispregnant")), str(latestBed.get("ward")), str(latestBed.get("department")),
-                    coverage, completeness, missingDetail, group, severity, now);
+            sync.updateCaseClinical(tn, patientRef, enc, str(visit.get("sex")), birthdate, ageYear,
+                    admission, discharge, str(visit.get("discharge_type")),
+                    str(visit.get("discharge_status")), str(visit.get("is_pregnant")),
+                    ward, department, coverage, completeness, missingDetail, group, severity, now);
             sync.deleteSections(tn);
             sync.deleteChunks(tn);
             sync.deleteOrders(tn);
@@ -250,11 +379,11 @@ public class SyncService {
         bump(stats, "cases");
 
         // READ → report sections (+ CREATE chunks, F11)
-        for (Map<String, Object> s : b.sections()) {
-            sync.insertSection(tn, str(s.get("documenttype")), str(s.get("fieldname")),
-                    str(s.get("value")), str(s.get("recorddatetime")));
+        for (Map<String, Object> d : documents) {
+            sync.insertSection(tn, str(d.get("document_type")), str(d.get("section_name")),
+                    str(d.get("text")), SyncRules.parseDt(str(d.get("recorded_at"))));
             bump(stats, "sections");
-            List<String> chunks = SyncRules.chunk(str(s.get("value")));
+            List<String> chunks = SyncRules.chunk(str(d.get("text")));
             for (int i = 0; i < chunks.size(); i++) {
                 sync.insertChunk(tn, chunks.get(i), i);
                 bump(stats, "chunks");
@@ -263,65 +392,75 @@ public class SyncService {
 
         // READ → codes: diagnoses (ICD-10) then procedures (ICD-9, which carry
         // the hospital's operation time window)
-        for (Map<String, Object> d : b.diags()) {
-            String icd = str(d.get("icd"));
+        for (Map<String, Object> d : diagnoses) {
+            String icd = str(d.get("icd10_code"));
             if (truthy(icd)) {
-                // null-safe: Map.of NPEs on a null key, and the hospital does
-                // ship diagnoses with no diagnosistype (Python's .get(None)
-                // quietly fell back to 'other'; match that)
-                String dtype = str(d.get("diagnosistype"));
-                importCode(tn, icd, "ICD-10", str(d.get("name")),
+                // null-safe: the hospital does ship diagnoses with no type
+                // (Python's .get(None) quietly fell back to 'other'; match that)
+                String dtype = str(d.get("diagnosis_type"));
+                importCode(tn, icd, "ICD-10", str(d.get("description")),
                         dtype == null ? "other" : SyncRules.DIAG_ROLE.getOrDefault(dtype, "other"),
-                        str(d.get("id")), null, null, null, stats);
+                        str(d.get("object_id")), null, null, null, stats);
             }
         }
-        for (Map<String, Object> pr : b.procs()) {
-            String icd = str(pr.get("icd"));
+        for (Map<String, Object> pr : procedures) {
+            String icd = str(pr.get("icd9_code"));
             if (truthy(icd)) {
-                importCode(tn, icd, "ICD-9", str(pr.get("name")), "procedure", str(pr.get("id")),
-                        SyncRules.parseDt(str(pr.get("startdatetime"))),
-                        SyncRules.parseDt(str(pr.get("enddatetime"))),
-                        trimOrNull(str(pr.get("operationtype"))), stats);
+                importCode(tn, icd, "ICD-9", str(pr.get("description")), "procedure",
+                        str(pr.get("object_id")),
+                        SyncRules.parseDt(str(pr.get("operation_start"))),
+                        SyncRules.parseDt(str(pr.get("operation_end"))),
+                        trimOrNull(str(pr.get("operation_type"))), stats);
             }
         }
 
         // READ → vital-sign readings (the hospital UI's strip above CC/PI/PE);
         // verbatim text, blanks normalized to null
-        for (Map<String, Object> v : b.vitals()) {
-            sync.insertVital(tn, SyncRules.parseDt(str(v.get("measuredatetime"))),
+        for (Map<String, Object> v : vitals) {
+            sync.insertVital(tn, SyncRules.parseDt(str(v.get("measured_at"))),
                     trimOrNull(str(v.get("temperature"))),
-                    trimOrNull(str(v.get("systolicbloodpressure"))),
-                    trimOrNull(str(v.get("diastolicbloodpressure"))),
-                    trimOrNull(str(v.get("heartrate"))),
-                    trimOrNull(str(v.get("oxygensaturation"))),
+                    trimOrNull(str(v.get("systolic"))),
+                    trimOrNull(str(v.get("diastolic"))),
+                    trimOrNull(str(v.get("heart_rate"))),
+                    trimOrNull(str(v.get("oxygen_saturation"))),
                     trimOrNull(str(v.get("weight"))),
                     trimOrNull(str(v.get("height"))));
             bump(stats, "vitals");
         }
 
-        // READ → orders (drugs, labs, radiology results, OR procedures, billing)
-        for (Map<String, Object> r : b.drugs()) {
-            order(tn, "medicine", "MedHack_OrderDrug", str(r.get("id")), str(r.get("name")),
-                    r, str(r.get("receiveddatetime")), stats);
+        // READ → orders (drugs, labs, radiology results, OR procedures, billing).
+        // The whole row is kept as order_detail JSONB, so these now carry the
+        // contract's key names; the frontend reads new-or-old (rows synced
+        // before 2026-08-19 still hold the extract's names).
+        for (Map<String, Object> r : drugOrders) {
+            order(tn, "medicine", "MedHack_OrderDrug", str(r.get("object_id")), str(r.get("name")),
+                    r, str(r.get("received_at")), stats);
         }
-        for (Map<String, Object> r : b.labs()) {
-            order(tn, "lab", "MedHack_OrderLAB", str(r.get("id")), str(r.get("panelname")),
-                    r, str(r.get("reportdatetime")), stats);
+        for (Map<String, Object> r : labResults) {
+            order(tn, "lab", "MedHack_OrderLAB", str(r.get("object_id")), str(r.get("panel_name")),
+                    r, str(r.get("reported_at")), stats);
         }
-        for (Map<String, Object> r : b.results()) {
-            String cat = "Radiology Report".equals(str(r.get("documenttype"))) ? "X-ray" : "other";
-            order(tn, cat, "MedHack_MedicalRecord_result", str(r.get("fieldid")), str(r.get("name")),
-                    r, str(r.get("recorddatetime")), stats);
+        for (Map<String, Object> r : recordResults) {
+            String cat = "Radiology Report".equals(str(r.get("document_type"))) ? "X-ray" : "other";
+            order(tn, cat, "MedHack_MedicalRecord_result", str(r.get("field_id")), str(r.get("name")),
+                    r, str(r.get("recorded_at")), stats);
         }
-        for (Map<String, Object> r : b.procs()) {
-            if ("OR Procedure".equals(str(r.get("operationtype")))) {
-                order(tn, "surgery", "MedHack_Procedure(ICD9)", str(r.get("id")), str(r.get("name")),
-                        r, str(r.get("startdatetime")), stats);
+        for (Map<String, Object> r : procedures) {
+            if ("OR Procedure".equals(str(r.get("operation_type")))) {
+                order(tn, "surgery", "MedHack_Procedure(ICD9)", str(r.get("object_id")),
+                        str(r.get("description")), r, str(r.get("operation_start")), stats);
             }
         }
-        for (Map<String, Object> r : b.bills()) {
-            order(tn, "other", "MedHack_BillingItem", str(r.get("id")), str(r.get("name")),
-                    r, str(r.get("verifydatetime")), stats);
+        for (Map<String, Object> r : billingItems) {
+            order(tn, "other", "MedHack_BillingItem", str(r.get("object_id")), str(r.get("name")),
+                    r, str(r.get("verified_at")), stats);
+        }
+        // ward_movements is read for the visit's department/ward only (the
+        // hospital already resolved "latest" into the visit block) — no order
+        // rows, matching the pre-contract behaviour.
+        if (!wardMovements.isEmpty() && department == null) {
+            log.debug("case {} has {} ward movements but no department on the visit block",
+                    tn, wardMovements.size());
         }
 
         // CREATE → audit-trail entry for the sync itself (traceability, F12)
@@ -343,9 +482,16 @@ public class SyncService {
         bump(stats, "codes");
     }
 
+    /**
+     * {@code when} is normalized like every other stored datetime: these are
+     * TEXT columns rendered verbatim by the frontend, and the contract sends
+     * ISO 8601 where the old extract sent "YYYY-MM-DD HH:MM:SS". The raw row
+     * kept in order_detail is NOT touched — that one is the hospital's, as-is.
+     */
     private void order(String tn, String category, String source, String ref, String name,
                        Map<String, Object> detail, String when, Map<String, Integer> stats) {
-        sync.insertOrder(tn, category, source, ref, name, json.writeValueAsString(detail), when);
+        sync.insertOrder(tn, category, source, ref, name, json.writeValueAsString(detail),
+                SyncRules.parseDt(when));
         bump(stats, "orders");
     }
 
@@ -390,10 +536,10 @@ public class SyncService {
     }
 
     // sync.py:111 load_coverage_types() — distinct hospital coverage codes → reference rows
-    private void loadCoverageTypes(List<Map<String, Object>> patients, Map<String, Integer> stats) {
+    private void loadCoverageTypes(List<Map<String, Object>> cases, Map<String, Integer> stats) {
         Set<String> seen = new HashSet<>();
-        for (Map<String, Object> p : patients) {
-            String code = trimOrNull(str(p.get("healthcoverage")));
+        for (Map<String, Object> c : cases) {
+            String code = trimOrNull(str(block(c, "visit").get("health_coverage")));
             if (code == null || !seen.add(code)) {
                 continue;
             }

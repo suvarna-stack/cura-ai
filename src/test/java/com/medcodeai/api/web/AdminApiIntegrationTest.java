@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Drives the auth + admin-account endpoints against the local seeded "medcode"
  * Postgres (same MockMvc, no-mocks style as CasesApiIntegrationTest). The
- * bootstrap admin is created by SchemaBootstrap at startup from the default
+ * bootstrap admin is created by AdminBootstrap at startup from the default
  * ADMIN_BOOTSTRAP_* values, so these tests log in with that known default.
  *
  * Create/delete tests use a unique email per run (self-cleaning). The one test
@@ -35,10 +35,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminApiIntegrationTest {
 
     private static final String ADMIN_EMAIL = "admin@medcodeai.demo";
-    private static final String ADMIN_PW = "admin1234"; // SchemaBootstrap's documented default
+    private static final String ADMIN_PW = "admin1234"; // AdminBootstrap's documented default
+
+    /**
+     * Complete and open, and touched by no other suite — this test approves and
+     * reopens it to create real coding history for the delete guard.
+     */
+    private static final String ADMIN_TEST_CASE_ID = "87026072310024100701";
 
     @Autowired
     private MockMvc mvc;
+
+    /** Only for tidying up the throwaway guard account the delete test creates. */
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private final JsonMapper json = new JsonMapper();
 
@@ -224,7 +234,11 @@ class AdminApiIntegrationTest {
         // real coding history via approve, then reopen to leave the case as it
         // was; the code_assigned history rows survive reopen, so the account
         // stays referenced — and thus protected from deletion
-        String openId = getJson(token, "/api/cases").get("complete").get(0).get("id").asString();
+        // A DEDICATED case, deliberately not whatever happens to be first in the
+        // dashboard: picking dynamically landed on CasesApiIntegrationTest's own
+        // fixture, and this test's approve then stamped it with this throwaway
+        // account — which that suite's coder assertion then read back.
+        String openId = ADMIN_TEST_CASE_ID;
         mvc.perform(post("/api/cases/approve").header("Authorization", "Bearer " + coderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ids\":[\"" + openId + "\"]}"))
@@ -237,6 +251,16 @@ class AdminApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error")
                         .value("this account has coding history and cannot be deleted — deactivate it instead"));
+
+        // Tidy up behind the assertion. The guard is a throwaway actor, but its
+        // code_assigned rows survive reopen by design, so without this every run
+        // left two more of them on a real case — and "History Guard" then showed
+        // up in the dashboard's coder facet. Direct SQL on purpose: the API
+        // refuses this delete, which is the very thing just asserted.
+        jdbc.update("DELETE FROM auth_sessions WHERE user_id = ?", guardId);
+        jdbc.update("DELETE FROM coding_history WHERE user_id = ?", guardId);
+        jdbc.update("UPDATE case_codes SET assigned_by = NULL WHERE assigned_by = ?", guardId);
+        jdbc.update("DELETE FROM users WHERE user_id = ?", guardId);
     }
 
     // ---- helpers ----
@@ -271,13 +295,6 @@ class AdminApiIntegrationTest {
     }
 
     private JsonNode adminArray(String token, String url) throws Exception {
-        String body = mvc.perform(get(url).header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return json.readTree(body);
-    }
-
-    private JsonNode getJson(String token, String url) throws Exception {
         String body = mvc.perform(get(url).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();

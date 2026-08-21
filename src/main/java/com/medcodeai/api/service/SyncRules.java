@@ -50,9 +50,12 @@ public final class SyncRules {
             "UCS", "NHSO", "WEL", "NHSO", "LGO", "NHSO", "VLG", "NHSO", "DIS", "NHSO",
             "SELF_PAY", "SELF");
 
-    // sync.py:36 DT_RE — tolerates the Q5 missing-separator case "2026-04-0106:45:00"
+    // sync.py:36 DT_RE — tolerates the Q5 missing-separator case "2026-04-0106:45:00".
+    // The [\sT]* separator also covers the R1-R6 contract's ISO 8601 form
+    // ("2026-04-01T06:45:00"); without the T the time was silently dropped and
+    // every synced datetime collapsed to midnight.
     private static final Pattern DT_RE =
-            Pattern.compile("(\\d{4}-\\d{2}-\\d{2})\\s*(\\d{2}:\\d{2}(:\\d{2})?)?");
+            Pattern.compile("(\\d{4}-\\d{2}-\\d{2})[\\sT]*(\\d{2}:\\d{2}(:\\d{2})?)?");
 
     /** sync.py:38 parse_dt() — normalize a hospital datetime to "YYYY-MM-DD HH:MM:SS", or null. */
     public static String parseDt(String raw) {

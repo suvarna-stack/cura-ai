@@ -12,6 +12,23 @@ spring:
       # tens of MB; Spring's 1MB default would reject them at the gate.
       max-file-size: 100MB
       max-request-size: 100MB
+  # Schema migrations, applied at startup before any bean touches the database.
+  #
+  # locations: on the CLASSPATH, not the repo's db/ folder — the Dockerfile
+  # copies only pom.xml and src/, so a filesystem: location would silently find
+  # nothing in every container.
+  #
+  # baseline-*: db/seed.sql.gz is a plain pg_dump with no version of its own, so
+  # it IS version 0 by definition. baseline-on-migrate lets Flyway adopt a
+  # database that already has content but no history table — which is every
+  # database that exists today, freshly seeded or long-running alike. Both then
+  # replay V1-V7; all are written IF NOT EXISTS, so on a database that already
+  # had them applied by the old SchemaBootstrap they are no-ops.
+  flyway:
+    enabled: true
+    locations: classpath:db/migrations
+    baseline-on-migrate: true
+    baseline-version: 0
 
 # Swagger UI is a local-dev convenience: default ON here so `mvnw
 # spring-boot:run` just works, forced OFF in the Dockerfile so every

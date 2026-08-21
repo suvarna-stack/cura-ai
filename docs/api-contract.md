@@ -150,9 +150,15 @@ real values here when the extract has them).
                   "ordered_at": "…",
                   "detail": { "…": "…" }             // the raw hospital order row (order_detail
                   }, ... ],                          //   JSONB) verbatim — keys differ per
-                                                     //   imed_source (dosage/quantity on drugs,
-                                                     //   panelname/itemname/itemvalue/itemuom on
+                                                     //   imed_source (dosage_signature/quantity on
+                                                     //   drugs, panel_name/item_name/value/unit on
                                                      //   labs, …); null when no source row stored.
+                                                     //   NOTE: these are the hospital's OWN field
+                                                     //   names, so they changed with the R1-R6
+                                                     //   contract (2026-08-19). Rows synced before
+                                                     //   that keep the old extract names
+                                                     //   (panelname/itemname/…) until re-synced —
+                                                     //   read new-or-old, as the frontend does.
                                                      //   Category-grouped, max 50 rows PER
                                                      //   category (a global cap starved late
                                                      //   categories on lab-heavy cases)
@@ -375,14 +381,19 @@ it briefly blocks approve/reopen. Response:
 ```
 
 Before the per-case loop, sync also mirrors the hospital's ICD reference
-catalogs (`GET /api/icd10-codes` / `GET /api/icd9-codes` on the iMed API) into
-this database's `icd_10`/`icd_9` tables — insert new codes, fill blank
+catalogs (R4/R5, `GET /api/v1/catalog/icd10` and `.../icd9` on the iMed API)
+into this database's `icd_10`/`icd_9` tables — insert new codes, fill blank
 descriptions, never overwrite an existing description. `stats.catalogCodes`
 counts the rows that changed.
 
-Note: an unwindowed sync pulls the hospital's full list; only the writes are
-selective. `document_chunks` is populated for future retrieval but has no
-reader today.
+How the cases are fetched (unchanged on the wire, but worth knowing): the iMed
+contract has no "download everything" endpoint, so a **windowed** sync calls
+R3 (`/api/v1/cases/sync-by-period`) once per ≤31-day chunk, and an
+**unwindowed** one calls R1 (`/api/v1/cases/check`) from the epoch for the id
+list and pulls it through R2 (`/api/v1/cases/sync`) in ≤20-id batches. Both
+are preceded by the R6 contract check, which fails the run with a `500` naming
+any field the hospital has stopped serving — before anything is written.
+`document_chunks` is populated for future retrieval but has no reader today.
 
 ### POST /api/cases/{caseId}/sync — sync one case from the hospital
 

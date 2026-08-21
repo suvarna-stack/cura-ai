@@ -9,9 +9,10 @@ import java.util.Map;
 
 /**
  * Agent chat history tables (agent_conversations + agent_messages, see
- * SchemaBootstrap.agentChatTables). Every query is scoped by user_id so one
- * coder can never read or touch another's conversations — the controller
- * passes the authenticated principal's id, not anything client-supplied.
+ * db/migrations/V7__agent_chat_history.sql). Every query is scoped by user_id
+ * so one coder can never read or touch another's conversations — the
+ * controller passes the authenticated principal's id, not anything
+ * client-supplied.
  *
  * sources / unverified_codes are stored as JSON-array text and returned
  * verbatim; the controller (de)serializes them.

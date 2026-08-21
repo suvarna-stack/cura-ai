@@ -410,7 +410,8 @@ Milestones (git log --oneline reads as this sequence):
   now holds the curated July demo dataset (empty-start-state era), so every
   test needing an approved/known case fails regardless of this change
   (verified identical red set on a clean checkout). The suite needs re-basing
-  onto the new demo data.
+  onto the new demo data. **(DONE 2026-08-19 — see the re-basing entry below;
+  the suite is 46/46 green.)**
 - ✅ **Analytics live + local `dev_all.sh` gains RAG (2026-08-07):** two
   things landed the same day. (1) **`GET /api/analytics`** arrived from remote
   (`AnalyticsController` / `AnalyticsService` / `AnalyticsRepository`, plus a
@@ -462,7 +463,8 @@ Milestones (git log --oneline reads as this sequence):
   `unselectedCodeEditsAreKeptButNotApproved` test sits in
   `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
   the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
-  known 13-failure problem, unrelated to this change).
+  known 13-failure problem, unrelated to this change). **(Re-based and passing
+  since 2026-08-19.)**
 - ✅ **Coding status on the hospital visit row (2026-08-07):** the hospital now
   has an "approved" flag of its own — `imed.medhack_patient.coding_status`
   (`'approved'` / NULL), the twin of our `cases.case_status`. It replaces the
@@ -594,6 +596,161 @@ Milestones (git log --oneline reads as this sequence):
   its Dockerfile uses `--legacy-peer-deps` and the repo is untouched.
   This does NOT replace the native dev loop, and `RUN-ALL.md`'s manual path
   stays the documented route for anyone not using Docker.
+- ✅ **New iMed read contract (R1–R6) mocked — hospital-independent (2026-08-19):**
+  MedCode AI wrote its own build contract for the hospital's read side
+  ("MedCode AI Case Data API", `docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`,
+  v1 11 Aug 2026) and SENT it — the hospital builds R1–R6 from that document.
+  Rather than wait, the fake side was built to the contract first, so
+  development runs at full speed and cutover is an `IMED_API_BASE` + token
+  swap. **Write side W1–W4 needed ZERO change** — the contract states outright
+  that the request bodies are what we already send, `coding_status` extension
+  included. Only the READ side is new, and it replaces the 12 per-table GETs
+  with a nested **case object**: one `visit` block + nine data blocks
+  (`documents`, `record_results`, `diagnoses`, `procedures`, `drug_orders`,
+  `lab_results`, `vitals`, `ward_movements`, `billing_items`), every key
+  renamed to the contract's snake_case (`transactionnumber` → `visit_id`,
+  `icd` → `icd10_code`, `startdatetime` → `operation_start`). Built in
+  `../imed-mock-api` (new `web/CaseSyncApiController` + `repo/ImedCaseSyncRepository`,
+  `ApiExceptionHandler` gained a 422 `ImedUnprocessableException`), on
+  `/api/v1` so the existing Bearer gate covers it. **Faithfulness over
+  convenience was the explicit rule** — R2 refuses >20 ids (`422
+  too_many_visit_ids`), R3 refuses >31 days (`422 period_too_long`), both in
+  the hospital's `STATUS_BUSINESS_ERROR` envelope; datetimes are normalized to
+  ISO 8601 (the extract stores `YYYY-MM-DD HH:MM:SS`), `birth_date` is a plain
+  date, `age_year` is a number (extract stores `"70,2,9"`), blanks collapse to
+  null, cancelled rows still never appear. **No schema change was needed after
+  all** (contradicting the first read of the contract): `last_changed_at` and
+  `encounter_type` are DERIVED — the change stamp reuses the tested
+  `LAST_CHANGED` SQL (visit datetime raised by code-row writes) and IPD is
+  "has an admission number", per the contract's own "the internal mechanism is
+  the hospital's choice". R6 answers from a static `SUPPORTED_FIELDS` list of
+  every `block.field` served — it correctly reports the contract's own
+  Priority-2 wishes (`lab_results.reference_range`, doctor names) as missing.
+  Verified live against the seeded demo data plus 8 new tests (mock suite
+  16 → **24/24 green**), including a create → read → cancel → read round trip.
+  Trap worth remembering: **Java text blocks strip trailing whitespace**, so
+  `"""… WHERE """ + FRAGMENT` concatenated to `WHEREGREATEST(` — the SQL
+  joins now add `+ " " +` explicitly. NOT done yet: medcode-api still calls the
+  12 legacy GETs; `ImedApiClient` + `SyncService` move over next, and the old
+  endpoints stay until then.
+- ✅ **medcode-api moved onto the R1–R6 contract (2026-08-19):** the second half
+  of the same day's work — this backend now READS the hospital through the new
+  contract instead of the 12 per-table GETs. `ImedApiClient`'s read half is
+  replaced (`checkChanges`/`syncCases`/`syncByPeriod`/`contractCheck` + the
+  `/api/v1/catalog/*` masters); `SyncService` consumes the nested case object,
+  and — since the contract has NO "download everything" endpoint by design —
+  the fetch strategy is now: **windowed sync → R3 in ≤31-day chunks** (long
+  windows are split client-side), **unwindowed → R1 from the epoch, then R2 in
+  ≤20-id batches**. Every run is preceded by the **R6 contract check** (a
+  `REQUIRED_FIELDS` list of the block.fields we actually depend on; failure is
+  a 500 naming the missing fields, before any fetch or write). Our own API
+  shape is UNCHANGED — `POST /api/sync`, its `{from,to}` body, the response and
+  the case detail all behave as before.
+  Three things this shook out, none obvious from the contract:
+  - **`SyncRules.parseDt` silently dropped the time** off an ISO datetime (its
+    regex expected `\s*` between date and time, so `…T09:14:23` matched only
+    the date). Every synced datetime would have collapsed to midnight. The
+    separator is now `[\sT]*`.
+  - **`ImedWritebackService` also read the hospital** (`liveRows` for the diff).
+    It now reads R2, but translates the rows BACK to the extract's key names
+    (`id`/`icd`/`name`/`startdatetime`…) at that one boundary — deliberately,
+    because those names are also the shape of the before-images in
+    `imed_write_ops`, and a journal written before today must stay replayable
+    by a reopen running after it.
+  - **`order_detail` JSONB now holds the contract's key names** (`panel_name`,
+    `item_name`, `value`, `unit`) because it stores the hospital row verbatim.
+    The frontend's lab table and order chips read those keys, so
+    `../audit-chart-frontend` (`LabResults.tsx`, `ReportOrders.tsx`) now reads
+    **new-or-old** — rows synced before today keep the old names until
+    re-synced. `HospitalPanels.tsx` needed nothing (`name`/`value`/`quantity`
+    survived the rename). Contract doc + `docs/types.ts` say so.
+  Section and order datetimes were raw pass-throughs; they now go through
+  `parseDt` like every other stored datetime, so the TEXT columns keep the
+  `YYYY-MM-DD HH:MM:SS` form the frontend renders.
+- ✅ **CasesApiIntegrationTest re-based onto the July demo data (2026-08-19):**
+  the long-standing "13 pre-existing failures" are GONE — the suite is **46/46
+  green**, verified stable over three consecutive runs with the dataset
+  unchanged after (4 complete / 17 incomplete, all open). The old
+  `KNOWN_CASE_ID`/`APPROVABLE_CASE_ID` were April TNs from the retired dataset,
+  present in NEITHER database. Fixtures are now explicitly split by role, which
+  is the part worth keeping: `APPROVABLE_CASE_ID` (87026072711124400801) is the
+  **sacrificial** visit the write tests approve/reopen — those churn the
+  hospital's own rows, so no test asserting exact hospital values may share it;
+  `KNOWN_CASE_ID` (…413210500101, the richest visit) and
+  `TIMED_PROCEDURE_CASE_ID` (…209142300201, the 49.46 window) are READ-ONLY.
+  Tests that wanted "an approved case from the seed" now approve one themselves
+  and reopen it in a `finally` (the July data is an empty start state), and
+  nothing hard-codes `complete[0]` any more — **an approved-then-reopened case
+  moves to the `reopened` queue permanently**, so `complete` drains as the suite
+  runs. Two expectations changed on real grounds, not to go green: the lab
+  50-row cap can only be an upper bound (no July case has >50 labs), and the
+  round-trip's `mcai_code_rows` is 2, not 0 — one PUT because our catalog's
+  L02.4 description differs from the hospital's, one CANCEL because "no saved
+  edits" re-confirms the imported PRINCIPAL only, so the visit's ICD-9 is not in
+  the coder's final list. Reopen re-creates it, which is what keeps that stable.
+  **Data hazard confirmed and repaired the same day:** running the write tests
+  against a shared fixture had cancelled real seed procedures at the hospital,
+  permanently marking cases incomplete. The `imed` database was restored from
+  `~/medcode-backups/imed_live_2026-08-19.dump` (see the memory note) — which is
+  exactly why that dump was taken before any of this started.
+- ✅ **Legacy per-table reads deleted (2026-08-19):** with medcode-api on the
+  contract and no caller left in any of the four repos, `imed-mock-api` dropped
+  `ImedCasesReadController` and its 12 GETs plus `/api/icd10-codes`/`icd9-codes`.
+  Only two pieces of `ImedReadRepository` survived — the VISIT_DT/LAST_CHANGED
+  SQL and `caseExists` (the write API's validation) — so they moved into
+  `ImedCaseSyncRepository` and the old class went too. Coverage was ported, not
+  dropped: the change-stamp test is now an R1 test, and the write round-trips
+  read their results back through R2. `openApiDocumentCoversEveryEndpoint`
+  asserts the removed paths are **absent**, so the old surface can't creep back.
+  Mock suite 24 → **19 green**. Two order-dependent failures surfaced and were
+  fixed on the medcode side: `AdminApiIntegrationTest` was picking whichever
+  open case came first (landing on the cases suite's fixture and stamping it
+  with its throwaway "History Guard" account) and now uses a dedicated case;
+  and the coder assertion now asks whether an account actually goes by that
+  name instead of hard-coding one — the rotated per-case fakes it guards
+  against would match no account at all. A full run now leaves the dataset
+  exactly as it found it.
+- ✅ **Flyway — one source of truth for the schema (2026-08-20):** every DDL
+  statement added after the frozen dump existed TWICE — as Java in
+  `config/SchemaBootstrap` (which ran) and as `db/migrations/000N.sql` (which
+  **nothing ever ran**; grep found it referenced only from Java comments). Nothing
+  compared the copies and they had drifted: `case_vitals` and `imed_write_ops`
+  were created by hand-written Java **without the `cases` foreign key** that all
+  six other case-keyed child tables carry, so deleting a case orphaned its vitals
+  and its write-back journal forever. Nobody decided that; the convention was just
+  forgotten in a place no test could see. Now Flyway runs the SQL files and they
+  are the only definition. The files moved to `src/main/resources/db/migrations/`
+  and became `V1__`…`V6__` — **classpath, not the repo's `db/` folder**, because
+  the Dockerfile copies only `pom.xml` and `src/`, so a `filesystem:` location
+  would have found nothing in every container. `SchemaBootstrap` became
+  `AdminBootstrap`: 196 lines → 75, keeping only the bootstrap admin (it needs the
+  `PasswordEncoder`, so it cannot be a `.sql` file). New `V6` adds the two missing
+  keys, deleting any orphans first so it can't fail on a database that
+  accumulated them. Three traps worth remembering:
+  - **Boot 4 split the autoconfigurations into per-technology modules**, so
+    `flyway-core` alone puts the library on the classpath and *nothing calls it* —
+    the app boots, migrates nothing, and only fails later on the first missing
+    column. `org.springframework.boot:spring-boot-flyway` is the piece that
+    actually wires it. (On Boot 3, `flyway-core` was enough.)
+  - **`V3` had explicit `BEGIN;`/`COMMIT;`** from its hand-apply days. Flyway
+    already wraps each migration in a transaction, and that `COMMIT` would end
+    *Flyway's* transaction mid-file, before the history row is written. Removed.
+  - Demo reset refills tables in `DemoBaselineService.TABLES` order, so the new
+    keys make that order load-bearing — it was already parent-first (`cases`
+    before both), verified rather than assumed.
+  Verified on three databases before the suite: a **fresh seed** (6 migrations
+  from scratch), a **copy of the live dev database** (baselined at 0, migrated to
+  6, row counts identical across `cases`/`case_codes`/`case_vitals`/`users`/
+  `coding_history`), and a schema diff of Flyway's output against the real
+  database showing **no difference except `flyway_schema_history` itself**. Suite
+  46/46 green. `imed-mock-api` got the same treatment the same day, in its own
+  commit: there the runner was deleted **outright** rather than trimmed, because
+  nothing had to stay in Java — its five mirror files were already faithful (and
+  in two places better than the Java), and the ICD catalog seed became `V6`,
+  since a re-seed drops that reference data along with the schema history and so
+  replays it exactly as the old emptiness check did. It sets
+  `spring.flyway.schemas: imed` so the history table lands beside the tables it
+  describes. Mock 19/19, and our 46/46 re-verified against that build.
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
@@ -626,29 +783,56 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   spec from the controller annotations, so nothing else notices a new route.
   When it fails, the fix is to document the endpoint in `docs/api-contract.md`
   + `docs/types.ts` and *then* add the path, not to add the path alone.
-- The seed dumps are the frozen demo baseline — regenerating them requires
-  the retired POC pipeline; treat `db/seed.sql.gz` (both repos) as data, not
-  build output.
+- **The seed dumps are the demo-start baseline, and they are NOT frozen**
+  (corrected 2026-08-21 — the old "regenerating needs the retired POC pipeline"
+  rule is what let them drift a month behind the working local databases, so
+  Docker booted 1150 stale April-2026 cases while the demo ran on 21 July-2026
+  visits). `db/seed.sql.gz` is data, not build output, but it is also the only
+  hospital/medcode data Docker ever sees — `medcode-stack` bind-mounts both
+  dumps into Postgres initdb. Change the demo data, regenerate the dump.
+  Ours holds schema + `coverage_types` + the `icd_10`/`icd_9` catalogs, with
+  every case table, `auth_sessions` AND `users` empty — that emptiness is what
+  makes the dashboard start empty, and an empty `users` is deliberate: it lets
+  `AdminBootstrap` create the admin from `ADMIN_BOOTSTRAP_EMAIL` /
+  `ADMIN_BOOTSTRAP_PASSWORD` at first boot. **Never ship an admin row in the
+  dump** — `AdminBootstrap` returns early once any admin exists, so a baked-in
+  hash would silently override the env password in prod. Take the dump from a
+  database already at demo start:
+
+  ```bash
+  psql -d medcode -c 'TRUNCATE cases, case_codes, case_code_edits, case_orders,
+      case_report_sections, case_vitals, coding_history, document_chunks,
+      imed_write_ops, knowledge_base, auth_sessions, users'
+  # then reset each serial with setval(..., 1, false)
+  pg_dump -d medcode -n public --no-owner --no-privileges \
+    -T public.flyway_schema_history | gzip -9 > db/seed.sql.gz
+  ```
+
+  Exclude `flyway_schema_history`, or `baseline-on-migrate` won't adopt the dump
+  as version 0 and replay V1–V7. `-n public` also leaves the `demo_baseline`
+  snapshot schema out. The hospital side has the same rule and its own recipe
+  in `../imed-mock-api/README.md` § *Regenerating the dump*.
 - The sibling `imed` database keeps every table in a schema named **`imed`**,
-  not `public` (a leftover from the pre-split single-database era, frozen into
-  its dump). Doesn't affect us — we only reach it over HTTP — but two things
-  follow for M7: the hospital-side SQL must stay schema-qualified, and
-  provisioning needs `GRANT USAGE ON SCHEMA imed` for any non-owner app role
-  or it fails with "permission denied for schema imed". Details in
-  `../imed-mock-api/README.md`.
-- The **ICD catalog split is also outside the seed dump** (same trap as auth):
-  `db/seed.sql.gz` still ships the pre-split single `icd_codes` table, so a fresh
-  re-seed resurrects it and `config/SchemaBootstrap.splitIcdCatalog()` re-applies
-  the split on the next boot (idempotent, mirrored in
-  `db/migrations/0003_split_icd_codes.sql`). Don't "fix" a re-appeared
-  `icd_codes` by editing the dump — just boot the app. Note the runner returns
-  early once a bootstrap admin exists, so **any new DDL must go ABOVE that
-  return**, as the split does.
-- Auth schema lives OUTSIDE the seed dump: `config/SchemaBootstrap` adds the
-  `users.password_hash` column + the bootstrap admin at every startup
-  (idempotent). So a fresh re-seed drops them and the next boot restores them —
-  don't "fix" a missing `password_hash` by editing the dump. `@SpringBootTest`
-  runs the runner too, so the test DB self-heals.
+  not `public` (a leftover from the pre-split single-database era; the dump is
+  taken with `pg_dump -n imed`, so it carries the schema along). Doesn't affect
+  us — we only reach it over HTTP — but two things follow for M7: the
+  hospital-side SQL must stay schema-qualified, and provisioning needs
+  `GRANT USAGE ON SCHEMA imed` for any non-owner app role, or it fails with
+  "permission denied for schema imed". Details in `../imed-mock-api/README.md`.
+- **Schema changes go in ONE place: a new `src/main/resources/db/migrations/
+  V<n>__<name>.sql` file** (Flyway, since 2026-08-20). Never also write the DDL
+  in Java — that duplication is exactly what drifted for a year. The seed dump is
+  version 0; `baseline-on-migrate` adopts any database that predates the history
+  table.
+- Everything after the dump is outside it, so **a fresh re-seed drops all of it**
+  — `icd_codes` comes back, `password_hash` and the admin vanish, and
+  `flyway_schema_history` goes too. The fix is always to boot the app (Flyway
+  replays from 0), never to edit the dump. `@SpringBootTest` boots it too, so the
+  test DB self-heals.
+- The **bootstrap admin is NOT a migration** — hashing `ADMIN_BOOTSTRAP_PASSWORD`
+  needs the `PasswordEncoder`, so it stays an `ApplicationRunner`
+  (`config/AdminBootstrap`, renamed from `SchemaBootstrap` when its DDL left).
+  It runs after Flyway and does nothing once any admin exists.
 - Auth covers the WHOLE case surface since 2026-07-25 (Phase 3 — the earlier
   "admin-only, never gate case routes" scope is OVER): the interceptor guards
   /api/cases/**, /api/sync and /api/demo/reset (any valid token), and

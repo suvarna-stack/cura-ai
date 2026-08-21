@@ -7,7 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * The one security bean we need: a BCrypt password encoder, shared by
- * SchemaBootstrap (hashing the bootstrap admin), AuthService (verifying logins)
+ * AdminBootstrap (hashing the bootstrap admin), AuthService (verifying logins)
  * and AccountService (hashing new/changed passwords).
  *
  * This comes from spring-security-crypto, NOT spring-boot-starter-security —

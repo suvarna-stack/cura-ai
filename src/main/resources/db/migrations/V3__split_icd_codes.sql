@@ -1,7 +1,9 @@
--- Manual mirror of the icd_10 / icd_9 DDL in config/SchemaBootstrap.java
--- (the runner applies it idempotently at every startup, so a fresh re-seed
--- from db/seed.sql.gz — which still ships the old single-table shape — is
--- healed on the next boot).
+-- V3 — split the single icd_codes catalog into icd_10 + icd_9.
+--
+-- db/seed.sql.gz still ships the old single-table shape, so a fresh re-seed
+-- starts from a database where this has NOT been applied; Flyway re-runs it
+-- there because the reset drops the schema history along with everything else.
+-- The legacy-table guard below is what makes it a no-op everywhere else.
 --
 -- Context (2026-07-28): the single `icd_codes` catalog, discriminated by the
 -- `code_system_t` enum, is split into two physical tables. The two systems are
@@ -18,8 +20,10 @@
 -- The `code_system_t` enum type is intentionally left defined but unused — the
 -- discriminator is now which column is populated. Dropping the type would be
 -- pure risk for no gain, and the seed dump still declares it.
-
-BEGIN;
+--
+-- No explicit BEGIN/COMMIT: Flyway already runs each migration inside one
+-- transaction, and a COMMIT here would end THAT transaction mid-file, before
+-- the schema-history row is written.
 
 CREATE TABLE IF NOT EXISTS icd_10 (
     icd_10_id   serial PRIMARY KEY,
@@ -82,5 +86,3 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS case_codes_icd_10_idx ON case_codes (icd_10_id);
 CREATE INDEX IF NOT EXISTS case_codes_icd_9_idx  ON case_codes (icd_9_id);
-
-COMMIT;

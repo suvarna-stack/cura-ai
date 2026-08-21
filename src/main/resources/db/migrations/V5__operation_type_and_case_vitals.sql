@@ -10,9 +10,6 @@
 -- 2) case_vitals — the extract's medhack_vitalsign readings (the strip above
 --    CC/PI/PE in the hospital UI). Hospital-sourced: sync refresh deletes and
 --    reinserts, coders never write here. Raw text verbatim; blanks → null.
---
--- Applied idempotently by config/SchemaBootstrap at startup; this file is the
--- reviewable mirror, like 0004.
 
 ALTER TABLE case_codes ADD COLUMN IF NOT EXISTS operation_type text;
 
