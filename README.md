@@ -85,10 +85,44 @@ Those scripts run **only once**, when the `pgdata` volume is empty. To re-seed:
 docker compose down -v && docker compose up -d
 ```
 
-Not in the dumps, and restored a different way: `medcode-api`'s `SchemaBootstrap`
-re-applies the auth columns, the bootstrap admin and the `icd_10`/`icd_9` catalog
-split at every startup. That is by design — don't try to fix a "missing"
-`password_hash` by editing a dump.
+### Pulling updated demo data — read this before `git pull`
+
+The seed dumps do **not** live in this repo. Compose bind-mounts them from the
+sibling checkouts:
+
+| Dump | Lives in |
+|---|---|
+| `/seed/medcode.sql.gz` | `../medcode-api/db/seed.sql.gz` |
+| `/seed/imed.sql.gz` | `../imed-mock-api/db/seed.sql.gz` |
+
+Two consequences that bite in exactly this order:
+
+1. **Pulling `medcode-stack` alone gets you no new data.** Pull all three —
+   `medcode-api`, `imed-mock-api` and this repo — or you will boot the stack
+   against last month's dumps while believing you are current.
+2. **`docker compose up -d` will silently ignore the new dumps.** The scripts in
+   `db/initdb/` are run by the postgres image only on an *empty* `pgdata`
+   volume. If you have ever started this stack, that volume is populated, the
+   new dumps are mounted at `/seed/` and never read, and nothing errors — you
+   just quietly keep the old data.
+
+So the whole update is:
+
+```bash
+for r in medcode-api imed-mock-api medcode-stack; do (cd ../$r && git pull); done
+docker compose down -v          # the -v is the load-bearing part
+docker compose up -d --build
+```
+
+`down -v` destroys the databases and the RAG index. That is fine here — both are
+rebuilt from the committed dumps — but it also destroys **any approvals made in
+this stack**, since they live only in the `pgdata` volume.
+
+Not in the dumps, and restored a different way: the auth columns, the bootstrap
+admin and the `icd_10`/`icd_9` catalog split are applied by `medcode-api`'s
+Flyway migrations (`V1__add_password_hash.sql`, `V3__split_icd_codes.sql`) at
+every startup, and the bootstrap admin by `AdminBootstrap`. That is by design —
+don't try to fix a "missing" `password_hash` by editing a dump; start the app.
 
 Reach it from the host with:
 

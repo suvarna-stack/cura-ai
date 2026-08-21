@@ -5,8 +5,10 @@
 # fresh database was created with, or the restore collides with it.
 #
 # NOT restored here: the auth columns, the bootstrap admin and the icd_10/icd_9
-# catalog split. Those live outside the dump on purpose — medcode-api's
-# SchemaBootstrap re-applies them idempotently at every startup.
+# catalog split. Those live outside the dump on purpose — medcode-api applies
+# them at every startup, via its Flyway migrations (V1__add_password_hash.sql,
+# V3__split_icd_codes.sql) and AdminBootstrap. The dump therefore ships with no
+# flyway_schema_history, so baseline-on-migrate adopts it as version 0.
 set -euo pipefail
 
 psql -q -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname medcode \
