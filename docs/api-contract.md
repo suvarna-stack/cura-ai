@@ -775,8 +775,19 @@ The coder teaches a coding rule in plain language (English or Thai) and it
 becomes an extra layer retrieval reads **on top of** the uploaded ICD
 references. Nothing is fine-tuned: a rule is a stored note, embedded as one
 chunk in the same index as the reference PDFs, listed, attributed, mutable
-and deletable. **Any valid token** (either role); `created_by` is taken from
-the token, never from the body.
+and deletable. **Any valid token** (either role); `created_by` and
+`created_by_id` are taken from the token, never from the body.
+
+**A rule belongs to the coder who taught it.** Everyone reads the whole list —
+a shared knowledge layer is the point — but **editing, muting and deleting are
+the author's alone**: `DELETE /notes/{id}`, `PATCH /notes/{id}` and a `POST
+/notes` carrying an existing `note.id` all answer **403** for anyone else. An
+**admin may act on any rule**, so a wrong rule taught by a coder who has since
+left is still removable. Ownership hangs on `created_by_id` (the author's user
+id, stable across a rename and unambiguous when two coders share a name);
+rules taught before that field existed carry `null` and fall back to matching
+the credited `created_by` name, and one crediting nobody stays open. An
+author never changes — editing a rule does not transfer it.
 
 ```jsonc
 POST /api/agent/learn/classify   { "text": "..." }
@@ -797,10 +808,16 @@ POST /api/agent/learn/extract    { "text": "Diabetic patient with AKI: code
      }
 
 POST /api/agent/learn/notes      { "note": { ...the confirmed draft... } }
-  -> the stored note (`id`, `created_by`, `created_at`, `hits`)
-GET  /api/agent/learn/notes      -> { "notes": [ ... ] }   // incl. muted
+  -> the stored note (`id`, `created_by`, `created_by_id`, `created_at`,
+                      `hits`)
+     403 when `note.id` names a rule taught by someone else
+GET  /api/agent/learn/notes      -> { "notes": [ ... ] }   // incl. muted,
+                                                           // and every coder's
 PATCH  /api/agent/learn/notes/{id}?active=false            // mute, keep
+     403 unless the caller taught it (or is an admin)
 DELETE /api/agent/learn/notes/{id}  -> { "deleted": 1 }
+     403 unless the caller taught it (or is an admin); an unknown id is
+     `{ "deleted": 0 }`, not a 403 — ids are not probeable
 POST /api/agent/learn/match      { "text": "...", "limit": 3 }
   -> { "notes": [ { "id", "summary", "scenario", "rule", "codes",
                     "created_by", "via" } ] }

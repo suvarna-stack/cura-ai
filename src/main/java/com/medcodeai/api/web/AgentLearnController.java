@@ -38,6 +38,14 @@ import java.util.Map;
  * what the AI understood. `created_by` is taken from the token, never from
  * the request body.
  *
+ * A taught rule belongs to the coder who taught it. Everyone reads the whole
+ * list — a shared knowledge layer is the point — but editing, muting and
+ * deleting are the author's alone, so one coder cannot quietly rewrite or
+ * silence another's rule. An admin may act on any rule: a wrong rule taught
+ * by a coder who has since left the hospital still has to be removable. That
+ * check lives here rather than in RAG because this is the only tier holding
+ * a token; RAG just records `created_by_id` and hands it back.
+ *
  * Lives under /api/agent/** so the existing WebConfig guard covers it (any
  * valid token, either role) — the same surface as the chat it belongs to.
  */
@@ -48,6 +56,9 @@ public class AgentLearnController {
 
     private static final int MAX_TEXT_CHARS = 2000;
     private static final int MAX_MATCH_LIMIT = 10;
+    /** Unreachable behind the interceptor; a stranger owns nothing and is no admin. */
+    private static final AuthService.Principal ANONYMOUS =
+            new AuthService.Principal(0, "", "coder", "coder", "");
 
     private final RagApiClient rag;
     private final JsonMapper json = new JsonMapper();
@@ -74,9 +85,11 @@ public class AgentLearnController {
                     + "model invents are dropped: only codes present in the coder's own text survive.")
     public Map<String, Object> extract(HttpServletRequest request,
                                        @RequestBody(required = false) Map<String, Object> body) {
+        AuthService.Principal me = principal(request);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("text", text(body));
-        payload.put("created_by", actor(request));
+        payload.put("created_by", displayName(me));
+        payload.put("created_by_id", me.userId());
         return forward(() -> rag.extractNote(payload));
     }
 
@@ -93,32 +106,47 @@ public class AgentLearnController {
             description = "`{\"note\": {...}}` — the draft as the coder confirmed or edited it. "
                     + "The note is stored and embedded into the knowledge index, so it starts "
                     + "influencing answers immediately. Passing an existing `note.id` edits that "
-                    + "rule in place. The author is taken from the token.")
+                    + "rule in place, which only its author (or an admin) may do — anyone else "
+                    + "gets 403. The author is taken from the token and never changes on an edit.")
     public Map<String, Object> save(HttpServletRequest request,
                                     @RequestBody(required = false) Map<String, Object> body) {
         Object note = body == null ? null : body.get("note");
         if (!(note instanceof Map<?, ?> map) || map.isEmpty()) {
             throw new ApiExceptionHandler.BadRequestException("note is required");
         }
+        AuthService.Principal me = principal(request);
+        // An id in the body means "edit that rule in place" — the same act as
+        // deleting it and teaching a new one, so it needs the same permission.
+        String editing = map.get("id") instanceof String id ? id.strip() : "";
+        if (!editing.isEmpty()) {
+            requireAuthor(me, editing);
+        }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("note", map);
-        payload.put("created_by", actor(request));
+        payload.put("created_by", displayName(me));
+        payload.put("created_by_id", me.userId());
         return forward(() -> rag.saveNote(payload));
     }
 
     @PatchMapping("/api/agent/learn/notes/{noteId}")
     @Operation(summary = "Mute / un-mute a taught rule",
             description = "`?active=false` stops the rule influencing answers (its chunk leaves "
-                    + "the index) while keeping it in the list; `?active=true` puts it back.")
-    public Map<String, Object> toggle(@PathVariable String noteId,
+                    + "the index) while keeping it in the list; `?active=true` puts it back. "
+                    + "Author (or admin) only — 403 for anyone else.")
+    public Map<String, Object> toggle(HttpServletRequest request,
+                                      @PathVariable String noteId,
                                       @RequestParam(defaultValue = "true") boolean active) {
+        requireAuthor(principal(request), noteId);
         return forward(() -> rag.toggleNote(noteId, active));
     }
 
     @DeleteMapping("/api/agent/learn/notes/{noteId}")
     @Operation(summary = "Forget a taught rule",
-            description = "Removes the note and its indexed chunk. `{deleted: 0|1}`.")
-    public Map<String, Object> delete(@PathVariable String noteId) {
+            description = "Removes the note and its indexed chunk. `{deleted: 0|1}`. "
+                    + "Author (or admin) only — 403 for anyone else.")
+    public Map<String, Object> delete(HttpServletRequest request,
+                                      @PathVariable String noteId) {
+        requireAuthor(principal(request), noteId);
         return forward(() -> rag.deleteNote(noteId));
     }
 
@@ -146,14 +174,63 @@ public class AgentLearnController {
         return s.length() > MAX_TEXT_CHARS ? s.substring(0, MAX_TEXT_CHARS) : s;
     }
 
-    /** Who taught this rule — from the token, so a note can never be misattributed. */
-    private String actor(HttpServletRequest request) {
+    /** Who is calling — from the token, so a rule can never be misattributed. */
+    private AuthService.Principal principal(HttpServletRequest request) {
         Object p = request.getAttribute(AuthInterceptor.PRINCIPAL);
-        if (p instanceof AuthService.Principal principal) {
-            String name = principal.fullName();
-            return (name == null || name.isBlank()) ? principal.email() : name;
+        return p instanceof AuthService.Principal principal ? principal : ANONYMOUS;
+    }
+
+    /** How a coder is credited on a rule they teach. */
+    private static String displayName(AuthService.Principal me) {
+        String name = me.fullName();
+        return (name == null || name.isBlank()) ? me.email() : name;
+    }
+
+    /**
+     * Refuse to change someone else's rule. An unknown id passes through so
+     * RAG still answers it (404 on mute, `{deleted: 0}` on delete) rather than
+     * this turning into a probe for which rule ids exist.
+     */
+    private void requireAuthor(AuthService.Principal me, String noteId) {
+        if (isAdmin(me)) {
+            return;                          // no lookup needed
         }
-        return "coder";                      // unreachable behind the interceptor
+        Map<String, Object> note = forward(() -> rag.note(noteId));
+        if (note == null || mayManage(note, me)) {
+            return;
+        }
+        Object owner = note.get("created_by");
+        String who = owner instanceof String s && !s.isBlank() ? s : "another coder";
+        throw new ApiExceptionHandler.ForbiddenException(
+                "This rule was taught by " + who
+                        + ". Only its author can change or delete it.");
+    }
+
+    private static boolean isAdmin(AuthService.Principal me) {
+        return "admin".equals(me.role());
+    }
+
+    /**
+     * May this coder change that rule? Ownership hangs on `created_by_id`, the
+     * user id RAG stored when the rule was taught — stable across a rename and
+     * unambiguous when two coders share a display name.
+     *
+     * Rules taught before that field existed carry only the credited name, so
+     * those fall back to matching it against the caller's own name or email;
+     * one with neither belongs to nobody and stays open. Package-private so
+     * the fallbacks are unit-testable without a running RAG.
+     */
+    static boolean mayManage(Map<String, Object> note, AuthService.Principal me) {
+        if (isAdmin(me)) {
+            return true;
+        }
+        if (note.get("created_by_id") instanceof Number ownerId) {
+            return ownerId.intValue() == me.userId();
+        }
+        String owner = note.get("created_by") instanceof String s ? s.strip() : "";
+        return owner.isEmpty()
+                || owner.equalsIgnoreCase(displayName(me))
+                || owner.equalsIgnoreCase(me.email());
     }
 
     /** Run a RAG call, translating FastAPI 4xx {"detail": ...} into our 400 shape. */

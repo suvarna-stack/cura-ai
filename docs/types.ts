@@ -721,7 +721,11 @@ export type AgentChatStreamEvent =
 // extracted into a structured note, confirmed on screen, then stored AND
 // embedded into the same index as the reference PDFs. Nothing is fine-tuned:
 // the rule is listed, attributed, mutable and deletable. Any valid token;
-// `created_by` comes from the token, never the body.
+// `created_by`/`created_by_id` come from the token, never the body.
+//
+// A rule belongs to whoever taught it: everyone reads the list, but editing,
+// muting and deleting are the author's alone (403 otherwise). Admins may act
+// on any rule.
 
 /** One ICD code inside a taught rule, with the job the coder gave it. */
 export interface LearnedCode {
@@ -751,6 +755,10 @@ export interface LearnedNote {
   /** false = muted: kept in the list, pulled out of the index */
   active: boolean;
   created_by: string;
+  /** the author's user id — who may edit, mute or delete this rule.
+   *  null on a rule taught before the field existed (falls back to
+   *  matching `created_by`). Never changes: an edit does not transfer it. */
+  created_by_id: number | null;
   created_at: string;
   updated_at: string;
   /** times this rule has fired in an answer or a case suggestion */
@@ -788,7 +796,8 @@ export interface ExtractNoteRequest {
 }
 
 /** POST /api/agent/learn/notes — save the draft the coder confirmed/edited.
- *  Passing an existing `note.id` edits that rule in place. */
+ *  Passing an existing `note.id` edits that rule in place, which only its
+ *  author (or an admin) may do — anyone else gets 403. */
 export interface SaveNoteRequest {
   note: LearnedNote;
 }

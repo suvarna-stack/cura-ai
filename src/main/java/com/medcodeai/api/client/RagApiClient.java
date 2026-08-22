@@ -9,6 +9,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -250,6 +251,24 @@ public class RagApiClient {
     public Map<String, Object> notes() {
         try {
             return http.get().uri("/learn/notes").retrieve().body(OBJECT);
+        } catch (ResourceAccessException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /**
+     * GET /learn/notes/{id} — one taught rule, or null when there is no such
+     * id. RAG holds no identity, so this is how the API reads a rule's author
+     * before letting anyone edit, mute or delete it.
+     */
+    public Map<String, Object> note(String noteId) {
+        try {
+            return http.get().uri("/learn/notes/{id}", noteId).retrieve().body(OBJECT);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return null;
+            }
+            throw e;
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         }

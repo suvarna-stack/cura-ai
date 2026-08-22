@@ -751,6 +751,40 @@ Milestones (git log --oneline reads as this sequence):
   replays it exactly as the old emptiness check did. It sets
   `spring.flyway.schemas: imed` so the history table lands beside the tables it
   describes. Mock 19/19, and our 46/46 re-verified against that build.
+- ✅ **Learned rules belong to the coder who taught them (2026-08-22):** the
+  Suggest & Learn panel let any coder delete, mute or **rewrite** any other
+  coder's rule. Reading everyone's rules is the point of a shared knowledge
+  layer; changing them is not. Now `DELETE /notes/{id}`, `PATCH /notes/{id}`
+  and a `POST /notes` carrying an existing `note.id` all 403 unless the caller
+  taught the rule — **listing is untouched**, every coder still reads every
+  rule. Three decisions worth keeping:
+  - **Edit is locked, not just delete.** Rewriting a rule to say the opposite
+    neuters it as thoroughly as removing it, and `POST /notes` with an id is
+    an in-place edit — locking only DELETE would have been a lock with the
+    door open beside it. Muting is in for the same reason.
+  - **Admin overrides.** A wrong rule taught by a coder who has since left the
+    hospital still has to be removable, and admin already owns the AI Training
+    surface these rules feed.
+  - **Ownership hangs on a new `created_by_id`** (the user id from the token),
+    not the `created_by` display name — a rename must not cost a coder their
+    rules, and two coders sharing a name must stay apart. RAG records it and
+    hands it back through a new `GET /learn/notes/{id}`; **the check lives
+    here** because this is the only tier holding a token. Rules taught before
+    the field fall back to matching the credited name; one crediting nobody
+    stays open. An edit never transfers authorship (RAG keeps the original),
+    so an admin fixing someone's rule doesn't quietly become its owner. An
+    unknown note id passes through unchecked, so this can't become a probe for
+    which rule ids exist.
+  Frontend (`../audit-chart-frontend`): the rules panel draws mute/delete only
+  on rules the signed-in coder may act on and a lock with a tooltip on the
+  rest (`utils/noteOwner.ts` mirrors the server rule, it does not replace it);
+  a refused change now says so in the chat instead of `console.warn`. The
+  decision itself is pure and unit-tested without a DB or a running RAG
+  (`AgentLearnOwnershipTest`, 8 cases incl. the shared-name and rename traps);
+  RAG's `test_learn.py` covers what it records. Verified live end-to-end:
+  coder B sees coder A's rule, is refused delete/mute/edit-in-place, A and the
+  admin both succeed.
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
