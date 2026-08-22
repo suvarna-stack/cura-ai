@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
+import { useAuth } from '../../auth/hooks/useAuth'
 import { ConfirmDialog } from '../../cases/components/global/ConfirmDialog'
 import {
   agentErrorMessage,
@@ -41,6 +42,7 @@ import type {
 } from '../types/agent.types'
 import { CHIP_KEYS, TEACH_CHIP_KEYS } from '../types/agent.types'
 import { isLearnBack } from '../utils/learnBack'
+import { canManageNote } from '../utils/noteOwner'
 import { noteLine } from '../utils/noteLine'
 import { RichText } from './RichText'
 import { LearnedNoteCard } from './LearnedNoteCard'
@@ -67,6 +69,7 @@ function listTime(ts: string): string {
 export function AgentPage() {
   const { gl } = useTheme()
   const { t } = useLang()
+  const { user } = useAuth()
   const [mode, setMode] = useState<ChatMode>('dict')
   const [convo, setConvo] = useState<AgentMessage[]>([])
   const [input, setInput] = useState('')
@@ -298,13 +301,27 @@ export function AgentPage() {
     setConvo((prev) => prev.filter((m) => m.id !== cardId))
   }
 
+  /**
+   * A refused change is worth a sentence in the chat. The panel only offers
+   * these buttons on the coder's own rules, so a 403 here means the list is
+   * stale (someone else's rule arrived after it was drawn) — silence would
+   * look like the click did nothing.
+   */
+  function reportNoteFailure(err: unknown) {
+    setConvo((prev) => [
+      ...prev,
+      msg('agent', agentErrorMessage(err, t('agent.learn.error.change'))),
+    ])
+    refreshNotes()
+  }
+
   async function muteNote(note: LearnedNote) {
     setBusyNoteId(note.id)
     try {
       const updated = await toggleNote(note.id, !note.active)
       setNotes((prev) => prev.map((n) => (n.id === note.id ? updated : n)))
     } catch (err) {
-      console.warn('failed to toggle rule', err)
+      reportNoteFailure(err)
     } finally {
       setBusyNoteId(null)
     }
@@ -317,7 +334,7 @@ export function AgentPage() {
       await deleteNote(note.id)
       setNotes((prev) => prev.filter((n) => n.id !== note.id))
     } catch (err) {
-      console.warn('failed to delete rule', err)
+      reportNoteFailure(err)
     } finally {
       setBusyNoteId(null)
     }
@@ -1080,6 +1097,7 @@ export function AgentPage() {
           notes={notes}
           loading={notesLoading}
           busyId={busyNoteId}
+          canManage={(n) => canManageNote(n, user)}
           onToggle={(n) => void muteNote(n)}
           onDelete={(n) => setForgettingNote(n)}
           onClose={() => setRulesOpen(false)}

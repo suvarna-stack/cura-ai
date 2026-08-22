@@ -21,6 +21,11 @@ export type LearnedNote = {
   doc_type: string | null
   active: boolean
   created_by: string
+  /**
+   * The author's user id — who may edit, mute or delete this rule. null on a
+   * rule taught before the field existed, which falls back to `created_by`.
+   */
+  created_by_id: number | null
   created_at: string
   updated_at: string
   /** how many times this rule has fired in an answer */
@@ -94,6 +99,7 @@ export const EMPTY_NOTE: LearnedNote = {
   doc_type: null,
   active: true,
   created_by: '',
+  created_by_id: null,
   created_at: '',
   updated_at: '',
   hits: 0,

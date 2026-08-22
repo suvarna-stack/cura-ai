@@ -1,4 +1,4 @@
-import { BellOff, Bell, Trash2, X } from 'lucide-react'
+import { BellOff, Bell, Lock, Trash2, X } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
 import type { LearnedNote } from '../types/agent.types'
@@ -10,11 +10,18 @@ import type { LearnedNote } from '../types/agent.types'
  * taught what, how often it has fired, and one click to mute a rule that has
  * started doing the wrong thing. Muting keeps the rule visible but pulls its
  * chunk out of the index; deleting forgets it entirely.
+ *
+ * Everyone reads every rule — a shared knowledge layer is the point — but the
+ * mute and delete buttons appear only on rules the signed-in coder may act on
+ * (`canManage`, mirroring the server's own rule). On someone else's rule they
+ * are replaced by a lock, so it reads as "not yours" rather than as a button
+ * that quietly 403s.
  */
 export function LearnedRulesPanel({
   notes,
   loading,
   busyId,
+  canManage,
   onToggle,
   onDelete,
   onClose,
@@ -22,6 +29,8 @@ export function LearnedRulesPanel({
   notes: LearnedNote[]
   loading: boolean
   busyId: string | null
+  /** may the signed-in coder mute/delete this rule? (author or admin) */
+  canManage: (note: LearnedNote) => boolean
   onToggle: (note: LearnedNote) => void
   onDelete: (note: LearnedNote) => void
   onClose: () => void
@@ -120,32 +129,49 @@ export function LearnedRulesPanel({
                 {note.created_by || '—'} · {(note.created_at || '').slice(0, 10)}
                 {note.hits > 0 && ` · ${t('agent.learn.used')} ${note.hits}×`}
               </span>
-              <button
-                type="button"
-                disabled={busyId === note.id}
-                onClick={() => onToggle(note)}
-                title={
-                  note.active ? t('agent.learn.mute') : t('agent.learn.unmute')
-                }
-                aria-label={
-                  note.active ? t('agent.learn.mute') : t('agent.learn.unmute')
-                }
-                className="ml-auto shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
-                style={{ color: note.active ? gl.muted : gl.accent }}
-              >
-                {note.active ? <BellOff size={12} /> : <Bell size={12} />}
-              </button>
-              <button
-                type="button"
-                disabled={busyId === note.id}
-                onClick={() => onDelete(note)}
-                title={t('agent.learn.forget')}
-                aria-label={t('agent.learn.forget')}
-                className="shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
-                style={{ color: gl.danger }}
-              >
-                <Trash2 size={12} />
-              </button>
+              {canManage(note) ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busyId === note.id}
+                    onClick={() => onToggle(note)}
+                    title={
+                      note.active
+                        ? t('agent.learn.mute')
+                        : t('agent.learn.unmute')
+                    }
+                    aria-label={
+                      note.active
+                        ? t('agent.learn.mute')
+                        : t('agent.learn.unmute')
+                    }
+                    className="ml-auto shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
+                    style={{ color: note.active ? gl.muted : gl.accent }}
+                  >
+                    {note.active ? <BellOff size={12} /> : <Bell size={12} />}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === note.id}
+                    onClick={() => onDelete(note)}
+                    title={t('agent.learn.forget')}
+                    aria-label={t('agent.learn.forget')}
+                    className="shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
+                    style={{ color: gl.danger }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </>
+              ) : (
+                <span
+                  title={t('agent.learn.readonly')}
+                  aria-label={t('agent.learn.readonly')}
+                  className="ml-auto flex shrink-0 items-center"
+                  style={{ color: gl.muted }}
+                >
+                  <Lock size={12} aria-hidden="true" />
+                </span>
+              )}
             </div>
           </div>
         ))}

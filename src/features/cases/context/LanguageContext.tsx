@@ -368,6 +368,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   "agent.learn.mute":        { en: "Mute this rule", th: "ปิดใช้กฎนี้" },
   "agent.learn.unmute":      { en: "Use this rule again", th: "เปิดใช้กฎนี้อีกครั้ง" },
   "agent.learn.forget":      { en: "Forget this rule", th: "ลบกฎนี้" },
+  "agent.learn.readonly":    { en: "Taught by another coder — you can read it, but only its author can change or delete it.", th: "ผู้ให้รหัสคนอื่นเป็นผู้สอนกฎนี้ — คุณดูได้ แต่เฉพาะผู้ที่สอนเท่านั้นที่แก้ไขหรือลบได้" },
+  "agent.learn.error.change": { en: "I couldn't change that rule. Only the coder who taught it can edit, mute or delete it.", th: "เปลี่ยนกฎนี้ไม่ได้ เฉพาะผู้ให้รหัสที่สอนกฎนี้เท่านั้นที่แก้ไข ปิดใช้ หรือลบได้" },
   "agent.history.title":  { en: "Chat history", th: "ประวัติแชท" },
   "agent.history.new":    { en: "New chat", th: "แชทใหม่" },
   "agent.history.empty":  { en: "No conversations yet", th: "ยังไม่มีบทสนทนา" },
