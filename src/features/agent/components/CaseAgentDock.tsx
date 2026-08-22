@@ -646,8 +646,14 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
         </button>
 
         <div
-          className="flex items-end gap-2 rounded-2xl px-3 py-2"
-          style={{ background: gl.inputBg, border: gl.border }}
+          className="focus-pill flex items-end gap-2 rounded-2xl px-3 py-2"
+          style={
+            {
+              background: gl.inputBg,
+              border: gl.border,
+              '--focus-ring': gl.accent,
+            } as CSSProperties
+          }
         >
           <textarea
             ref={inputRef}

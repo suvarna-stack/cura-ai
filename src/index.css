@@ -92,6 +92,21 @@ body {
   outline-offset: 2px;
 }
 
+/* ...except a composer, where the ring belongs on the pill and not on the
+   bare textarea inside it: a square black box drawn inside a rounded input
+   reads as a rendering fault, not as focus. The pill lights up instead —
+   same 2px, themed via a local --focus-ring, and `outline` follows the
+   border-radius, so the indicator stays just as visible (2.4.7). Buttons
+   sharing the pill keep their own ring, which is why this is :has() on the
+   textarea rather than :focus-within on the container. */
+.focus-pill:has(textarea:focus-visible) {
+  outline: 2px solid var(--focus-ring, #2563eb);
+  outline-offset: 2px;
+}
+.focus-pill textarea:focus-visible {
+  outline: none;
+}
+
 /* WCAG 2.3.3 — kill decorative motion (tab slide, pulse/spin skeletons,
    hover scale) for users who asked the OS for reduced motion. !important
    also overrides inline transition styles. Tab switching still works: it

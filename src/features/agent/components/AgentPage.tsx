@@ -985,13 +985,16 @@ export function AgentPage() {
         )}
 
         <div
-          className="flex items-center gap-3 rounded-2xl px-4 py-2.5"
-          style={{
-            background: gl.card,
-            backdropFilter: gl.blur20,
-            border: gl.border,
-            boxShadow: gl.shadow,
-          }}
+          className="focus-pill flex items-center gap-3 rounded-2xl px-4 py-2.5"
+          style={
+            {
+              background: gl.card,
+              backdropFilter: gl.blur20,
+              border: gl.border,
+              boxShadow: gl.shadow,
+              '--focus-ring': gl.accent,
+            } as CSSProperties
+          }
         >
           <div
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
