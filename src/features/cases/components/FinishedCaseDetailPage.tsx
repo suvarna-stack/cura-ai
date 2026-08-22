@@ -2,7 +2,7 @@ import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState } from "react";
 import {
   FileText, Flag, ArrowLeft, BadgeCheck, Download, Printer,
-  RotateCcw, AlertCircle, Clock, Users,
+  RotateCcw, Clock, Users,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
@@ -11,7 +11,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
-import { ModalShell } from "../../../components/ui/Modal";
+import { ConfirmDialog } from "./global/ConfirmDialog";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
 import { ReportHeader } from "./global/ReportHeader";
@@ -38,46 +38,6 @@ function HighlightedReport({ text, accent }: { text: string; accent: string }) {
           : <span key={i}>{part}</span>
       )}
     </p>
-  );
-}
-
-// Confirmation modal for re-opening
-function ReopenModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
-  const { gl } = useTheme();
-  return (
-    <ModalShell onClose={onClose} ariaLabel="Re-open for Editing?"
-      overlayClassName=""
-      overlayStyle={{ background: gl.isDark ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.40)" }}
-      className="w-[400px] rounded-2xl overflow-hidden"
-      style={{ background: gl.isDark ? "#1e1218" : "#fff", border: `1.5px solid rgba(${gl.accentRgb},0.35)`, boxShadow: `0 24px 60px rgba(0,0,0,0.35)` }}>
-        <div className="px-5 py-4" style={{ borderBottom: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.06)` }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: `rgba(${gl.accentRgb},0.15)`, border: `1px solid rgba(${gl.accentRgb},0.25)` }}>
-              <AlertCircle size={15} style={{ color: gl.accent }} />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>Re-open for Editing?</h3>
-              <p className="text-[12px]" style={{ color: gl.muted }}>This will move the case back to Incomplete</p>
-            </div>
-          </div>
-        </div>
-        <div className="px-5 py-4">
-          <p className="text-[13px] leading-relaxed" style={{ color: gl.muted }}>
-            Re-opening this case will remove its <strong style={{ color: gl.text }}>Finished</strong> status and allow codes and the report to be edited again. This action is logged.
-          </p>
-        </div>
-        <div className="px-5 py-4 flex gap-2.5" style={{ borderTop: `1px solid rgba(${gl.accentRgb},0.12)` }}>
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold hover:opacity-80 transition-all"
-            style={{ border: `1.5px solid rgba(${gl.accentRgb},0.30)`, color: gl.text, background: "transparent" }}>Cancel</button>
-          <button onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"
-            style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 4px 16px rgba(${gl.accentRgb},0.35)` }}>
-            <RotateCcw size={12} /> Yes, Re-open
-          </button>
-        </div>
-    </ModalShell>
   );
 }
 
@@ -175,7 +135,11 @@ export function FinishedCaseDetailPage({
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
       {showReopen && (
-        <ReopenModal
+        <ConfirmDialog
+          icon={RotateCcw} danger
+          title={t("confirm.reopen.title")}
+          body={t("confirm.reopen.body", { patientName: c.patient })}
+          confirmLabel={t("confirm.reopen.confirm")}
           onConfirm={() => {
             setShowReopen(false);
             reopen(c.id);

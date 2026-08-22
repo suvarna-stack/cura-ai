@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
+import { ConfirmDialog } from '../../cases/components/global/ConfirmDialog'
 import {
   agentErrorMessage,
   appendMessages,
@@ -101,6 +102,8 @@ export function AgentPage() {
   const [notes, setNotes] = useState<LearnedNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
   const [busyNoteId, setBusyNoteId] = useState<string | null>(null)
+  // forgetting a rule is permanent — the panel asks before it calls forgetNote
+  const [forgettingNote, setForgettingNote] = useState<LearnedNote | null>(null)
 
   // --- history sidebar state -------------------------------------------
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -340,6 +343,7 @@ export function AgentPage() {
   }
 
   async function forgetNote(note: LearnedNote) {
+    setForgettingNote(null)
     setBusyNoteId(note.id)
     try {
       await deleteNote(note.id)
@@ -1111,8 +1115,21 @@ export function AgentPage() {
           loading={notesLoading}
           busyId={busyNoteId}
           onToggle={(n) => void muteNote(n)}
-          onDelete={(n) => void forgetNote(n)}
+          onDelete={(n) => setForgettingNote(n)}
           onClose={() => setRulesOpen(false)}
+        />
+      )}
+
+      {forgettingNote && (
+        <ConfirmDialog
+          icon={Trash2}
+          danger
+          busy={busyNoteId === forgettingNote.id}
+          title={t('confirm.forgetRule.title')}
+          body={t('confirm.forgetRule.body')}
+          confirmLabel={t('confirm.forgetRule.confirm')}
+          onConfirm={() => void forgetNote(forgettingNote)}
+          onClose={() => setForgettingNote(null)}
         />
       )}
     </main>

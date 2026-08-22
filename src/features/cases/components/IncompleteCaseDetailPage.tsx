@@ -21,7 +21,7 @@ import { Field } from "./codes/Field";
 import { ModalShell } from "../../../components/ui/Modal";
 import { CodesColumn } from "./codes/CodesColumn";
 import type { CodeSystem } from "./codes/CodesColumn";
-import { ConfirmDialog } from "./codes/ConfirmDialog";
+import { ConfirmDialog } from "./global/ConfirmDialog";
 import { ReportHeader } from "./global/ReportHeader";
 import { ReportOrders } from "./global/ReportOrders";
 import { VitalsStrip } from "./global/VitalsStrip";
@@ -287,6 +287,20 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   const [adding, setAdding] = useState<CodeSystem | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
+  // un-approving withdraws codes already written back to iMed, so it is gated
+  // exactly like approving is — the shared button flips between the two
+  const [confirmingUnapprove, setConfirmingUnapprove] = useState(false);
+
+  const handleUnapprove = () => {
+    setConfirmingUnapprove(false);
+    reopen(c.id);
+    const logId = addLog({
+      userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
+      targetId: c.id, targetType: "case",
+      description: `Reopened case for ${c.patient}`, previousState: null,
+    });
+    showToast(`Reopened case for ${c.patient}`, logId);
+  };
 
   const persistCodes = (next: StoredCode[]) => { setCodes(next); saveCodeEdits(c.id, next); };
 
@@ -502,6 +516,17 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         />
       )}
 
+      {confirmingUnapprove && (
+        <ConfirmDialog
+          icon={RotateCcw} danger
+          title={t("confirm.unapprove.title")}
+          body={t("confirm.unapprove.body", { patientName: c.patient })}
+          confirmLabel={t("detail.unapprove")}
+          onConfirm={handleUnapprove}
+          onClose={() => setConfirmingUnapprove(false)}
+        />
+      )}
+
       <header className="shrink-0 px-6 py-3.5 flex items-center justify-between"
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
         <div className="flex items-center gap-3">
@@ -542,7 +567,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           </button>
           {/* approve sends the ticked codes only — blocked (with the reason)
               while nothing is ticked, rather than finalizing an empty case */}
-          <button onClick={() => (approved ? reopen(c.id) : setConfirmingApprove(true))}
+          <button onClick={() => (approved ? setConfirmingUnapprove(true) : setConfirmingApprove(true))}
             disabled={!approved && picked === 0}
             title={!approved && picked === 0 ? t("code.pickNone") : undefined}
             className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed"

@@ -235,6 +235,10 @@ export function TrainingPage() {
   const [log, setLog] = useState<string[]>([])
 
   const [syncingCodes, setSyncingCodes] = useState(false)
+  // Both buttons below run long and rewrite shared state — the vector index the
+  // coding AI queries, and the icd_codes table medcode-api reads. Ask first.
+  const [confirmingTrain, setConfirmingTrain] = useState(false)
+  const [confirmingCodeSync, setConfirmingCodeSync] = useState(false)
   const [codeSync, setCodeSync] = useState<CodeSyncResult | null>(null)
   const [codeSyncError, setCodeSyncError] = useState<string | null>(null)
 
@@ -438,6 +442,7 @@ export function TrainingPage() {
   const untaggedDocs = docs.filter((d) => !d.docType)
 
   const startTraining = () => {
+    setConfirmingTrain(false)
     if (training || busy || !docs.length) return
     setTraining(true)
     trainStart.current = Date.now()
@@ -460,6 +465,7 @@ export function TrainingPage() {
   }
 
   const runCodeSync = () => {
+    setConfirmingCodeSync(false)
     if (syncingCodes) return
     setSyncingCodes(true)
     setCodeSyncError(null)
@@ -881,7 +887,7 @@ export function TrainingPage() {
           </p>
 
           <Button
-            onClick={startTraining}
+            onClick={() => setConfirmingTrain(true)}
             disabled={training || busy || uploading !== null || !docs.length}
             fullWidth
           >
@@ -910,7 +916,7 @@ export function TrainingPage() {
             </p>
             <Button
               variant="secondary"
-              onClick={runCodeSync}
+              onClick={() => setConfirmingCodeSync(true)}
               disabled={syncingCodes || !docs.length}
               fullWidth
             >
@@ -1111,6 +1117,28 @@ export function TrainingPage() {
             })()
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+
+      {confirmingTrain && (
+        <ConfirmModal
+          title={lastRun ? 'Retrain the index' : 'Train the AI'}
+          message={`Re-embed all ${docs.length} document${docs.length === 1 ? '' : 's'} and rebuild the vector index the coding AI queries? Suggestions keep using the current index until the rebuild finishes.`}
+          confirmLabel={lastRun ? 'Retrain index' : 'Train AI'}
+          variant="primary"
+          onConfirm={startTraining}
+          onClose={() => setConfirmingTrain(false)}
+        />
+      )}
+
+      {confirmingCodeSync && (
+        <ConfirmModal
+          title="Sync codes to system DB"
+          message={`Extract ICD codes and titles from all ${docs.length} uploaded document${docs.length === 1 ? '' : 's'} into the system's icd_codes table? New codes are inserted; existing descriptions are never overwritten.`}
+          confirmLabel="Sync codes"
+          variant="primary"
+          onConfirm={runCodeSync}
+          onClose={() => setConfirmingCodeSync(false)}
         />
       )}
 

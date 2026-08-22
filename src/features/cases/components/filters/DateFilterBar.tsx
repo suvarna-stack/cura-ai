@@ -24,7 +24,7 @@ function isoToday(): string {
 export function DateFilterBar({ f }: { f: CaseFilters }) {
   const { gl } = useTheme();
   const { t } = useLang();
-  const { syncing, lastSync, runSync } = useSync();
+  const { syncing, lastSync, requestSync } = useSync();
   const syncFailed = lastSync === "sync.failed";
 
   const w = f.syncWindow;
@@ -145,7 +145,7 @@ export function DateFilterBar({ f }: { f: CaseFilters }) {
       {/* the action: pull the selected period from the hospital — or everything.
           The ONLY sync control (header button removed 2026-08-05), so it also
           carries the danger tint when the last run failed. */}
-      <button onClick={() => runSync(w ?? undefined)} disabled={syncing}
+      <button onClick={() => requestSync(w ?? undefined)} disabled={syncing}
         className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-all disabled:opacity-60"
         style={syncFailed
           ? {

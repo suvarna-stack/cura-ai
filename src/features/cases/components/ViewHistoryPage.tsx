@@ -10,6 +10,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useLang } from "../context/LanguageContext";
 import { useActivityLog } from "../context/ActivityLogContext";
 import { useCaseDetail } from "../hooks/useCaseDetail";
+import { ConfirmDialog } from "./global/ConfirmDialog";
 import { formatDateTime } from "../utils/formatDate";
 import { actionIcon } from "../utils/actionIcon";
 import { UNDOABLE_ACTIONS, UNDO_WINDOW_MS } from "../types/activityLog.types";
@@ -49,6 +50,9 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
   const { logs, undoLog } = useActivityLog();
   useDocumentTitle(t("history.title"));
   const [undoneToast, setUndoneToast] = useState(false);
+  // an undone approval withdraws codes from iMed and puts the case back in its
+  // queue, so the timeline asks before it reverses anything
+  const [pendingUndo, setPendingUndo] = useState<{ id: string; description: string } | null>(null);
 
   // local (this browser, undoable) + server (every coder, read-only), newest first
   const { detail } = useCaseDetail(caseId);
@@ -67,6 +71,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
   }, []);
 
   const handleUndo = (id: string) => {
+    setPendingUndo(null);
     if (undoLog(id)) {
       setUndoneToast(true);
       setTimeout(() => setUndoneToast(false), 3000);
@@ -75,6 +80,17 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
+      {pendingUndo && (
+        <ConfirmDialog
+          icon={Undo2} danger
+          title={t("confirm.undo.title")}
+          body={t("confirm.undo.body", { action: pendingUndo.description })}
+          confirmLabel={t("confirm.undo.confirm")}
+          onConfirm={() => handleUndo(pendingUndo.id)}
+          onClose={() => setPendingUndo(null)}
+        />
+      )}
+
       {/* header — matches the detail pages' header pattern */}
       <header className="shrink-0 px-6 py-3.5 flex items-center gap-3"
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
@@ -151,7 +167,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
                           ↩️ {t("activity.undone")}
                         </span>
                       ) : canUndo && (
-                        <button onClick={() => handleUndo(log!.id)}
+                        <button onClick={() => setPendingUndo({ id: log!.id, description })}
                           className="flex items-center gap-1 text-[12px] font-bold mt-1.5 px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
                           style={{ background: "transparent", color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
                           <Undo2 size={10} /> {t("activity.undo")}

@@ -14,6 +14,12 @@ type SyncCtxValue = {
   syncVersion: number;
   /** no window (or an empty one) pulls everything, as before */
   runSync: (window?: SyncWindow) => void;
+  /**
+   * Ask before syncing. A sync re-pulls the hospital's records over the
+   * dashboard, so every UI trigger goes through here; runSync stays the raw
+   * action for anything that has already confirmed.
+   */
+  requestSync: (window?: SyncWindow) => void;
 };
 
 export const SyncCtx = createContext<SyncCtxValue>({
@@ -21,6 +27,7 @@ export const SyncCtx = createContext<SyncCtxValue>({
   lastSync: "sync.ago2m",
   syncVersion: 0,
   runSync: () => {},
+  requestSync: () => {},
 });
 
 export const useSync = () => useContext(SyncCtx);

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../features/auth/hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
+import { ConfirmModal } from './ui/Modal'
 
 // Strict role separation (Phase 3): no cross-link to the coder's /cases —
 // admins see admin pages only (the router would bounce it anyway).
@@ -30,7 +31,13 @@ export function AdminLayout() {
     active: mobileOpen,
   })
 
+  // Ending the admin session is one click away from every page — ask first.
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
   const handleLogout = () => {
+    if (loggingOut) return
+    setLoggingOut(true)
     void logout().finally(() => navigate('/login', { replace: true }))
   }
 
@@ -70,7 +77,10 @@ export function AdminLayout() {
 
       <button
         type="button"
-        onClick={handleLogout}
+        onClick={() => {
+          setMobileOpen(false)
+          setConfirmingLogout(true)
+        }}
         className="flex items-center gap-3 border-t border-border px-5 py-3.5 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/10"
       >
         <LogOut size={15} /> Logout
@@ -80,6 +90,17 @@ export function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-bg text-text">
+      {confirmingLogout && (
+        <ConfirmModal
+          title="Log out"
+          message="End this admin session and return to the login screen?"
+          confirmLabel="Log out"
+          variant="primary"
+          busy={loggingOut}
+          onConfirm={handleLogout}
+          onClose={() => setConfirmingLogout(false)}
+        />
+      )}
       {/* keyboard users skip the sidebar on every page (WCAG 2.4.1) */}
       <a
         href="#main"

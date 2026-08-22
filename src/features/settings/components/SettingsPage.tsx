@@ -13,6 +13,7 @@ import { useTheme, themes } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
 import type { Lang } from '../../cases/context/LanguageContext'
 import { GlassCard } from '../../cases/components/global/GlassCard'
+import { ConfirmDialog } from '../../cases/components/global/ConfirmDialog'
 import type { ThemeId } from '../../cases/types/theme.types'
 import { useApprovals } from '../../cases/context/ApprovalsContext'
 import {
@@ -51,6 +52,9 @@ export function SettingsPage() {
   const { approvedIds } = useApprovals()
   const [resetProgress, setResetProgress] = useState<number | null>(null)
   const resetting = resetProgress !== null
+  // Reset reopens EVERY approved case and withdraws its iMed write-back, so
+  // it is gated the same way single-case reopen is.
+  const [confirmingReset, setConfirmingReset] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -82,6 +86,8 @@ export function SettingsPage() {
       await resetDemoApprovals()
     } catch {
       setResetProgress(null)
+    } finally {
+      setConfirmingReset(false)
     }
   }
 
@@ -113,6 +119,19 @@ export function SettingsPage() {
           </p>
         </div>
       </header>
+
+      {confirmingReset && (
+        <ConfirmDialog
+          icon={RotateCcw}
+          danger
+          busy={resetting}
+          title={t('confirm.reset.title')}
+          body={t('confirm.reset.body', { n: approvedCount })}
+          confirmLabel={t('confirm.reset.confirm')}
+          onConfirm={() => void resetDemo()}
+          onClose={() => setConfirmingReset(false)}
+        />
+      )}
 
       <div className="max-w-2xl space-y-6 p-6">
         <GlassCard className="p-5">
@@ -365,7 +384,7 @@ export function SettingsPage() {
             </span>
             <button
               type="button"
-              onClick={() => void resetDemo()}
+              onClick={() => setConfirmingReset(true)}
               disabled={approvedCount === 0 || resetting}
               className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-bold transition-all hover:opacity-90 disabled:opacity-40"
               style={{

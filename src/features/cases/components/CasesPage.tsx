@@ -10,7 +10,7 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
-import { ModalShell } from "../../../components/ui/Modal";
+import { ConfirmDialog } from "./global/ConfirmDialog";
 import { Pagination } from "./global/Pagination";
 import { EmptyState } from "./global/EmptyState";
 import { CasePreview } from "./global/CasePreview";
@@ -147,7 +147,7 @@ export function CasesPage({
   setTab: (t: CaseTab) => void;
 }) {
   const { gl } = useTheme();
-  const { syncing, syncVersion, runSync } = useSync();
+  const { syncing, syncVersion, requestSync } = useSync();
   const { t } = useLang();
   useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
@@ -176,6 +176,20 @@ export function CasesPage({
   const { showToast } = useToast();
   const [pendingApproval, setPendingApproval] = useState<{ n: number; ids: string[]; run: () => void } | null>(null);
   const askApprove = (ids: string[], run: () => void) => { if (ids.length > 0) setPendingApproval({ n: ids.length, ids, run }); };
+  // reopen withdraws codes already written back to iMed — same gate as approve
+  const [pendingReopen, setPendingReopen] = useState<{ id: string; patient: string } | null>(null);
+  const confirmReopen = () => {
+    if (!pendingReopen) return;
+    const { id, patient } = pendingReopen;
+    setPendingReopen(null);
+    reopen(id);
+    const logId = addLog({
+      userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
+      targetId: id, targetType: "case",
+      description: `Reopened case for ${patient}`, previousState: null,
+    });
+    showToast(`Reopened case for ${patient}`, logId);
+  };
   const confirmApproval = () => {
     if (!pendingApproval) return;
     pendingApproval.run();
@@ -559,7 +573,7 @@ export function CasesPage({
                   {unfilteredComplete === 0 && (noData ? (
                     <EmptyState icon={CheckCircle2}
                       title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
-                      actionLabel={t("empty.noData.action")} onAction={runSync} />
+                      actionLabel={t("empty.noData.action")} onAction={() => requestSync()} />
                   ) : (
                     <EmptyState icon={CheckCircle2}
                       title={t("empty.complete.title")} subtext={t("empty.complete.sub")}
@@ -655,7 +669,7 @@ export function CasesPage({
                   {unfilteredIncomplete === 0 && (noData ? (
                     <EmptyState icon={AlertCircle}
                       title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
-                      actionLabel={t("empty.noData.action")} onAction={runSync} />
+                      actionLabel={t("empty.noData.action")} onAction={() => requestSync()} />
                   ) : (
                     <EmptyState icon={AlertCircle}
                       title={t("empty.incomplete.title")} subtext={t("empty.incomplete.sub")}
@@ -899,13 +913,7 @@ export function CasesPage({
                         style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}
                         onClick={e => {
                           e.stopPropagation();
-                          reopen(c.id);
-                          const logId = addLog({
-                            userId: me.userId, userName: me.userName, actionType: "REOPEN_CASE",
-                            targetId: c.id, targetType: "case",
-                            description: `Reopened case for ${c.patient}`, previousState: null,
-                          });
-                          showToast(`Reopened case for ${c.patient}`, logId);
+                          setPendingReopen({ id: c.id, patient: c.patient });
                         }}>
                         {t("btn.reopen")}
                       </button>
@@ -931,36 +939,27 @@ export function CasesPage({
 
       {/* approval confirmation dialog — gates every approve action (F14) */}
       {pendingApproval && (
-        <ModalShell onClose={() => setPendingApproval(null)} ariaLabel={t("confirm.title")}
-          overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
-          className="w-full max-w-sm rounded-2xl p-5"
-          style={{
-            background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
-            border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
-          }}>
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
-                style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent }}>
-                <CheckCircle2 size={18} />
-              </div>
-              <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>{t("confirm.title")}</h3>
-            </div>
-            <p className="text-[12px] font-normal leading-relaxed mb-4" style={{ color: gl.muted }}>
-              {t("confirm.body", { n: pendingApproval.n })}
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setPendingApproval(null)}
-                className="text-[12px] font-semibold px-4 py-2 rounded-lg hover:opacity-80 transition-all"
-                style={{ border: gl.border, color: gl.text, background: gl.inputBg }}>
-                {t("confirm.cancel")}
-              </button>
-              <button onClick={confirmApproval}
-                className="flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all"
-                style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
-                <CheckCircle2 size={12} /> {t("confirm.confirm", { n: pendingApproval.n })}
-              </button>
-            </div>
-        </ModalShell>
+        <ConfirmDialog
+          icon={CheckCircle2}
+          title={t("confirm.title")}
+          body={t("confirm.body", { n: pendingApproval.n })}
+          confirmLabel={t("confirm.confirm", { n: pendingApproval.n })}
+          onConfirm={confirmApproval}
+          onClose={() => setPendingApproval(null)}
+        />
+      )}
+
+      {/* reopen confirmation — the counterpart gate on the Finished tab */}
+      {pendingReopen && (
+        <ConfirmDialog
+          icon={RotateCcw}
+          danger
+          title={t("confirm.reopen.title")}
+          body={t("confirm.reopen.body", { patientName: pendingReopen.patient })}
+          confirmLabel={t("confirm.reopen.confirm")}
+          onConfirm={confirmReopen}
+          onClose={() => setPendingReopen(null)}
+        />
       )}
     </main>
   );

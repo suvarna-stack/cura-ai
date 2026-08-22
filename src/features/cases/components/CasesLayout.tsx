@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -7,6 +8,7 @@ import {
   Cpu,
   LogOut,
 } from 'lucide-react'
+import { ConfirmDialog } from './global/ConfirmDialog'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
 import { CasesProviders } from '../context/CasesProviders'
@@ -28,8 +30,14 @@ function CoderShell() {
   // The agent page is a chat: lock the shell to the viewport so only its
   // message list scrolls. Every other page keeps normal document scrolling.
   const chatShell = pathname.startsWith('/agent')
+  // Logging out drops the held case lock and any unapproved code edits, so the
+  // button asks first rather than ending the session on a stray click.
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const handleLogout = () => {
+    if (loggingOut) return
+    setLoggingOut(true)
     void logout().finally(() => navigate('/login', { replace: true }))
   }
 
@@ -104,7 +112,7 @@ function CoderShell() {
           {/* Logout — neutral glass chip */}
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => setConfirmingLogout(true)}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-95"
             style={{ color: gl.text, background: gl.card, border: gl.borderSm }}
           >
@@ -113,6 +121,18 @@ function CoderShell() {
           </button>
         </div>
       </header>
+
+      {confirmingLogout && (
+        <ConfirmDialog
+          icon={LogOut}
+          busy={loggingOut}
+          title={t('confirm.logout.title')}
+          body={t('confirm.logout.body')}
+          confirmLabel={t('confirm.logout.confirm')}
+          onConfirm={handleLogout}
+          onClose={() => setConfirmingLogout(false)}
+        />
+      )}
 
       {/* #main skip-link target — the pages inside render their own <main> */}
       <div id="main" tabIndex={-1} className="flex min-h-0 flex-1">

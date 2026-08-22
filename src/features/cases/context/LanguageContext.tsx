@@ -373,6 +373,61 @@ export const dict: Record<string, { en: string; th: string }> = {
   "agent.history.empty":  { en: "No conversations yet", th: "ยังไม่มีบทสนทนา" },
   "agent.history.loading": { en: "Loading…", th: "กำลังโหลด…" },
   "agent.history.confirm": { en: "Delete?", th: "ลบ?" },
+  // ---- confirmation dialogs for consequential actions -------------------
+  // Every button that writes to the hospital, wipes local work, or ends the
+  // session is gated by ConfirmDialog; these are its strings.
+  "confirm.working":  { en: "Working…", th: "กำลังดำเนินการ…" },
+  // reopen / unapprove — reverses a hospital write-back
+  "confirm.reopen.title": { en: "Reopen this case?", th: "เปิดเคสนี้ใหม่?" },
+  "confirm.reopen.body": {
+    en: "Reopening {patientName}'s case removes its Finished status and sends the case back for editing. The codes already written to iMed are withdrawn. This action is logged.",
+    th: "การเปิดเคสของ {patientName} ใหม่จะยกเลิกสถานะเสร็จสิ้น และส่งเคสกลับไปแก้ไข รหัสที่บันทึกลง iMed แล้วจะถูกเพิกถอน การกระทำนี้จะถูกบันทึกไว้",
+  },
+  "confirm.reopen.confirm": { en: "Yes, reopen", th: "ใช่ เปิดใหม่" },
+  "confirm.unapprove.title": { en: "Undo this approval?", th: "ยกเลิกการอนุมัติ?" },
+  "confirm.unapprove.body": {
+    en: "This withdraws the codes already approved for {patientName} and returns the case for editing. This action is logged.",
+    th: "การดำเนินการนี้จะเพิกถอนรหัสที่อนุมัติไว้แล้วสำหรับ {patientName} และส่งเคสกลับไปแก้ไข การกระทำนี้จะถูกบันทึกไว้",
+  },
+  // iMed sync — pulls fresh hospital data over the current dashboard
+  "confirm.sync.title": { en: "Sync from iMed?", th: "ซิงค์ข้อมูลจาก iMed?" },
+  "confirm.sync.bodyAll": {
+    en: "This pulls every available visit from the hospital system and refreshes the dashboard. Cases you have not approved yet are reloaded from iMed.",
+    th: "ระบบจะดึงข้อมูลการเข้ารับบริการทั้งหมดจากระบบโรงพยาบาล และรีเฟรชแดชบอร์ด เคสที่ยังไม่ได้อนุมัติจะถูกโหลดใหม่จาก iMed",
+  },
+  "confirm.sync.bodyWindow": {
+    en: "This pulls visits for {window} from the hospital system and refreshes the dashboard. Cases you have not approved yet are reloaded from iMed.",
+    th: "ระบบจะดึงข้อมูลการเข้ารับบริการช่วง {window} จากระบบโรงพยาบาล และรีเฟรชแดชบอร์ด เคสที่ยังไม่ได้อนุมัติจะถูกโหลดใหม่จาก iMed",
+  },
+  "confirm.sync.confirm": { en: "Sync now", th: "ซิงค์เลย" },
+  // Settings → reset demo — reopens every approved case at once
+  "confirm.reset.title": { en: "Reset the demo?", th: "รีเซ็ตเดโม?" },
+  "confirm.reset.body": {
+    en: "Every approved case ({n}) is reopened and returned to its original tab, and the codes written back to iMed are withdrawn. This cannot be undone.",
+    th: "เคสที่อนุมัติแล้วทั้งหมด ({n} เคส) จะถูกเปิดใหม่และย้ายกลับไปยังแท็บเดิม และรหัสที่บันทึกกลับไปยัง iMed จะถูกเพิกถอน ไม่สามารถย้อนกลับได้",
+  },
+  "confirm.reset.confirm": { en: "Reset demo", th: "รีเซ็ตเดโม" },
+  // logout — a held case lock and unsaved code edits go with it
+  "confirm.logout.title": { en: "Log out?", th: "ออกจากระบบ?" },
+  "confirm.logout.body": {
+    en: "You will be returned to the login screen. Any case you have open is released and code edits that were not approved are not kept.",
+    th: "ระบบจะพากลับไปยังหน้าเข้าสู่ระบบ เคสที่คุณเปิดค้างไว้จะถูกปลดล็อก และการแก้ไขรหัสที่ยังไม่ได้อนุมัติจะไม่ถูกบันทึก",
+  },
+  "confirm.logout.confirm": { en: "Log out", th: "ออกจากระบบ" },
+  // Agent → learned rules
+  "confirm.forgetRule.title": { en: "Forget this rule?", th: "ลบกฎนี้?" },
+  "confirm.forgetRule.body": {
+    en: "The AI stops applying this rule to future suggestions. It is deleted permanently and cannot be restored.",
+    th: "AI จะหยุดใช้กฎนี้กับคำแนะนำในอนาคต กฎจะถูกลบถาวรและไม่สามารถกู้คืนได้",
+  },
+  "confirm.forgetRule.confirm": { en: "Forget", th: "ลบ" },
+  // activity log → undo
+  "confirm.undo.title": { en: "Undo this action?", th: "ยกเลิกการกระทำนี้?" },
+  "confirm.undo.body": {
+    en: "This reverses \u201c{action}\u201d. If it was an approval, the codes are withdrawn from iMed and the case returns to its queue.",
+    th: "ระบบจะย้อนกลับ \u201c{action}\u201d หากเป็นการอนุมัติ รหัสจะถูกเพิกถอนจาก iMed และเคสจะกลับไปยังคิวเดิม",
+  },
+  "confirm.undo.confirm": { en: "Undo", th: "ยกเลิก" },
   "agent.searched.icd10":  { en: "Searched ICD-10 references only", th: "ค้นหาจากเอกสาร ICD-10 เท่านั้น" },
   "agent.searched.icd9cm": { en: "Searched ICD-9 references only", th: "ค้นหาจากเอกสาร ICD-9 เท่านั้น" },
 };
