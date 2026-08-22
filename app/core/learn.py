@@ -118,8 +118,16 @@ def get_note(note_id: str) -> dict[str, Any] | None:
         return _load().get(note_id)
 
 
-def save_note(draft: dict[str, Any], created_by: str = "") -> dict[str, Any]:
-    """Persist a (possibly coder-edited) draft and index it for retrieval."""
+def save_note(draft: dict[str, Any], created_by: str = "",
+              created_by_id: int | None = None) -> dict[str, Any]:
+    """Persist a (possibly coder-edited) draft and index it for retrieval.
+
+    `created_by_id` is the author's stable key. This module never enforces
+    anything with it — it has no idea who is calling — it only records it, so
+    the caller that DOES hold the identity (medcode-api, which reads it off
+    the token) can refuse an edit or a delete from anyone but the author. On
+    an edit the original author is kept: editing does not transfer ownership.
+    """
     note = _normalize(draft)
     note_id = note.get("id") or _new_id()
     existing = get_note(note_id) or {}
@@ -127,7 +135,8 @@ def save_note(draft: dict[str, Any], created_by: str = "") -> dict[str, Any]:
 
     note.update({
         "id": note_id,
-        "created_by": created_by or existing.get("created_by") or "coder",
+        "created_by": existing.get("created_by") or created_by or "coder",
+        "created_by_id": existing.get("created_by_id", created_by_id),
         "created_at": existing.get("created_at") or now,
         "updated_at": now,
         "hits": existing.get("hits", 0),
@@ -466,7 +475,8 @@ _EXTRACT_PROMPT = (
 )
 
 
-def extract_note(text: str, created_by: str = "") -> dict[str, Any]:
+def extract_note(text: str, created_by: str = "",
+                 created_by_id: int | None = None) -> dict[str, Any]:
     """Free-text rule -> unsaved draft note, ready for the confirm card."""
     raw = (text or "").strip()
     if not raw:
@@ -510,6 +520,7 @@ def extract_note(text: str, created_by: str = "") -> dict[str, Any]:
 
     draft = _normalize({**base, "raw_text": raw})
     draft["created_by"] = created_by
+    draft["created_by_id"] = created_by_id
     draft["extraction"] = "llm" if llm else "rules"
     return draft
 

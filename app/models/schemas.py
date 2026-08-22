@@ -216,6 +216,10 @@ class LearnedNote(BaseModel):
     doc_type: str | None = None      # icd10 | icd9cm | None (mixed)
     active: bool = True
     created_by: str = ""
+    # Stable owner key: the caller's user id, so ownership survives a rename
+    # and never collides on two coders sharing a display name. None on notes
+    # taught before this field existed (and on drafts from an anonymous call).
+    created_by_id: int | None = None
     created_at: str = ""
     updated_at: str = ""
     hits: int = 0                    # times this rule fired in an answer
@@ -241,12 +245,14 @@ class ExtractNoteRequest(BaseModel):
     """Free-text rule -> draft note. Nothing is stored by this call."""
     text: str = Field(..., min_length=1, max_length=2000)
     created_by: str = ""
+    created_by_id: int | None = None
 
 
 class SaveNoteRequest(BaseModel):
     """Save a draft the coder confirmed (or edited) on the card."""
     note: LearnedNote
     created_by: str = ""
+    created_by_id: int | None = None
 
 
 class ClassifyRequest(BaseModel):

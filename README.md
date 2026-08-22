@@ -134,6 +134,7 @@ Response shape:
 | POST | `/learn/extract` | plain-language rule → structured draft (stores nothing) |
 | POST | `/learn/notes` | save a confirmed draft + index it for retrieval |
 | GET | `/learn/notes` | list taught rules (incl. muted) |
+| GET | `/learn/notes/{id}` | one rule — who taught it, for the caller's auth check |
 | PATCH | `/learn/notes/{id}?active=` | mute / un-mute a rule |
 | DELETE | `/learn/notes/{id}` | forget a rule |
 | POST | `/learn/match` | which taught rules apply to this narrative? |
@@ -169,6 +170,12 @@ Two properties this deliberately keeps:
 
 - **Nothing is trained.** Learning is retrieval-time. Every rule is listed,
   attributed, mutable and deletable — the audit trail a hospital needs.
+- **Attribution is recorded, not enforced here.** A note carries
+  `created_by` and `created_by_id`, both supplied by the caller; this service
+  holds no identity and refuses nothing. medcode-api — the only tier with a
+  token — reads `created_by_id` back (that is what `GET /learn/notes/{id}` is
+  for) and lets only the author, or an admin, edit, mute or delete a rule.
+  A rule's author never changes: an edit keeps the original.
 - **Nothing is invented.** Codes the model proposes are dropped unless the
   coder typed them; prose that echoes the prompt or shares no words with the
   coder's sentence is discarded; a reason is recorded only when the coder

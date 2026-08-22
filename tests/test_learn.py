@@ -249,6 +249,34 @@ def test_delete_removes_note_and_chunk(store):
     assert learn.delete_note(note["id"]) is False
 
 
+# --------------------------- authorship ---------------------------
+# This module enforces nothing — it has no idea who is calling. It records who
+# taught a rule so medcode-api, which holds the token, can refuse an edit or a
+# delete from anyone but the author.
+
+def test_a_rule_records_the_author_id_that_taught_it(store):
+    note = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."),
+                           created_by="Frank", created_by_id=7)
+    assert note["created_by_id"] == 7
+    assert learn.get_note(note["id"])["created_by_id"] == 7
+
+
+def test_editing_never_transfers_ownership(store):
+    note = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."),
+                           created_by="Frank", created_by_id=7)
+    # An admin fixing someone else's rule leaves the credit where it was.
+    edited = learn.save_note({**note, "rule": "code E11.22 first"},
+                             created_by="Ann", created_by_id=9)
+    assert edited["created_by_id"] == 7
+    assert edited["created_by"] == "Frank"
+
+
+def test_a_rule_taught_before_author_ids_keeps_none(store):
+    note = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."),
+                           created_by="Frank")
+    assert note["created_by_id"] is None
+
+
 # --------------------------- matching ---------------------------
 
 def test_matching_narrative_finds_the_rule(store):

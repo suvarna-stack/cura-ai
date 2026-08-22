@@ -6,10 +6,15 @@ The flow the Agent page drives:
   POST /learn/extract   free text -> draft note                  (nothing saved)
   POST /learn/notes     the confirmed/edited draft -> stored + indexed
   GET  /learn/notes     review list (what has this hospital taught?)
+  GET  /learn/notes/{id}  one rule — who owns it, for the caller's auth check
   POST /learn/match     which rules apply to this case narrative?
 
 Extraction and saving are deliberately separate calls: nothing enters the
 knowledge layer until a human has seen exactly what the AI understood.
+
+This service has no identity of its own and enforces no ownership: it records
+`created_by_id` and hands it back, and medcode-api — the only thing that holds
+a token — decides whether the caller may edit, mute or delete a given rule.
 """
 from __future__ import annotations
 
@@ -44,7 +49,8 @@ def classify(req: ClassifyRequest) -> ClassifyResponse:
 @router.post("/extract", response_model=LearnedNote)
 def extract(req: ExtractNoteRequest) -> LearnedNote:
     """Free-text rule -> structured draft for the confirm card. Not stored."""
-    draft = learn.extract_note(req.text, created_by=req.created_by)
+    draft = learn.extract_note(req.text, created_by=req.created_by,
+                               created_by_id=req.created_by_id)
     if not draft["codes"] and not draft["scenario"]:
         raise HTTPException(
             status_code=400,
@@ -62,6 +68,16 @@ def list_notes(include_inactive: bool = True) -> NotesResponse:
     )
 
 
+@router.get("/notes/{note_id}", response_model=LearnedNote)
+def read_note(note_id: str) -> LearnedNote:
+    """One rule by id — how the caller learns who its author is before
+    allowing an edit, a mute or a delete."""
+    note = learn.get_note(note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="note not found")
+    return LearnedNote(**_fill(note))
+
+
 @router.post("/notes", response_model=LearnedNote)
 def save_note(req: SaveNoteRequest) -> LearnedNote:
     """Store a confirmed draft and embed it into the shared index.
@@ -73,7 +89,11 @@ def save_note(req: SaveNoteRequest) -> LearnedNote:
     if not draft.get("codes") and not draft.get("scenario"):
         raise HTTPException(status_code=400,
                             detail="A note needs at least a scenario or a code.")
-    note = learn.save_note(draft, created_by=req.created_by or req.note.created_by)
+    note = learn.save_note(draft,
+                           created_by=req.created_by or req.note.created_by,
+                           created_by_id=req.created_by_id
+                           if req.created_by_id is not None
+                           else req.note.created_by_id)
     return LearnedNote(**_fill(note))
 
 
@@ -113,5 +133,5 @@ def _applied(note: dict) -> AppliedNote:
 
 def _fill(note: dict) -> dict:
     """Stored notes predate optional fields; give Pydantic sane defaults."""
-    return {"extraction": "", "match": None, **note,
+    return {"extraction": "", "match": None, "created_by_id": None, **note,
             "id": note.get("id") or ""}
