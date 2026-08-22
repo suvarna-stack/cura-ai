@@ -25,6 +25,7 @@ import { codeTypeFromRole } from "../utils/aiSuggestions";
 import { buildCaseReportDocument, caseReportFilename } from "../utils/caseReportDocument";
 import { printHtmlDocument, openHtmlPreview } from "../utils/printDocument";
 import type { FinishedCase } from "../types/case.types";
+import { CaseAgentDock } from "../../agent/components/CaseAgentDock";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
  *  MedHack_MedicalRecord sections are emphasised in the accent colour. */
@@ -261,6 +262,12 @@ export function FinishedCaseDetailPage({
           />
         ))}
       </div>
+
+      {/* The agent, floating on top of the case: a code question gets answered
+          here instead of costing a trip to /agent and the record on screen. */}
+      <CaseAgentDock ctx={{ caseId: c.id, vn: c.vn ?? c.id,
+                            hn: dc?.patient_ref ?? c.hn ?? null,
+                            dept: c.dept ?? dc?.department ?? undefined, detail, codes: codes }} />
     </main>
   );
 }

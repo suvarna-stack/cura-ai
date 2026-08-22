@@ -40,6 +40,7 @@ import type {
   LearnedNote,
 } from '../types/agent.types'
 import { CHIP_KEYS, TEACH_CHIP_KEYS } from '../types/agent.types'
+import { RichText } from './RichText'
 import { LearnedNoteCard } from './LearnedNoteCard'
 import { LearnedRulesPanel } from './LearnedRulesPanel'
 
@@ -66,21 +67,6 @@ function listTime(ts: string): string {
   const d = new Date()
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return ts.slice(0, 10) === today ? ts.slice(11, 16) : ts.slice(0, 10)
-}
-
-function RichText({ text }: { text: string }) {
-  const parts = text.split(/\*\*(.+?)\*\*/g)
-  return (
-    <>
-      {parts.map((p, i) =>
-        i % 2 === 1 ? (
-          <strong key={i}>{p}</strong>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
-      )}
-    </>
-  )
 }
 
 export function AgentPage() {

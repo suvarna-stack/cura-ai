@@ -32,6 +32,7 @@ import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLoca
 import { pickedCount, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
+import { CaseAgentDock } from "../../agent/components/CaseAgentDock";
 
 const dischargeReport = `DISCHARGE SUMMARY
 
@@ -613,6 +614,12 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
           );
         })}
       </div>
+
+      {/* The agent, floating on top of the case: a code question gets answered
+          here instead of costing a trip to /agent and the record on screen. */}
+      <CaseAgentDock ctx={{ caseId: c.id, vn: c.vn ?? c.id,
+                            hn: dc?.patient_ref ?? c.hn ?? null,
+                            dept: c.dept, detail, codes: codes }} />
     </main>
   );
 }

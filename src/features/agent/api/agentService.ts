@@ -96,12 +96,17 @@ export async function sendAgentMessage(
  *
  * Uses fetch (axios has no streaming body support); mirrors the axios
  * interceptor's auth header + 401 handling.
+ *
+ * `signal` powers the Stop button: aborting mid-answer is not an error —
+ * the reader stops and we resolve with whatever had already streamed, so
+ * the caller keeps the partial reply instead of losing it.
  */
 export async function streamAgentMessage(
   question: string,
   history: AgentChatTurn[],
   maxNewTokens: number,
   onDelta: (accumulated: string) => void,
+  signal?: AbortSignal,
 ): Promise<AgentReply> {
   const token = localStorage.getItem('token')
   const resp = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
@@ -111,6 +116,7 @@ export async function streamAgentMessage(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ question, history, max_new_tokens: maxNewTokens }),
+    signal,
   })
   if (resp.status === 401) {
     localStorage.removeItem('token')
@@ -146,19 +152,24 @@ export async function streamAgentMessage(
     }
   }
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let sep
-    while ((sep = buffer.indexOf('\n\n')) !== -1) {
-      const frame = buffer.slice(0, sep)
-      buffer = buffer.slice(sep + 2)
-      const data = frame
-        .split('\n')
-        .find((l) => l.startsWith('data: '))
-      if (data) handle(JSON.parse(data.slice(6)) as AgentStreamEvent)
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let sep
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const frame = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+        const data = frame
+          .split('\n')
+          .find((l) => l.startsWith('data: '))
+        if (data) handle(JSON.parse(data.slice(6)) as AgentStreamEvent)
+      }
     }
+  } catch (err) {
+    // Stop pressed — keep the partial answer; anything else is a real failure.
+    if (!signal?.aborted) throw err
   }
   return { answer: answer.trim(), sources, unverifiedCodes, searchedSystem,
            learnedNotes }
