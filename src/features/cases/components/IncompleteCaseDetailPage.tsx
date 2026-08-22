@@ -71,6 +71,21 @@ const initialCodes: (CodeEntry & { missing?: boolean; missingMsg?: string })[] =
   { code: "DRG-???", type: "DRG",        desc: "DRG pending primary diagnosis and procedure",                        confidence: 0,  missing: true, missingMsg: "Pending primary dx + procedure" },
 ];
 
+/** Which column a "not documented" gap row belongs in. The row carries no real
+ *  code, so its system can only come from the field it is about — the backend's
+ *  missing label ("ICD-9 procedure codes" / "ICD-10 diagnosis codes"). */
+const gapType = (label: string) => (isIcd9Type(label) ? "ICD-9" : "ICD-10");
+
+/** Payloads saved before 2026-08-22 typed EVERY gap row "ICD-10", so an ICD-9
+ *  gap sat in the diagnosis column. Move those on load — saved data is not
+ *  migrated by a rule change, so the reader fixes it. Only the mistyped ICD-9
+ *  gaps are touched; every other row keeps the exact type it was saved with. */
+const retypeGapRows = (codes: StoredCode[]): StoredCode[] =>
+  codes.map((k) => (k.missing && !isIcd9Type(k.type ?? "")
+                    && isIcd9Type(k.missingMsg ?? k.desc ?? "")
+    ? { ...k, type: "ICD-9" }
+    : k));
+
 function HighlightedReport({ text, accentRgb, accent }: { text: string; accentRgb: string; accent: string }) {
   const escapedTerms = medicalHighlights.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`(\\[[^\\]]+\\]|${escapedTerms.join("|")})`, "gi");
@@ -351,7 +366,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       if (savedCodes) {
         // payloads saved before the tick-to-approve flow keep the coder's own
         // codes ticked; the rest wait to be picked (withSelectionDefaults)
-        setCodes(withSelectionDefaults(savedCodes));
+        setCodes(retypeGapRows(withSelectionDefaults(savedCodes)));
       } else {
         const real = detail.codes.map(k => ({
           // role-bearing label, so the Edit dialog opens on the right type and
@@ -369,7 +384,12 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         const missingRows = (caseData?.missing ?? "")
           .split(",").map(m => m.trim()).filter(m => m && m !== "—")
           .map(m => ({
-            code: "???", type: "ICD-10", desc: `${m} — not documented in the iMed record`,
+            // the gap lands in the column it is about: "ICD-9 procedure codes"
+            // belongs beside the procedures, not beside the diagnoses. Same
+            // regex the columns filter by (aiSuggestions.isIcd9Type), so a
+            // label naming ICD-9 / PCS can never render in the ICD-10 column.
+            code: "???", type: gapType(m),
+            desc: `${m} — not documented in the iMed record`,
             confidence: 0, missing: true, missingMsg: `Missing: ${m}`,
           }));
         setCodes(real.length + missingRows.length > 0 ? [...real, ...missingRows] : []);
