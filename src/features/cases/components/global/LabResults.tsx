@@ -12,20 +12,7 @@ import { FlaskConical } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import type { ApiCaseDetail } from "../../types/api.types";
-
-type OrderRow = ApiCaseDetail["orders"][number];
-
-/** Group lab rows by panel, keeping first-appearance order. */
-function byPanel(rows: OrderRow[]): Map<string, OrderRow[]> {
-  const panels = new Map<string, OrderRow[]>();
-  for (const r of rows) {
-    const panel = r.detail?.panel_name || r.detail?.panelname || r.order_name || "—";
-    const list = panels.get(panel);
-    if (list) list.push(r);
-    else panels.set(panel, [r]);
-  }
-  return panels;
-}
+import { byPanel } from "../../utils/orderFields";
 
 export function LabResults({ detail, embedded }: {
   detail: ApiCaseDetail | null;

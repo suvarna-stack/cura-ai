@@ -242,6 +242,16 @@ export const dict: Record<string, { en: string; th: string }> = {
   "hosp.shownOf":     { en: "showing {shown} of {total} orders", th: "แสดง {shown} จาก {total} รายการ" },
   // case history
   "btn.viewHistory": { en: "View History", th: "ดูประวัติ" },
+  // printing / exporting the approved case as a Coding Summary document
+  "btn.print":       { en: "Print",      th: "พิมพ์" },
+  "btn.exportPdf":   { en: "Export PDF", th: "บันทึกเป็น PDF" },
+  "print.title":     { en: "Print coding summary", th: "พิมพ์สรุปการให้รหัส" },
+  "print.exportTitle": { en: "Export coding summary as PDF", th: "บันทึกสรุปการให้รหัสเป็น PDF" },
+  "print.opening":   { en: "Opening the print dialog\u2026", th: "กำลังเปิดหน้าต่างพิมพ์\u2026" },
+  "print.saveHint":  { en: "Choose \u201cSave as PDF\u201d as the destination to download the file.",
+                       th: "เลือกปลายทางเป็น \u201cบันทึกเป็น PDF\u201d เพื่อดาวน์โหลดไฟล์" },
+  "print.notReady":  { en: "The case record is still loading \u2014 try again in a moment.",
+                       th: "กำลังโหลดข้อมูลเคส กรุณาลองอีกครั้ง" },
   "history.title":   { en: "Case History", th: "ประวัติเคส" },
   "history.empty":   { en: "No activity recorded for this case yet.", th: "ยังไม่มีกิจกรรมสำหรับเคสนี้" },
   // item 17: rows that came from the server audit trail (any coder, any browser)

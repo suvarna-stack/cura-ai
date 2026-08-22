@@ -22,6 +22,8 @@ import { HospitalPanels, ReportViewToggle, useReportView } from "./global/Hospit
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { codeTypeFromRole } from "../utils/aiSuggestions";
+import { buildCaseReportDocument, caseReportFilename } from "../utils/caseReportDocument";
+import { printHtmlDocument, openHtmlPreview } from "../utils/printDocument";
 import type { FinishedCase } from "../types/case.types";
 
 /** Renders the real iMed report text; the [fieldname] section headers built from
@@ -143,6 +145,33 @@ export function FinishedCaseDetailPage({
   // item 16: a case can have many coders — the responsible one is the latest
   const coders = c.coders?.length ? c.coders : [c.coder];
 
+  // Print / Export PDF — one document, two destinations. Both render the
+  // Coding Summary (utils/caseReportDocument) through the browser's own print
+  // engine; Export opens it as a visible page first so the coder sees what
+  // they are saving, and falls back to the silent frame if popups are blocked.
+  // fullCodes, not codes: the document splits the approved set from the
+  // suggestions the coder left out, and needs both.
+  const reportDocument = (mode: "print" | "preview") =>
+    buildCaseReportDocument(
+      { caseData: c, detail, codes: fullCodes, generatedBy: me.userName },
+      { mode },
+    );
+
+  const handlePrint = () => {
+    // half a record is worse than none on a document that gets filed
+    if (status === "loading") { showToast(t("print.notReady")); return; }
+    printHtmlDocument(reportDocument("print"), caseReportFilename(c));
+    showToast(t("print.opening"));
+  };
+
+  const handleExportPdf = () => {
+    if (status === "loading") { showToast(t("print.notReady")); return; }
+    if (!openHtmlPreview(reportDocument("preview"))) {
+      printHtmlDocument(reportDocument("print"), caseReportFilename(c));
+    }
+    showToast(t("print.saveHint"));
+  };
+
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
       {showReopen && (
@@ -195,14 +224,16 @@ export function FinishedCaseDetailPage({
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
-          {/* the case actions live at the top of the page, with its status —
-              [POC] Print / Export PDF are still placeholders */}
-          <button title="Print"
+          {/* the case actions live at the top of the page, with its status.
+              Both print the same Coding Summary document — Print sends it
+              straight to the printer, Export PDF opens it so the coder can
+              save it from the dialog's "Save as PDF" destination. */}
+          <button onClick={handlePrint} title={t("print.title")} aria-label={t("print.title")}
             className="flex items-center justify-center w-9 h-9 rounded-lg hover:opacity-80 transition-all"
             style={{ border: gl.border, color: gl.muted, background: "transparent" }}>
             <Printer size={13} />
           </button>
-          <button title="Export PDF"
+          <button onClick={handleExportPdf} title={t("print.exportTitle")} aria-label={t("print.exportTitle")}
             className="flex items-center justify-center w-9 h-9 rounded-lg hover:opacity-80 transition-all"
             style={{ border: gl.border, color: gl.muted, background: "transparent" }}>
             <Download size={13} />
