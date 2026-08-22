@@ -672,7 +672,12 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
               }
             }}
             placeholder={t('dock.placeholder')}
-            className="max-h-24 flex-1 resize-none bg-transparent text-[12.5px] leading-relaxed outline-none"
+            /* min-h/py match the 32px send button so a one-line question sits
+               centred against it — items-end alone bottom-aligned the 20px
+               text box inside a 32px row and dropped the caret below centre.
+               The grow handler measures scrollHeight, which counts this
+               padding, so line two still lands exactly one line taller. */
+            className="max-h-24 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-[12.5px] leading-relaxed outline-none"
             style={{ color: gl.text }}
           />
           {/* Stop covers the whole wait, not just the typing part — the local
