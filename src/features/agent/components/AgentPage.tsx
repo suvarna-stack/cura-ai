@@ -40,18 +40,13 @@ import type {
   LearnedNote,
 } from '../types/agent.types'
 import { CHIP_KEYS, TEACH_CHIP_KEYS } from '../types/agent.types'
+import { isLearnBack } from '../utils/learnBack'
+import { noteLine } from '../utils/noteLine'
 import { RichText } from './RichText'
 import { LearnedNoteCard } from './LearnedNoteCard'
 import { LearnedRulesPanel } from './LearnedRulesPanel'
 
 let uid = 1
-
-/** Bare "teach my previous message" commands — "learn that", "remember it",
- *  Thai "จำไว้" — sent as a follow-up after the agent answered. */
-const LEARN_BACK_RE =
-  /^(please\s+)?(learn|remember|save|note)(\s+(that|this|it))?\s*[.!]*$/i
-const LEARN_BACK_TH_RE =
-  /^(ช่วย)?(จำ|จดจำ|เรียนรู้|บันทึก|สอน)(ไว้|อันนี้|สิ่งนี้|เลย)?(ด้วย)?(นะ|สิ|ครับ|ค่ะ|คะ)?$/
 
 const now = () =>
   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -283,7 +278,7 @@ export function AgentPage() {
       refreshNotes()
       const taught = draft.raw_text || draft.scenario
       void persistExchange(mode, taught, {
-        answer: `${t('agent.learn.saved')} — ${noteLine(saved)}`,
+        answer: `${t('agent.learn.saved')} — ${noteLine(saved, t)}`,
         sources: [],
         unverifiedCodes: [],
         searchedSystem: null,
@@ -297,19 +292,6 @@ export function AgentPage() {
     } finally {
       setSavingNote(false)
     }
-  }
-
-  /** One-line form of a rule, for receipts and persisted history. */
-  function noteLine(note: LearnedNote): string {
-    const use = note.codes.filter((c) => c.role !== 'exclude').map((c) => c.code)
-    const avoid = note.codes.filter((c) => c.role === 'exclude').map((c) => c.code)
-    return [
-      note.scenario,
-      use.length > 0 ? `→ ${use.join(', ')}` : '',
-      avoid.length > 0 ? `(${t('agent.learn.not')} ${avoid.join(', ')})` : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
   }
 
   function discardNote(cardId: number) {
@@ -352,15 +334,10 @@ export function AgentPage() {
     if (mode === 'learn') {
       // "learn that" after an answer is a back-reference: the thing to teach
       // is the claim the coder just made, not the two-word command itself.
-      if (LEARN_BACK_RE.test(text) || LEARN_BACK_TH_RE.test(text)) {
+      if (isLearnBack(text)) {
         const prev = [...convo]
           .reverse()
-          .find(
-            (m) =>
-              m.role === 'coder' &&
-              !LEARN_BACK_RE.test(m.text.trim()) &&
-              !LEARN_BACK_TH_RE.test(m.text.trim()),
-          )
+          .find((m) => m.role === 'coder' && !isLearnBack(m.text))
         if (prev) return teach(prev.text)
       }
       sendingRef.current = true // held through the classify round-trip
@@ -760,7 +737,7 @@ export function AgentPage() {
                     ✓ {t('agent.learn.saved')}
                   </span>
                   <span className="text-[12px]" style={{ color: gl.text }}>
-                    {noteLine(m.note)}
+                    {noteLine(m.note, t)}
                   </span>
                   <span className="text-[10px]" style={{ color: gl.muted }}>
                     {t('agent.learn.savedHint')}

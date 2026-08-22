@@ -434,8 +434,12 @@ export const dict: Record<string, { en: string; th: string }> = {
   "dock.title":        { en: "AI Agent", th: "AI ผู้ช่วย" },
   "dock.subtitle":     { en: "Grounded in this case", th: "อ้างอิงข้อมูลจากเคสนี้" },
   "dock.ask":          { en: "Ask AI", th: "ถาม AI" },
-  "dock.welcome":      { en: "Ask about any code on this case — I can see the record and the codes already on it, and I answer from your hospital's references.", th: "ถามเกี่ยวกับรหัสใดก็ได้ในเคสนี้ — ฉันเห็นเวชระเบียนและรหัสที่มีอยู่แล้ว และตอบจากเอกสารอ้างอิงของโรงพยาบาลคุณ" },
-  "dock.placeholder":  { en: "Ask about this case…", th: "ถามเกี่ยวกับเคสนี้…" },
+  "dock.mode.dict":    { en: "Dictionary", th: "พจนานุกรม" },
+  "dock.mode.learn":   { en: "Suggest & Learn", th: "แนะนำรหัส" },
+  "dock.welcome.dict":  { en: "Ask about any code on this case — I can see the record and the codes already on it, and I answer from your hospital's references.", th: "ถามเกี่ยวกับรหัสใดก็ได้ในเคสนี้ — ฉันเห็นเวชระเบียนและรหัสที่มีอยู่แล้ว และตอบจากเอกสารอ้างอิงของโรงพยาบาลคุณ" },
+  "dock.welcome.learn": { en: "Describe this patient's picture and I'll suggest codes — or type a coding rule the way you'd explain it to a new coder. I'll show you what I understood before anything is saved.", th: "อธิบายอาการของผู้ป่วยรายนี้แล้วฉันจะแนะนำรหัส — หรือพิมพ์กฎการให้รหัสเหมือนที่คุณอธิบายให้เพื่อนร่วมงานใหม่ฟัง ฉันจะแสดงสิ่งที่เข้าใจให้ดูก่อนบันทึก" },
+  "dock.placeholder.dict":  { en: "Ask about this case…", th: "ถามเกี่ยวกับเคสนี้…" },
+  "dock.placeholder.learn": { en: "Ask about this case, or teach me a rule…", th: "ถามเกี่ยวกับเคสนี้ หรือสอนกฎให้ฉัน…" },
   "dock.send":         { en: "Send", th: "ส่ง" },
   "dock.stop":         { en: "Stop generating", th: "หยุดสร้างคำตอบ" },
   "dock.copy":         { en: "Copy answer", th: "คัดลอกคำตอบ" },
@@ -453,6 +457,11 @@ export const dict: Record<string, { en: string; th: string }> = {
   "dock.chip.needProc":  { en: "Does this case need an ICD-9 procedure code?", th: "เคสนี้ต้องมีรหัสหัตถการ ICD-9 หรือไม่?" },
   "dock.chip.principal": { en: "Which diagnosis should be the principal one here?", th: "การวินิจฉัยใดควรเป็นโรคหลักของเคสนี้?" },
   "dock.chip.suggest":   { en: "Which ICD-10 codes fit this record?", th: "รหัส ICD-10 ใดเหมาะกับเวชระเบียนนี้?" },
+  // Suggest & Learn starters are TEMPLATES — they land in the composer to be
+  // edited, never sent on one tap, so they read as a sentence to finish.
+  "dock.chip.teachPrincipal": { en: "For a case like this, always code {code} as principal because…", th: "เคสแบบนี้ ให้ลง {code} เป็นรหัสหลักเสมอ เพราะ…" },
+  "dock.chip.teachProc":      { en: "For this procedure, always code {code} because…", th: "หัตถการนี้ ให้ลงรหัส {code} เสมอ เพราะ…" },
+  "dock.chip.teachExample":   { en: "For a case like this, always code … as principal, and do not code …", th: "เคสแบบนี้ ให้ลง … เป็นรหัสหลัก และไม่ต้องลง …" },
 };
 
 type LanguageCtxValue = {

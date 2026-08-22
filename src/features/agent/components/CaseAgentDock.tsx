@@ -32,10 +32,13 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  BookOpen,
   Bot,
+  Brain,
   Check,
   Copy,
   ExternalLink,
+  GraduationCap,
   Maximize2,
   Minimize2,
   Plus,
@@ -47,7 +50,17 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { useLang } from '../../cases/context/LanguageContext'
+import {
+  agentErrorMessage,
+  classifyIntent,
+  extractNote,
+  saveNote,
+} from '../api/agentService'
 import { useAgentChat } from '../hooks/useAgentChat'
+import type { ChatMode, LearnedNote } from '../types/agent.types'
+import { isLearnBack } from '../utils/learnBack'
+import { noteLine } from '../utils/noteLine'
+import { LearnedNoteCard } from './LearnedNoteCard'
 import { RichText } from './RichText'
 import {
   buildCaseContextTurns,
@@ -58,15 +71,24 @@ import {
 type DockMode = 'float' | 'rail'
 
 interface DockPrefs {
+  /** how the dock is shaped — NOT the agent's mode, see chatMode */
   mode: DockMode
   w: number
   h: number
   /** send the case briefing with every question */
   ground: boolean
+  /** which half of the agent the composer talks to */
+  chatMode: ChatMode
 }
 
 const PREFS_KEY = 'mcai.caseDock'
-const DEFAULT_PREFS: DockPrefs = { mode: 'float', w: 420, h: 560, ground: true }
+const DEFAULT_PREFS: DockPrefs = {
+  mode: 'float',
+  w: 420,
+  h: 560,
+  ground: true,
+  chatMode: 'dict',
+}
 const MIN_W = 320
 const MAX_W = 680
 const MIN_H = 320
@@ -85,6 +107,7 @@ function loadPrefs(): DockPrefs {
       w: clamp(Number(p.w) || DEFAULT_PREFS.w, MIN_W, MAX_W),
       h: Math.max(Number(p.h) || DEFAULT_PREFS.h, MIN_H),
       ground: p.ground !== false,
+      chatMode: p.chatMode === 'learn' ? 'learn' : 'dict',
     }
   } catch {
     return DEFAULT_PREFS
@@ -118,9 +141,16 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const chatMode = prefs.chatMode
+  const learn = chatMode === 'learn'
+  // the teaching round-trips (classify -> extract -> save) are the dock's own,
+  // not the chat hook's, so they carry their own in-flight flags
+  const [teaching, setTeaching] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
+
   const chat = useAgentChat({
-    mode: 'dict',
-    maxNewTokens: 256,
+    mode: chatMode,
+    maxNewTokens: learn ? 320 : 256,
     errorText: t('agent.error'),
     titlePrefix: `VN ${ctx.vn ?? ctx.caseId}`,
   })
@@ -256,6 +286,15 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
     )
     const ten = live.find((k) => !isIcd9(k.type))
     const nine = live.find((k) => isIcd9(k.type))
+    if (learn) {
+      return [
+        t('dock.chip.suggest'),
+        ten
+          ? t('dock.chip.teachPrincipal', { code: ten.code })
+          : t('dock.chip.teachExample'),
+        nine ? t('dock.chip.teachProc', { code: nine.code }) : null,
+      ].filter((x): x is string => x !== null)
+    }
     return [
       ten ? t('dock.chip.check', { code: ten.code }) : t('dock.chip.suggest'),
       t('dock.chip.principal'),
@@ -263,18 +302,110 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
         ? t('dock.chip.checkProc', { code: nine.code })
         : t('dock.chip.needProc'),
     ]
-  }, [ctx.codes, t])
+  }, [ctx.codes, learn, t])
 
   // Grounding is decided here, at click time, from the case as it stands right
   // now — the coder may have added a code since the last question.
+  //
+  // Suggest & Learn is one surface, exactly as it is on the Agent page: every
+  // message is classified, a sentence that reads like a rule goes to the
+  // extractor and comes back as a confirm CARD (nothing is stored until the
+  // coder signs it off), and anything else is simply answered. A wrong
+  // "teach" guess costs one Discard click.
   const submit = useCallback(
     (text: string) => {
-      if (!text.trim() || chat.busy) return
-      chat.send(text, prefs.ground ? buildCaseContextTurns(ctx) : [])
+      const q = text.trim()
+      if (!q || chat.busy || teaching) return
       setInput('')
       if (inputRef.current) inputRef.current.style.height = 'auto'
+      const context = prefs.ground ? buildCaseContextTurns(ctx) : []
+      if (!learn) {
+        chat.send(q, context)
+        return
+      }
+      void (async () => {
+        setTeaching(true)
+        try {
+          // "learn that" is a back-reference: the thing to teach is the claim
+          // the coder made before it, not the two-word command itself.
+          let toTeach: string | null = null
+          if (isLearnBack(q)) {
+            const prev = [...chat.messages]
+              .reverse()
+              .find((m) => m.role === 'coder' && !isLearnBack(m.text))
+            if (prev) toTeach = prev.text
+          }
+          if (toTeach === null) {
+            const intent = await classifyIntent(q)
+              .then((r) => r.intent)
+              .catch(() => 'ask' as const) // classifier down -> answer, safest
+            if (intent === 'teach') toTeach = q
+          }
+          if (toTeach === null) {
+            chat.send(q, context)
+            return
+          }
+          chat.append({ role: 'coder', text: q })
+          try {
+            const draft = await extractNote(toTeach)
+            chat.append({
+              role: 'agent',
+              text: '',
+              kind: 'note-draft',
+              note: draft,
+            })
+          } catch (err) {
+            // a failed extraction is a normal reply saying what was missing,
+            // so the chat never dead-ends on it
+            chat.append({
+              role: 'agent',
+              text: agentErrorMessage(err, t('agent.learn.error')),
+            })
+          }
+        } finally {
+          setTeaching(false)
+        }
+      })()
     },
-    [chat, ctx, prefs.ground],
+    [chat, ctx, learn, prefs.ground, t, teaching],
+  )
+
+  /** Confirmed draft -> stored rule; the card becomes its own receipt. */
+  const confirmNote = useCallback(
+    (cardId: number, draft: LearnedNote) => {
+      setSavingNote(true)
+      void saveNote(draft)
+        .then((saved) => {
+          chat.patch(cardId, {
+            kind: 'note-saved',
+            note: saved,
+            text: t('agent.learn.saved'),
+          })
+          chat.record(
+            draft.raw_text || draft.scenario,
+            `${t('agent.learn.saved')} — ${noteLine(saved, t)}`,
+          )
+        })
+        .catch((err: unknown) =>
+          chat.append({
+            role: 'agent',
+            text: agentErrorMessage(err, t('agent.learn.error')),
+          }),
+        )
+        .finally(() => setSavingNote(false))
+    },
+    [chat, t],
+  )
+
+  /** Switching half is switching thread — a rule and a question are not one. */
+  const switchMode = useCallback(
+    (next: ChatMode) => {
+      if (next === chatMode || chat.busy || teaching) return
+      setPrefs((p) => ({ ...p, chatMode: next }))
+      reset()
+      setInput('')
+    },
+    [chatMode, chat.busy, reset, teaching],
   )
 
   const copy = (id: number, text: string) => {
@@ -407,7 +538,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
             reset()
             setInput('')
           }}
-          disabled={chat.busy || chat.messages.length === 0}
+          disabled={chat.busy || teaching || chat.messages.length === 0}
           title={t('dock.new')}
           aria-label={t('dock.new')}
           className={`${iconBtn} disabled:opacity-35`}
@@ -449,6 +580,50 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
         </button>
       </header>
 
+      {/* The two halves of the agent, as one segmented control: looking a code
+          up, and teaching a rule. Its own strip rather than a header button —
+          which half you are in changes what typing does, so it has to be
+          readable at a glance, not hidden behind an icon. */}
+      <div
+        className="flex shrink-0 gap-0.5 p-1"
+        style={{ borderBottom: `1px solid rgba(${gl.accentRgb},0.14)` }}
+      >
+        {(
+          [
+            ['dict', t('dock.mode.dict'), BookOpen],
+            ['learn', t('dock.mode.learn'), Brain],
+          ] as const
+        ).map(([id, label, Icon]) => {
+          const on = id === chatMode
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => switchMode(id)}
+              disabled={chat.busy || teaching}
+              aria-pressed={on}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-bold transition-all hover:opacity-90 disabled:opacity-50"
+              style={
+                on
+                  ? {
+                      background: `rgba(${gl.accentRgb},0.16)`,
+                      border: `1px solid rgba(${gl.accentRgb},0.28)`,
+                      color: gl.accent,
+                    }
+                  : {
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      color: gl.muted,
+                    }
+              }
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
       {/* ---------------------------------------------------------- messages */}
       <div
         ref={scrollRef}
@@ -469,14 +644,27 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
                 className="mt-0.5 shrink-0"
                 style={{ color: gl.accent }}
               />
-              <p className="text-[12px] leading-relaxed">{t('dock.welcome')}</p>
+              <p className="text-[12px] leading-relaxed">
+                {t(`dock.welcome.${chatMode}`)}
+              </p>
             </div>
             <div className="flex flex-col gap-1.5 pt-1">
               {starters.map((s) => (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => submit(s)}
+                  // In Suggest & Learn a starter is a TEMPLATE, so it lands in
+                  // the composer to be edited — firing off a rule the coder
+                  // did not write, into a knowledge base the whole team reads,
+                  // is not something one tap should be able to start.
+                  onClick={() => {
+                    if (learn) {
+                      setInput(s)
+                      inputRef.current?.focus()
+                    } else {
+                      submit(s)
+                    }
+                  }}
                   className="rounded-xl px-3 py-2 text-left text-[12px] leading-snug font-medium transition-all hover:opacity-80"
                   style={{
                     background: gl.row,
@@ -493,6 +681,68 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
 
         {chat.messages.map((m) => {
           const isAgent = m.role === 'agent'
+
+          // Teaching turns are cards, not bubbles: the draft the coder has to
+          // sign off, and the receipt once the rule is stored.
+          if (m.kind === 'note-draft' && m.note) {
+            return (
+              <div key={m.id} className="flex gap-2">
+                <div
+                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: gl.card, border: gl.border }}
+                >
+                  <GraduationCap size={12} style={{ color: gl.accent }} />
+                </div>
+                <LearnedNoteCard
+                  note={m.note}
+                  saving={savingNote}
+                  onSave={(draft) => confirmNote(m.id, draft)}
+                  onDiscard={() => chat.remove(m.id)}
+                />
+              </div>
+            )
+          }
+
+          if (m.kind === 'note-saved' && m.note) {
+            return (
+              <div key={m.id} className="flex gap-2">
+                <div
+                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: `rgba(${gl.accentRgb},0.18)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.30)`,
+                  }}
+                >
+                  <GraduationCap size={12} style={{ color: gl.accent }} />
+                </div>
+                <div
+                  className="flex min-w-0 max-w-[85%] flex-col gap-1 px-3 py-2"
+                  style={{
+                    background: `rgba(${gl.accentRgb},0.10)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.28)`,
+                    borderRadius: '4px 14px 14px 14px',
+                  }}
+                >
+                  <span
+                    className="text-[11.5px] font-bold"
+                    style={{ color: gl.accent }}
+                  >
+                    ✓ {t('agent.learn.saved')}
+                  </span>
+                  <span
+                    className="text-[12px] break-words"
+                    style={{ color: gl.text }}
+                  >
+                    {noteLine(m.note, t)}
+                  </span>
+                  <span className="text-[10px]" style={{ color: gl.muted }}>
+                    {t('agent.learn.savedHint')}
+                  </span>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <div
               key={m.id}
@@ -597,7 +847,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
           )
         })}
 
-        {chat.pending && (
+        {(chat.pending || teaching) && (
           <div className="flex items-center gap-2 px-1" role="status" aria-live="polite">
             <span className="flex gap-1" aria-hidden="true">
               {[0, 1, 2].map((i) => (
@@ -671,7 +921,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
                 submit(input)
               }
             }}
-            placeholder={t('dock.placeholder')}
+            placeholder={t(`dock.placeholder.${chatMode}`)}
             /* min-h/py match the 32px send button so a one-line question sits
                centred against it — items-end alone bottom-aligned the 20px
                text box inside a 32px row and dropped the caret below centre.
@@ -701,11 +951,11 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
             <button
               type="button"
               onClick={() => submit(input)}
-              disabled={!input.trim() || chat.busy}
+              disabled={!input.trim() || chat.busy || teaching}
               aria-label={t('dock.send')}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
               style={
-                input.trim() && !chat.busy
+                input.trim() && !chat.busy && !teaching
                   ? {
                       background: gl.accentGrad,
                       color: gl.isDark ? '#1a0a00' : '#fff',

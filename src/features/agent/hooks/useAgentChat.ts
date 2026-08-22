@@ -56,6 +56,16 @@ export interface AgentChat {
   send: (text: string, context?: AgentChatTurn[]) => void
   stop: () => void
   reset: () => void
+  /** Put a message in the thread without asking anything; returns its id. */
+  append: (m: Omit<AgentMessage, 'id' | 'time'>) => number
+  /** Rewrite one message in place — a draft card becoming its receipt. */
+  patch: (id: number, next: Partial<AgentMessage>) => void
+  remove: (id: number) => void
+  /**
+   * Persist an exchange this hook did not run itself (Suggest & Learn stores
+   * a taught rule, not an answer), so a dock conversation reads back whole.
+   */
+  record: (question: string, answer: string) => void
 }
 
 export function useAgentChat(opts: UseAgentChatOptions): AgentChat {
@@ -220,6 +230,35 @@ export function useAgentChat(opts: UseAgentChatOptions): AgentChat {
     [errorText, maxNewTokens, messages, persist],
   )
 
+  const append = useCallback((m: Omit<AgentMessage, 'id' | 'time'>) => {
+    const id = uid++
+    setMessages((prev) => [...prev, { ...m, id, time: now() }])
+    return id
+  }, [])
+
+  const patch = useCallback((id: number, next: Partial<AgentMessage>) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...next, time: now() } : m)),
+    )
+  }, [])
+
+  const remove = useCallback((id: number) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id))
+  }, [])
+
+  const record = useCallback(
+    (question: string, answer: string) => {
+      void persist(question, {
+        answer,
+        sources: [],
+        unverifiedCodes: [],
+        searchedSystem: null,
+        learnedNotes: [],
+      })
+    },
+    [persist],
+  )
+
   return {
     messages,
     pending,
@@ -228,5 +267,9 @@ export function useAgentChat(opts: UseAgentChatOptions): AgentChat {
     send,
     stop,
     reset,
+    append,
+    patch,
+    remove,
+    record,
   }
 }
