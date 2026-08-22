@@ -26,10 +26,35 @@ function CoderShell() {
   const { t } = useLang()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
   // The agent page is a chat: lock the shell to the viewport so only its
   // message list scrolls. Every other page keeps normal document scrolling.
   const chatShell = pathname.startsWith('/agent')
+  // The top nav is a tab bar, so the Dashboard tab keeps its own stack: a case
+  // the coder has open is remembered while they detour to Agent / Analytics /
+  // Settings, and Dashboard brings that case back instead of dropping them on
+  // the list with their place lost. Clicking Dashboard from *inside* the case
+  // section still pops to the list (tab-bar convention) — same as Back does.
+  // The memory lives only in this component; the case itself loses nothing by
+  // being left, since code edits are held by utils/caseLocal + the server.
+  const inCases = pathname === '/cases' || pathname.startsWith('/cases/')
+  const onCaseDetail = inCases && pathname !== '/cases'
+  const here = `${pathname}${location.search}`
+  const [openCase, setOpenCase] = useState<{
+    to: string
+    state: unknown
+  } | null>(() =>
+    // mounting straight on a case (deep link, reload) counts as open too
+    onCaseDetail ? { to: here, state: location.state } : null,
+  )
+  const [seen, setSeen] = useState(here)
+  if (seen !== here) {
+    setSeen(here) // render-phase update, same as hooks/useCaseDetail does
+    if (onCaseDetail) setOpenCase({ to: here, state: location.state })
+    else if (inCases) setOpenCase(null) // back on the list: nothing open now
+  }
+
   // Logging out drops the held case lock and any unapproved code edits, so the
   // button asks first rather than ending the session on a stray click.
   const [confirmingLogout, setConfirmingLogout] = useState(false)
@@ -69,27 +94,34 @@ function CoderShell() {
         </div>
 
         <nav aria-label="Primary" className="flex items-center gap-1">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                  isActive ? '' : 'opacity-70 hover:opacity-100'
-                }`
-              }
-              style={({ isActive }) => ({
-                color: isActive ? gl.accent : gl.text,
-                background: isActive
-                  ? `rgba(${gl.accentRgb},0.12)`
-                  : 'transparent',
-              })}
-            >
-              <item.icon size={14} />
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
+          {NAV.map((item) => {
+            // resume the open case only from another tab — never while the
+            // coder is already in it, where Dashboard means "back to the list"
+            const resume =
+              item.to === '/cases' && !onCaseDetail ? openCase : null
+            return (
+              <NavLink
+                key={item.to}
+                to={resume?.to ?? item.to}
+                state={resume?.state}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                    isActive ? '' : 'opacity-70 hover:opacity-100'
+                  }`
+                }
+                style={({ isActive }) => ({
+                  color: isActive ? gl.accent : gl.text,
+                  background: isActive
+                    ? `rgba(${gl.accentRgb},0.12)`
+                    : 'transparent',
+                })}
+              >
+                <item.icon size={14} />
+                {t(item.labelKey)}
+              </NavLink>
+            )
+          })}
         </nav>
 
         {/* logged-in coder + logout (coders never see the admin sidebar).
