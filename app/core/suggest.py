@@ -19,10 +19,36 @@ logger = logging.getLogger(__name__)
 _ICD10_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,4})?)\b")
 # Procedure (ICD-9-CM Vol.3 style): NN.N / NN.NN  ->  93.27, 81.51
 _ICD9_RE = re.compile(r"\b(\d{2}\.\d{1,2})\b")
-# Title sitting on the same line after the code
-_TITLE_RE = re.compile(
-    r"^([A-Z]\d{2}(?:\.\d{1,4})?|\d{2}\.\d{1,2})\s+([A-Za-z][^\n]{3,100}?)\s*$",
-    re.MULTILINE,
+_SHAPE = {"ICD-10": _ICD10_RE, "ICD-9": _ICD9_RE}
+
+# Title sitting on the same line after the code — one per system, so a
+# procedure line can never be read out of a diagnosis pass and vice versa.
+_TITLE_RE = {
+    "ICD-10": re.compile(
+        r"^([A-Z]\d{2}(?:\.\d{1,4})?)\s+([A-Za-z][^\n]{3,100}?)\s*$",
+        re.MULTILINE,
+    ),
+    "ICD-9": re.compile(
+        r"^(\d{2}\.\d{1,2})\s+([A-Za-z][^\n]{3,100}?)\s*$",
+        re.MULTILINE,
+    ),
+}
+
+# One pass per upload box. Each box is searched on its OWN, with its own
+# question and its own doc_type filter, and only its own code shape is read
+# out of what comes back: the ICD-10 column is built from the ICD-10 library
+# and ICD-10 codes, the ICD-9 column from the ICD-9 library and ICD-9 codes.
+# The single "suggest ICD-10 and ICD-9 codes" search this replaced always
+# resolved to "mixed", which switched the box filter OFF and then scraped
+# both shapes out of every chunk — that is how a page number in an ICD-10
+# PDF ended up in the ICD-9 column as an 83%-confident procedure.
+_BOXES = (
+    ("ICD-10", "icd10",
+     "Which ICD-10 diagnosis codes fit this patient's chief complaint and "
+     "present illness?"),
+    ("ICD-9", "icd9cm",
+     "Which ICD-9-CM procedure codes fit the procedures performed in this "
+     "case?"),
 )
 
 # Noise codes that show up in every guideline TOC / running head
@@ -47,15 +73,6 @@ def suggest_codes(
     # ("Learned note applies") above the machine's own guesses.
     notes = learn.match_notes(text, limit=3)
 
-    # Ask the index like a coder would — diagnosis + procedure angles.
-    query = (
-        "Suggest ICD-10 diagnosis codes and ICD-9 procedure codes for this case.\n\n"
-        f"{text[:3500]}"
-    )
-    mode, hits = retrieve_chunks(query, top_k=top_k or 12, mode="plain")
-    if not hits:
-        mode, hits = retrieve_chunks(query, top_k=top_k or 12, mode="graph")
-
     # Codes the coder taught NOT to use here. Whatever the references say,
     # this list wins — an excluded code must never reach the suggestions.
     banned = {c["code"] for n in notes for c in n.get("codes", [])
@@ -63,23 +80,44 @@ def suggest_codes(
 
     # code -> {system, description, confidence, source}
     found: dict[str, dict[str, Any]] = {}
-    for h in hits:
-        # A coder rule is not a code list: scraping it would harvest the very
-        # codes it forbids. Its codes are added deliberately below.
-        if (h.get("metadata") or {}).get("kind") == learn.LEARNED_KIND:
-            continue
-        chunk = h.get("text") or ""
-        score = float(h.get("score") or 0.0)
-        conf = _score_to_confidence(score)
-        source = str(h.get("source") or "knowledge")
+    modes: list[str] = []
+    hit_ids: set[str] = set()
 
-        for code, title in _TITLE_RE.findall(chunk):
-            _offer(found, code, title, conf, source)
+    for system, box, ask in _BOXES:
+        query = f"{ask}\n\n{text[:3500]}"
+        mode, hits = retrieve_chunks(query, top_k=top_k or 12, mode="plain",
+                                     code_system=box)
+        if not hits:
+            mode, hits = retrieve_chunks(query, top_k=top_k or 12,
+                                         mode="graph", code_system=box)
+        modes.append(mode)
 
-        for code in _ICD10_RE.findall(chunk):
-            _offer(found, code, None, conf, source)
-        for code in _ICD9_RE.findall(chunk):
-            _offer(found, code, None, conf, source)
+        for h in hits:
+            hit_ids.add(str(h.get("id")))
+            meta = h.get("metadata") or {}
+            # A coder rule is not a code list: scraping it would harvest the
+            # very codes it forbids. Its codes are added deliberately below.
+            if meta.get("kind") == learn.LEARNED_KIND:
+                continue
+            chunk = h.get("text") or ""
+            conf = _score_to_confidence(float(h.get("score") or 0.0))
+            source = str(h.get("source") or "knowledge")
+
+            # A code with its title on the line is a real catalogue entry.
+            for code, title in _TITLE_RE[system].findall(chunk):
+                _offer(found, code, title, conf, source, system)
+
+            # A BARE ICD-9 token is only "two digits, a dot, one or two more"
+            # — the same shape as a page reference, a table number, a dose or
+            # a lab value. Believe one only when the chunk actually came from
+            # the ICD-9 box; an untagged legacy upload has to show a title
+            # next to the code (above) to be counted at all.
+            if system == "ICD-9" and meta.get("doc_type") != "icd9cm":
+                continue
+            for code in _SHAPE[system].findall(chunk):
+                _offer(found, code, None, conf, source, system)
+
+    mode = modes[0] if modes else "plain"
 
     # The taught codes themselves, above anything the references suggested:
     # principal first, and never the excluded ones.
@@ -87,6 +125,9 @@ def suggest_codes(
         for c in note.get("codes", []):
             if c.get("role") == "exclude":
                 continue
+            # No system= here on purpose: a code the hospital's coder typed
+            # is trusted as typed, including shapes neither regex knows (Thai
+            # TTM procedure codes, say). Only SCRAPED codes are shape-checked.
             _offer(found, c["code"], c.get("description") or None,
                    99 if c.get("role") == "principal" else 96,
                    f"coder note ({note.get('created_by') or 'coder'})")
@@ -118,7 +159,7 @@ def suggest_codes(
     return {
         "codes": icd10 + icd9,
         "mode": mode,
-        "hits_used": len(hits),
+        "hits_used": len(hit_ids),
         "notes": [
             {
                 "id": n["id"],
@@ -141,11 +182,23 @@ def _offer(
     title: str | None,
     confidence: int,
     source: str,
+    system: str | None = None,
 ) -> None:
+    """Record one candidate.
+
+    ``system`` is the box the code was READ FROM. Pass it for anything scraped
+    out of a document: the code must then also LOOK like that system's code or
+    it is dropped, so the two columns can never swap contents. Leave it None
+    for a code a coder typed — that one is trusted as typed.
+    """
     code = code.strip().upper() if code[:1].isalpha() else code.strip()
     if code in _SKIP or len(code) < 3:
         return
-    system = "ICD-10" if code[0].isalpha() else "ICD-9"
+    shape = "ICD-10" if code[0].isalpha() else "ICD-9"
+    if system is None:
+        system = shape
+    elif shape != system or not _SHAPE[system].fullmatch(code):
+        return
     desc = _clean_title(title) if title else None
 
     cur = found.get(code)
