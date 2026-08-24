@@ -576,6 +576,212 @@ S = [
              "Extremities: no edema"],
          assess="Chronic pelvic pain, rule out gynecologic cause\\r\\nPlan: ultrasound, gynecology referral",
          plan="Ultrasound, gynecology F/U", labs=["CBC", "Urine Analysis"], drugs=["simeth", "para"]),
+    # --- showcase presentations (2026-08-25) --------------------------------
+    # Ten surgical/procedural visits carry a COMPLETE chart -- notes, labs,
+    # imaging, an operating-room procedure and comorbidity -- because a demo
+    # needs cases a coder can actually read end to end. Six of them are new
+    # here; the other four (D17.1, K35.8, K64.2, L02.4) already existed and
+    # gain imaging below. Every ICD-10/ICD-9 pair is checked against
+    # imed.icd_10 / imed.icd_9.
+    dict(dept="SURG", icd10=("C50.9", "CA Rt breast"),
+         icd9=("85.21", "Local excision of lesion of breast", "OR Procedure"),
+         cc="คลำได้ก้อนที่เต้านมขวา 2 เดือน",
+         pi="2 เดือนก่อนมา คลำได้ก้อนแข็งที่เต้านมขวาด้านบนด้านนอก ขนาดโตขึ้นช้าๆ ไม่เจ็บ ไม่มีน้ำเหลืองหรือเลือดออกจากหัวนม ไม่มีไข้ น้ำหนักลดลงเล็กน้อย",
+         pe=["General Appearance: good consciousness, not pale, no jaundice",
+             "Breast: firm mass 2.5 cm at right upper outer quadrant, non-tender, no skin retraction",
+             "Axilla: no palpable lymph node both sides",
+             "Respiratory: clear breath sound both lungs"],
+         assess="Breast mass, right upper outer quadrant\\r\\nPlan: excision biopsy, send for pathology",
+         plan="Excision biopsy, pathology, F/U 1 wk",
+         labs=["CBC", "Liver Function Test", "Electrolyte"],
+         drugs=["para", "amox", "tramad"]),
+    dict(dept="SURG", icd10=("E04.1", "Nontoxic single thyroid nodule"),
+         icd9=("06.2", "Unilateral thyroid lobectomy", "OR Procedure"),
+         cc="คลำได้ก้อนที่คอด้านหน้า 6 เดือน",
+         pi="6 เดือนก่อนมา คลำได้ก้อนที่คอด้านหน้าข้างขวา โตขึ้นช้าๆ ไม่เจ็บ กลืนอาหารได้ปกติ ไม่มีเสียงแหบ ไม่ใจสั่น ไม่มือสั่น น้ำหนักคงที่",
+         pe=["General Appearance: good consciousness, euthyroid appearance",
+             "Neck: firm nodule 3 cm at right thyroid lobe, moves with swallowing, no bruit",
+             "Lymph node: no cervical lymphadenopathy",
+             "Cardiovascular: normal s1s2, regular rhythm, no tachycardia"],
+         assess="Solitary thyroid nodule, right lobe, clinically euthyroid\\r\\nPlan: right lobectomy with frozen section",
+         plan="Right thyroid lobectomy, F/U pathology 1 wk",
+         labs=["CBC", "Liver Function Test", "Electrolyte"],
+         drugs=["para", "tramad", "omep"]),
+    dict(dept="MED", icd10=("E11.5", "DM type 2 foot with Diabetic ulcer"),
+         icd9=("86.22", "Excisional debridement of wound, infection, or burn", "OR Procedure"),
+         cc="แผลที่ฝ่าเท้าขวาไม่หาย 3 สัปดาห์",
+         pi="3 สัปดาห์ก่อนมา มีแผลที่ฝ่าเท้าขวา เริ่มจากตุ่มพองแล้วแตกเป็นแผล มีหนองไหล กลิ่นเหม็น ชาปลายเท้าทั้งสองข้าง เป็นเบาหวานมา 10 ปี คุมระดับน้ำตาลได้ไม่ดี",
+         pe=["General Appearance: good consciousness, mild febrile",
+             "Right foot: 3x2 cm ulcer at plantar aspect with necrotic tissue and purulent discharge",
+             "Neurological: decreased protective sensation both feet (monofilament test)",
+             "Vascular: dorsalis pedis pulse palpable both sides, no gangrene"],
+         assess="Infected diabetic foot ulcer, right\\r\\nPlan: excisional debridement, antibiotic, glycemic control",
+         plan="Debridement, antibiotic, DM control, F/U 3 days",
+         labs=["CBC", "Glucose (Fasting)", "Hb A1C", "Creatinine"],
+         abn={"White Cell Count": (12800, 18600), "Neutrophil": (76, 90),
+              "Fasting Blood Sugar": (168, 258), "Hb A1C": (8.4, 11.2)},
+         drugs=["amox", "para", "metf"]),
+    dict(dept="SURG", icd10=("E14.3", "Diabetic cataract"),
+         icd9=("13.41", "Phacoemulsification and aspiration of cataract", "OR Procedure"),
+         cc="ตาขวามัวลงเรื่อยๆ 6 เดือน",
+         pi="6 เดือนก่อนมา ตาขวามัวลงเรื่อยๆ มองแสงจ้าแล้วพร่า อ่านหนังสือลำบาก ไม่มีปวดตา ไม่มีตาแดง ไม่มีเห็นแสงวาบ เป็นเบาหวานมา 12 ปี",
+         pe=["General Appearance: good consciousness, cooperative",
+             "Right eye: visual acuity 20/200, lens opacity, pupil round and reactive",
+             "Left eye: visual acuity 20/40, early lens opacity",
+             "Fundus: no active proliferative change seen, media hazy on the right"],
+         assess="Diabetic cataract, right eye\\r\\nPlan: phacoemulsification with intraocular lens implantation",
+         plan="Phaco + IOL right eye, F/U 1 day",
+         labs=["CBC", "Glucose (Fasting)", "Hb A1C"],
+         abn={"Fasting Blood Sugar": (140, 212), "Hb A1C": (7.2, 9.6)},
+         drugs=["para", "metf", "cetiri"]),
+    dict(dept="ORTHO", icd10=("G56.0", "Carpal tunnel syndrome"),
+         icd9=("04.43", "Release of carpal tunnel", "OR Procedure"),
+         cc="ชาปลายนิ้วมือขวา ตื่นกลางดึก 4 เดือน",
+         pi="4 เดือนก่อนมา ชาที่นิ้วหัวแม่มือ นิ้วชี้ และนิ้วกลางข้างขวา เป็นมากตอนกลางคืนจนตื่น สะบัดมือแล้วอาการดีขึ้น หยิบจับของชิ้นเล็กลำบาก ทำงานเย็บผ้ามา 20 ปี",
+         pe=["General Appearance: good consciousness, not distressed",
+             "Right hand: positive Tinel sign and Phalen test, mild thenar atrophy",
+             "Sensory: decreased sensation over median nerve distribution",
+             "Motor: thumb abduction power grade 4"],
+         assess="Carpal tunnel syndrome, right, failed conservative treatment\\r\\nPlan: open carpal tunnel release",
+         plan="Carpal tunnel release, night splint, F/U 2 wks",
+         labs=["CBC", "Glucose (Fasting)"],
+         drugs=["ibu", "para", "predni"]),
+    dict(dept="SURG", icd10=("K80.2", "symptomatic gallstone"),
+         icd9=("51.23", "Laparoscopic cholecystectomy", "OR Procedure"),
+         cc="ปวดจุกแน่นใต้ชายโครงขวาหลังกินอาหารมัน 1 เดือน",
+         pi="1 เดือนก่อนมา ปวดจุกแน่นใต้ชายโครงขวาเป็นๆ หายๆ มักเป็นหลังรับประทานอาหารมัน ปวดร้าวไปสะบักขวา คลื่นไส้ ไม่อาเจียน ไม่มีไข้ ไม่มีตาเหลือง",
+         pe=["General Appearance: good consciousness, not jaundiced",
+             "Abdomen: tender at right upper quadrant, positive Murphy sign, no guarding",
+             "Bowel sound: normal, no mass palpable",
+             "HEENT: no scleral icterus, moist lips"],
+         assess="Symptomatic cholelithiasis\\r\\nPlan: laparoscopic cholecystectomy",
+         plan="Laparoscopic cholecystectomy, NPO, F/U 1 wk",
+         labs=["CBC", "Liver Function Test", "Electrolyte"],
+         abn={"AST": (38, 88), "ALT": (42, 96)},
+         drugs=["omep", "para", "tramad"]),
+    # --- two more procedural presentations for the everyday complete mix ----
+    dict(dept="SURG", icd10=("N40", "BPH"), icd9=("57.32", "Cystoscope", "NON OR Procedure"),
+         cc="ปัสสาวะลำบาก ต้องเบ่ง ปัสสาวะบ่อยตอนกลางคืน 6 เดือน",
+         pi="6 เดือนก่อนมา ปัสสาวะลำบาก ต้องเบ่ง สายปัสสาวะไม่พุ่ง ปัสสาวะบ่อยตอนกลางคืน 3-4 ครั้ง รู้สึกปัสสาวะไม่สุด ไม่มีปัสสาวะเป็นเลือด ไม่มีไข้",
+         pe=["General Appearance: good consciousness, not distressed",
+             "Abdomen: soft, no palpable bladder, no CVA tenderness",
+             "Digital rectal examination: smooth enlarged prostate, no nodule",
+             "Genitalia: no urethral discharge"],
+         assess="Benign prostatic hyperplasia with lower urinary tract symptoms\\r\\nPlan: cystoscopy, alpha blocker",
+         plan="Cystoscopy, medication, F/U 1 month",
+         labs=["Urine Analysis", "Creatinine"], drugs=["norflox", "para"]),
+    dict(dept="MED", icd10=("R42", "Dizziness"),
+         icd9=("88.72", "Echo-Transthoracic", "NON OR Procedure"),
+         cc="เวียนศีรษะ บ้านหมุน 3 วัน",
+         pi="3 วันก่อนมา เวียนศีรษะบ้านหมุนเวลาเปลี่ยนท่า เป็นครั้งละ 1-2 นาที คลื่นไส้ ไม่อาเจียน ไม่มีหูอื้อ ไม่มีแขนขาอ่อนแรง ไม่มีเจ็บหน้าอก ใจสั่นเล็กน้อย",
+         pe=["General Appearance: good consciousness, not distressed",
+             "Neurological: no focal neurological deficit, gait steady",
+             "HEENT: no nystagmus at rest, positive Dix-Hallpike test on the right",
+             "Cardiovascular: normal s1s2, regular rhythm, no murmur"],
+         assess="Dizziness, benign paroxysmal positional vertigo, rule out cardiac cause\\r\\nPlan: echocardiogram, vestibular exercise",
+         plan="Echocardiogram, Epley manoeuvre, F/U 2 wks",
+         labs=["CBC", "Electrolyte"], drugs=["cpm", "para"]),
+]
+
+
+# ---------------------------------------------------------------- imaging
+# Radiology reports, keyed by principal diagnosis. iMed delivers these as
+# medhack_medicalrecord_result rows with documenttype 'Radiology Report' --
+# the SAME table the lab results use, told apart by that one column
+# (SyncService: "Radiology Report" -> order_category X-ray, anything else
+# "other"). Without a row here a case shows "X-ray —" in the report header,
+# which is what every generated visit did before 2026-08-25.
+#
+# Only presentations that genuinely GET imaging appear here. A hemorrhoid is
+# diagnosed by proctoscopy and a sore throat by looking at it; inventing a
+# film for them would produce a chart no coder in the room would believe.
+RADIOLOGY = {
+    "C50.9": ("Mammogram both breasts with ultrasound",
+              "Right breast: irregular hypoechoic mass 2.4 x 1.8 cm at 10 o'clock position, "
+              "3 cm from the nipple, with indistinct margin. BI-RADS 4b. "
+              "No axillary lymphadenopathy. Left breast unremarkable."),
+    "D17.1": ("Ultrasound soft tissue, back",
+              "Well-defined oval hyperechoic lesion 4.2 x 2.1 cm in the subcutaneous plane, "
+              "no internal vascularity on colour Doppler. Findings consistent with lipoma."),
+    "E04.1": ("Ultrasound thyroid gland",
+              "Right lobe: well-defined solid isoechoic nodule 3.1 x 2.2 cm, TIRADS 3, "
+              "no microcalcification. Left lobe and isthmus normal. No cervical lymphadenopathy."),
+    "E11.5": ("X-ray right foot, AP and oblique",
+              "Soft tissue swelling at the plantar aspect. No periosteal reaction, "
+              "no bone destruction and no gas in the soft tissue. "
+              "No radiological evidence of osteomyelitis."),
+    "E14.3": ("Ultrasound B-scan, right eye",
+              "Posterior segment: no vitreous haemorrhage, retina attached. "
+              "Axial length 23.4 mm. Dense lens opacity confirmed."),
+    "G56.0": ("X-ray right wrist, PA and lateral",
+              "No fracture or dislocation. Carpal bones intact and joint spaces preserved. "
+              "No degenerative or erosive change."),
+    "K35.8": ("Ultrasound lower abdomen",
+              "Non-compressible blind-ending tubular structure 9 mm in diameter at the right "
+              "iliac fossa with peri-appendiceal fat stranding and a small amount of free fluid. "
+              "Findings consistent with acute appendicitis."),
+    "K80.2": ("Ultrasound upper abdomen",
+              "Gallbladder contains multiple mobile echogenic foci with posterior acoustic "
+              "shadowing, largest 1.2 cm. Wall thickness 3 mm, no pericholecystic fluid. "
+              "Common bile duct not dilated (4 mm). Liver, pancreas and both kidneys normal."),
+    "L02.4": ("Ultrasound soft tissue, right hip",
+              "Hypoechoic collection 4.5 x 3.2 cm with internal debris and peripheral "
+              "hyperaemia in the subcutaneous plane. Findings consistent with an abscess."),
+    "J18.9": ("Chest X-ray, PA upright",
+              "Patchy alveolar infiltration at the right lower lung zone. "
+              "Costophrenic angles clear, heart size normal, no pneumothorax."),
+    "N20.0": ("Ultrasound kidneys, ureters and bladder",
+              "Echogenic focus 8 mm with posterior shadowing at the left renal pelvis, "
+              "mild left hydronephrosis. Right kidney normal. Bladder unremarkable."),
+    "N40": ("Ultrasound kidneys, ureters and bladder",
+            "Prostate enlarged, volume 48 mL, with intravesical protrusion. "
+            "Post-void residual urine 95 mL. Both kidneys normal, no hydronephrosis, "
+            "no bladder stone."),
+    "R10.4": ("Ultrasound whole abdomen",
+              "No free fluid. Liver, gallbladder, pancreas, spleen and both kidneys "
+              "unremarkable. Appendix not visualised. Bowel gas pattern normal."),
+    "R42": ("Echocardiogram, transthoracic",
+            "Normal chamber sizes. Left ventricular ejection fraction 62 percent, "
+            "no regional wall motion abnormality. No valvular stenosis, trivial mitral "
+            "regurgitation. No intracardiac thrombus."),
+    "R51": ("CT brain without contrast",
+            "No intracranial haemorrhage, mass or midline shift. "
+            "Grey-white differentiation preserved. Paranasal sinuses clear."),
+    "S01.8": ("X-ray skull, AP and lateral",
+              "No skull fracture. No radio-opaque foreign body in the soft tissue. "
+              "Sella and sutures normal."),
+    "S61.0": ("X-ray right hand, PA and oblique",
+              "No fracture or dislocation. No radio-opaque foreign body. "
+              "Soft tissue swelling over the affected finger."),
+}
+
+# The ten showcase visits, by principal diagnosis. Every one of them is a
+# procedural presentation with an OPERATING-ROOM procedure, so the report
+# header reads CC&PI / PE / MX / Order / Lab / X-ray / Operative -- a full
+# chart to walk a room through. They are also the ten lowest ICD-10 codes in
+# the Complete tab and the ten most recent visits, so they lead the list under
+# both the default A-Z sort and "newest first".
+#
+# K64.2 (hemorrhoid) is deliberately NOT among them: it is the one operative
+# presentation here that gets no imaging, and a showcase case with an invented
+# film is worse than one fewer showcase case.
+SHOWCASE = ["C50.9", "D17.1", "E04.1", "E11.5", "E14.3",
+            "G56.0", "K35.8", "K64.2", "K80.2", "L02.4"]
+
+# Everyday complete visits draw from these only. Every code here sorts AFTER
+# the showcase codes, which is what keeps the showcase at the top of the
+# Complete tab -- the list's default order is the case's primary code, A-Z.
+EVERYDAY_COMPLETE = ["M17.1", "M54.5", "N20.0", "N40", "R10.4", "R42", "R51",
+                     "S01.8", "S61.0"]
+
+# Past history lines for the showcase charts -- the section a coder reads for
+# comorbidity. Deliberately consistent with the COMORBIDITIES pool.
+PAST_HX = [
+    "เป็นความดันโลหิตสูงมา 8 ปี รับประทานยาสม่ำเสมอ ไม่เคยผ่าตัด",
+    "เป็นเบาหวานชนิดที่ 2 มา 10 ปี และไขมันในเลือดสูง ติดตามการรักษาต่อเนื่อง",
+    "เคยผ่าตัดไส้ติ่งเมื่อ 15 ปีก่อน ปฏิเสธโรคประจำตัวอื่น",
+    "ปฏิเสธโรคประจำตัว ไม่สูบบุหรี่ ไม่ดื่มสุรา",
+    "เป็นความดันโลหิตสูงและไขมันในเลือดสูง รับประทานยาต่อเนื่อง 5 ปี",
 ]
 
 
@@ -640,8 +846,15 @@ class Rows:
 
 # --------------------------------------------------------------- generation
 
-def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0):
-    """Emit every child row for one visit. Returns the visit id."""
+def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0, rich=False):
+    """Emit every child row for one visit. Returns the visit id.
+
+    rich=True builds a SHOWCASE chart: the past-history section a coder reads
+    for comorbidity, two extra lab panels, and the radiology report that turns
+    the report header's "X-ray —" into a real study. Everything else is the
+    same code path, so a showcase visit is a normal visit with more of the
+    record filled in, never a differently-shaped one.
+    """
     vid = visit_id(when, seq)
     ts = when.strftime("%Y-%m-%d %H:%M:%S")
     n = 100  # child-row counter; diagnoses use the 200 range
@@ -737,9 +950,20 @@ def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0):
         rec("OPD Record", "Plan", sc["plan"])
         rec("OPD Record", "Family History", RNG.choice(FAMILY_HX))
         rec("OPD Record", "Food-Drug Allergy", RNG.choice(ALLERGY))
+        if rich:
+            # The section a coder reads for comorbidity. Only on the showcase
+            # charts: the extract's own OPD records rarely carry one.
+            rec("OPD Record", "Past History", RNG.choice(PAST_HX))
 
     # --- labs (orderlab + the matching Diagnostic Report rows) -------------
-    for panel in sc["labs"]:
+    # A showcase chart is worked up properly: whatever the presentation orders,
+    # plus the two panels any Thai OPD sends before a procedure.
+    panels = list(sc["labs"])
+    if rich:
+        for extra in ("CBC", "Electrolyte", "Creatinine"):
+            if extra not in panels:
+                panels.append(extra)
+    for panel in panels:
         tmlt, cgd, items = PANELS[panel]
         report = when + dt.timedelta(minutes=RNG.randint(25, 95))
         rts = report.strftime("%Y-%m-%d %H:%M:%S")
@@ -777,6 +1001,21 @@ def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0):
                   "itemcgd", "itemname", "itemvalue", "itemuom"),
                  (vid, sub_id(vid, n), panel, tmlt, cgd, ts, rts, itemid,
                   tmlt, cgd, "Comment", RNG.choice(LAB_COMMENTS), None))
+
+    # --- imaging (Radiology Report rows -> the X-ray column) ---------------
+    # Same table as the lab results; documenttype is what tells them apart.
+    film = RADIOLOGY.get(sc["icd10"][0])
+    if film and (rich or RNG.random() < 0.35):
+        study, findings = film
+        read_at = (when + dt.timedelta(minutes=RNG.randint(30, 120))
+                   ).strftime("%Y-%m-%d %H:%M:%S")
+        n += 1
+        rows.add("medhack_medicalrecord_result",
+                 ("transactionnumber", "tmlt", "cgd", "name", "documenttype",
+                  "fieldid", "fieldname", "subfieldname", "value", "uom",
+                  "recorddatetime"),
+                 (vid, "300500", "30301", study, "Radiology Report", vid[:11],
+                  "Report", "Impression", findings, None, read_at))
 
     # --- drugs -------------------------------------------------------------
     for key in sc["drugs"]:
@@ -845,13 +1084,14 @@ def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0):
 def main():
     rows = Rows()
 
-    # Target mix across the 100 OPD visits, counting the 21 originals
-    # (5 complete + 16 incomplete). 79 new OPD visits:
-    #   25 complete, 20 finished, 34 incomplete (mixed flavours of missing).
-    # Final dashboard split: 30 complete / 20 finished / 50 incomplete.
-    buckets = (["complete"] * 25 + ["finished"] * 20
-               + ["incomplete"] * 14 + ["icd10_only"] * 12 + ["icd9_only"] * 8)
-    assert len(buckets) == 79, len(buckets)
+    # Target mix, counting the 21 hand-written originals (5 complete +
+    # 16 incomplete). 119 new OPD visits:
+    #   45 complete + 10 showcase, 20 finished, 44 incomplete.
+    # Final dashboard split: 60 complete / 60 incomplete / 20 finished.
+    # The showcase ten are built separately, after this loop.
+    buckets = (["complete"] * 45 + ["finished"] * 20
+               + ["incomplete"] * 18 + ["icd10_only"] * 15 + ["icd9_only"] * 11)
+    assert len(buckets) == 109, len(buckets)
     RNG.shuffle(buckets)
 
     # A bucket that needs an ICD-9 can only be built from a presentation that
@@ -859,6 +1099,13 @@ def main():
     # approved while its procedure coding is still missing, which no coder
     # would ever sign off.
     with_proc = [s for s in S if s["icd9"] is not None]
+    by_code = {s["icd10"][0]: s for s in S}
+    # The Complete tab is ordered by the case's primary code, A-Z. Everyday
+    # complete visits are drawn ONLY from codes that sort after the showcase
+    # ten, so the showcase stays at the top of the list a coder opens.
+    everyday = [by_code[c] for c in EVERYDAY_COMPLETE]
+    showcase = [by_code[c] for c in SHOWCASE]
+    assert all(s["icd9"] for s in showcase + everyday), "a complete visit needs a procedure"
 
     # Spread across 2026-06-01 .. 2026-08-20 so a windowed sync has to split
     # into more than one <=31-day chunk, and analytics has a real time series.
@@ -870,7 +1117,9 @@ def main():
         day = start + dt.timedelta(days=RNG.randrange(days))
         when = dt.datetime(day.year, day.month, day.day,
                            RNG.randint(8, 16), RNG.randint(0, 59), RNG.randint(0, 59))
-        if bucket in ("complete", "finished", "icd9_only"):
+        if bucket == "complete":
+            sc = everyday[i % len(everyday)]
+        elif bucket in ("finished", "icd9_only"):
             sc = with_proc[i % len(with_proc)]
         else:
             sc = S[i % len(S)]
@@ -882,6 +1131,20 @@ def main():
         else:
             comorbid = 0
         generated.append(build_visit(rows, when, seq, sc, bucket, comorbid=comorbid))
+        seq += 1
+
+    # --- the ten showcase visits -------------------------------------------
+    # Dated last (14-20 August, one per day plus three doubled up) so they are
+    # also the ten most recent cases: they lead the Complete tab under the
+    # default A-Z-by-code sort AND under "newest first". Each carries a
+    # comorbidity or two, because a chart with none reads as a training
+    # exercise rather than a patient.
+    for i, sc in enumerate(showcase):
+        day = dt.date(2026, 8, 14) + dt.timedelta(days=i % 7)
+        when = dt.datetime(day.year, day.month, day.day,
+                           8 + (i % 8), RNG.randint(0, 59), RNG.randint(0, 59))
+        generated.append(build_visit(rows, when, seq, sc, "complete",
+                                     comorbid=1 + (i % 3), rich=True))
         seq += 1
 
     # Ten IPD admissions. These are the rows that exercise admissionnumber,
@@ -951,6 +1214,11 @@ def main():
         fh.write(sql + "\n")
 
     print(f"generated {len(generated)} visits -> {path}")
+    # SQL_ONLY=1 writes the script and stops. The demo stack runs Postgres in a
+    # container with no psql on the host, so the SQL is applied there instead:
+    #   docker compose exec -T db psql -U postgres -d imed -f - < generated_demo_data.sql
+    if os.environ.get("SQL_ONLY") == "1":
+        return
     r = subprocess.run(["psql", "-q", "-v", "ON_ERROR_STOP=1", "-d", DB, "-f", path],
                        capture_output=True, text=True)
     if r.returncode != 0:
