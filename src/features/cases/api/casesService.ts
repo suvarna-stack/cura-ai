@@ -73,9 +73,24 @@ export async function releaseCaseLock(id: string): Promise<void> {
   await apiClient.delete(`/cases/${encodeURIComponent(id)}/lock`)
 }
 
-/** POST /api/cases/approve — the server records the logged-in coder. */
-export const approveCases = (ids: string[]) =>
-  send('/cases/approve', 'POST', { ids })
+/**
+ * POST /api/cases/approve — the server records the logged-in coder.
+ *
+ * `blocked` are the cases the server REFUSED: a case needs a code in both
+ * columns (or the coder's "no procedure" statement) before it can be
+ * finalized, and approving from the list can only fill a column when the
+ * choice is unambiguous. The caller un-approves those and says so.
+ */
+export async function approveCases(ids: string[]): Promise<{ ok: boolean; blocked: string[] }> {
+  try {
+    const { data } = await apiClient.request<{ blocked?: string[] }>({
+      url: '/cases/approve', method: 'POST', data: { ids },
+    })
+    return { ok: true, blocked: Array.isArray(data?.blocked) ? data.blocked : [] }
+  } catch {
+    return { ok: false, blocked: [] }
+  }
+}
 
 /** POST /api/cases/{id}/reopen — undo an approve (actor = logged-in coder). */
 export const reopenCase = (id: string) =>

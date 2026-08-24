@@ -397,6 +397,17 @@ export function CasesPage({
     setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleSelectAll = () =>
     setSelectedIds(allSelected ? new Set() : new Set(filters.filteredComplete.map(c => c.id)));
+  // A case the server refused (an empty code column) must not sit in the list
+  // looking approved — the provider rolls it back and says so here.
+  useEffect(() => {
+    const onBlocked = (e: Event) => {
+      const ids: string[] = (e as CustomEvent).detail?.caseIds ?? [];
+      if (ids.length > 0) showToast(t("toast.approveBlocked", { n: ids.length }));
+    };
+    window.addEventListener("approvals:blocked", onBlocked);
+    return () => window.removeEventListener("approvals:blocked", onBlocked);
+  }, [showToast, t]);
+
   const approveSelected = () => askApprove([...selectedIds], () => { approve([...selectedIds]); setSelectedIds(new Set()); });
   const approveOne = (id: string) => askApprove([id], () => approve([id]));
 

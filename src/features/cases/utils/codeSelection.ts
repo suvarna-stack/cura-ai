@@ -10,6 +10,7 @@
 // mind without re-typing a code.
 // ============================================================
 import type { StoredCode } from "./caseLocal";
+import { isIcd9Type } from "./aiSuggestions";
 
 /** A row that can be ticked at all — an unresolved "???" placeholder can't. */
 export const isPickable = (c: StoredCode) => !c.missing && !!c.code && c.code !== "???";
@@ -18,6 +19,61 @@ export const isPickable = (c: StoredCode) => !c.missing && !!c.code && c.code !=
 export const isPicked = (c: StoredCode) => c.selected === true && isPickable(c);
 
 export const pickedCount = (codes: StoredCode[]) => codes.filter(isPicked).length;
+
+/**
+ * Ticked codes per system. A case is coded when BOTH sides of it are answered
+ * — the diagnosis and the procedure — so approve reads this, not the total:
+ * eight ticked diagnoses and no procedure is an unfinished case, and the old
+ * "at least one code" gate let it through.
+ */
+export const pickedBySystem = (codes: StoredCode[]) => {
+  const picked = codes.filter(isPicked);
+  return {
+    icd10: picked.filter((c) => !isIcd9Type(c.type)).length,
+    icd9: picked.filter((c) => isIcd9Type(c.type)).length,
+  };
+};
+
+/** The coder stated outright that this visit had no procedure. */
+export const hasNoProcedure = (codes: StoredCode[]) =>
+  codes.some((c) => c.noProcedure === true);
+
+/**
+ * Which system still has nothing ticked — null once both do.
+ *
+ * The ICD-9 side is answered EITHER by a ticked procedure code or by the
+ * coder saying there was no procedure. Both are positive statements; what is
+ * not allowed is approving a case where nobody said anything about the
+ * procedures at all.
+ */
+export function missingSystem(codes: StoredCode[]): "icd10" | "icd9" | "both" | null {
+  const { icd10, icd9 } = pickedBySystem(codes);
+  const nine = icd9 > 0 || hasNoProcedure(codes);
+  if (icd10 === 0 && !nine) return "both";
+  if (icd10 === 0) return "icd10";
+  if (!nine) return "icd9";
+  return null;
+}
+
+/** Set / clear the "no procedure performed" statement. Setting it unticks the
+ *  procedure codes: a ticked code and "no procedure" contradict each other,
+ *  and the statement the coder just made is the one that stands. */
+export function setNoProcedure(codes: StoredCode[], next: boolean): StoredCode[] {
+  const without = codes.filter((c) => !c.noProcedure);
+  if (!next) return without;
+  return [
+    ...without.map((c) =>
+      isIcd9Type(c.type) && isPicked(c) ? { ...c, selected: false } : c),
+    { code: "", type: "ICD-9", desc: "", confidence: 0, noProcedure: true },
+  ];
+}
+
+/** The mirror of the above: ticking a procedure code withdraws the
+ *  "no procedure" statement, so the two can never both be true. */
+export const clearNoProcedureIfPicked = (codes: StoredCode[]) =>
+  codes.some((c) => isIcd9Type(c.type) && isPicked(c))
+    ? codes.filter((c) => !c.noProcedure)
+    : codes;
 
 /** Suggestions the coder has left out — the count the approve dialog warns about. */
 export const unpickedCount = (codes: StoredCode[]) =>

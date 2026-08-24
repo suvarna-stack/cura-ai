@@ -29,7 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
-import { pickedCount, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
+import { clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
 import { CaseAgentDock } from "../../agent/components/CaseAgentDock";
@@ -297,8 +297,17 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
   // suggestions arrive unticked and stay on the case when they aren't picked
   const picked = pickedCount(codes);
   const unpicked = unpickedCount(codes);
-  const toggleCode = (index: number) => persistCodes(toggleAt(codes, index));
-  const toggleMany = (indices: number[], next: boolean) => persistCodes(setPicked(codes, indices, next));
+  // A case is only finished when both halves are answered: a diagnosis AND a
+  // procedure. Which one is still empty drives the button's blocked reason.
+  const missing = missingSystem(codes);
+  // Ticking a procedure code withdraws a standing "no procedure" statement —
+  // the two must never both be true on one case.
+  const toggleCode = (index: number) =>
+    persistCodes(clearNoProcedureIfPicked(toggleAt(codes, index)));
+  const toggleMany = (indices: number[], next: boolean) =>
+    persistCodes(clearNoProcedureIfPicked(setPicked(codes, indices, next)));
+  const noProcedure = hasNoProcedure(codes);
+  const markNoProcedure = (next: boolean) => persistCodes(setNoProcedure(codes, next));
 
   const handleAddCode = (entry: { code: string; type: string; desc: string;
                                   operation_start?: string; operation_end?: string;
@@ -527,14 +536,17 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
-          {/* approve is only meaningful once something is ticked — the button
-              says how many codes it will send, and blocks (with the reason) at
-              zero instead of silently finalizing an empty case */}
+          {/* approve needs a ticked code in BOTH columns — the button says how
+              many codes it will send, and blocks (naming the empty column)
+              instead of finalizing a half-coded case */}
           <button onClick={() => (approved ? setConfirmingUnapprove(true) : setConfirmingApprove(true))}
-            disabled={!approved && picked === 0}
-            title={!approved && picked === 0 ? t("code.pickNone") : undefined}
+            disabled={!approved && missing !== null}
+            title={approved || missing === null ? undefined
+              : missing === "both" ? t("code.pickNone")
+              : missing === "icd10" ? t("code.pickNo10")
+              : t("code.pickNo9")}
             className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed"
-            style={!approved && picked === 0
+            style={!approved && missing !== null
               ? { background: `rgba(${gl.accentRgb},0.10)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }
               : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>
             {approved
@@ -610,6 +622,8 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
               onAdd={setAdding}
               onToggle={toggleCode}
               onToggleAll={toggleMany}
+              noProcedure={noProcedure}
+              onNoProcedure={markNoProcedure}
             />
           );
         })}

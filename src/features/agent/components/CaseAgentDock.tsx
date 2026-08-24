@@ -79,6 +79,12 @@ interface DockPrefs {
   ground: boolean
   /** which half of the agent the composer talks to */
   chatMode: ChatMode
+  /**
+   * where the FLOATING card sits, as viewport px of its top-left corner.
+   * null = the default bottom-right corner (the dock is anchored right/bottom
+   * until the coder drags it, so it stays put when the window is resized).
+   */
+  pos: { x: number; y: number } | null
 }
 
 const PREFS_KEY = 'mcai.caseDock'
@@ -88,6 +94,7 @@ const DEFAULT_PREFS: DockPrefs = {
   h: 560,
   ground: true,
   chatMode: 'dict',
+  pos: null,
 }
 const MIN_W = 320
 const MAX_W = 680
@@ -96,6 +103,8 @@ const MIN_H = 320
 const TOAST_LANE = 72
 /** fallback for the app header's height until #main can be measured. */
 const HEADER_FALLBACK = 52
+/** how much of the dock must stay on screen when it is dragged. */
+const EDGE = 8
 
 function loadPrefs(): DockPrefs {
   try {
@@ -108,6 +117,10 @@ function loadPrefs(): DockPrefs {
       h: Math.max(Number(p.h) || DEFAULT_PREFS.h, MIN_H),
       ground: p.ground !== false,
       chatMode: p.chatMode === 'learn' ? 'learn' : 'dict',
+      pos:
+        p.pos && Number.isFinite(p.pos.x) && Number.isFinite(p.pos.y)
+          ? { x: p.pos.x, y: p.pos.y }
+          : null,
     }
   } catch {
     return DEFAULT_PREFS
@@ -116,6 +129,25 @@ function loadPrefs(): DockPrefs {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(Math.max(v, lo), hi)
+}
+
+/**
+ * Keeps a dragged dock inside the window: never over the app header, never
+ * pushed past an edge. Re-applied on every move AND on window resize, so a
+ * card parked at the right edge of a wide window cannot end up off-screen
+ * when the window is narrowed.
+ */
+function clampPos(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  top: number,
+): { x: number; y: number } {
+  return {
+    x: clamp(x, EDGE, Math.max(EDGE, window.innerWidth - w - EDGE)),
+    y: clamp(y, top, Math.max(top, window.innerHeight - h - EDGE)),
+  }
 }
 
 const isIcd9 = (type: string) => /icd[- ]?9|pcs/i.test(type)
@@ -184,10 +216,25 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
     )
   }, [])
 
+  // A moved dock is positioned in viewport px, so a window the coder narrows
+  // could otherwise leave it half (or wholly) off-screen — re-clamp on resize.
   useEffect(() => {
-    window.addEventListener('resize', measureHeader)
-    return () => window.removeEventListener('resize', measureHeader)
-  }, [measureHeader])
+    const onResize = () => {
+      measureHeader()
+      const r = dockRef.current?.getBoundingClientRect()
+      if (!r) return
+      setPrefs((p) =>
+        p.pos
+          ? {
+              ...p,
+              pos: clampPos(p.pos.x, p.pos.y, r.width, r.height, headerTop),
+            }
+          : p,
+      )
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [measureHeader, headerTop])
 
   // Follow the answer as it streams, but never yank the view back when the
   // coder has scrolled up to re-read something. Scrolls the list itself
@@ -222,36 +269,72 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [measureHeader])
 
+  const rail = prefs.mode === 'rail'
+
   // --- resize ----------------------------------------------------------
   // FLOAT resizes from its top-left corner, RAIL from its left edge; both
   // grow the way the pointer moves because the panel is anchored right.
-  const dragRef = useRef<{ x: number; y: number; w: number; h: number } | null>(
-    null,
+  const dragRef = useRef<{
+    x: number
+    y: number
+    w: number
+    h: number
+    right: number
+    bottom: number
+  } | null>(null)
+
+  /**
+   * Applies a new size while holding the corner the coder is NOT dragging
+   * still. The dock is anchored right/bottom by default, so that corner stays
+   * put on its own — but once it has been MOVED it is anchored by its stored
+   * top-left, and the position has to be given back or the panel would grow
+   * out from under the pointer.
+   */
+  const sized = useCallback(
+    (p: DockPrefs, w: number, h: number, right: number, bottom: number) => {
+      const nw = clamp(w, MIN_W, Math.min(MAX_W, window.innerWidth - 40))
+      const nh =
+        p.mode === 'rail'
+          ? p.h
+          : clamp(h, MIN_H, window.innerHeight - headerTop - TOAST_LANE - 16)
+      return {
+        ...p,
+        w: nw,
+        h: nh,
+        pos:
+          p.pos && p.mode !== 'rail'
+            ? clampPos(right - nw, bottom - nh, nw, nh, headerTop)
+            : p.pos,
+      }
+    },
+    [headerTop],
   )
+
   const onGripDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { x: e.clientX, y: e.clientY, w: prefs.w, h: prefs.h }
+    const r = dockRef.current?.getBoundingClientRect()
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: prefs.w,
+      h: prefs.h,
+      right: r?.right ?? 0,
+      bottom: r?.bottom ?? 0,
+    }
   }
   const onGripMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     const d = dragRef.current
     if (!d) return
-    setPrefs((p) => ({
-      ...p,
-      w: clamp(
+    setPrefs((p) =>
+      sized(
+        p,
         d.w + (d.x - e.clientX),
-        MIN_W,
-        Math.min(MAX_W, window.innerWidth - 40),
+        d.h + (d.y - e.clientY),
+        d.right,
+        d.bottom,
       ),
-      h:
-        p.mode === 'rail'
-          ? p.h
-          : clamp(
-              d.h + (d.y - e.clientY),
-              MIN_H,
-              window.innerHeight - headerTop - TOAST_LANE - 16,
-            ),
-    }))
+    )
   }
   const onGripUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     dragRef.current = null
@@ -263,18 +346,79 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
     const stepH = e.key === 'ArrowUp' ? 24 : e.key === 'ArrowDown' ? -24 : 0
     if (stepW === 0 && stepH === 0) return
     e.preventDefault()
+    const r = dockRef.current?.getBoundingClientRect()
+    setPrefs((p) =>
+      sized(p, p.w + stepW, p.h + stepH, r?.right ?? 0, r?.bottom ?? 0),
+    )
+  }
+
+  // --- move ------------------------------------------------------------
+  // A floating card always covers SOMETHING, and which column the coder needs
+  // to read changes case to case — so the header is a drag handle. The first
+  // drag pins the card where it already is (right/bottom anchoring becomes a
+  // stored top-left) so it does not jump under the pointer; double-clicking
+  // the header sends it back to the default corner. Arrow keys move it too,
+  // because a drag-only handle puts the panel out of reach from the keyboard.
+  const moveRef = useRef<{ dx: number; dy: number } | null>(null)
+  const [moving, setMoving] = useState(false)
+
+  const onHeadDown = (e: React.PointerEvent<HTMLElement>) => {
+    if (rail || e.button !== 0) return
+    // the header is also a toolbar — a press on a control is that control's
+    if ((e.target as HTMLElement).closest('button,a,input,textarea,select'))
+      return
+    const r = dockRef.current?.getBoundingClientRect()
+    if (!r) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    moveRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top }
+    setMoving(true)
     setPrefs((p) => ({
       ...p,
-      w: clamp(p.w + stepW, MIN_W, Math.min(MAX_W, window.innerWidth - 40)),
-      h:
-        p.mode === 'rail'
-          ? p.h
-          : clamp(
-              p.h + stepH,
-              MIN_H,
-              window.innerHeight - headerTop - TOAST_LANE - 16,
-            ),
+      pos: clampPos(r.left, r.top, r.width, r.height, headerTop),
     }))
+  }
+  const onHeadMove = (e: React.PointerEvent<HTMLElement>) => {
+    const m = moveRef.current
+    if (!m) return
+    const r = dockRef.current?.getBoundingClientRect()
+    if (!r) return
+    e.preventDefault()
+    setPrefs((p) => ({
+      ...p,
+      pos: clampPos(
+        e.clientX - m.dx,
+        e.clientY - m.dy,
+        r.width,
+        r.height,
+        headerTop,
+      ),
+    }))
+  }
+  const onHeadUp = (e: React.PointerEvent<HTMLElement>) => {
+    if (!moveRef.current) return
+    moveRef.current = null
+    setMoving(false)
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+  const onHeadKey = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (rail || e.target !== e.currentTarget) return
+    const step = e.shiftKey ? 48 : 16
+    const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
+    const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
+    if (dx === 0 && dy === 0) return
+    const r = dockRef.current?.getBoundingClientRect()
+    if (!r) return
+    e.preventDefault()
+    setPrefs((p) => ({
+      ...p,
+      pos: clampPos(r.left + dx, r.top + dy, r.width, r.height, headerTop),
+    }))
+  }
+  const onHeadDouble = (e: React.MouseEvent<HTMLElement>) => {
+    if (rail) return
+    if ((e.target as HTMLElement).closest('button,a,input,textarea,select'))
+      return
+    setPrefs((p) => ({ ...p, pos: null }))
   }
 
   // --- starters --------------------------------------------------------
@@ -415,8 +559,6 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
     })
   }
 
-  const rail = prefs.mode === 'rail'
-
   // ---------------------------------------------------------------- launcher
   if (!open) {
     return (
@@ -455,8 +597,11 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
       }
     : {
         position: 'fixed',
-        right: 20,
-        bottom: TOAST_LANE,
+        // parked in the default corner until the coder drags it, and pinned by
+        // its top-left from then on
+        ...(prefs.pos
+          ? { left: prefs.pos.x, top: prefs.pos.y }
+          : { right: 20, bottom: TOAST_LANE }),
         width: prefs.w,
         height: prefs.h,
         maxWidth: 'calc(100vw - 40px)',
@@ -504,11 +649,26 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
         }}
       />
 
+      {/* The header doubles as the drag handle (float only — a rail is edge to
+          edge and has nowhere to go). */}
       <header
-        className="flex shrink-0 items-center gap-2 px-3 py-2.5"
+        className={`flex shrink-0 items-center gap-2 px-3 py-2.5 ${
+          rail ? '' : moving ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+        onPointerDown={onHeadDown}
+        onPointerMove={onHeadMove}
+        onPointerUp={onHeadUp}
+        onPointerCancel={onHeadUp}
+        onDoubleClick={onHeadDouble}
+        onKeyDown={onHeadKey}
+        tabIndex={rail ? undefined : 0}
+        aria-label={rail ? undefined : t('dock.move')}
+        title={rail ? undefined : t('dock.move')}
         style={{
           background: `rgba(${gl.accentRgb},${gl.isDark ? 0.16 : 0.08})`,
           borderBottom: `1px solid rgba(${gl.accentRgb},0.18)`,
+          touchAction: rail ? undefined : 'none',
+          userSelect: moving ? 'none' : undefined,
         }}
       >
         <div

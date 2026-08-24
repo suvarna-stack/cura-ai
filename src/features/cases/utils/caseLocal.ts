@@ -36,6 +36,16 @@ export type StoredCode = CodeEntry & {
    * before this flow, which the backend still approves wholesale).
    */
   selected?: boolean;
+  /**
+   * The coder's explicit "this visit had no procedure" statement, kept as a
+   * marker ROW because the code list is the only per-case store there is.
+   * It carries no code, so everything that walks the list already skips it —
+   * the columns don't render it, the counts don't see it, and the backend's
+   * materializer drops empty codes before they can reach the hospital. Its
+   * only job is to let approve tell "no procedure was performed" apart from
+   * "nobody has looked at the procedures yet".
+   */
+  noProcedure?: boolean;
 };
 
 const codeEdits = new Map<string, StoredCode[]>();

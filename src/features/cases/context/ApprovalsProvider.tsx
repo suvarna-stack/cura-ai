@@ -41,7 +41,19 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
       if (!ids.some(id => prev.has(id))) return prev;
       const n = new Set(prev); ids.forEach(id => n.delete(id)); return n;
     });
-    void approveCases(ids); // no-op (false) without a live server
+    // The server has the last word: it refuses a case that still has an empty
+    // column, so anything it reports as blocked is rolled back out of the
+    // optimistic set and announced (CasesPage turns this into a toast — this
+    // provider sits ABOVE ToastProvider and cannot raise one itself).
+    void approveCases(ids).then(({ blocked }) => {
+      if (blocked.length === 0) return;
+      setApprovedIds(prev => {
+        const n = new Set(prev); blocked.forEach(id => n.delete(id)); return n;
+      });
+      window.dispatchEvent(new CustomEvent("approvals:blocked", {
+        detail: { caseIds: blocked },
+      }));
+    });
   };
   const reopen = (id: string) => {
     setApprovedIds(prev => { const n = new Set(prev); n.delete(id); return n; });

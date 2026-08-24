@@ -54,6 +54,10 @@ export interface CodesColumnProps {
   onToggle?: (index: number) => void;
   /** tick / untick every pickable code in THIS column at once */
   onToggleAll?: (indices: number[], next: boolean) => void;
+  /** ICD-9 only: the coder stated this visit had no procedure. Passing the
+   *  handler is what shows the statement's checkbox at all. */
+  noProcedure?: boolean;
+  onNoProcedure?: (next: boolean) => void;
   loading?: boolean;
   /** Coder-taught rules (Suggest & Learn) matching this case. The column
    *  shows the ones that talk about ITS system, above the codes — a rule the
@@ -62,7 +66,8 @@ export interface CodesColumnProps {
 }
 
 export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
-                             onToggle, onToggleAll, loading, notes }: CodesColumnProps) {
+                             onToggle, onToggleAll, noProcedure, onNoProcedure,
+                             loading, notes }: CodesColumnProps) {
   const { gl } = useTheme();
   const { t } = useLang();
 
@@ -85,6 +90,9 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
   // the priority lives in that array
   const filtered = codes
     .map((entry, index) => ({ entry, index }))
+    // the "no procedure" marker is a statement, not a code — it lives in the
+    // same array but never renders as a card
+    .filter((r) => !r.entry.noProcedure)
     .filter((r) => (system === "icd9") === isIcd9(r.entry.type));
   // Codes group by ORIGIN (2026-08-07): manual → hospital → AI → gaps, each
   // under its own header, because "the coder typed this", "the hospital
@@ -471,6 +479,21 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
         )}
       </div>
 
+      {/* A visit with no operation still has to be ANSWERED before it can be
+          approved — otherwise "no procedure" and "nobody checked" look the
+          same on screen and in the audit trail. */}
+      {system === "icd9" && onNoProcedure && (
+        <label className="flex items-start gap-2 px-3 py-2.5 shrink-0 cursor-pointer"
+          style={{ borderTop: gl.borderSm }}>
+          <input type="checkbox" checked={!!noProcedure}
+            onChange={(e) => onNoProcedure(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
+            style={{ accentColor: gl.accent }} />
+          <span className="text-[12px] leading-snug" style={{ color: gl.muted }}>
+            {t("code.noProc")}
+          </span>
+        </label>
+      )}
       {onAdd && (
         <div className="px-3 py-3 shrink-0" style={{ borderTop: gl.borderSm }}>
           <button onClick={() => onAdd(system)}
