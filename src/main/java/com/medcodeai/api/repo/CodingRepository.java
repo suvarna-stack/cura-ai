@@ -105,6 +105,25 @@ public class CodingRepository {
         return r.isEmpty() ? null : r.get(0);
     }
 
+    /**
+     * EVERY code the hospital sent for this case, both systems, with the roles
+     * and the operation window it gave them. Approving a case from the LIST
+     * never opens it, so there is nothing ticked by hand — these rows are what
+     * the coder would have been ticking, and confirming them is the same
+     * decision made in one click instead of two.
+     */
+    public List<Map<String, Object>> importedCodes(String caseId) {
+        return jdbc.query("""
+                SELECT COALESCE(icd_10_id, icd_9_id) AS icd_code_id,
+                       CASE WHEN icd_10_id IS NOT NULL THEN 'ICD-10' ELSE 'ICD-9' END AS code_system,
+                       code_role::text AS code_role,
+                       operation_start, operation_end, operation_type
+                FROM case_codes
+                WHERE case_id = ? AND source = 'imported_from_imed'
+                  AND (icd_10_id IS NOT NULL OR icd_9_id IS NOT NULL)
+                ORDER BY case_code_id""", CasesRepository.ROW, caseId);
+    }
+
     // writeback.py:81 — workflow status flip
     public void updateCaseStatus(String caseId, String status) {
         jdbc.update("UPDATE cases SET case_status = ? WHERE case_id = ?", status, caseId);

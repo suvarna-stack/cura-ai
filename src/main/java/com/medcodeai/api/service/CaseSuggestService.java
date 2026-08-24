@@ -18,15 +18,35 @@ import java.util.Map;
 @Service
 public class CaseSuggestService {
 
-    /** Prefer these section names when assembling the RAG query. */
-    private static final List<String> PREFERRED = List.of(
+    /**
+     * What the patient came in with, and how it developed. A coder reads these
+     * two first and so does the suggester: the disease is in the complaint and
+     * the history of it, not in the boilerplate that follows. They lead the
+     * query and are the last thing any cap is allowed to cut.
+     */
+    private static final List<String> PRIMARY = List.of(
             "chief complaint", "chiefcomplaint", "cc",
+            "present illness", "history of present", "hpi"
+    );
+
+    /** Read after the complaint: these confirm, stage or rule out what it says. */
+    private static final List<String> SUPPORTING = List.of(
             "subjective", "objective", "assessment", "plan",
-            "present illness", "history of present", "hpi",
             "diagnosis", "principal diagnosis", "final diagnosis",
             "procedure", "operative", "operation",
             "physical examination", "progress"
     );
+
+    /**
+     * The RAG service embeds only the first 3500 characters of the narrative,
+     * so anything past that was being built here and thrown away there. Cap at
+     * the same number: what we send is now exactly what gets searched on.
+     */
+    private static final int TOTAL_MAX = 3500;
+
+    /** ...of which the complaint and the illness history may claim this much
+     *  before any supporting section is allowed in. */
+    private static final int PRIMARY_MAX = 2000;
 
     private final CasesRepository cases;
     private final RagApiClient rag;
@@ -74,8 +94,11 @@ public class CaseSuggestService {
                 row.put("system", str(m.get("system")));
                 row.put("description", str(m.get("description")));
                 row.put("confidence", conf(m.get("confidence")));
-                row.put("source", str(m.get("source")));
-                if (row.get("code") != null && row.get("system") != null) {
+                String src = str(m.get("source"));
+                row.put("source", src);
+                boolean taught = src != null && src.startsWith("coder note");
+                if (row.get("code") != null && row.get("system") != null
+                        && (taught || systemFitsCode(str(m.get("system")), str(m.get("code"))))) {
                     codes.add(row);
                 }
             }
@@ -94,11 +117,35 @@ public class CaseSuggestService {
         return out;
     }
 
+    /**
+     * The page files a suggestion into a column by its {@code system} string,
+     * so a mislabelled row lands in the wrong column with no way for the coder
+     * to tell. ICD-10 codes start with a letter, ICD-9-CM procedure codes do
+     * not; anything that disagrees never leaves this service. Codes a coder
+     * taught by hand (source "coder note ...") are exempt — they may be local
+     * shapes, e.g. Thai TTM, and the coder's own label is the truth there.
+     */
+    private static boolean systemFitsCode(String system, String code) {
+        if (system == null || code == null || code.isBlank()) {
+            return false;
+        }
+        boolean letterFirst = Character.isLetter(code.charAt(0));
+        boolean saysNine = system.toLowerCase(Locale.ROOT).contains("9");
+        return saysNine != letterFirst;
+    }
+
+    /**
+     * The narrative the suggestion is made from, in three tiers: the complaint
+     * and its history first (up to PRIMARY_MAX), then the sections that back
+     * them up, then whatever else the hospital sent — each tier only if there
+     * is room left under TOTAL_MAX. Ordering IS the weighting here: the text
+     * is embedded as one vector, so what leads it decides what is retrieved.
+     */
     private String clinicalText(String caseId) {
-        List<Map<String, Object>> sections = cases.sectionRows(caseId);
-        List<String> preferred = new ArrayList<>();
-        List<String> rest = new ArrayList<>();
-        for (Map<String, Object> s : sections) {
+        List<String> primary = new ArrayList<>();
+        List<String> supporting = new ArrayList<>();
+        List<String> other = new ArrayList<>();
+        for (Map<String, Object> s : cases.sectionRows(caseId)) {
             String name = str(s.get("fieldname"));
             String value = str(s.get("value"));
             if (value == null || value.isBlank() || "—".equals(value)) {
@@ -106,22 +153,43 @@ public class CaseSuggestService {
             }
             String label = name == null ? "section" : name;
             String block = label + ":\n" + value.trim();
-            if (name != null && isPreferred(name)) {
-                preferred.add(block);
+            if (name != null && matches(name, PRIMARY)) {
+                primary.add(block);
+            } else if (name != null && matches(name, SUPPORTING)) {
+                supporting.add(block);
             } else {
-                rest.add(block);
+                other.add(block);
             }
         }
-        List<String> all = new ArrayList<>(preferred);
-        all.addAll(rest);
-        String joined = String.join("\n\n", all);
-        // Cap so the RAG request stays focused.
-        return joined.length() > 6000 ? joined.substring(0, 6000) : joined;
+        StringBuilder sb = new StringBuilder();
+        appendWithin(sb, primary, PRIMARY_MAX);
+        appendWithin(sb, supporting, TOTAL_MAX);
+        appendWithin(sb, other, TOTAL_MAX);
+        return sb.toString();
     }
 
-    private static boolean isPreferred(String fieldname) {
+    /**
+     * Appends whole sections while they fit under {@code budget}. A section
+     * that would overflow is SKIPPED rather than cut, so the query never ends
+     * mid-symptom — except when nothing has been written yet, where a single
+     * over-long complaint is truncated rather than lost entirely.
+     */
+    private static void appendWithin(StringBuilder sb, List<String> blocks, int budget) {
+        for (String block : blocks) {
+            if (sb.length() == 0) {
+                sb.append(block.length() > budget ? block.substring(0, budget) : block);
+                continue;
+            }
+            if (sb.length() + 2 + block.length() > budget) {
+                continue;
+            }
+            sb.append("\n\n").append(block);
+        }
+    }
+
+    private static boolean matches(String fieldname, List<String> names) {
         String n = fieldname.toLowerCase(Locale.ROOT);
-        for (String p : PREFERRED) {
+        for (String p : names) {
             if (n.contains(p)) {
                 return true;
             }
