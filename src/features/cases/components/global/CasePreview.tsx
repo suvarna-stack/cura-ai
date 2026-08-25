@@ -47,12 +47,10 @@ export function CasePreview({ c }: { c: RichCase }) {
   // one clean left edge instead of a ragged one.
 
   /** fixed-width chip so every line's text starts at the same x */
-  const chip = (text: string, opts?: { principal?: boolean; icon?: typeof Pill; title?: string }, key?: number) => (
+  const chip = (text: string, opts?: { icon?: typeof Pill; title?: string }, key?: number) => (
     <span key={key} className="w-[4.5rem] shrink-0 text-[12px] font-bold px-1 py-0.5 rounded-md truncate text-center inline-flex items-center justify-center gap-0.5"
       title={opts?.title}
-      style={opts?.principal
-        ? { background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }
-        : { background: gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.045)", color: gl.muted, border: gl.borderSm }}>
+      style={{ background: gl.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.045)", color: gl.muted, border: gl.borderSm }}>
       {opts?.icon && <opts.icon size={8} />}{text}
     </span>
   );
@@ -63,7 +61,6 @@ export function CasePreview({ c }: { c: RichCase }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       {list.slice(0, MAX_CODES).map((k, i) =>
         chip(k.code, {
-          principal: k.role === "principal_diagnosis",
           title: `${k.code} · ${k.desc ?? ""} (${k.role.replace(/_/g, " ")})`,
         }, i))}
       {list.length > MAX_CODES && (
