@@ -58,6 +58,14 @@ export function avgStoredConfidence(caseId: string): number | null {
  * Fill empty ICD-9 / ICD-10 columns with RAG suggestions.
  * Never overwrites codes already present for that system (iMed import or
  * coder edits). Skips duplicate code values.
+ *
+ * The suggestions go in HIGHEST CONFIDENCE FIRST (2026-08-25), so the top card
+ * of the AI group is the model's best guess. Sorting happens here rather than
+ * at render because a column displays its rows in array order: sorting the
+ * saved array keeps display order and stored order identical, so a coder can
+ * still drag an AI row to a different priority without it snapping back, and
+ * the positional "first ICD-10 is the principal diagnosis" pick still names
+ * the code the coder can see at the top.
  */
 export function fillEmptySystems(
   existing: StoredCode[],
@@ -69,8 +77,12 @@ export function fillEmptySystems(
   const has10 = existing.some((c) => !isIcd9Type(c.type) && !c.missing && c.code !== '???')
   const seen = new Set(existing.map((c) => c.code.toUpperCase()))
 
+  // one ranked list for both systems — each column filters out the other's
+  // rows, so interleaving here still leaves each column sorted
+  const ranked = [...ai].sort((a, b) => b.confidence - a.confidence)
+
   const add: StoredCode[] = []
-  for (const s of ai) {
+  for (const s of ranked) {
     const key = s.code.toUpperCase()
     if (seen.has(key)) continue
     const nine = isIcd9Type(s.system)

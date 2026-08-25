@@ -8,9 +8,16 @@
 // same `selected` flag out of the saved codeEdits payload), so the
 // rejected suggestions stay on screen — a coder can change their
 // mind without re-typing a code.
+//
+// One concession to the common case (2026-08-25): pressing Approve
+// with NOTHING ticked used to be a dead button. It now ticks the top
+// card of each column (autoPickIndices) and opens the usual confirm
+// dialog, so the ordinary "the AI got it right" case is one click —
+// still confirmed, still visible, never an unattended write.
 // ============================================================
 import type { StoredCode } from "./caseLocal";
 import { isIcd9Type } from "./aiSuggestions";
+import { ORIGIN_ORDER, originOf } from "./codeOrigin";
 
 /** A row that can be ticked at all — an unresolved "???" placeholder can't. */
 export const isPickable = (c: StoredCode) => !c.missing && !!c.code && c.code !== "???";
@@ -78,6 +85,35 @@ export const clearNoProcedureIfPicked = (codes: StoredCode[]) =>
 /** Suggestions the coder has left out — the count the approve dialog warns about. */
 export const unpickedCount = (codes: StoredCode[]) =>
   codes.filter((c) => isPickable(c) && !isPicked(c)).length;
+
+/**
+ * Nothing ticked and the coder pressed Approve: the rows to tick on their
+ * behalf — the TOP card of each column, one ICD-10 and one ICD-9.
+ *
+ * "Top" means top ON SCREEN, so this walks the same order CodesColumn draws:
+ * origin groups first (manual -> hospital -> AI -> gaps), array order inside a
+ * group. With only AI rows present that is the highest-confidence suggestion,
+ * because fillEmptySystems stores them ranked.
+ *
+ * A column that is already answered is left alone — and a standing
+ * "no procedure" statement answers the ICD-9 side, so this never silently
+ * withdraws it by ticking a procedure code the coder ruled out.
+ */
+export function autoPickIndices(codes: StoredCode[]): number[] {
+  const { icd10, icd9 } = pickedBySystem(codes);
+  const rank = (c: StoredCode) => ORIGIN_ORDER.indexOf(originOf(c));
+  const topOf = (nine: boolean) =>
+    codes
+      .map((entry, index) => ({ entry, index }))
+      .filter((r) => isPickable(r.entry) && isIcd9Type(r.entry.type) === nine)
+      .sort((a, b) => rank(a.entry) - rank(b.entry) || a.index - b.index)[0]?.index;
+
+  const wanted: (number | undefined)[] = [
+    icd10 > 0 ? undefined : topOf(false),
+    icd9 > 0 || hasNoProcedure(codes) ? undefined : topOf(true),
+  ];
+  return wanted.filter((i): i is number => i !== undefined);
+}
 
 /** Flip one row by its index in the full array. */
 export function toggleAt(codes: StoredCode[], index: number): StoredCode[] {

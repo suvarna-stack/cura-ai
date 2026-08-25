@@ -29,7 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
-import { clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
+import { autoPickIndices, clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { IncompleteCase, CodeEntry } from "../types/case.types";
 import { CaseAgentDock } from "../../agent/components/CaseAgentDock";
@@ -309,9 +309,17 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
   // "???" placeholder rows can't be ticked at all until they're filled in.
   const picked = pickedCount(codes);
   const unpicked = unpickedCount(codes);
+  // Approve with nothing ticked = "the AI got it right" (2026-08-25): rather
+  // than sitting disabled, the button ticks the top card of each column — with
+  // only AI rows present, the highest-confidence ICD-10 and ICD-9 — and then
+  // opens the same confirm dialog, which names the count before anything is
+  // written. Empty when the coder has already ticked something.
+  const autoPick = picked === 0 ? autoPickIndices(codes) : [];
   // A case is only finished when both halves are answered: a diagnosis AND a
-  // procedure. Which one is still empty drives the button's blocked reason.
-  const missing = missingSystem(codes);
+  // procedure. Which one is still empty drives the button's blocked reason —
+  // read AFTER the auto-pick, so the button only stays blocked when a column
+  // has nothing to pick at all.
+  const missing = missingSystem(autoPick.length ? setPicked(codes, autoPick, true) : codes);
   // Ticking a procedure code withdraws a standing "no procedure" statement —
   // the two must never both be true on one case.
   const toggleCode = (index: number) =>
@@ -351,6 +359,13 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
       previousState: { caseId: c.id, code: removed },
     });
     showToast(`Deleted code ${removed.code} from ${c.patient}`, logId);
+  };
+
+  /** Approve pressed: tick the top of each column first when nothing is
+   *  ticked, so the dialog that opens describes what will actually be sent. */
+  const startApprove = () => {
+    if (autoPick.length) persistCodes(clearNoProcedureIfPicked(setPicked(codes, autoPick, true)));
+    setConfirmingApprove(true);
   };
 
   const handleApprove = () => {
@@ -576,9 +591,10 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
           {/* approve sends the ticked codes only, and needs one in BOTH
-              columns — blocked (naming the empty column) rather than
-              finalizing a half-coded case */}
-          <button onClick={() => (approved ? setConfirmingUnapprove(true) : setConfirmingApprove(true))}
+              columns — with nothing ticked it ticks the top card of each
+              column first (startApprove); it stays blocked, naming the empty
+              column, only when there is nothing there to tick */}
+          <button onClick={() => (approved ? setConfirmingUnapprove(true) : startApprove())}
             disabled={!approved && missing !== null}
             title={approved || missing === null ? undefined
               : missing === "both" ? t("code.pickNone")
