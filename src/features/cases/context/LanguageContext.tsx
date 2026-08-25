@@ -98,6 +98,11 @@ export const dict: Record<string, { en: string; th: string }> = {
                          th: "ข้อมูลจาก iMed ไม่มีฟิลด์แพทย์ผู้รักษา (MD)" },
   "report.partMissing": { en: "{part} is not in this record — the AI cannot suggest codes from it",
                           th: "ไม่มี {part} ในเวชระเบียนนี้ — AI จึงแนะนำรหัสจากส่วนนี้ไม่ได้" },
+  "report.partPresent": { en: "{part} is recorded in this visit",
+                          th: "มี {part} ในเวชระเบียนนี้" },
+  // the count badge on the Order / Lab / X-ray / Operative chips
+  "report.partCount":   { en: "{n} {part} record(s) in this visit",
+                          th: "{part} {n} รายการในเวชระเบียนนี้" },
   "report.orders":       { en: "Orders & results", th: "คำสั่งและผลตรวจ" },
   "report.moreOrders":   { en: "more — click to expand", th: "รายการ — คลิกเพื่อดูทั้งหมด" },
   "report.ordersCapped": { en: "showing {shown} of {total} — the rest are not sent in one payload",

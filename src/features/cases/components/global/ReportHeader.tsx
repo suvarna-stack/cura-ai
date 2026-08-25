@@ -8,32 +8,97 @@
 // AI cannot suggest codes when a part is missing, so a coder must
 // see at a glance WHICH part is missing.
 //
+// The strip carries two different kinds of fact, so it is drawn as
+// two groups split by a rule:
+//   · narrative sections (CC&PI / PE / MX) — present or not, ✓ or –
+//   · order categories (Order / Lab / X-ray / Operative) — HOW MANY
+// The count is a separate badge, never plain text after the label:
+// "Lab 7" set in one weight reads as the name of a thing, which is
+// exactly the confusion this layout fixes.
+//
 // Fields iMed does not supply at all (MD, Operative Note for OPD)
 // are shown as "—" with the reason on hover rather than hidden:
 // the gap is information the hospital needs.
 // ============================================================
-import { User, Hash, Calendar, Activity, UserCheck, Stethoscope } from "lucide-react";
+import {
+  User, Hash, Calendar, Activity, UserCheck, Stethoscope,
+  FileText, ClipboardList, Pill, FlaskConical, Scan, Scissors, Check, Minus,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import type { GL } from "../../types/theme.types";
 import type { ApiCaseDetail } from "../../types/api.types";
 
+/** narrative parts — presence only, matched on the synced section fieldnames */
+const SECTION_PARTS: { key: string; icon: LucideIcon; names: string[] }[] = [
+  { key: "CC&PI", icon: FileText,      names: ["chief complaint", "present illness", "subjective"] },
+  { key: "PE",    icon: Stethoscope,   names: ["physical examination", "objective"] },
+  { key: "MX",    icon: ClipboardList, names: ["plan", "assessment", "progression"] },
+];
+
+/** order parts — countable, so they carry a number badge */
+const ORDER_PARTS: { key: string; icon: LucideIcon; cat: string; section?: string }[] = [
+  { key: "Order",     icon: Pill,         cat: "medicine", section: "order" },
+  { key: "Lab",       icon: FlaskConical, cat: "lab" },
+  { key: "X-ray",     icon: Scan,         cat: "X-ray" },
+  { key: "Operative", icon: Scissors,     cat: "surgery" },
+];
+
+type Part = { key: string; icon: LucideIcon; ok: boolean; n: number };
+
 /** Which report parts are present, derived from the synced sections + orders. */
-function reportParts(detail: ApiCaseDetail | null) {
+function reportParts(detail: ApiCaseDetail | null): { sections: Part[]; orders: Part[] } {
   const has = (...names: string[]) =>
     (detail?.sections ?? []).some(
       (s) => names.some((n) => (s.fieldname ?? "").toLowerCase().includes(n)) && (s.value ?? "").trim() !== "");
   // true totals from orderCounts — the orders[] array is capped per category
-  const orders = (cat: string) =>
+  const count = (cat: string) =>
     detail?.orderCounts?.[cat] ?? (detail?.orders ?? []).filter((o) => o.order_category === cat).length;
-  return [
-    { key: "CC&PI",     ok: has("chief complaint", "present illness", "subjective"), n: 0 },
-    { key: "PE",        ok: has("physical examination", "objective"), n: 0 },
-    { key: "MX",        ok: has("plan", "assessment", "progression"), n: 0 },
-    { key: "Order",     ok: has("order") || orders("medicine") > 0, n: orders("medicine") },
-    { key: "Lab",       ok: orders("lab") > 0, n: orders("lab") },
-    { key: "X-ray",     ok: orders("X-ray") > 0, n: orders("X-ray") },
-    { key: "Operative", ok: orders("surgery") > 0, n: orders("surgery") },
-  ];
+  return {
+    sections: SECTION_PARTS.map((p) => ({ key: p.key, icon: p.icon, ok: has(...p.names), n: 0 })),
+    orders: ORDER_PARTS.map((p) => {
+      const n = count(p.cat);
+      return { key: p.key, icon: p.icon, n, ok: n > 0 || (p.section ? has(p.section) : false) };
+    }),
+  };
+}
+
+/** One part of the record: icon + name, then either a count badge, a ✓, or a – */
+function PartChip({ part, gl, title }: { part: Part; gl: GL; title: string }) {
+  const base = "inline-flex items-center gap-1.5 h-[22px] rounded-full text-[12px] font-semibold";
+  if (!part.ok) {
+    return (
+      <span title={title}
+        className={`${base} pl-2 pr-2.5`}
+        style={{ background: "transparent", color: gl.muted, border: `1px dashed ${gl.isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.20)"}`, opacity: 0.75 }}>
+        <part.icon size={11} className="shrink-0" />
+        {part.key}
+        <Minus size={11} className="shrink-0" />
+      </span>
+    );
+  }
+  return (
+    <span title={title}
+      className={`${base} ${part.n > 0 ? "pl-2 pr-1" : "pl-2 pr-2.5"}`}
+      style={{
+        background: gl.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)",
+        color: gl.text, border: gl.borderSm,
+      }}>
+      <part.icon size={11} className="shrink-0" style={{ color: gl.accent }} />
+      {part.key}
+      {part.n > 0 ? (
+        // the number lives in its own badge so it reads as a quantity,
+        // not as part of the category name
+        <span className="min-w-[18px] h-[16px] px-1.5 inline-flex items-center justify-center rounded-full text-[11px] font-bold tabular-nums leading-none"
+          style={{ background: `rgba(${gl.accentRgb},0.16)`, color: gl.accent }}>
+          {part.n}
+        </span>
+      ) : (
+        <Check size={11} className="shrink-0" style={{ color: gl.accent }} />
+      )}
+    </span>
+  );
 }
 
 export function ReportHeader({ detail, caseId, dept }: {
@@ -66,6 +131,8 @@ export function ReportHeader({ detail, caseId, dept }: {
       title: dc?.attending_physician ? undefined : t("report.mdMissing") },
   ];
 
+  const parts = reportParts(detail);
+
   return (
     <>
       <div className="grid grid-cols-3 gap-x-5 gap-y-1.5">
@@ -80,19 +147,28 @@ export function ReportHeader({ detail, caseId, dept }: {
       </div>
       {/* encounter type + which clinical parts the record actually holds */}
       <div className="flex items-center gap-1.5 flex-wrap mt-2">
-        <span className="text-[12px] font-bold px-2 py-0.5 rounded-full"
+        <span className="inline-flex items-center h-[22px] px-2.5 text-[12px] font-bold rounded-full"
           style={{ background: `rgba(${gl.accentRgb},0.14)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}>
           {enc === "1" ? "IPD" : "OPD"}
         </span>
-        {reportParts(detail).map((p) => (
-          <span key={p.key}
-            title={p.ok ? undefined : t("report.partMissing", { part: p.key })}
-            className="text-[12px] font-semibold px-2 py-0.5 rounded-full"
-            style={p.ok
-              ? { background: gl.isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", color: gl.text, border: gl.borderSm }
-              : { background: "transparent", color: gl.muted, border: gl.borderSm, opacity: 0.7 }}>
-            {p.key} {p.ok ? (p.n > 0 ? p.n : "✓") : "—"}
-          </span>
+
+        {/* written-up sections: present or missing, no quantity to show */}
+        {parts.sections.map((p) => (
+          <PartChip key={p.key} part={p} gl={gl}
+            title={p.ok ? t("report.partPresent", { part: p.key })
+                        : t("report.partMissing", { part: p.key })} />
+        ))}
+
+        {/* rule keeps the ✓/– group from being read as the same scale as the counts */}
+        <span aria-hidden className="w-px h-[16px] mx-0.5 shrink-0"
+          style={{ background: gl.isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)" }} />
+
+        {/* order categories: the badge is the number of records in this visit */}
+        {parts.orders.map((p) => (
+          <PartChip key={p.key} part={p} gl={gl}
+            title={p.n > 0 ? t("report.partCount", { n: String(p.n), part: p.key })
+                 : p.ok  ? t("report.partPresent", { part: p.key })
+                         : t("report.partMissing", { part: p.key })} />
         ))}
       </div>
     </>
