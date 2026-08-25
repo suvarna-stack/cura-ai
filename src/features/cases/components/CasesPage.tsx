@@ -556,8 +556,25 @@ export function CasesPage({
         {/* Filters + sort, moved here from the left sidebar and from the old
             sync-period bar (hospital request 2026-08-25). Sync itself now
             lives in the header beside the account chip, so nothing on this
-            page competes with the case list for width. */}
-        <FilterBar f={filters} loading={loading} />
+            page competes with the case list for width.
+
+            Sticky (requested 2026-08-25): these queues run to hundreds of
+            rows, and the whole point of moving the facets out of the sidebar
+            was that they stay reachable — a control that scrolls away is
+            worse than the sidebar it replaced. The scroll container is this
+            page's <main>, so top-0 anchors to the app header, not the window.
+
+            -mx-5/px-5 cancels the parent's padding so the band spans the full
+            width: without it, rows would slide through the 20px gutters on
+            either side of the card while it is pinned. */}
+        <div className="sticky top-0 z-20 -mx-5 px-5 py-2"
+          style={{
+            background: gl.headerBg,
+            backdropFilter: gl.blur20,
+            WebkitBackdropFilter: gl.blur20,
+          }}>
+          <FilterBar f={filters} loading={loading} />
+        </div>
 
         {/* items-start: the card sizes to its content, so there is no empty
             void below the pagination. Single column since the sidebar left. */}
