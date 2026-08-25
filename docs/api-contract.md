@@ -176,6 +176,9 @@ real values here when the extract has them).
                   "at": "2026-07-20 09:00:00",
                   "detail": { "by": "demo.coder", "codes": 1 } }, ... ],  // coder audit trail, oldest first
   "codeEdits": <CodeEdit[] | null>,   // last PUT …/codes payload, echoed verbatim
+  "starred": true,                    // the same shared star the cards carry, so the
+  "starredBy": "Austin",              //   case's own page can show it on a deep link
+  "starredAt": "2026-08-25 10:11:12"  //   or reload; the last two null when not starred
 }
 ```
 

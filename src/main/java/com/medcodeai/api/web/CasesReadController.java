@@ -1,5 +1,6 @@
 package com.medcodeai.api.web;
 
+import com.medcodeai.api.service.CaseStarService;
 import com.medcodeai.api.service.CasesCache;
 import com.medcodeai.api.service.CasesViewService;
 import com.medcodeai.api.service.WorkingStateService;
@@ -29,11 +30,14 @@ public class CasesReadController {
     private final CasesViewService views;
     private final CasesCache cache;
     private final WorkingStateService workingState;
+    private final CaseStarService stars;
 
-    public CasesReadController(CasesViewService views, CasesCache cache, WorkingStateService workingState) {
+    public CasesReadController(CasesViewService views, CasesCache cache,
+                               WorkingStateService workingState, CaseStarService stars) {
         this.views = views;
         this.cache = cache;
         this.workingState = workingState;
+        this.stars = stars;
     }
 
     // app.py:229 — cached until the next approve/reopen/reset
@@ -117,7 +121,9 @@ public class CasesReadController {
             description = "Serves ALL cases, IPD included (unlike the OPD-only dashboard), so "
                     + "`hn`-type fields carry real values here when the extract has them. "
                     + "`codeEdits` is the coder's saved working state and is "
-                    + "always present, `null` when unset.\n\n"
+                    + "always present, `null` when unset. `starred` / `starredBy` / "
+                    + "`starredAt` mirror the card's shared star, so the case's own "
+                    + "page shows it on a deep link or reload.\n\n"
                     + "Example below is trimmed; datetimes are raw hospital text — treat as "
                     + "opaque display strings.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
@@ -171,7 +177,10 @@ public class CasesReadController {
                           "ordered_at": "2026-04-01 07:10:00"
                         }
                       ],
-                      "codeEdits": null
+                      "codeEdits": null,
+                      "starred": true,
+                      "starredBy": "Austin",
+                      "starredAt": "2026-08-25 10:11:12"
                     }
                     """)))
     @ApiResponse(responseCode = "404", description = "Unknown case",
@@ -184,6 +193,13 @@ public class CasesReadController {
         }
         WorkingStateService.WorkingState ws = workingState.load(caseId);
         detail.put("codeEdits", ws.edits());
+        // The shared star, so the case's own page can say it is flagged without
+        // the dashboard payload: a coder who deep-links or reloads here has no
+        // card to read it off, and the star is a message meant to be seen.
+        Map<String, Object> star = stars.state(caseId);
+        detail.put("starred", star.get("starred"));
+        detail.put("starredBy", star.get("starredBy"));
+        detail.put("starredAt", star.get("starredAt"));
         return detail;
     }
 }

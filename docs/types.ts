@@ -145,6 +145,13 @@ export interface CaseDetail {
   history: CaseHistoryEntry[];
   /** last PUT …/codes payload, echoed verbatim; null when never saved */
   codeEdits: CodeEdit[] | null;
+  /** the same shared "look at this one first" flag the cards carry, repeated
+   *  here so the case's own page can show it on a deep link or reload */
+  starred: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null;
 }
 
 /** One row of this case's coder audit trail (medcodeai `coding_history`) — what

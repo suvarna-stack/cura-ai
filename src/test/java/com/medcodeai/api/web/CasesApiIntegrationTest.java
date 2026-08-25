@@ -403,6 +403,33 @@ class CasesApiIntegrationTest {
     }
 
     @Test
+    void caseDetailCarriesTheStarSoTheCasePageCanShowIt() throws Exception {
+        // a coder who deep-links or reloads straight into a case has no card to
+        // read the star off — the detail payload has to carry the same value
+        mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))
+                .andExpect(status().isOk());
+
+        JsonNode unstarred = getJson("/api/cases/" + KNOWN_CASE_ID);
+        assertTrue(unstarred.has("starred") && !unstarred.get("starred").asBoolean());
+        assertTrue(unstarred.get("starredBy").isNull(), "starredBy is null while unstarred");
+        assertTrue(unstarred.get("starredAt").isNull(), "starredAt is null while unstarred");
+
+        String set = mvc.perform(post("/api/cases/{id}/star", KNOWN_CASE_ID)
+                        .header("Authorization", auth()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode state = json.readTree(set);
+
+        JsonNode starred = getJson("/api/cases/" + KNOWN_CASE_ID);
+        assertTrue(starred.get("starred").asBoolean(), "the case page sees the star the card sees");
+        assertEquals(state.get("starredBy").asString(), starred.get("starredBy").asString());
+        assertEquals(state.get("starredAt").asString(), starred.get("starredAt").asString());
+
+        mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void starringAnUnknownCaseReturns404() throws Exception {
         mvc.perform(post("/api/cases/{id}/star", "no-such-case").header("Authorization", auth()))
                 .andExpect(status().isNotFound())
