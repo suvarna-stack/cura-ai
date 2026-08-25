@@ -20,6 +20,7 @@ import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
+import { StarredBadge } from "./global/StarredBadge";
 import { loadCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { codeTypeFromRole } from "../utils/aiSuggestions";
 import { buildCaseReportDocument, caseReportFilename } from "../utils/caseReportDocument";
@@ -178,6 +179,9 @@ export function FinishedCaseDetailPage({
             style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
             <BadgeCheck size={13} /> Approved · {c.codedDate}
           </span>
+          {/* the shared star, if a coder left one — who wants this case looked
+              at first, next to the case's identity like its status is */}
+          <StarredBadge detail={detail} fallback={c} />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => onViewHistory(c.id, c.patient)}

@@ -39,11 +39,7 @@ export interface RichCase extends CompleteCase {
   updated_at?: string
   revenue_impact?: 'high' | 'medium' | 'low'
   reopened?: boolean
-  /** the shared "look at this one first" flag: one star per case, set by any
-   *  coder and seen by all of them (not a private favourites list) */
-  starred?: boolean
-  starredBy?: string | null
-  starredAt?: string | null
+  // starred / starredBy / starredAt come from CompleteCase
 }
 
 export interface RichIncompleteGroup extends Omit<IncompleteGroup, 'cases'> {

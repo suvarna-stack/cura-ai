@@ -187,4 +187,12 @@ export interface ApiCaseDetail {
   // Present only when served by the live server (server/app.py), which echoes
   // the coder's saved working state; absent in the static JSON export.
   codeEdits?: ApiStoredCode[] | null;
+  /** CREATE: the same shared star the cards carry, repeated here so the case's
+   *  own page can show it on a deep link or reload, where no card was ever
+   *  loaded. Live server only; absent in the static JSON export. */
+  starred?: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy?: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt?: string | null;
 }

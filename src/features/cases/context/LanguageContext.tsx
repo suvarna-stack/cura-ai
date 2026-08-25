@@ -303,6 +303,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "star.add":    { en: "Mark case {vn} as important", th: "ทำเครื่องหมายเคส {vn} ว่าสำคัญ" },
   "star.remove": { en: "Remove the star from case {vn}", th: "เอาดาวออกจากเคส {vn}" },
   "star.by":     { en: "Starred by {name} — click to remove", th: "ติดดาวโดย {name} — คลิกเพื่อเอาออก" },
+  // …and the same star inside the case, where it is read-only and has room to
+  // say who left it and when (the row only has room for the glyph)
+  "star.badgeBy": { en: "Starred by {name}", th: "ติดดาวโดย {name}" },
+  "star.badge":   { en: "Starred",           th: "ติดดาว" },
   "reopen.finishedBy": { en: "Finished by", th: "ทำเสร็จโดย" },
   "reopen.reopenedBy": { en: "Reopened by", th: "เปิดใหม่โดย" },
   "facet.dept":      { en: "Department",   th: "แผนก" },

@@ -28,6 +28,7 @@ import { VitalsStrip } from "./global/VitalsStrip";
 import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
+import { StarredBadge } from "./global/StarredBadge";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
 import { isReopenedCase } from "../utils/caseHistory";
 import { autoPickIndices, clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
@@ -591,6 +592,9 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
               {missingCount > 0 ? t("detail.fieldsPending", { n: missingCount }) : t("detail.readyToApprove")}
             </span>
           )}
+          {/* the shared star, if a coder left one — who wants this case looked
+              at first, next to the case's identity like its status is */}
+          <StarredBadge detail={detail} fallback={c} />
         </div>
         {/* actions at the top right */}
         <div className="flex items-center gap-2">

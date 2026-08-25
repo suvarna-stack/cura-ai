@@ -11,6 +11,11 @@ export interface CompleteCase {
   dept: string;
   group?: string;
   confidence: number;
+  /** the shared "look at this one first" flag: one star per case, set by any
+   *  coder and seen by all of them (not a private favourites list) */
+  starred?: boolean;
+  starredBy?: string | null;
+  starredAt?: string | null;
 }
 
 export interface IncompleteCase {
@@ -22,6 +27,10 @@ export interface IncompleteCase {
   confidence: number;
   missing: string;
   group?: string;
+  /** the shared "look at this one first" flag — see CompleteCase */
+  starred?: boolean;
+  starredBy?: string | null;
+  starredAt?: string | null;
 }
 
 export interface FinishedCase {
