@@ -48,6 +48,14 @@ export interface ApiCase {
   created_at: string | null; // READ: raw hospital datetime text; null on OPD rows today
   updated_at: string | null; // READ: same caveat
   revenue_impact: "high" | "medium" | "low" | null; // always null from the live server (no real DRG revenue)
+  /** CREATE: the shared "look at this one first" flag — one star per case, set
+   *  by any coder and seen by all of them (POST/DELETE /api/cases/{id}/star).
+   *  Present on every card in every collection. */
+  starred: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null;
   /** CREATE: every coder who worked this case, from coding_history — a case is
    *  not limited to one responsible coder. Most recent toucher LAST, so
    *  `coders.at(-1)` is the responsible coder. Empty on untouched cases. */
@@ -96,6 +104,14 @@ export interface ApiFinishedCase {
   orders: Record<string, number>;
   codes: ApiCodePreview[];
   revenue_impact: "high" | "medium" | "low" | null; // always null from the live server
+  /** CREATE: the shared "look at this one first" flag — one star per case, set
+   *  by any coder and seen by all of them (POST/DELETE /api/cases/{id}/star).
+   *  Present on every card in every collection. */
+  starred: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null;
 }
 
 /** One row of the server-side audit trail (medcodeai `coding_history`).

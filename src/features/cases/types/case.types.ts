@@ -47,6 +47,10 @@ export interface FinishedCase {
   orders?: Record<string, number>;
   codes?: { code: string; system: string; role: string; desc?: string | null }[];
   revenue_impact?: "high" | "medium" | "low";
+  /** shared "important" flag — see RichCase / the API contract */
+  starred?: boolean;
+  starredBy?: string | null;
+  starredAt?: string | null;
 }
 
 export interface CodeEntry {

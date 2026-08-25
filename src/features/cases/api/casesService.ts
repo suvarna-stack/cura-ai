@@ -73,6 +73,37 @@ export async function releaseCaseLock(id: string): Promise<void> {
   await apiClient.delete(`/cases/${encodeURIComponent(id)}/lock`)
 }
 
+// ---------------------------------------------------------------------------
+// Case stars — the shared "look at this one first" flag. One star per CASE,
+// not per coder: whoever sets it, every coder sees the same star, which is the
+// whole point (a private favourites list would look identical and tell a
+// colleague nothing). Allowed even while another coder holds the case's lock.
+
+export interface CaseStarState {
+  starred: boolean
+  /** display name of the coder who set it; null when not starred */
+  starredBy: string | null
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null
+}
+
+/** POST / DELETE /api/cases/{id}/star — returns the resulting shared state,
+ *  or null when the write failed (the caller rolls its optimistic star back). */
+export async function setCaseStar(
+  id: string,
+  starred: boolean,
+): Promise<CaseStarState | null> {
+  try {
+    const { data } = await apiClient.request<CaseStarState>({
+      url: `/cases/${encodeURIComponent(id)}/star`,
+      method: starred ? 'POST' : 'DELETE',
+    })
+    return data
+  } catch {
+    return null
+  }
+}
+
 /**
  * POST /api/cases/approve — the server records the logged-in coder.
  *

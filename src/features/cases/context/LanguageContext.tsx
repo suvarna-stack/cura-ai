@@ -298,6 +298,11 @@ export const dict: Record<string, { en: string; th: string }> = {
   "coder.plusOthers": { en: "+{n} more", th: "+อีก {n}" },
   "coder.all":        { en: "Coders",    th: "ผู้ให้รหัส" },
   // Reopen tab: whose finished work was pulled back, and by whom
+  // shared case star — the tooltip names whoever left it, because the point of
+  // the star is that it is a message to another coder
+  "star.add":    { en: "Mark case {vn} as important", th: "ทำเครื่องหมายเคส {vn} ว่าสำคัญ" },
+  "star.remove": { en: "Remove the star from case {vn}", th: "เอาดาวออกจากเคส {vn}" },
+  "star.by":     { en: "Starred by {name} — click to remove", th: "ติดดาวโดย {name} — คลิกเพื่อเอาออก" },
   "reopen.finishedBy": { en: "Finished by", th: "ทำเสร็จโดย" },
   "reopen.reopenedBy": { en: "Reopened by", th: "เปิดใหม่โดย" },
   "facet.dept":      { en: "Department",   th: "แผนก" },

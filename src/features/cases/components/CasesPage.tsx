@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, AlertCircle, Flag, RotateCcw,
-  Search, Eye, X,
+  Search, Eye, X, Star,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useSync } from "../context/SyncContext";
@@ -21,6 +21,8 @@ import { useCases } from "../hooks/useCases";
 import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import type { RichCase } from "../hooks/useCases";
 import { useCaseFilters } from "../hooks/useCaseFilters";
+import { useCaseStars } from "../hooks/useCaseStars";
+import type { StarView } from "../hooks/useCaseStars";
 import type { CaseTab, CompleteCase, IncompleteCase, FinishedCase } from "../types/case.types";
 
 const PER_PAGE = 10;
@@ -35,6 +37,52 @@ const missingDocAbbr: Record<string, string> = {
   "Assessment / progression note": "missing.doc.ap",
   "Principal diagnosis (ICD-10)": "missing.doc.dx",
 };
+
+/**
+ * The shared case star. One star per CASE, not per coder: whoever sets it,
+ * every coder sees the same one — that is the whole feature ("which of these
+ * should I pick up first?"), and a private favourites list would look
+ * identical on screen while telling a colleague nothing. So the tooltip names
+ * whoever left it; an anonymous star is just decoration.
+ *
+ * Available on every row of every tab, including Finished — a finished case
+ * can be the one worth re-reading.
+ */
+function StarButton({ view, onToggle, vn }: {
+  view: StarView;
+  onToggle: () => void;
+  vn: string;
+}) {
+  const { gl } = useTheme();
+  const { t } = useLang();
+  const label = view.starred
+    ? (view.starredBy ? t("star.by", { name: view.starredBy }) : t("star.remove", { vn }))
+    : t("star.add", { vn });
+  return (
+    <button type="button" title={label} aria-label={label} aria-pressed={view.starred}
+      // rows in the Finished tab are click-to-open; the star is not that click
+      onClick={e => { e.stopPropagation(); onToggle(); }}
+      className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg hover:opacity-100 transition-all"
+      style={{
+        color: view.starred ? gl.warning : gl.muted,
+        opacity: view.starred ? 1 : 0.5,
+        background: view.starred ? `${gl.warning}1F` : "transparent",
+        border: view.starred ? `1px solid ${gl.warning}59` : "1px solid transparent",
+      }}>
+      <Star size={13} fill={view.starred ? gl.warning : "none"} />
+    </button>
+  );
+}
+
+/** Starred cases float to the top of their tab — a star only works if the
+ *  colleague it was left for actually sees it, and these queues are paginated.
+ *  Keyed on the SERVER's `starred`, never on this browser's optimistic
+ *  override: clicking a star must not make the row leap out from under the
+ *  cursor (or off the page entirely). It takes its new place on the next fetch.
+ *  Sort is stable, so inside each half the coder's chosen order survives. */
+function starFirst<T>(list: T[], of: (x: T) => boolean | undefined): T[] {
+  return [...list].sort((a, b) => Number(of(b) ?? false) - Number(of(a) ?? false));
+}
 
 /** Card identity block (meeting item 2): the visit number, then the hospital
  *  number, then the two facts a coder identifies a visit by — which coverage
@@ -173,6 +221,9 @@ export function CasesPage({
   // holds the ids (for the activity log) + the action to run on confirm.
   const { addLog } = useActivityLog();
   const me = useCoderIdentity();
+  // the shared "look at this one first" flag; `me` only labels the optimistic
+  // star until the server answers with the name it actually stamped
+  const { starOf, toggleStar } = useCaseStars(me.userName);
   const { showToast } = useToast();
   const [pendingApproval, setPendingApproval] = useState<{ n: number; ids: string[]; run: () => void } | null>(null);
   const askApprove = (ids: string[], run: () => void) => { if (ids.length > 0) setPendingApproval({ n: ids.length, ids, run }); };
@@ -263,6 +314,7 @@ export function CasesPage({
           id: f.id, patient: f.patient, dept: f.dept ?? "—", group: f.group, confidence: 0,
           severity: f.severity, coverage: f.coverage, encountertype: f.encountertype,
           orders: f.orders, created_at: f.created_at, revenue_impact: f.revenue_impact,
+          starred: f.starred, starredBy: f.starredBy, starredAt: f.starredAt,
           // keep the coder trail: the row must still say whose finished work this was
           coders: f.coders ?? (f.coder ? [f.coder] : []),
         } });
@@ -296,6 +348,8 @@ export function CasesPage({
       const coders = [...(c?.coders ?? []).filter(n => n !== me.userName), me.userName];
       return { id, patient: c?.patient ?? id, vn: c?.vn ?? id, hn: c?.hn ?? null,
                codedDate: today, coder: me.userName, coders,
+               // approving in this browser must not drop the case's star
+               starred: c?.starred, starredBy: c?.starredBy, starredAt: c?.starredAt,
                drg: c?.codes?.[0]?.code ?? "—", created_at: c?.created_at,
                // facet fields from the source case so the sidebar filters apply
                dept: c?.dept, group: c?.group, severity: c?.severity, coverage: c?.coverage,
@@ -332,7 +386,7 @@ export function CasesPage({
   const searchQ = filters.query.trim().toLowerCase();
   const { matchesFacets } = filters;
   const visibleFinished = useMemo(() =>
-    displayFinished.filter(c =>
+    starFirst(displayFinished, c => c.starred).filter(c =>
       matchesFacets(c) &&
       (searchQ === "" ||
         c.id.toLowerCase().includes(searchQ) ||
@@ -343,7 +397,7 @@ export function CasesPage({
 
   // the Reopen tab bypasses useCaseFilters' lists too — same predicate applied here
   const visibleReopen = useMemo(() =>
-    reopenRows.filter(({ c }) =>
+    starFirst(reopenRows, r => r.c.starred).filter(({ c }) =>
       matchesFacets(c) &&
       (searchQ === "" ||
         c.id.toLowerCase().includes(searchQ) ||
@@ -367,8 +421,10 @@ export function CasesPage({
     setCompletePage(1);
     setIncompletePage(1);
   }
-  const pagedComplete = filters.filteredComplete.slice((completePage - 1) * PER_PAGE, completePage * PER_PAGE);
-  const pagedIncomplete = filteredIncomplete.slice((incompletePage - 1) * PER_PAGE, incompletePage * PER_PAGE);
+  const pagedComplete = starFirst(filters.filteredComplete, c => c.starred)
+    .slice((completePage - 1) * PER_PAGE, completePage * PER_PAGE);
+  const pagedIncomplete = starFirst(filteredIncomplete, c => c.starred)
+    .slice((incompletePage - 1) * PER_PAGE, incompletePage * PER_PAGE);
 
   // unfiltered totals — used to make filtered views explicit in the list itself,
   // so a coder can't finish a filtered queue and think ALL cases are done
@@ -638,12 +694,18 @@ export function CasesPage({
                         style={{
                           background: gl.row,
                           backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
-                          border: selectedIds.has(c.id) ? `1px solid rgba(${gl.accentRgb},0.45)` : gl.border,
+                          // a star has to be visible while SCANNING, not only
+                          // when you look straight at the icon — so the row
+                          // carries it too. Selection still wins: that one is
+                          // about what the next click will do.
+                          border: selectedIds.has(c.id) ? `1px solid rgba(${gl.accentRgb},0.45)`
+                            : starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border,
                           boxShadow: gl.shadowSm,
                         }}>
                         <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)}
                           aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                           className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
+                        <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                         {/* col 1 — identity: VN, HN */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
                           <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} />
@@ -730,13 +792,15 @@ export function CasesPage({
                       style={{
                         background: gl.row,
                         backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
-                        border: selectedIncomplete.has(c.id) ? `1px solid rgba(${gl.accentRgb},0.45)` : gl.border,
+                        border: selectedIncomplete.has(c.id) ? `1px solid rgba(${gl.accentRgb},0.45)`
+                          : starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border,
                         boxShadow: gl.shadowSm,
                       }}>
                       <input type="checkbox" checked={selectedIncomplete.has(c.id)}
                         onChange={() => toggleSelectIncomplete(c.id)}
                         aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                         className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
+                      <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="w-60 shrink-0 min-w-0 self-center">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
                           const missingDocs = c.missing.split(",").map(m => m.trim()).filter(m => m && m !== "—");
@@ -805,7 +869,9 @@ export function CasesPage({
                       : openCase(c);
                     return (
                       <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
-                        style={{ background: gl.row, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16, border: gl.border, boxShadow: gl.shadowSm }}>
+                        style={{ background: gl.row, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
+                          border: starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border, boxShadow: gl.shadowSm }}>
+                        <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                         {/* col 1 — identity + reopened badge (no group tag —
                             the long visit numbers leave no room in the fixed
                             column, same trade-off as the Finished rows) */}
@@ -892,8 +958,10 @@ export function CasesPage({
                     // is the keyboard/screen-reader path to the same action
                     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
                     <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:opacity-90"
-                      style={{ background: gl.row, backdropFilter: gl.blur16, border: gl.border, boxShadow: gl.shadowSm }}
+                      style={{ background: gl.row, backdropFilter: gl.blur16, boxShadow: gl.shadowSm,
+                        border: starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border }}
                       onClick={() => openFinishedCase(c)}>
+                      <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="flex-1 min-w-0">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
                           <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"

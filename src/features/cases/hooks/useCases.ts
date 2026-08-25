@@ -39,6 +39,11 @@ export interface RichCase extends CompleteCase {
   updated_at?: string
   revenue_impact?: 'high' | 'medium' | 'low'
   reopened?: boolean
+  /** the shared "look at this one first" flag: one star per case, set by any
+   *  coder and seen by all of them (not a private favourites list) */
+  starred?: boolean
+  starredBy?: string | null
+  starredAt?: string | null
 }
 
 export interface RichIncompleteGroup extends Omit<IncompleteGroup, 'cases'> {
@@ -89,6 +94,9 @@ const rich = (c: ApiCase): RichCase => ({
   updated_at: c.updated_at ?? undefined,
   revenue_impact: c.revenue_impact ?? undefined,
   reopened: c.reopened,
+  starred: c.starred,
+  starredBy: c.starredBy,
+  starredAt: c.starredAt,
 })
 
 export interface CasesData {
@@ -160,6 +168,9 @@ export function useCases(refreshKey = 0): CasesData {
             encountertype: f.encountertype,
             orders: f.orders,
             revenue_impact: f.revenue_impact ?? undefined,
+            starred: f.starred,
+            starredBy: f.starredBy,
+            starredAt: f.starredAt,
           })),
           stats: api.stats,
           loading: false,

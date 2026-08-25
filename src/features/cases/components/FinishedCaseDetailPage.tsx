@@ -1,7 +1,7 @@
 import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
 import { useState } from "react";
 import {
-  FileText, Flag, ArrowLeft, BadgeCheck, Download, Printer,
+  FileText, ArrowLeft, BadgeCheck, Download, Printer,
   RotateCcw, Clock, Users,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
@@ -177,10 +177,6 @@ export function FinishedCaseDetailPage({
           <span className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full"
             style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
             <BadgeCheck size={13} /> Approved · {c.codedDate}
-          </span>
-          <span className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full"
-            style={{ background: `rgba(${gl.accentRgb},0.10)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.20)` }}>
-            <Flag size={12} /> {c.drg}
           </span>
         </div>
         <div className="flex items-center gap-2">
