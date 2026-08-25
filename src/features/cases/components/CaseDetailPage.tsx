@@ -29,6 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { isReopenedCase } from "../utils/caseHistory";
 import { clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { CompleteCase, CodeEntry } from "../types/case.types";
@@ -368,10 +369,16 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
     // mock. The initial useState may briefly show local codes until the
     // fetch settles — cosmetic, the server copy replaces them here.
     const saved = (status === "ready" ? detail?.codeEdits : null) ?? loadCodeEdits(c.id);
+    // A REOPENED case has already been approved once, and the codes it was
+    // approved with come back TICKED (2026-08-25) — the coder is revising a
+    // decision, not making it from scratch, and re-ticking what they already
+    // approved is work they've done before. The reopen withdrew the coder rows
+    // from the hospital, so what's left to seed from is exactly that set.
+    const reopened = status === "ready" && isReopenedCase(detail?.history);
     if (saved) {
       // a payload saved before the tick-to-approve flow keeps the coder's own
       // codes ticked; everything else waits to be picked (withSelectionDefaults)
-      setCodes(withSelectionDefaults(saved));
+      setCodes(withSelectionDefaults(saved, reopened));
     } else if (status === "ready" && detail && detail.codes.length > 0) {
       setCodes(detail.codes.map((k) => ({
         code: k.code,
@@ -386,6 +393,10 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
         operation_start: k.operation_start ?? undefined,
         operation_end: k.operation_end ?? undefined,
         operation_type: k.operation_type ?? undefined,
+        // pre-ticked ONLY on a reopened case: these are the codes it was
+        // approved with. The key stays absent otherwise — an explicit
+        // `selected: false` reads as "the coder rejected this" at approve.
+        ...(reopened ? { selected: true } : {}),
       })));
     } else if (status === "ready") {
       // no iMed codes — leave empty; RAG suggest effect fills the columns

@@ -29,6 +29,7 @@ import { LabResults } from "./global/LabResults";
 import { HospitalPanels, ReportViewToggle, useReportView } from "./global/HospitalPanels";
 import { ReportSkeleton } from "./global/DetailSkeletons";
 import { loadCodeEdits, saveCodeEdits, type StoredCode } from "../utils/caseLocal";
+import { isReopenedCase } from "../utils/caseHistory";
 import { autoPickIndices, clearNoProcedureIfPicked, hasNoProcedure, missingSystem, pickedCount, setNoProcedure, unpickedCount, setPicked, toggleAt, withSelectionDefaults } from "../utils/codeSelection";
 import { nowOperationTime, toInputValue, fromInputValue, OPERATION_TYPES } from "../utils/operationTime";
 import type { IncompleteCase, CodeEntry } from "../types/case.types";
@@ -402,10 +403,14 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         setReport(initialReport);
       }
       const savedCodes = detail.codeEdits ?? loadCodeEdits(c.id);
+      // A REOPENED case comes back with the codes it was approved with already
+      // ticked (2026-08-25) — same rule as CaseDetail; the coder is revising a
+      // decision they already made, not making it again from nothing.
+      const reopened = isReopenedCase(detail.history);
       if (savedCodes) {
         // payloads saved before the tick-to-approve flow keep the coder's own
         // codes ticked; the rest wait to be picked (withSelectionDefaults)
-        setCodes(retypeGapRows(withSelectionDefaults(savedCodes)));
+        setCodes(retypeGapRows(withSelectionDefaults(savedCodes, reopened)));
       } else {
         const real = detail.codes.map(k => ({
           // role-bearing label, so the Edit dialog opens on the right type and
@@ -419,6 +424,10 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
           operation_start: k.operation_start ?? undefined,
           operation_end: k.operation_end ?? undefined,
           operation_type: k.operation_type ?? undefined,
+          // pre-ticked ONLY on a reopened case: these are the codes it was
+          // approved with. The key stays absent otherwise — an explicit
+          // `selected: false` reads as "the coder rejected this" at approve.
+          ...(reopened ? { selected: true } : {}),
         }));
         const missingRows = (caseData?.missing ?? "")
           .split(",").map(m => m.trim()).filter(m => m && m !== "—")

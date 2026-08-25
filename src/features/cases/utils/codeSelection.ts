@@ -126,14 +126,24 @@ export function setPicked(codes: StoredCode[], indices: number[], next: boolean)
   return codes.map((c, i) => (wanted.has(i) && isPickable(c) ? { ...c, selected: next } : c));
 }
 
+/** Tick every row that can be ticked — the approved set of a reopened case. */
+export const pickAll = (codes: StoredCode[]): StoredCode[] =>
+  codes.map((c) => (isPickable(c) ? { ...c, selected: true } : c));
+
 /**
  * Give a payload saved BEFORE this flow its selection state. Such a payload
  * carries no `selected` key anywhere; treating it as "nothing ticked" would
  * quietly drop work a coder had already done, so their hand-added codes stay
  * ticked and the AI/hospital rows fall back to the new default (untick, coder
  * picks). A payload that already carries the flag is returned untouched.
+ *
+ * `approvedBefore` is the reopened case (2026-08-25): a flag-less payload was
+ * approved WHOLESALE — that is exactly how the backend materialized it — so
+ * every row in it comes back ticked, not just the coder's own.
  */
-export function withSelectionDefaults(codes: StoredCode[]): StoredCode[] {
+export function withSelectionDefaults(codes: StoredCode[],
+                                      approvedBefore = false): StoredCode[] {
   if (codes.some((c) => "selected" in c)) return codes;
+  if (approvedBefore) return pickAll(codes);
   return codes.map((c) => (c.manual ? { ...c, selected: true } : c));
 }
