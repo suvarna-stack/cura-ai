@@ -96,12 +96,23 @@ public class ApprovalService {
                 Integer uid = userId != null ? userId : ensureDemoCoder(coder);
                 List<String> approved = new ArrayList<>();
                 List<String> notFound = new ArrayList<>();
+                List<String> blocked = new ArrayList<>();
                 for (String tn : ids) {
                     if (!cases.caseExists(tn)) {
                         notFound.add(tn);
                         continue;
                     }
-                    materializeCodeEdits(tn, uid, coder, now, stats);
+                    // A case is coded when BOTH halves are answered — a
+                    // diagnosis AND a procedure (or the coder's explicit "no
+                    // procedure"). Decided BEFORE anything is written, so a
+                    // half-coded case is skipped whole rather than
+                    // half-approved.
+                    Picks picks = effectiveCodes(tn);
+                    if (!coversBothSystems(picks)) {
+                        blocked.add(tn);
+                        continue;
+                    }
+                    writePicks(tn, picks, uid, coder, now, stats);
                     finalizeCase(tn, coder, now, stats, ops);
                     approved.add(tn);
                 }
@@ -109,6 +120,9 @@ public class ApprovalService {
                 o.put("ok", true);
                 o.put("approved", approved);
                 o.put("notFound", notFound);
+                // cases that need a code in both columns before they can be
+                // approved — the caller un-approves these and says so
+                o.put("blocked", blocked);
                 o.put("stats", stats);
                 return o;
             });
@@ -170,38 +184,148 @@ public class ApprovalService {
     // app.py:129 materialize_code_edits() — the coder's saved UI edits become
     // real case_codes rows; with no saved edits, fall back to re-confirming
     // the imported principal (POC behavior)
-    void materializeCodeEdits(String tn, Integer uid, String coder, String now, Map<String, Integer> stats) {
+    /**
+     * What an approve would write for this case: the codes the coder ticked,
+     * or — when the case is being approved from the LIST, where nothing can be
+     * ticked because the case was never opened — the codes that stand in for
+     * that decision.
+     *
+     * Auto-pick, per system, and only into a system with NOTHING ticked:
+     *   * the hospital's own codes, if it sent any (the Complete tab: iMed
+     *     already carries both a diagnosis and a procedure);
+     *   * otherwise a lone candidate, if there is exactly ONE (the Incomplete
+     *     tab, where the AI filled the empty column with a single prediction).
+     * Two or more candidates and no hospital code is a real choice, and a
+     * choice belongs to the coder — the case is left for them to open.
+     *
+     * An explicitly unticked code is NEVER auto-picked back: rejecting a
+     * suggestion is a decision too.
+     */
+    Picks effectiveCodes(String tn) {
         String payload = workingState.loadEditsPayload(tn);
         if (payload == null) {
-            simulateCoderAssignment(tn, uid, coder, now, stats);
-            return;
+            // never opened, nothing saved: the hospital's codes are the pick
+            return new Picks(List.of(), coding.importedCodes(tn), false);
         }
-        List<?> entries;
+        List<?> parsedEntries;
         try {
             Object parsed = json.readValue(payload, Object.class);
-            entries = parsed instanceof List<?> l ? l : List.of();
+            parsedEntries = parsed instanceof List<?> l ? l : List.of();
         } catch (RuntimeException e) {
-            entries = List.of();
+            parsedEntries = List.of();
         }
 
-        // replace, don't append: re-approving after new edits must not duplicate
-        coding.deleteCoderAssigned(tn);
-        boolean firstIcd10 = true;
-        int written = 0;
-        int skippedUnselected = 0;
-        for (Object o : entries) {
-            if (!(o instanceof Map<?, ?> e) || jsTruthy(e.get("missing"))) {
-                continue; // unresolved "???" placeholder rows never reach the DB
-            }
-            // Selection-first coding (2026-08-07): the UI ticks the codes to
-            // approve instead of deleting the unwanted ones, so an explicit
-            // `selected: false` means "the coder left this suggestion out".
-            // ABSENT means legacy payload (saved before the checkbox UI) —
-            // those still approve wholesale, as they always did.
-            if (e.containsKey("selected") && !jsTruthy(e.get("selected"))) {
-                skippedUnselected++;
+        boolean noProcedure = false;
+        boolean anyFlagged = false;     // payload predates the checkbox if false
+        List<Map<String, Object>> ticked = new ArrayList<>();
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        List<Map<String, Object>> rejected = new ArrayList<>();
+        for (Object o : parsedEntries) {
+            if (!(o instanceof Map<?, ?> raw)) {
                 continue;
             }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> e = (Map<String, Object>) raw;
+            if (jsTruthy(e.get("noProcedure"))) {
+                noProcedure = true;      // the coder said this visit had none
+                continue;
+            }
+            if (jsTruthy(e.get("missing"))) {
+                continue;                // unresolved "???" placeholder
+            }
+            String code = Py.or_(str(e.get("code")), "").strip();
+            if (code.isEmpty() || code.equals("???")) {
+                continue;
+            }
+            candidates.add(e);
+            if (e.containsKey("selected")) {
+                anyFlagged = true;
+                if (jsTruthy(e.get("selected"))) {
+                    ticked.add(e);
+                } else {
+                    rejected.add(e);
+                }
+            }
+        }
+        // A payload saved before the checkbox existed carries no flag at all:
+        // it approves wholesale, exactly as it always did.
+        if (!anyFlagged) {
+            return new Picks(candidates, List.of(), noProcedure);
+        }
+
+        List<Map<String, Object>> picks = new ArrayList<>(ticked);
+        for (boolean nine : new boolean[]{false, true}) {
+            if (picks.stream().anyMatch(e -> isNine(e) == nine)) {
+                continue;                        // this column is answered
+            }
+            if (nine && noProcedure) {
+                continue;                        // answered by the statement
+            }
+            List<Map<String, Object>> open = candidates.stream()
+                    .filter(e -> isNine(e) == nine && !containsRef(rejected, e))
+                    .toList();
+            List<Map<String, Object>> hospital = open.stream()
+                    .filter(e -> "hospital".equals(str(e.get("origin"))))
+                    .toList();
+            if (!hospital.isEmpty()) {
+                picks.addAll(hospital);
+            } else if (open.size() == 1) {
+                picks.addAll(open);
+            }
+        }
+        // keep the payload's order — the first ICD-10 is the principal
+        List<Map<String, Object>> ordered = candidates.stream()
+                .filter(e -> containsRef(picks, e)).toList();
+        return new Picks(ordered, List.of(), noProcedure);
+    }
+
+    /** Reference equality, deliberately: two rows can be value-identical and
+     *  still be different picks — one ticked, one not. */
+    private static boolean containsRef(List<Map<String, Object>> list, Map<String, Object> e) {
+        for (Map<String, Object> x : list) {
+            if (x == e) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Which column an entry belongs to, by the frontend's own rule. */
+    private static boolean isNine(Map<String, Object> e) {
+        return ICD9_TYPE.matcher(Py.or_(str(e.get("type")), "ICD-10").strip()).find();
+    }
+
+    /**
+     * A case may only be approved once BOTH halves are answered: a diagnosis
+     * and a procedure — or, for a visit that had no operation, the coder's
+     * explicit "no procedure was performed". Half a code set is an unfinished
+     * case, and finalizing one hides that fact from the audit.
+     */
+    boolean coversBothSystems(Picks picks) {
+        boolean ten = picks.entries().stream().anyMatch(e -> !isNine(e))
+                || picks.imported().stream().anyMatch(r -> "ICD-10".equals(str(r.get("code_system"))));
+        boolean nine = picks.noProcedure()
+                || picks.entries().stream().anyMatch(ApprovalService::isNine)
+                || picks.imported().stream().anyMatch(r -> "ICD-9".equals(str(r.get("code_system"))));
+        return ten && nine;
+    }
+
+    /** The codes an approve will write, and how they were arrived at. */
+    record Picks(List<Map<String, Object>> entries,
+                 List<Map<String, Object>> imported,
+                 boolean noProcedure) {}
+
+    void writePicks(String tn, Picks picks, Integer uid, String coder, String now,
+                    Map<String, Integer> stats) {
+        // replace, don't append: re-approving after new edits must not duplicate
+        coding.deleteCoderAssigned(tn);
+        if (picks.entries().isEmpty()) {
+            confirmImportedCodes(tn, picks.imported(), uid, coder, now, stats);
+            return;
+        }
+        boolean firstIcd10 = true;
+        int written = 0;
+        for (Map<String, Object> e : picks.entries()) {
             String code = Py.or_(str(e.get("code")), "").strip();
             if (code.isEmpty() || code.equals("???")) {
                 continue;
@@ -253,20 +377,42 @@ public class ApprovalService {
             written++;
         }
 
-        // Nothing ticked and nothing else to write: the payload is an untouched
-        // suggestion list (the UI saves RAG suggestions as soon as a case is
-        // opened, and the list page can approve a case nobody reviewed). Treat
-        // it like "no saved edits at all" rather than finalizing an empty case.
-        // A coder who deliberately empties the list still lands on written == 0
-        // with skippedUnselected == 0 and writes nothing, as before.
-        if (written == 0 && skippedUnselected > 0) {
-            simulateCoderAssignment(tn, uid, coder, now, stats);
-            return;
-        }
-
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("by", coder);
         detail.put("from", "ui_edits");
+        detail.put("codes", written);
+        detail.put("at", now);
+        coding.insertHistory(tn, uid, "code_assigned", json.writeValueAsString(detail));
+    }
+
+    /**
+     * Confirm the hospital's own codes as the coder's, roles and operation
+     * window intact. This is the list-approve path for a case nobody opened:
+     * ticking every imported code by hand would produce exactly these rows.
+     * Falls back to the principal-only simulate when iMed sent nothing.
+     */
+    void confirmImportedCodes(String tn, List<Map<String, Object>> imported, Integer uid,
+                              String coder, String now, Map<String, Integer> stats) {
+        if (imported.isEmpty()) {
+            simulateCoderAssignment(tn, uid, coder, now, stats);
+            return;
+        }
+        int written = 0;
+        for (Map<String, Object> r : imported) {
+            Object id = r.get("icd_code_id");
+            if (!(id instanceof Number n)) {
+                continue;
+            }
+            coding.insertCaseCode(tn, str(r.get("code_system")), n.intValue(),
+                    str(r.get("code_role")), "coder_assigned", null, uid, now,
+                    opTime(r.get("operation_start")), opTime(r.get("operation_end")),
+                    blankToNull(str(r.get("operation_type"))));
+            bump(stats, "coder_codes_created");
+            written++;
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("by", coder);
+        detail.put("from", "hospital_codes");
         detail.put("codes", written);
         detail.put("at", now);
         coding.insertHistory(tn, uid, "code_assigned", json.writeValueAsString(detail));
