@@ -10,12 +10,12 @@ import { useActivityLog } from "../context/ActivityLogContext";
 import { useCoderIdentity } from "../hooks/useCoderIdentity";
 import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
+import { useCaseFields } from "../context/CaseFieldsContext";
 import { ConfirmDialog } from "./global/ConfirmDialog";
 import { Pagination } from "./global/Pagination";
 import { EmptyState } from "./global/EmptyState";
 import { CasePreview } from "./global/CasePreview";
-import { FilterPanel } from "./filters/FilterPanel";
-import { DateFilterBar } from "./filters/DateFilterBar";
+import { FilterBar } from "./filters/FilterBar";
 import { formatDate } from "../utils/formatDate";
 import { useCases } from "../hooks/useCases";
 import { useDocumentTitle } from "../../../hooks/useDocumentTitle";
@@ -84,50 +84,81 @@ function starFirst<T>(list: T[], of: (x: T) => boolean | undefined): T[] {
   return [...list].sort((a, b) => Number(of(b) ?? false) - Number(of(a) ?? false));
 }
 
+/** The years out of the extract's frozen "y,m,d" age string ("47,4,10" → "47").
+ *  Returns null for anything that is not a leading number, so a format we have
+ *  not seen prints nothing rather than something wrong. */
+function ageYears(age?: string | null): string | null {
+  if (!age) return null;
+  const years = age.split(",")[0]?.trim();
+  return years && /^\d+$/.test(years) ? years : null;
+}
+
 /** Card identity block (meeting item 2): the visit number, then the hospital
- *  number, then the two facts a coder identifies a visit by — which coverage
+ *  number, then the facts a coder identifies a visit by — age, which coverage
  *  scheme paid for it and when it happened. iMed only fills HN for IPD
  *  admissions, so on the OPD queue it shows as "—" with the reason on hover:
- *  the gap belongs on screen, not hidden. */
-function CaseIdent({ vn, hn, coverage, date, badge }: {
+ *  the gap belongs on screen, not hidden.
+ *
+ *  Which of name/VN/HN actually render is the admin's call (2026-08-25) — see
+ *  useCaseFields. Age and the visit date are not switchable: they carry no
+ *  patient identity, and the coder asked for both outright. */
+function CaseIdent({ vn, hn, patient, age, coverage, date, badge }: {
   vn: string;
   hn?: string | null;
+  patient?: string | null;
+  age?: string | null;
   coverage?: string | null;
   date?: string | null;
   badge?: React.ReactNode;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
+  const fields = useCaseFields();
   // labels bold, values regular; sizes +1 across the row (requests 22/07/2026)
   const label = "text-[12px] font-bold uppercase tracking-wide";
+  const years = ageYears(age);
+  // The name is switched on but the extract carries none — say so rather than
+  // printing an empty label, which reads as a rendering bug.
+  const nameText = fields.name ? (patient?.trim() || t("ident.nameMissing")) : null;
+  const meta = [
+    years ? { key: "age", label: t("meta.age"), value: years } : null,
+    coverage ? { key: "cov", label: t("meta.coverage"), value: coverage } : null,
+    date ? { key: "date", label: t("meta.date"), value: date } : null,
+  ].filter(Boolean) as { key: string; label: string; value: string }[];
   return (
     <>
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[12px] font-medium truncate" style={{ color: gl.muted }} title={`VN ${vn}`}>
-          <span className="font-bold opacity-70">VN </span>{vn}
-        </span>
-        {badge}
-      </div>
-      <p className="text-[14px] font-semibold truncate" style={{ color: hn ? gl.text : gl.muted }}
-        title={hn ? `HN ${hn}` : t("ident.hnMissing")}>
-        <span className="text-[12px] font-bold opacity-70">HN </span>{hn ?? "—"}
-        {!hn && <span className="text-[12px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
-      </p>
-      {(coverage || date) && (
+      {(fields.vn || badge) && (
+        <div className="flex items-center gap-1.5 mb-1">
+          {fields.vn && (
+            <span className="text-[12px] font-medium truncate" style={{ color: gl.muted }} title={`VN ${vn}`}>
+              <span className="font-bold opacity-70">VN </span>{vn}
+            </span>
+          )}
+          {badge}
+        </div>
+      )}
+      {nameText && (
+        <p className="text-[14px] font-semibold truncate"
+          style={{ color: patient?.trim() ? gl.text : gl.muted }} title={nameText}>
+          {nameText}
+        </p>
+      )}
+      {fields.hn && (
+        <p className="text-[14px] font-semibold truncate" style={{ color: hn ? gl.text : gl.muted }}
+          title={hn ? `HN ${hn}` : t("ident.hnMissing")}>
+          <span className="text-[12px] font-bold opacity-70">HN </span>{hn ?? "—"}
+          {!hn && <span className="text-[12px] font-normal ml-1.5 opacity-70">{t("ident.hnMissingShort")}</span>}
+        </p>
+      )}
+      {meta.length > 0 && (
         <div className="flex items-center gap-x-2 flex-wrap mt-1">
-          {coverage && (
-            <span className="flex items-center gap-1">
-              <span className={label} style={{ color: gl.muted, opacity: 0.75 }}>{t("meta.coverage")}</span>
-              <span className="text-[12px] font-medium" style={{ color: gl.text }}>{coverage}</span>
+          {meta.map((m, i) => (
+            <span key={m.key} className="flex items-center gap-1">
+              {i > 0 && <span className="text-[12px] mr-1" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
+              <span className={label} style={{ color: gl.muted, opacity: 0.75 }}>{m.label}</span>
+              <span className="text-[12px] font-medium" style={{ color: gl.text }}>{m.value}</span>
             </span>
-          )}
-          {coverage && date && <span className="text-[12px]" style={{ color: gl.muted, opacity: 0.4 }}>·</span>}
-          {date && (
-            <span className="flex items-center gap-1">
-              <span className={label} style={{ color: gl.muted, opacity: 0.75 }}>{t("meta.date")}</span>
-              <span className="text-[12px] font-medium" style={{ color: gl.text }}>{date}</span>
-            </span>
-          )}
+          ))}
         </div>
       )}
     </>
@@ -314,6 +345,7 @@ export function CasesPage({
           id: f.id, patient: f.patient, dept: f.dept ?? "—", group: f.group, confidence: 0,
           severity: f.severity, coverage: f.coverage, encountertype: f.encountertype,
           orders: f.orders, created_at: f.created_at, revenue_impact: f.revenue_impact,
+          visitDate: f.visitDate ?? null, age: f.age ?? null,
           starred: f.starred, starredBy: f.starredBy, starredAt: f.starredAt,
           // keep the coder trail: the row must still say whose finished work this was
           coders: f.coders ?? (f.coder ? [f.coder] : []),
@@ -351,6 +383,9 @@ export function CasesPage({
                // approving in this browser must not drop the case's star
                starred: c?.starred, starredBy: c?.starredBy, starredAt: c?.starredAt,
                drg: c?.codes?.[0]?.code ?? "—", created_at: c?.created_at,
+               // the card reads these two now — carry them over or an
+               // optimistically-approved row loses its age and visit date
+               visitDate: c?.visitDate ?? null, age: c?.age ?? null,
                // facet fields from the source case so the sidebar filters apply
                dept: c?.dept, group: c?.group, severity: c?.severity, coverage: c?.coverage,
                coverageFamily: c?.coverageFamily, codes: c?.codes,
@@ -518,17 +553,32 @@ export function CasesPage({
           </div>
         )}
 
-        {/* date filter bar — top of the page (dates are the first thing coders
-            narrow by, so it gets prime placement instead of the sidebar) */}
-        <DateFilterBar f={filters} />
+        {/* Filters + sort, moved here from the left sidebar and from the old
+            sync-period bar (hospital request 2026-08-25). Sync itself now
+            lives in the header beside the account chip, so nothing on this
+            page competes with the case list for width.
 
-        {/* items-start: each column keeps its own height. The card sizes to its
-            content (no forced stretch → no empty void below the pagination); the
-            sidebar is sticky + self-scrolling so it never dwarfs a short list. */}
+            Sticky (requested 2026-08-25): these queues run to hundreds of
+            rows, and the whole point of moving the facets out of the sidebar
+            was that they stay reachable — a control that scrolls away is
+            worse than the sidebar it replaced. The scroll container is this
+            page's <main>, so top-0 anchors to the app header, not the window.
+
+            -mx-5/px-5 cancels the parent's padding so the band spans the full
+            width: without it, rows would slide through the 20px gutters on
+            either side of the card while it is pinned. */}
+        <div className="sticky top-0 z-20 -mx-5 px-5 py-2"
+          style={{
+            background: gl.headerBg,
+            backdropFilter: gl.blur20,
+            WebkitBackdropFilter: gl.blur20,
+          }}>
+          <FilterBar f={filters} loading={loading} />
+        </div>
+
+        {/* items-start: the card sizes to its content, so there is no empty
+            void below the pagination. Single column since the sidebar left. */}
         <div className="flex gap-3 items-start">
-          {/* e-commerce style facet filters (feedback items 4, 5, 7) */}
-          <FilterPanel f={filters} loading={loading} />
-
           <div className="flex-1 min-w-0">
           <div className="flex items-end gap-2.5">
             <div role="tablist" aria-label={t("a11y.caseTabs")} className="flex items-end gap-2.5">
@@ -708,7 +758,7 @@ export function CasesPage({
                         <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                         {/* col 1 — identity: VN, HN */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
-                          <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} />
+                          <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} />
                         </div>
                         {/* col 2 — info: meta + clinical preview */}
                         <div className="flex-1 min-w-0 self-center">
@@ -802,7 +852,7 @@ export function CasesPage({
                         className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
                       <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="w-60 shrink-0 min-w-0 self-center">
-                        <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={(() => {
+                        <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} badge={(() => {
                           const missingDocs = c.missing.split(",").map(m => m.trim()).filter(m => m && m !== "—");
                           if (missingDocs.length === 0) return null;
                           const abbrKeys = missingDocs.map(m => missingDocAbbr[m]);
@@ -876,7 +926,7 @@ export function CasesPage({
                             the long visit numbers leave no room in the fixed
                             column, same trade-off as the Finished rows) */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
-                          <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
+                          <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} badge={
                             <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap shrink-0"
                               style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                               <RotateCcw size={8} /> {t("tab.reopen")}
@@ -963,7 +1013,7 @@ export function CasesPage({
                       onClick={() => openFinishedCase(c)}>
                       <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="flex-1 min-w-0">
-                        <CaseIdent vn={c.vn ?? c.id} hn={c.hn} coverage={c.coverageFamily ?? c.coverage} date={c.created_at ? formatDate(c.created_at) : null} badge={
+                        <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} badge={
                           <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
                             style={{ background: `rgba(${gl.accentRgb},0.18)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.28)` }}>
                             <Flag size={8} /> {t("tab.finished")}

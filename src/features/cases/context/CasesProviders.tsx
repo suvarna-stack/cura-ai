@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ThemeCtx, useThemeProvider } from './ThemeContext'
 import { LanguageProvider } from './LanguageProvider'
 import { SyncProvider } from './SyncProvider'
+import { CaseFieldsProvider } from './CaseFieldsProvider'
 import { ApprovalsProvider } from './ApprovalsProvider'
 import { ActivityLogProvider } from './ActivityLogProvider'
 import { ToastCtx } from './ToastContext'
@@ -83,11 +84,13 @@ export function CasesProviders({ children }: { children: ReactNode }) {
     <ThemeProvider>
       <LanguageProvider>
         <SyncProvider>
-          <ApprovalsProvider>
-            <ActivityLogProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </ActivityLogProvider>
-          </ApprovalsProvider>
+          <CaseFieldsProvider>
+            <ApprovalsProvider>
+              <ActivityLogProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </ActivityLogProvider>
+            </ApprovalsProvider>
+          </CaseFieldsProvider>
         </SyncProvider>
       </LanguageProvider>
     </ThemeProvider>

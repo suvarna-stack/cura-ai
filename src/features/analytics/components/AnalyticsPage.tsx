@@ -11,10 +11,15 @@ import {
   UserCheck,
   ClipboardList,
   Grid3x3,
+  CalendarRange,
+  Stethoscope,
+  Gauge,
 } from 'lucide-react'
 import { useTheme } from '../../cases/context/ThemeContext'
 import { GlassCard } from '../../cases/components/global/GlassCard'
 import { EmptyState } from '../../cases/components/global/EmptyState'
+import { DateRangeDialog } from '../../cases/components/global/DateRangeDialog'
+import { rangeLabel, type DateRange } from '../../cases/utils/dateRange'
 import { fetchAnalytics } from '../api/analyticsService'
 import type { AnalyticsData } from '../types/analytics.types'
 import { EMPTY_ANALYTICS } from '../types/analytics.types'
@@ -222,18 +227,101 @@ function CaseMixTable({
   )
 }
 
+/** The hospital's KPI table: one row per coder, two percentages.
+ *
+ *  A null percentage renders "—", never 0% — an empty denominator is "not
+ *  measured", and showing it as zero would read as a failing coder. The raw
+ *  counts sit under each percentage so the number can be checked. */
+function CoderKpiTable({
+  rows,
+}: {
+  rows: AnalyticsData['coderKpi']
+}) {
+  const { gl } = useTheme()
+  const pct = (v: number | null) => (v === null ? '—' : `${v}%`)
+  const head = 'pb-1 text-[11px] font-semibold'
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-separate" style={{ borderSpacing: '0 4px' }}>
+        <caption className="sr-only">
+          Finish rate and 7-day turnaround per coder
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" className={`${head} text-left`} style={{ color: gl.muted }}>
+              Coder
+            </th>
+            <th scope="col" className={`${head} text-center`} style={{ color: gl.muted, minWidth: 96 }}>
+              Finish case (%)
+            </th>
+            <th scope="col" className={`${head} text-center`} style={{ color: gl.muted, minWidth: 110 }}>
+              Duration &lt; 7 days (%)
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.coderId}>
+              <th
+                scope="row"
+                className="truncate pr-2 text-left text-[12px] font-semibold"
+                style={{ color: gl.text, maxWidth: 180 }}
+                title={r.coderId}
+              >
+                {truncate(r.coder, 26)}
+              </th>
+              <td className="text-center">
+                <span className="text-[13px] font-bold" style={{ color: gl.accent }}>
+                  {pct(r.finishedPct)}
+                </span>
+                <span className="ml-1 text-[11px]" style={{ color: gl.muted }}>
+                  ({r.finished}/{r.touched})
+                </span>
+              </td>
+              <td className="text-center">
+                <span className="text-[13px] font-bold" style={{ color: gl.accent }}>
+                  {pct(r.within7DaysPct)}
+                </span>
+                <span className="ml-1 text-[11px]" style={{ color: gl.muted }}>
+                  ({r.within7Days}/{r.measured})
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function AnalyticsPage() {
   const { gl } = useTheme()
   useDocumentTitle("Analytics")
   const [data, setData] = useState<AnalyticsData>(EMPTY_ANALYTICS)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  // null = no filter: the server then serves the Dashboard's own counts
+  // verbatim, which is the only state in which these tiles are guaranteed
+  // to match the Dashboard's.
+  const [range, setRange] = useState<DateRange | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  // Changing the range must put the skeletons back while the new figures load.
+  // Done as a render-phase update rather than inside the effect — the same
+  // idiom CasesLayout and hooks/useCaseDetail use, and the one React's
+  // set-state-in-effect rule asks for.
+  const [seenRange, setSeenRange] = useState(range)
+  if (seenRange !== range) {
+    setSeenRange(range)
+    setLoading(true)
+    setFailed(false)
+  }
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const next = await fetchAnalytics()
+        const next = await fetchAnalytics(30, range)
         if (!cancelled) setData(next)
       } catch {
         // No mock to fall back to: an unreachable server must READ as
@@ -246,7 +334,7 @@ export function AnalyticsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [range])
 
   const DONUT_R = 54
   const DONUT_CX = 80
@@ -285,26 +373,37 @@ export function AnalyticsPage() {
     }
   })
 
+  // The hospital's own four tiles (their dashboard sketch, 2026-08-25):
+  // Total / Not finished / Finished / Finished %. "Not finished" is one
+  // number on purpose — the coder does not care which queue a case is
+  // sitting in, only that it is not done. The complete/incomplete/reopened
+  // split still lives on the Dashboard and in the cards below.
+  const pctText =
+    data.summary.finishedPct === null ? '—' : `${data.summary.finishedPct}%`
   const statRow = [
-    {
-      label: 'Total Complete',
-      value: String(data.summary.complete),
-      icon: CheckCircle2,
-    },
-    {
-      label: 'Total Incomplete',
-      value: String(data.summary.incomplete),
-      icon: AlertCircle,
-    },
-    {
-      label: 'Total Finished',
-      value: String(data.summary.finished),
-      icon: Flag,
-    },
     {
       label: 'Total Cases',
       value: String(data.summary.total),
       icon: Layers,
+      hint: 'OPD visits in view',
+    },
+    {
+      label: 'Not Finished',
+      value: String(data.summary.notFinished),
+      icon: AlertCircle,
+      hint: `${data.summary.complete} complete · ${data.summary.incomplete} incomplete · ${data.summary.reopened} reopened`,
+    },
+    {
+      label: 'Finished',
+      value: String(data.summary.finished),
+      icon: Flag,
+      hint: 'approved by a coder',
+    },
+    {
+      label: 'Finished (%)',
+      value: pctText,
+      icon: CheckCircle2,
+      hint: 'of every case in view',
     },
   ]
 
@@ -359,10 +458,48 @@ export function AnalyticsPage() {
           <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
             {failed
               ? 'Could not reach the server'
-              : 'Live view of the synced hospital data'}
+              : range
+                ? `Filtered to ${rangeLabel(range)}`
+                : 'Live view of the synced hospital data'}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {range && (
+            <button
+              onClick={() => setRange(null)}
+              className="rounded-lg px-3 py-2 text-[12px] font-semibold transition-all hover:opacity-80"
+              style={{ border: gl.border, color: gl.muted, background: gl.inputBg }}
+            >
+              Clear
+            </button>
+          )}
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all hover:opacity-90"
+            style={
+              range
+                ? {
+                    background: `rgba(${gl.accentRgb},0.15)`,
+                    border: `1px solid rgba(${gl.accentRgb},0.35)`,
+                    color: gl.accent,
+                  }
+                : { background: gl.inputBg, border: gl.border, color: gl.text }
+            }
+          >
+            <CalendarRange size={13} />
+            {rangeLabel(range)}
+          </button>
+        </div>
       </header>
+
+      {pickerOpen && (
+        <DateRangeDialog
+          value={range}
+          title="Filter by date"
+          onApply={setRange}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       <div className="space-y-4 p-5">
         {failed && (
@@ -405,6 +542,13 @@ export function AnalyticsPage() {
                 >
                   {s.label}
                 </p>
+                <p
+                  className="mt-0.5 truncate text-[11px] font-normal"
+                  style={{ color: gl.muted, opacity: 0.7 }}
+                  title={s.hint}
+                >
+                  {s.hint}
+                </p>
               </GlassCard>
             ))}
           </div>
@@ -428,6 +572,33 @@ export function AnalyticsPage() {
               />
             ) : (
               <BarList rows={coderBars} />
+            )}
+          </GlassCard>
+        )}
+
+        {loading ? (
+          <ChartSkeleton height={200} />
+        ) : failed ? null : (
+          <GlassCard className="p-5">
+            <p className="mb-1 text-[15px] font-bold" style={{ color: gl.text }}>
+              Coder KPI
+            </p>
+            {/* The honesty line. The hospital asked for "% of assigned cases
+                finished"; there is no assignment system, so the denominator
+                is stated in the open rather than implied. */}
+            <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
+              Finish rate is measured against the cases each coder{' '}
+              <strong style={{ color: gl.text }}>touched</strong> — case
+              assignment does not exist yet
+            </p>
+            {data.coderKpi.length === 0 ? (
+              <EmptyState
+                icon={Gauge}
+                title="No coder activity yet"
+                subtext="Rows appear once a coder edits or approves their first case."
+              />
+            ) : (
+              <CoderKpiTable rows={data.coderKpi} />
             )}
           </GlassCard>
         )}
@@ -539,6 +710,32 @@ export function AnalyticsPage() {
             </GlassCard>
           )}
         </div>
+
+        {loading ? (
+          <ChartSkeleton height={180} />
+        ) : failed ? null : (
+          <GlassCard className="p-5">
+            <p className="mb-1 text-[15px] font-bold" style={{ color: gl.text }}>
+              Top {data.topPrincipalDiagnosis.length || 10} Principal Diagnosis
+            </p>
+            {/* Not a filtered view of the card above: this counts ONLY the
+                principal_diagnosis role, so a common procedure or comorbidity
+                cannot outrank a diagnosis. */}
+            <p className="mb-4 text-[12px]" style={{ color: gl.muted }}>
+              ICD-10 principal diagnoses only — procedures and comorbidities
+              excluded
+            </p>
+            {data.topPrincipalDiagnosis.length === 0 ? (
+              <EmptyState
+                icon={Stethoscope}
+                title="No principal diagnosis yet"
+                subtext="A case contributes here once it carries an ICD-10 code in the principal-diagnosis role."
+              />
+            ) : (
+              <BarList rows={data.topPrincipalDiagnosis} />
+            )}
+          </GlassCard>
+        )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {loading ? (

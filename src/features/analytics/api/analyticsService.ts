@@ -9,10 +9,28 @@ import type { AnalyticsData } from '../types/analytics.types'
  * the page rather than as plausible-looking fake data.
  */
 
-/** GET /api/analytics — the whole page in one round trip. */
-export async function fetchAnalytics(days = 30): Promise<AnalyticsData> {
+/** A from/to range, or null for "everything" (the server's default). */
+export interface AnalyticsRange {
+  /** ISO YYYY-MM-DD, inclusive. */
+  from: string
+  /** ISO YYYY-MM-DD, inclusive. */
+  to: string
+}
+
+/**
+ * GET /api/analytics — the whole page in one round trip.
+ *
+ * With a `range` every card is scoped to it and `days` is ignored (the server
+ * spans the series across the range instead). Without one nothing is filtered
+ * and the summary tiles are the Dashboard's own counts verbatim. The server
+ * rejects a half-open range, so this only ever sends both ends or neither.
+ */
+export async function fetchAnalytics(
+  days = 30,
+  range: AnalyticsRange | null = null,
+): Promise<AnalyticsData> {
   const { data } = await apiClient.get<AnalyticsData>('/analytics', {
-    params: { days },
+    params: range ? { from: range.from, to: range.to } : { days },
   })
   return data
 }

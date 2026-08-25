@@ -37,6 +37,12 @@ export interface RichCase extends CompleteCase {
   missing?: string
   created_at?: string
   updated_at?: string
+  /** The date to SHOW. `created_at` is the raw admissiondatetime iMed sent,
+   *  which is null on every OPD row; this falls back to the datetime encoded
+   *  in the transaction number, the same way analytics dates a visit. */
+  visitDate?: string | null
+  /** "y,m,d" as the extract froze it — print the years, don't do maths on it. */
+  age?: string | null
   revenue_impact?: 'high' | 'medium' | 'low'
   reopened?: boolean
   // starred / starredBy / starredAt come from CompleteCase
@@ -88,6 +94,8 @@ const rich = (c: ApiCase): RichCase => ({
   missing: c.missing,
   created_at: c.created_at ?? undefined,
   updated_at: c.updated_at ?? undefined,
+  visitDate: c.visitDate ?? null,
+  age: c.age ?? null,
   revenue_impact: c.revenue_impact ?? undefined,
   reopened: c.reopened,
   starred: c.starred,
@@ -155,6 +163,8 @@ export function useCases(refreshKey = 0): CasesData {
             coders: f.coders,
             drg: f.drg,
             created_at: f.created_at ?? undefined,
+            visitDate: f.visitDate ?? null,
+            age: f.age ?? null,
             dept: f.dept,
             group: f.group,
             severity: f.severity,
