@@ -42,7 +42,7 @@ public class DemoBaselineService {
     private static final List<String> TABLES = List.of(
             "users", "coverage_types", "icd_10", "icd_9",
             "cases", "case_codes", "case_code_edits", "case_orders",
-            "case_report_sections", "case_vitals",
+            "case_report_sections", "case_stars", "case_vitals",
             "coding_history", "document_chunks", "imed_write_ops", "knowledge_base");
 
     /** table → serial PK column, for post-restore sequence re-alignment. */

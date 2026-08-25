@@ -42,6 +42,8 @@ class OpenApiDocsTest {
             "/api/cases/approve",
             "/api/cases/{caseId}/reopen",
             "/api/cases/{caseId}/suggest-codes",
+            "/api/cases/{caseId}/lock",
+            "/api/cases/{caseId}/star",
             "/api/demo/reset",
             "/api/demo/snapshot",
             "/api/sync",

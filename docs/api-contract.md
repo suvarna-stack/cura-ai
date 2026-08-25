@@ -94,6 +94,9 @@ exactly one of `complete`, an `incompleteGroups` group, `reopened` or
 | `created_at` | `string \| null` | `cases.admissiondatetime` (raw hospital text). OPD rows lack it → currently always `null` here |
 | `updated_at` | `string \| null` | `cases.dischargedatetime` — same caveat |
 | `revenue_impact` | `null` | no real DRG/revenue source exists |
+| `starred` | `boolean` | `case_stars` row exists — the shared "look at this one first" flag any coder can set (see `POST /api/cases/{caseId}/star`). One star per case, everyone sees the same one |
+| `starredBy` | `string \| null` | display name of the coder who set it (`users.full_name`, else the account email); `null` when not starred |
+| `starredAt` | `string \| null` | `YYYY-MM-DD HH:MM:SS`; `null` when not starred |
 | `missing?` | `string` | **incomplete-origin rows only** (incomplete groups + reopened rows that came from one): human-readable labels joined with `", "`, else `"—"` |
 
 **ReopenedCard** = CaseCard for a human-reopened, not-yet-reapproved case
@@ -301,6 +304,37 @@ on by <name>"}` — the lock is enforced at the writes, not just in the UI.
 
 Release the working lock when leaving the page. Only the caller's own lock
 is released (a stale release is a harmless no-op). Response `{"ok": true}`.
+
+### POST /api/cases/{caseId}/star — mark a case important
+
+No request body (the starring coder is the logged-in account). Marks the case
+important **for everyone** — one star per case, not a private favourites list,
+because the point is that a fellow coder can tell which case to pick up first.
+Response:
+
+```jsonc
+{ "ok": true,
+  "starred": true,
+  "starredBy": "Austin",              // display name; null when not starred
+  "starredAt": "2026-08-25 10:11:12" } // null when not starred
+```
+
+`404` unknown case. Starring an already-starred case moves the star to the new
+coder and time. Unlike `PUT /codes` / `approve` / `reopen`, this is **allowed
+while another coder holds the case's lock** — a star annotates the case, it
+doesn't edit it, and the coder who most wants to flag a case is often the one
+locked out of it. Nothing here reaches the hospital. The star is persisted
+(`case_stars`, V8) and cleared by a demo reset along with every other case
+table.
+
+Every card in `GET /api/cases` carries `starred` / `starredBy` / `starredAt`,
+in all four collections.
+
+### DELETE /api/cases/{caseId}/star
+
+Clears the star whoever set it — any coder may clear any star, the same posture
+`reopen` takes. Clearing an unstarred case is a no-op. `404` unknown case.
+Response `{"ok": true, "starred": false, "starredBy": null, "starredAt": null}`.
 
 ### POST /api/demo/snapshot
 

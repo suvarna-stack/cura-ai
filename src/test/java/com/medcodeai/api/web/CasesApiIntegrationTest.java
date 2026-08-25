@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -341,6 +342,73 @@ class CasesApiIntegrationTest {
                 "reopened case should enter the reopened queue");
         assertFalse(containsCaseId(afterReopen.get("complete"), APPROVABLE_CASE_ID),
                 "reopened case must not stay in the complete list");
+    }
+
+    // ---- shared case star (2026-08-25) ----
+    // One star per case, set by any coder and seen by all of them — the value
+    // of the feature IS that it crosses coders, so the assertions follow it
+    // from the write endpoint into the dashboard payload every coder reads.
+
+    @Test
+    void starringACaseShowsUpOnTheCardForEveryCoder() throws Exception {
+        // start clean: the star is persistent, so a previous run must not decide
+        // this one's outcome
+        mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))
+                .andExpect(status().isOk());
+
+        String starredBy = mvc.perform(post("/api/cases/{id}/star", KNOWN_CASE_ID)
+                        .header("Authorization", auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.starred").value(true))
+                .andExpect(jsonPath("$.starredAt").isString())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode set = json.readTree(starredBy);
+        assertTrue(isRealAccount(set.get("starredBy").asString()),
+                "starredBy must be a real account (the logged-in coder), not a synthesized name");
+        assertTrue(set.get("starredAt").asString().matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"),
+                "starredAt is a backend-written datetime: YYYY-MM-DD HH:MM:SS");
+
+        // the card another coder loads carries it — and the cases cache had to
+        // invalidate for that to be true
+        JsonNode card = findCase(getJson("/api/cases"), KNOWN_CASE_ID);
+        assertNotNull(card, "the starred case should still be listed on the dashboard");
+        assertTrue(card.get("starred").asBoolean(), "the star belongs to the case, not to a session");
+        assertEquals(set.get("starredBy").asString(), card.get("starredBy").asString());
+        assertEquals(set.get("starredAt").asString(), card.get("starredAt").asString());
+
+        // any coder may clear any star (same posture as reopen)
+        mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.starred").value(false))
+                .andExpect(jsonPath("$.starredBy").isEmpty())
+                .andExpect(jsonPath("$.starredAt").isEmpty());
+
+        JsonNode cleared = findCase(getJson("/api/cases"), KNOWN_CASE_ID);
+        assertNotNull(cleared);
+        assertFalse(cleared.get("starred").asBoolean());
+        assertTrue(cleared.get("starredBy").isNull(), "starredBy is null once the star is gone");
+    }
+
+    @Test
+    void everyCardCarriesTheStarKeysStarredOrNot() throws Exception {
+        // "no key is ever absent" (docs/api-contract.md conventions) — the
+        // frontend renders one star control per row and must not null-check the
+        // shape of the row it got
+        JsonNode sample = firstListedCase(getJson("/api/cases"));
+        assertNotNull(sample, "expected at least one case in the dashboard payload");
+        assertTrue(sample.has("starred") && sample.get("starred").isBoolean());
+        assertTrue(sample.has("starredBy"));
+        assertTrue(sample.has("starredAt"));
+    }
+
+    @Test
+    void starringAnUnknownCaseReturns404() throws Exception {
+        mvc.perform(post("/api/cases/{id}/star", "no-such-case").header("Authorization", auth()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("not found"));
+        mvc.perform(delete("/api/cases/{id}/star", "no-such-case").header("Authorization", auth()))
+                .andExpect(status().isNotFound());
     }
 
     // ---- ICD-9 operation time window (2026-07-30) ----
@@ -856,6 +924,25 @@ class CasesApiIntegrationTest {
             JsonNode cases = group.get("cases");
             if (cases != null && !cases.isEmpty()) {
                 return cases.get(0);
+            }
+        }
+        return null;
+    }
+
+    /** The card for one case wherever it currently lives in the payload. */
+    private JsonNode findCase(JsonNode root, String caseId) {
+        for (String bucket : List.of("complete", "reopened", "finished")) {
+            for (JsonNode n : root.get(bucket)) {
+                if (caseId.equals(n.get("id").asString())) {
+                    return n;
+                }
+            }
+        }
+        for (JsonNode group : root.get("incompleteGroups")) {
+            for (JsonNode n : group.get("cases")) {
+                if (caseId.equals(n.get("id").asString())) {
+                    return n;
+                }
             }
         }
         return null;

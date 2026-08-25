@@ -785,6 +785,25 @@ Milestones (git log --oneline reads as this sequence):
   coder B sees coder A's rule, is refused delete/mute/edit-in-place, A and the
   admin both succeed.
 
+- ✅ **Shared case star (2026-08-25):** one "look at this one first" flag per
+  CASE, set by any coder and seen by every coder — deliberately not a private
+  favourites list, since the whole point is telling a colleague which case
+  matters. `POST` / `DELETE /api/cases/{id}/star` (the lock's two verbs),
+  persisted in `case_stars` (**V8**, FK to `cases` like every other case-keyed
+  table, and the migration also back-fills `demo_baseline.case_stars` so a
+  reset on an already-baselined database still works). Every card in
+  `GET /api/cases` now carries `starred` / `starredBy` / `starredAt` in all
+  four collections; a star toggle invalidates the cases cache like an approve
+  does. Deliberately **not** gated by the working lock or `WriteGate`: a star
+  annotates a case, it does not edit it, and the coder most likely to want to
+  flag one is the one locked out of it. Nothing reaches the hospital.
+  Frontend (`../audit-chart-frontend`): a star button on every row of all four
+  tabs, optimistic with rollback (`hooks/useCaseStars.ts`), starred rows
+  pinned to the top of their tab — keyed on the SERVER's flag, not the
+  optimistic one, so clicking a star never makes the row jump out from under
+  the cursor. Same commit removed the Finished detail page's DRG pill, which
+  could only ever render the `"—"` placeholder.
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

@@ -85,6 +85,13 @@ export interface CaseCard {
   updated_at: string | null;
   /** always null — no real DRG/revenue source exists */
   revenue_impact: null;
+  /** the shared "look at this one first" flag — one star per case, set by any
+   *  coder and seen by all of them (POST/DELETE /api/cases/{caseId}/star) */
+  starred: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null;
   /** incomplete-origin rows only (incomplete groups + reopened rows that came
    *  from one): human-readable missing labels joined ", ", else "—" */
   missing?: string;
@@ -295,6 +302,16 @@ export interface CodeEdit {
 }
 
 // ---------- write responses ----------
+
+/** POST / DELETE /api/cases/{caseId}/star — the resulting shared star state. */
+export interface StarResponse {
+  ok: true;
+  starred: boolean;
+  /** display name of the coder who starred it; null when not starred */
+  starredBy: string | null;
+  /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
+  starredAt: string | null;
+}
 
 export interface OkResponse {
   ok: true;

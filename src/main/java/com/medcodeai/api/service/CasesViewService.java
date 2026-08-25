@@ -1,5 +1,6 @@
 package com.medcodeai.api.service;
 
+import com.medcodeai.api.repo.CaseStarsRepository;
 import com.medcodeai.api.repo.CasesRepository;
 import com.medcodeai.api.repo.UsersRepository;
 import com.medcodeai.api.repo.WorkingStateRepository;
@@ -58,13 +59,15 @@ public class CasesViewService {
     private final CasesRepository repo;
     private final WorkingStateRepository workingState;
     private final UsersRepository users;
+    private final CaseStarsRepository stars;
     private final JsonMapper json = new JsonMapper();
 
     public CasesViewService(CasesRepository repo, WorkingStateRepository workingState,
-                            UsersRepository users) {
+                            UsersRepository users, CaseStarsRepository stars) {
         this.repo = repo;
         this.workingState = workingState;
         this.users = users;
+        this.stars = stars;
     }
 
     // views.py:99 build_cases_payload()
@@ -137,6 +140,11 @@ public class CasesViewService {
         // Average confidence from saved RAG/coder code edits (null when unset).
         Map<String, Integer> aiConfidence = workingState.avgConfidenceByCase();
 
+        // case_id -> {starred_by stamp, starred_at} for the shared "important"
+        // flag (V8). One query for the whole payload — a star is on every card
+        // in every tab, so a per-case lookup would be 100+ round trips.
+        Map<String, String[]> stars = this.stars.allStars();
+
         // views.py:194 — finalization info from the audit trail
         Map<String, String> approvedAt = new HashMap<>();
         Map<String, String> approvedBy = new HashMap<>();
@@ -171,7 +179,8 @@ public class CasesViewService {
         Set<String> finishedOmits = Set.of("confidence", "ccpi", "cc", "pi");
 
         for (Map<String, Object> r : repo.opdCases()) {
-            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, ordnames, caseCoders, aiConfidence);
+            Map<String, Object> u = uiCase(r, coverage, ccpi, codes, ordcat, ordnames, caseCoders,
+                    aiConfidence, stars, coderNames);
             String id = (String) u.get("id");
             if ("approved".equals(r.get("case_status"))) {
                 // views.py:221 — finished is an exclusive queue
@@ -282,7 +291,9 @@ public class CasesViewService {
                                        Map<String, Map<String, Object>> ordcat,
                                        Map<String, Map<String, List<String>>> ordnames,
                                        Map<String, List<String>> caseCoders,
-                                       Map<String, Integer> aiConfidence) {
+                                       Map<String, Integer> aiConfidence,
+                                       Map<String, String[]> stars,
+                                       Map<String, String> coderNames) {
         String cid = (String) r.get("case_id");
         Map<String, String> cc = ccpi.getOrDefault(cid, Map.of());
         Map<String, Object> cv = coverage.get(r.get("coverage_type"));
@@ -312,6 +323,12 @@ public class CasesViewService {
         u.put("created_at", r.get("admissiondatetime")); // real column; null where the extract lacks it
         u.put("updated_at", r.get("dischargedatetime")); // real column; null where the extract lacks it
         u.put("revenue_impact", null); // no real DRG/revenue source exists
+        // shared "this one matters" flag (V8) — same three keys on every card
+        // in every tab, so the frontend never has to ask which lists carry it
+        String[] star = stars.get(cid);
+        u.put("starred", star != null);
+        u.put("starredBy", star == null ? null : coderDisplay(star[0], coderNames));
+        u.put("starredAt", star == null ? null : star[1]);
         return u;
     }
 
