@@ -83,6 +83,9 @@ export interface CaseStarState {
   starred: boolean
   /** display name of the coder who set it; null when not starred */
   starredBy: string | null
+  /** the ACCOUNT that set it (audit stamp / email) — only that coder may
+   *  clear the star, so the caller compares this, not the display name */
+  starredByStamp: string | null
   /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
   starredAt: string | null
 }

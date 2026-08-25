@@ -540,9 +540,10 @@ export function CaseDetailPage({ caseData, onBack, onViewHistory }: {
               <CheckCircle2 size={12} /> {t("detail.pending")}
             </span>
           )}
-          {/* the shared star, if a coder left one — who wants this case looked
-              at first, next to the case's identity like its status is */}
-          <StarredBadge detail={detail} fallback={c} />
+          {/* the shared star — who wants this case looked at first, next to
+              the case's identity like its status is. Clickable: the coder who
+              decides a case matters decides it while reading the case */}
+          <StarredBadge caseId={c.id} detail={detail} fallback={c} />
         </div>
         {/* the case's actions live at the top right */}
         <div className="flex items-center gap-2">

@@ -45,7 +45,7 @@ export interface RichCase extends CompleteCase {
   age?: string | null
   revenue_impact?: 'high' | 'medium' | 'low'
   reopened?: boolean
-  // starred / starredBy / starredAt come from CompleteCase
+  // starred / starredBy / starredByStamp / starredAt come from CompleteCase
 }
 
 export interface RichIncompleteGroup extends Omit<IncompleteGroup, 'cases'> {
@@ -100,6 +100,7 @@ const rich = (c: ApiCase): RichCase => ({
   reopened: c.reopened,
   starred: c.starred,
   starredBy: c.starredBy,
+  starredByStamp: c.starredByStamp,
   starredAt: c.starredAt,
 })
 
@@ -176,6 +177,7 @@ export function useCases(refreshKey = 0): CasesData {
             revenue_impact: f.revenue_impact ?? undefined,
             starred: f.starred,
             starredBy: f.starredBy,
+            starredByStamp: f.starredByStamp,
             starredAt: f.starredAt,
           })),
           stats: api.stats,

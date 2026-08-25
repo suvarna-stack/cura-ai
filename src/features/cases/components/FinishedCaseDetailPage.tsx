@@ -179,9 +179,10 @@ export function FinishedCaseDetailPage({
             style={{ background: `rgba(${gl.accentRgb},0.15)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
             <BadgeCheck size={13} /> Approved · {c.codedDate}
           </span>
-          {/* the shared star, if a coder left one — who wants this case looked
-              at first, next to the case's identity like its status is */}
-          <StarredBadge detail={detail} fallback={c} />
+          {/* the shared star — who wants this case looked at first, next to
+              the case's identity like its status is. Clickable: the coder who
+              decides a case matters decides it while reading the case */}
+          <StarredBadge caseId={c.id} detail={detail} fallback={c} />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => onViewHistory(c.id, c.patient)}

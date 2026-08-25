@@ -310,11 +310,16 @@ export const dict: Record<string, { en: string; th: string }> = {
   // the star is that it is a message to another coder
   "star.add":    { en: "Mark case {vn} as important", th: "ทำเครื่องหมายเคส {vn} ว่าสำคัญ" },
   "star.remove": { en: "Remove the star from case {vn}", th: "เอาดาวออกจากเคส {vn}" },
-  "star.by":     { en: "Starred by {name} — click to remove", th: "ติดดาวโดย {name} — คลิกเพื่อเอาออก" },
-  // …and the same star inside the case, where it is read-only and has room to
-  // say who left it and when (the row only has room for the glyph)
+  // a colleague's star: seen by all, cleared by its author only — so the
+  // tooltip explains why there is nothing to click rather than staying silent
+  "star.byLocked": { en: "Starred by {name} — only they can remove it",
+                     th: "ติดดาวโดย {name} — เอาออกได้เฉพาะผู้ติดดาว" },
+  // …and the same star inside the case, where it has room to say who left it
+  // and when (the row only has room for the glyph), and doubles as the control
   "star.badgeBy": { en: "Starred by {name}", th: "ติดดาวโดย {name}" },
   "star.badge":   { en: "Starred",           th: "ติดดาว" },
+  "star.mark":    { en: "Mark important",    th: "ทำเครื่องหมายว่าสำคัญ" },
+  "star.unmark":  { en: "Remove this star",  th: "เอาดาวนี้ออก" },
   "reopen.finishedBy": { en: "Finished by", th: "ทำเสร็จโดย" },
   "reopen.reopenedBy": { en: "Reopened by", th: "เปิดใหม่โดย" },
   "facet.dept":      { en: "Department",   th: "แผนก" },

@@ -9,11 +9,19 @@
 //
 // The popover is absolutely positioned inside the sticky bar, so
 // it travels with it and closes on outside-click or Escape.
+//
+// The panel is OPAQUE (gl.popover), unlike the glass cards around
+// it: it opens straight over the tab strip and the case rows, and
+// as glass their text read through it (hospital, 25/08/2026 —
+// "a little crash"). backdrop-filter cannot save it either, since
+// the sticky bar it lives in already blurs and the two do not
+// compose.
 // ============================================================
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
+import { useMenuDismiss } from "./useMenuDismiss";
 import type { CaseFilters, Facet } from "../../hooks/useCaseFilters";
 
 /** How many unticked options render at once. The search box exists so this
@@ -35,23 +43,7 @@ export function FacetDropdown({
   const [query, setQuery] = useState<Record<string, string>>({});
   const wrap = useRef<HTMLDivElement>(null);
 
-  // Close on outside click / Escape. Bound only while open, so the page is
-  // not carrying five idle document listeners.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useMenuDismiss(open, wrap, () => setOpen(false));
 
   const picked = facet.options.filter((o) => o.selected).length;
 
@@ -73,16 +65,16 @@ export function FacetDropdown({
 
   const searchBox = (qk: string) => (
     <div
-      className="mb-1 flex items-center gap-1.5 rounded-lg px-1.5 py-1"
+      className="mb-1.5 flex items-center gap-2 rounded-lg px-2 py-1.5"
       style={{ background: gl.inputBg, border: gl.borderSm }}
     >
-      <Search size={10} style={{ color: gl.muted }} className="shrink-0" />
+      <Search size={13} style={{ color: gl.muted }} className="shrink-0" />
       <input
         value={query[qk] ?? ""}
         onChange={(e) => setQuery((p) => ({ ...p, [qk]: e.target.value }))}
         aria-label={t("facet.ordernameSearch")}
         placeholder={t("facet.ordernameSearch")}
-        className="w-full min-w-0 bg-transparent text-[12px] font-normal outline-none"
+        className="w-full min-w-0 bg-transparent text-[13px] font-normal outline-none"
         style={{ color: gl.text }}
       />
       {(query[qk] ?? "") !== "" && (
@@ -92,7 +84,7 @@ export function FacetDropdown({
           className="shrink-0 transition-all hover:opacity-70"
           style={{ color: gl.muted }}
         >
-          <X size={10} />
+          <X size={12} />
         </button>
       )}
     </div>
@@ -105,17 +97,17 @@ export function FacetDropdown({
   ) => (
     <label
       key={o.value}
-      className="flex cursor-pointer items-center gap-2 py-0.5 transition-all hover:opacity-80"
+      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 transition-all hover:opacity-80"
     >
       <input
         type="checkbox"
         checked={o.selected}
         onChange={() => f.toggle(key, o.value)}
-        className={small ? "h-2.5 w-2.5 rounded" : "h-3 w-3 rounded"}
+        className={small ? "h-3.5 w-3.5 rounded" : "h-4 w-4 rounded"}
         style={{ accentColor: gl.accent }}
       />
       <span
-        className={`min-w-0 flex-1 truncate text-[12px] ${small ? "font-normal" : "font-medium"}`}
+        className={`min-w-0 flex-1 truncate text-[13px] ${small ? "font-normal" : "font-semibold"}`}
         style={{ color: gl.text }}
         title={o.label}
       >
@@ -141,7 +133,7 @@ export function FacetDropdown({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
+        className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
         style={
           picked > 0
             ? {
@@ -155,14 +147,14 @@ export function FacetDropdown({
         {t(`facet.${facet.key}`)}
         {picked > 0 && (
           <span
-            className="rounded-full px-1.5 text-[11px] font-bold"
+            className="rounded-full px-2 py-0.5 text-[12px] font-bold leading-none"
             style={{ background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff" }}
           >
             {picked}
           </span>
         )}
         <ChevronDown
-          size={12}
+          size={14}
           style={{
             color: gl.muted,
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
@@ -173,20 +165,21 @@ export function FacetDropdown({
 
       {open && (
         <div
-          className="absolute left-0 z-30 mt-1.5 w-72 overflow-y-auto rounded-2xl p-3"
+          className="absolute left-0 z-50 mt-2 w-80 overflow-y-auto rounded-2xl p-3.5"
           style={{
             top: "100%",
             maxHeight: "60vh",
-            background: gl.card,
-            backdropFilter: gl.blur20,
-            WebkitBackdropFilter: gl.blur20,
-            border: `1px solid rgba(${gl.accentRgb},0.25)`,
-            boxShadow: gl.shadow,
+            // opaque, NOT gl.card — see the header note
+            background: gl.popover,
+            border: `1.5px solid rgba(${gl.accentRgb},0.35)`,
+            boxShadow: gl.isDark
+              ? "0 12px 32px rgba(0,0,0,0.55)"
+              : "0 12px 32px rgba(0,0,0,0.18)",
             scrollbarWidth: "none",
           } as React.CSSProperties}
         >
           {facet.options.length === 0 ? (
-            <p className="py-0.5 text-[12px] font-normal" style={{ color: gl.muted }}>
+            <p className="py-1 text-[13px] font-normal" style={{ color: gl.muted }}>
               {t("facet.ordernameEmpty")}
             </p>
           ) : (
@@ -207,13 +200,13 @@ export function FacetDropdown({
                         style={{ borderLeft: `1px solid rgba(${gl.accentRgb},0.25)` }}
                       >
                         <p
-                          className="pb-0.5 text-[12px] font-bold uppercase tracking-wide"
+                          className="pb-1 text-[12px] font-bold uppercase tracking-wide"
                           style={{ color: gl.accent, opacity: 0.7 }}
                         >
                           {t("facet.ordername")}
                         </p>
                         {o.children.length === 0 ? (
-                          <p className="text-[12px] font-normal" style={{ color: gl.muted }}>
+                          <p className="text-[13px] font-normal" style={{ color: gl.muted }}>
                             {t("facet.ordernameEmpty")}
                           </p>
                         ) : (
@@ -221,12 +214,12 @@ export function FacetDropdown({
                             {searchBox(o.value)}
                             {kid.visible.map((k) => row(k, "ordername", true))}
                             {kid.noMatch && (
-                              <p className="py-0.5 text-[12px] font-normal" style={{ color: gl.muted }}>
+                              <p className="py-1 text-[13px] font-normal" style={{ color: gl.muted }}>
                                 {t("facet.ordernameNoMatch", { q: query[o.value] ?? "" })}
                               </p>
                             )}
                             {kid.hidden > 0 && (
-                              <p className="py-0.5 text-[12px] font-medium" style={{ color: gl.muted }}>
+                              <p className="py-1 text-[13px] font-medium" style={{ color: gl.muted }}>
                                 {t("facet.ordernameMore", { n: kid.hidden })}
                               </p>
                             )}
@@ -238,12 +231,12 @@ export function FacetDropdown({
                 </div>
               ))}
               {main.noMatch && (
-                <p className="py-0.5 text-[12px] font-normal" style={{ color: gl.muted }}>
+                <p className="py-1 text-[13px] font-normal" style={{ color: gl.muted }}>
                   {t("facet.ordernameNoMatch", { q: query[`facet:${facet.key}`] ?? "" })}
                 </p>
               )}
               {main.hidden > 0 && (
-                <p className="py-0.5 text-[12px] font-medium" style={{ color: gl.muted }}>
+                <p className="py-1 text-[13px] font-medium" style={{ color: gl.muted }}>
                   {t("facet.ordernameMore", { n: main.hidden })}
                 </p>
               )}

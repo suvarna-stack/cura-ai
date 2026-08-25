@@ -62,6 +62,9 @@ export interface ApiCase {
   starred: boolean;
   /** display name of the coder who starred it; null when not starred */
   starredBy: string | null;
+  /** the ACCOUNT that owns the star (its audit stamp / email) — only that
+   *  coder may clear it, so the UI needs an identity names cannot give */
+  starredByStamp: string | null;
   /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
   starredAt: string | null;
   /** CREATE: every coder who worked this case, from coding_history — a case is
@@ -122,6 +125,9 @@ export interface ApiFinishedCase {
   starred: boolean;
   /** display name of the coder who starred it; null when not starred */
   starredBy: string | null;
+  /** the ACCOUNT that owns the star (its audit stamp / email) — only that
+   *  coder may clear it, so the UI needs an identity names cannot give */
+  starredByStamp: string | null;
   /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
   starredAt: string | null;
 }
@@ -205,6 +211,9 @@ export interface ApiCaseDetail {
   starred?: boolean;
   /** display name of the coder who starred it; null when not starred */
   starredBy?: string | null;
+  /** the ACCOUNT that owns the star (its audit stamp / email) — only that
+   *  coder may clear it, so the UI needs an identity names cannot give */
+  starredByStamp?: string | null;
   /** "YYYY-MM-DD HH:MM:SS"; null when not starred */
   starredAt?: string | null;
 }

@@ -93,7 +93,9 @@ export function IcdFilterDialog({
       overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
       className="w-full max-w-lg rounded-2xl p-5 flex flex-col"
       style={{
-        background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+        // opaque, like the bar's dropdowns: a code list is read one line at a
+        // time, and glass put the dimmed dashboard behind every one of them
+        background: gl.popover,
         border: `1px solid rgba(${gl.accentRgb},0.25)`, boxShadow: gl.shadow,
         maxHeight: "min(40rem, calc(100vh - 4rem))",
       }}>

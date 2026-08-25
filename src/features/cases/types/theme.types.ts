@@ -6,6 +6,8 @@ export type GL = {
   card: string
   row: string
   sidebar: string
+  /** OPAQUE surface for popovers/menus — see ThemeContext */
+  popover: string
   blur20: string
   blur24: string
   blur16: string

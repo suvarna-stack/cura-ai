@@ -1,6 +1,6 @@
 // ============================================================
 // Sort options + the active-mode label, kept component-free so
-// fast refresh works in SortDialog (same split as
+// fast refresh works in SortMenu (same split as
 // LanguageContext / LanguageProvider).
 // ============================================================
 import { useLang } from "../context/LanguageContext";

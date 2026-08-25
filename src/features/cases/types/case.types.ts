@@ -15,6 +15,8 @@ export interface CompleteCase {
    *  coder and seen by all of them (not a private favourites list) */
   starred?: boolean;
   starredBy?: string | null;
+  /** the account that owns the star — only it may clear the star */
+  starredByStamp?: string | null;
   starredAt?: string | null;
 }
 
@@ -30,6 +32,8 @@ export interface IncompleteCase {
   /** the shared "look at this one first" flag — see CompleteCase */
   starred?: boolean;
   starredBy?: string | null;
+  /** the account that owns the star — only it may clear the star */
+  starredByStamp?: string | null;
   starredAt?: string | null;
 }
 
@@ -63,6 +67,8 @@ export interface FinishedCase {
   /** shared "important" flag — see RichCase / the API contract */
   starred?: boolean;
   starredBy?: string | null;
+  /** the account that owns the star — only it may clear the star */
+  starredByStamp?: string | null;
   starredAt?: string | null;
 }
 

@@ -45,24 +45,34 @@ const missingDocAbbr: Record<string, string> = {
  * identical on screen while telling a colleague nothing. So the tooltip names
  * whoever left it; an anonymous star is just decoration.
  *
+ * Seen by everyone, cleared by its author only (hospital request 2026-08-25).
+ * A colleague's star still draws in full — hiding it would defeat the point —
+ * but it is not a button for them: `canToggle` false renders the same glyph
+ * with no click and a tooltip saying whose flag it is. The server refuses it
+ * as well; this is so the refusal is visible BEFORE the click.
+ *
  * Available on every row of every tab, including Finished — a finished case
  * can be the one worth re-reading.
  */
-function StarButton({ view, onToggle, vn }: {
+function StarButton({ view, canToggle, onToggle, vn }: {
   view: StarView;
+  canToggle: boolean;
   onToggle: () => void;
   vn: string;
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
-  const label = view.starred
-    ? (view.starredBy ? t("star.by", { name: view.starredBy }) : t("star.remove", { vn }))
-    : t("star.add", { vn });
+  const label = !canToggle
+    ? t("star.byLocked", { name: view.starredBy ?? "" })
+    : view.starred
+      ? t("star.remove", { vn })
+      : t("star.add", { vn });
   return (
     <button type="button" title={label} aria-label={label} aria-pressed={view.starred}
+      disabled={!canToggle}
       // rows in the Finished tab are click-to-open; the star is not that click
       onClick={e => { e.stopPropagation(); onToggle(); }}
-      className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg hover:opacity-100 transition-all"
+      className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-all ${canToggle ? "hover:opacity-100" : "cursor-default"}`}
       style={{
         color: view.starred ? gl.warning : gl.muted,
         opacity: view.starred ? 1 : 0.5,
@@ -254,7 +264,7 @@ export function CasesPage({
   const me = useCoderIdentity();
   // the shared "look at this one first" flag; `me` only labels the optimistic
   // star until the server answers with the name it actually stamped
-  const { starOf, toggleStar } = useCaseStars(me.userName);
+  const { starOf, canToggle, toggleStar } = useCaseStars(me.userName, me.userId);
   const { showToast } = useToast();
   const [pendingApproval, setPendingApproval] = useState<{ n: number; ids: string[]; run: () => void } | null>(null);
   const askApprove = (ids: string[], run: () => void) => { if (ids.length > 0) setPendingApproval({ n: ids.length, ids, run }); };
@@ -346,7 +356,8 @@ export function CasesPage({
           severity: f.severity, coverage: f.coverage, encountertype: f.encountertype,
           orders: f.orders, created_at: f.created_at, revenue_impact: f.revenue_impact,
           visitDate: f.visitDate ?? null, age: f.age ?? null,
-          starred: f.starred, starredBy: f.starredBy, starredAt: f.starredAt,
+          starred: f.starred, starredBy: f.starredBy,
+          starredByStamp: f.starredByStamp, starredAt: f.starredAt,
           // keep the coder trail: the row must still say whose finished work this was
           coders: f.coders ?? (f.coder ? [f.coder] : []),
         } });
@@ -381,7 +392,8 @@ export function CasesPage({
       return { id, patient: c?.patient ?? id, vn: c?.vn ?? id, hn: c?.hn ?? null,
                codedDate: today, coder: me.userName, coders,
                // approving in this browser must not drop the case's star
-               starred: c?.starred, starredBy: c?.starredBy, starredAt: c?.starredAt,
+               starred: c?.starred, starredBy: c?.starredBy,
+               starredByStamp: c?.starredByStamp, starredAt: c?.starredAt,
                drg: c?.codes?.[0]?.code ?? "—", created_at: c?.created_at,
                // the card reads these two now — carry them over or an
                // optimistically-approved row loses its age and visit date
@@ -755,7 +767,7 @@ export function CasesPage({
                         <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)}
                           aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                           className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
-                        <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
+                        <StarButton view={starOf(c)} canToggle={canToggle(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                         {/* col 1 — identity: VN, HN */}
                         <div className="w-60 shrink-0 min-w-0 self-center">
                           <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} />
@@ -850,7 +862,7 @@ export function CasesPage({
                         onChange={() => toggleSelectIncomplete(c.id)}
                         aria-label={t("a11y.selectCase", { vn: c.vn ?? c.id })}
                         className="w-3.5 h-3.5 rounded cursor-pointer shrink-0" style={{ accentColor: gl.accent }} />
-                      <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
+                      <StarButton view={starOf(c)} canToggle={canToggle(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="w-60 shrink-0 min-w-0 self-center">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} badge={(() => {
                           const missingDocs = c.missing.split(",").map(m => m.trim()).filter(m => m && m !== "—");
@@ -921,7 +933,7 @@ export function CasesPage({
                       <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
                         style={{ background: gl.row, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16,
                           border: starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border, boxShadow: gl.shadowSm }}>
-                        <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
+                        <StarButton view={starOf(c)} canToggle={canToggle(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                         {/* col 1 — identity + reopened badge (no group tag —
                             the long visit numbers leave no room in the fixed
                             column, same trade-off as the Finished rows) */}
@@ -1011,7 +1023,7 @@ export function CasesPage({
                       style={{ background: gl.row, backdropFilter: gl.blur16, boxShadow: gl.shadowSm,
                         border: starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border }}
                       onClick={() => openFinishedCase(c)}>
-                      <StarButton view={starOf(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
+                      <StarButton view={starOf(c)} canToggle={canToggle(c)} onToggle={() => toggleStar(c)} vn={c.vn ?? c.id} />
                       <div className="flex-1 min-w-0">
                         <CaseIdent vn={c.vn ?? c.id} hn={c.hn} patient={c.patient} age={c.age} coverage={c.coverageFamily ?? c.coverage} date={c.visitDate ? formatDate(c.visitDate) : null} badge={
                           <span className="text-[12px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"

@@ -29,6 +29,11 @@ const themes: Record<ThemeId, ThemeConfig> = {
     gl: {
       // Glass surface backgrounds (used for cards, rows, sidebar)
       card: "rgba(255,255,255,0.65)", row: "rgba(255,255,255,0.55)", sidebar: "rgba(255,255,255,0.50)",
+      // Menus and dropdowns are NOT glass: they float over the very rows they
+      // filter, and a translucent panel let that text read straight through it
+      // (backdrop-filter does not compose when the sticky bar above already
+      // blurs). One opaque surface per theme — blush white.
+      popover: "#FFF8FA",
       // Backdrop blur levels for glass layers
       blur20: "blur(20px)", blur24: "blur(24px)", blur16: "blur(16px)",
       // Border tokens — stronger on outer glass, subtler on inner elements
@@ -69,6 +74,11 @@ const themes: Record<ThemeId, ThemeConfig> = {
     gl: {
       // Very translucent glass surfaces for dark mode (low alpha)
       card: "rgba(255,255,255,0.06)", row: "rgba(255,255,255,0.05)", sidebar: "rgba(255,255,255,0.04)",
+      // Menus and dropdowns are NOT glass: they float over the very rows they
+      // filter, and a translucent panel let that text read straight through it
+      // (backdrop-filter does not compose when the sticky bar above already
+      // blurs). One opaque surface per theme — lifted off the near-black base.
+      popover: "#1F141A",
       blur20: "blur(20px)", blur24: "blur(24px)", blur16: "blur(16px)",
       // Subtle white borders — just enough to define glass edges in dark
       border: "1px solid rgba(255,255,255,0.10)", borderSm: "1px solid rgba(255,255,255,0.08)",
@@ -106,6 +116,11 @@ const themes: Record<ThemeId, ThemeConfig> = {
     gl: {
       // Glass surfaces — alphas stack, so rows read a step above their parent card
       card: "rgba(255,255,255,0.65)", row: "rgba(255,255,255,0.55)", sidebar: "rgba(255,255,255,0.50)",
+      // Menus and dropdowns are NOT glass: they float over the very rows they
+      // filter, and a translucent panel let that text read straight through it
+      // (backdrop-filter does not compose when the sticky bar above already
+      // blurs). One opaque surface per theme — the faintest green-white.
+      popover: "#FAFDFB",
       blur20: "blur(20px)", blur24: "blur(24px)", blur16: "blur(16px)",
       // White glass borders — stronger on outer surfaces, subtler inside
       border: "1px solid rgba(255,255,255,0.90)", borderSm: "1px solid rgba(255,255,255,0.80)",
@@ -138,6 +153,11 @@ const themes: Record<ThemeId, ThemeConfig> = {
     },
     gl: {
       card: "rgba(255,255,255,0.72)", row: "rgba(255,255,255,0.60)", sidebar: "rgba(255,255,255,0.55)",
+      // Menus and dropdowns are NOT glass: they float over the very rows they
+      // filter, and a translucent panel let that text read straight through it
+      // (backdrop-filter does not compose when the sticky bar above already
+      // blurs). One opaque surface per theme — plain white.
+      popover: "#FFFFFF",
       blur20: "blur(20px)", blur24: "blur(24px)", blur16: "blur(16px)",
       // Pure black borders for clear edge definition in a colorless theme
       border: "1px solid rgba(0,0,0,0.10)", borderSm: "1px solid rgba(0,0,0,0.08)",

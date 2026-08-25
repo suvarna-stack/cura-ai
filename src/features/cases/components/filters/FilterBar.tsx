@@ -18,13 +18,12 @@
 // existing IcdFilterDialog rather than a cramped popover.
 // ============================================================
 import { useState } from "react";
-import { ArrowUpDown, FilterX, ListFilter, X } from "lucide-react";
+import { FilterX, ListFilter, X } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { FacetDropdown } from "./FacetDropdown";
 import { IcdFilterDialog, type IcdTab } from "./IcdFilterDialog";
-import { SortDialog } from "./SortDialog";
-import { useSortLabel } from "../../utils/sortOptions";
+import { SortMenu } from "./SortMenu";
 import type { CaseFilters } from "../../hooks/useCaseFilters";
 
 /** Rendered by their own dialog, not as a popover — see the header note. */
@@ -39,9 +38,7 @@ export function FilterBar({
 }) {
   const { gl } = useTheme();
   const { t } = useLang();
-  const [sortOpen, setSortOpen] = useState(false);
   const [icdDialog, setIcdDialog] = useState<IcdTab | null>(null);
-  const sortLabel = useSortLabel(f.sortMode);
 
   // `ordername` is the second level inside Order Type, never a bar control of
   // its own; the ICD facets get buttons below instead of dropdowns.
@@ -59,7 +56,7 @@ export function FilterBar({
   return (
     <>
       <div
-        className="flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2"
+        className="flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2.5"
         style={{
           background: gl.card,
           backdropFilter: gl.blur16,
@@ -74,7 +71,7 @@ export function FilterBar({
           ? [0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="h-8 w-28 animate-pulse rounded-lg"
+                className="h-9 w-32 animate-pulse rounded-xl"
                 style={{ background: gl.inputBg, border: gl.border }}
               />
             ))
@@ -92,14 +89,14 @@ export function FilterBar({
             <button
               key={key}
               onClick={() => setIcdDialog(key)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
+              className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
               style={picked > 0 ? onStyle : offStyle}
             >
-              <ListFilter size={12} style={{ color: gl.accent }} />
+              <ListFilter size={14} style={{ color: gl.accent }} />
               {t(`facet.${key}`)}
               {picked > 0 && (
                 <span
-                  className="rounded-full px-1.5 text-[11px] font-bold"
+                  className="rounded-full px-2 py-0.5 text-[12px] font-bold leading-none"
                   style={{ background: gl.accent, color: gl.isDark ? "#1a0a00" : "#fff" }}
                 >
                   {picked}
@@ -109,28 +106,19 @@ export function FilterBar({
           );
         })}
 
-        <button
-          onClick={() => setSortOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
-          style={offStyle}
-          title={t("sort.title")}
-        >
-          <ArrowUpDown size={12} style={{ color: gl.accent }} />
-          <span style={{ color: gl.muted }}>{t("sort.title")}:</span>
-          <span style={{ color: gl.text }}>{sortLabel}</span>
-        </button>
+        <SortMenu value={f.sortMode} onPick={f.setSortMode} />
 
         {f.active && (
           <>
-            <span className="text-[12px] font-semibold" style={{ color: gl.muted }}>
+            <span className="text-[13px] font-semibold" style={{ color: gl.muted }}>
               {t("filter.match", { n: f.totalComplete + f.totalIncomplete })}
             </span>
             <button
               onClick={f.clearAll}
-              className="ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-all hover:opacity-80"
+              className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition-all hover:opacity-80"
               style={{ color: gl.accent, background: `rgba(${gl.accentRgb},0.10)` }}
             >
-              <FilterX size={11} /> {t("filter.clearAll")}
+              <FilterX size={13} /> {t("filter.clearAll")}
             </button>
           </>
         )}
@@ -144,7 +132,7 @@ export function FilterBar({
               <button
                 key={`${c.key}:${c.value}`}
                 onClick={() => f.toggle(c.key, c.value)}
-                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold transition-all hover:opacity-80"
+                className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold transition-all hover:opacity-80"
                 style={{
                   background: `rgba(${gl.accentRgb},0.15)`,
                   color: gl.accent,
@@ -152,7 +140,7 @@ export function FilterBar({
                 }}
                 title={`${f.codeDesc[c.value] ?? c.label} — remove`}
               >
-                {c.label} <X size={9} />
+                {c.label} <X size={11} />
               </button>
             ))}
           </div>
@@ -161,13 +149,6 @@ export function FilterBar({
 
       {icdDialog && (
         <IcdFilterDialog f={f} initialTab={icdDialog} onClose={() => setIcdDialog(null)} />
-      )}
-      {sortOpen && (
-        <SortDialog
-          value={f.sortMode}
-          onPick={f.setSortMode}
-          onClose={() => setSortOpen(false)}
-        />
       )}
     </>
   );
