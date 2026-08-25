@@ -13,7 +13,26 @@ import { IcdFilterDialog, type IcdTab } from "./IcdFilterDialog";
 // the search box exists precisely so this cap never blocks anyone
 const CHILD_CAP = 10;
 
-export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: boolean }) {
+/**
+ * `sidebar` — the original sticky left column.
+ * `dialog`  — the same facets inside FilterDialog (2026-08-25): the wrapper
+ *             chrome, the header and the sort block all belong to the dialog
+ *             now, so this variant drops them and fills the width it is given.
+ *
+ * The facet bodies themselves are identical in both, which is the point:
+ * moving the panel must not fork the filtering logic.
+ */
+export type FilterPanelVariant = "sidebar" | "dialog";
+
+export function FilterPanel({
+  f,
+  loading = false,
+  variant = "sidebar",
+}: {
+  f: CaseFilters;
+  loading?: boolean;
+  variant?: FilterPanelVariant;
+}) {
   const { gl } = useTheme();
   const { t } = useLang();
   // Decision: every facet starts expanded so all options + selections are
@@ -28,11 +47,21 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
   const [icdDialog, setIcdDialog] = useState<IcdTab | null>(null);
   const bar = gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
 
+  const inDialog = variant === "dialog";
+
   return (
-    // sticky + self-scrolling: stays in view while the coder scrolls the results,
-    // and its own overflow scrolls rather than making the whole page tall
-    <div className="w-56 shrink-0 space-y-2 sticky top-5 self-start overflow-y-auto pr-0.5"
-      style={{ maxHeight: "calc(100vh - 7rem)", scrollbarWidth: "none" } as React.CSSProperties}>
+    // sidebar: sticky + self-scrolling, so it stays in view while the coder
+    // scrolls the results and its own overflow scrolls instead of making the
+    // page tall. dialog: full width, and the modal owns the scrolling.
+    <div
+      className={inDialog
+        ? "space-y-2"
+        : "w-56 shrink-0 space-y-2 sticky top-5 self-start overflow-y-auto pr-0.5"}
+      style={inDialog
+        ? undefined
+        : ({ maxHeight: "calc(100vh - 7rem)", scrollbarWidth: "none" } as React.CSSProperties)}>
+      {/* the dialog prints its own title and Clear-all */}
+      {!inDialog && (
       <div className="flex items-center gap-2 px-1">
         <SlidersHorizontal size={12} style={{ color: gl.accent }} />
         <span className="text-[13px] font-bold flex-1" style={{ color: gl.text }}>
@@ -46,8 +75,9 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
           </button>
         )}
       </div>
+      )}
 
-      {f.chips.length > 0 && (
+      {!inDialog && f.chips.length > 0 && (
         <div className="flex flex-wrap gap-1 px-1">
           {f.chips.map((c) => (
             <button key={`${c.key}:${c.value}`} onClick={() => f.toggle(c.key, c.value)}
@@ -59,8 +89,9 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         </div>
       )}
 
-      {/* explicit filter result count — tabs alone made this too implicit */}
-      {f.active && (
+      {/* explicit filter result count — tabs alone made this too implicit.
+          In the dialog the bar behind it already prints the same count. */}
+      {!inDialog && f.active && (
         <div className="rounded-2xl px-3 py-2.5"
           style={{ background: `rgba(${gl.accentRgb},0.08)`, border: `1px solid rgba(${gl.accentRgb},0.22)` }}>
           <p className="text-[12px] font-bold" style={{ color: gl.accent }}>
@@ -72,9 +103,11 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         </div>
       )}
 
-      {/* sort lives with the filters — one control panel, list stays clean.
-          Collapsible like the facet cards below ("sort" can't collide with a
-          facet key). */}
+      {/* Sort used to live here, with the filters. Since 2026-08-25 the top
+          bar owns it (SortDialog) — the sidebar keeps its copy so nothing is
+          lost if the sidebar is ever restored, but the dialog must not show
+          two sort controls. */}
+      {!inDialog && (
       <div className="rounded-2xl overflow-hidden"
         style={{ background: gl.card, backdropFilter: gl.blur16, WebkitBackdropFilter: gl.blur16, border: gl.border, boxShadow: gl.shadowSm }}>
         <button onClick={() => setOpen((o) => ({ ...o, sort: !isOpen("sort") }))}
@@ -105,6 +138,7 @@ export function FilterPanel({ f, loading = false }: { f: CaseFilters; loading?: 
         </div>
         )}
       </div>
+      )}
 
       {/* facets derive from the fetched case list — placeholder cards while it loads */}
       {loading && Array.from({ length: 3 }).map((_, i) => (

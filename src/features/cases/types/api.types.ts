@@ -47,6 +47,14 @@ export interface ApiCase {
   missing?: string;        // CREATE: only on incomplete cases (F03)
   created_at: string | null; // READ: raw hospital datetime text; null on OPD rows today
   updated_at: string | null; // READ: same caveat
+  /** The date to DISPLAY: created_at when iMed sent one, else the datetime
+   *  encoded at positions 4-15 of the transaction number. Null only when
+   *  neither exists. Added 2026-08-25 — created_at is null on every OPD row,
+   *  so the list had no date to show. */
+  visitDate: string | null;
+  /** Patient age as the extract froze it, "y,m,d" (e.g. "47,4,10"). Text, not
+   *  a number: it is a snapshot, not arithmetic. Null where the extract has none. */
+  age: string | null;
   revenue_impact: "high" | "medium" | "low" | null; // always null from the live server (no real DRG revenue)
   /** CREATE: the shared "look at this one first" flag — one star per case, set
    *  by any coder and seen by all of them (POST/DELETE /api/cases/{id}/star).
@@ -92,6 +100,10 @@ export interface ApiFinishedCase {
   reopenable: boolean;     // DEPRECATED: always true — any coder may reopen any case; kept so old payloads/frontends still parse, the UI no longer reads it
   created_at: string | null; // READ: raw hospital datetime text; null on OPD rows today
   updated_at: string | null; // READ: same caveat
+  /** Same fallback rule as ApiCase.visitDate — the date the card shows. */
+  visitDate: string | null;
+  /** Patient age as the extract froze it, "y,m,d". */
+  age: string | null;
   // facet fields (same sources as ApiCase) so the sidebar filters work on Finished too
   dept: string;
   ward: string | null;

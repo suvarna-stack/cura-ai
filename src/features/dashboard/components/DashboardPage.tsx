@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Users, Activity, Database, CheckCircle2 } from 'lucide-react'
 import { Badge } from '../../../components/ui/Badge'
 import { Card } from '../../../components/ui/Card'
+import { CaseFieldSwitches } from './CaseFieldSwitches'
 import {
   fetchDashboardAccounts,
   fetchDashboardOverview,
@@ -84,6 +85,8 @@ export function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <CaseFieldSwitches />
 
       <Card padded={false} className="overflow-hidden shadow-none">
         <div className="border-b border-border px-5 py-4">

@@ -152,9 +152,14 @@ export interface CaseFilters {
   active: boolean;
   query: string;
   setQuery: (q: string) => void;
-  // ---- date period (repurposed 2026-08-05): the selection no longer filters
-  // the case lists — it is the SYNC period. DateFilterBar reads syncWindow and
-  // fires POST /api/sync {from,to}; no selection = sync all.
+  // ---- date period (repurposed 2026-08-05): the selection never filtered the
+  // case lists — it was the SYNC period, read by DateFilterBar.
+  //
+  // CURRENTLY UNUSED (2026-08-25). Sync moved to the header, where it owns its
+  // own window via DateRangeDialog, and DateFilterBar was deleted along with
+  // the sidebar. The state is kept — and still persisted — because it is the
+  // only wiring left if a per-page sync period is ever wanted again; delete it
+  // together with its sessionStorage keys if that stops being true.
   dateMode: DateMode;
   setDateMode: (mode: DateMode) => void;
   specificDate: string | null;      // ISO date string (yyyy-mm-dd)

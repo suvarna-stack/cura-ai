@@ -93,6 +93,9 @@ export const dict: Record<string, { en: string; th: string }> = {
   "ident.hnMissing":      { en: "HN is not supplied by iMed for OPD visits (admissionnumber is IPD-only)",
                             th: "iMed ไม่ส่ง HN สำหรับผู้ป่วยนอก (admissionnumber มีเฉพาะผู้ป่วยใน)" },
   "ident.hnMissingShort": { en: "not supplied for OPD", th: "ไม่มีข้อมูลสำหรับผู้ป่วยนอก" },
+  // shown when an admin has switched the name field ON but the hospital
+  // extract carries no patient name (open Data-Mapping question Q1)
+  "ident.nameMissing":    { en: "Name not supplied by iMed", th: "iMed ไม่ได้ส่งชื่อผู้ป่วย" },
   // report header (item 8)
   "report.mdMissing":  { en: "The iMed extract carries no attending physician (MD) field",
                          th: "ข้อมูลจาก iMed ไม่มีฟิลด์แพทย์ผู้รักษา (MD)" },
@@ -110,6 +113,7 @@ export const dict: Record<string, { en: string; th: string }> = {
   "meta.dept":     { en: "Dept",     th: "แผนก" },
   "meta.coverage": { en: "Coverage", th: "สิทธิ" },
   "meta.date":     { en: "Date",     th: "วันที่" },
+  "meta.age":      { en: "Age",      th: "อายุ" },
   // filters + sort
   "filter.title":     { en: "Filters",    th: "ตัวกรอง" },
   "filter.clearAll":  { en: "Clear all",  th: "ล้างทั้งหมด" },
@@ -118,6 +122,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "filter.emptyHidden": { en: "No cases match your filters or search — {n} cases are hidden", th: "ไม่มีเคสตรงกับตัวกรองหรือคำค้นหา — มีอีก {n} เคสที่ถูกซ่อนไว้" },
   "filter.showAll":   { en: "Show all", th: "แสดงทั้งหมด" },
   "filter.breakdown": { en: "{c} complete · {i} incomplete", th: "สมบูรณ์ {c} · ไม่สมบูรณ์ {i}" },
+  "filter.done":      { en: "Done", th: "เสร็จสิ้น" },
+  // sync moved out of the page and into the header (2026-08-25)
+  "sync.period":      { en: "Sync period", th: "ช่วงเวลาซิงค์" },
+  "sync.button":      { en: "Sync", th: "ซิงค์" },
   "sort.title":   { en: "Sort by",      th: "เรียงตาม" },
   "sort.newest":  { en: "Newest first", th: "ใหม่ที่สุดก่อน" },
   "sort.oldest":  { en: "Oldest first", th: "เก่าที่สุดก่อน" },
