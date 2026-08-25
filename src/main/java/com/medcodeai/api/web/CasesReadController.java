@@ -122,7 +122,7 @@ public class CasesReadController {
                     + "`hn`-type fields carry real values here when the extract has them. "
                     + "`codeEdits` is the coder's saved working state and is "
                     + "always present, `null` when unset. `starred` / `starredBy` / "
-                    + "`starredAt` mirror the card's shared star, so the case's own "
+                    + "`starredByStamp` / `starredAt` mirror the card's shared star, so the case's own "
                     + "page shows it on a deep link or reload.\n\n"
                     + "Example below is trimmed; datetimes are raw hospital text — treat as "
                     + "opaque display strings.")
@@ -180,6 +180,7 @@ public class CasesReadController {
                       "codeEdits": null,
                       "starred": true,
                       "starredBy": "Austin",
+                      "starredByStamp": "austin@hospital.th",
                       "starredAt": "2026-08-25 10:11:12"
                     }
                     """)))
@@ -199,6 +200,7 @@ public class CasesReadController {
         Map<String, Object> star = stars.state(caseId);
         detail.put("starred", star.get("starred"));
         detail.put("starredBy", star.get("starredBy"));
+        detail.put("starredByStamp", star.get("starredByStamp"));
         detail.put("starredAt", star.get("starredAt"));
         return detail;
     }

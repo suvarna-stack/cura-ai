@@ -804,6 +804,43 @@ Milestones (git log --oneline reads as this sequence):
   the cursor. Same commit removed the Finished detail page's DRG pill, which
   could only ever render the `"—"` placeholder.
 
+- ✅ **The star gained an owner, and a home inside the case (2026-08-26):**
+  two follow-ups to the star above, both from the hospital.
+  (1) **Only its author may take a star down.** Everyone still SEES it — that
+  is the whole feature — but a message any reader can delete is not one the
+  writer can rely on. `CaseStarService.mayManage(owner, caller)` is the whole
+  rule, pure and unit-tested (`CaseStarOwnershipTest`, 7 cases), and it guards
+  BOTH verbs: star as well as unstar, because re-starting writes a new owner
+  and would otherwise hand the star over to be cleared on the next click.
+  Matched on `case_stars.starred_by` (the account stamp) case-insensitively,
+  never on the display name — the same reasoning `AgentLearnController
+  .mayManage` spells out for taught rules: two coders can share a name, and
+  renaming yourself must not cost you your stars. An unowned star stays free
+  to take, or pre-stamp rows would be unclearable forever. Refusal is `403
+  {"error": "starred by <name> — only they can remove it"}`. Cards, the case
+  detail payload and both star responses gained **`starredByStamp`** so the
+  frontend can grey the control out instead of offering a click that 403s
+  (`hooks/useCaseStars.ts` mirrors the rule; the server is what enforces it).
+  (2) **The badge inside the case is now the control.** It was read-only, so
+  the one place a coder could NOT set a star was while reading the case she
+  had just decided mattered. `StarredBadge` toggles, holds its own optimistic
+  override, and draws a quiet "Mark important" outline when unstarred instead
+  of rendering nothing; a colleague's star keeps the old read-only sentence.
+
+- ✅ **Filter-bar dropdowns stopped being glass (2026-08-26):** the hospital
+  reported the sort control looked "a little crash" — the Sort and Order Type
+  panels open straight over the tab strip and the case rows, and as glass
+  (`gl.card` + `backdrop-filter`) that text read right through the options.
+  `backdrop-filter` could not fix it either: the sticky filter bar the panels
+  live in already blurs, and the two do not compose. New **`gl.popover`** token
+  — one OPAQUE surface per theme — now backs `FacetDropdown`, the new
+  `SortMenu` and `IcdFilterDialog`. Sort also stopped being a centered MODAL:
+  a dim overlay covering the list was the wrong weight for a choice that only
+  reorders it, so it is an anchored dropdown like every other control on the
+  bar (`SortDialog.tsx` → `SortMenu.tsx`, outside-click/Escape shared via
+  `useMenuDismiss`). Same pass enlarged the bar per the same request: 12px →
+  13px labels, taller hit targets, 14px icons, wider panels, bigger tick boxes.
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

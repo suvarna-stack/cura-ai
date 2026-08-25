@@ -377,11 +377,13 @@ class CasesApiIntegrationTest {
         assertEquals(set.get("starredBy").asString(), card.get("starredBy").asString());
         assertEquals(set.get("starredAt").asString(), card.get("starredAt").asString());
 
-        // any coder may clear any star (same posture as reopen)
+        // the coder who left it may take it down again (another coder gets a
+        // 403 — the pure rule is covered in CaseStarOwnershipTest)
         mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.starred").value(false))
                 .andExpect(jsonPath("$.starredBy").isEmpty())
+                .andExpect(jsonPath("$.starredByStamp").isEmpty())
                 .andExpect(jsonPath("$.starredAt").isEmpty());
 
         JsonNode cleared = findCase(getJson("/api/cases"), KNOWN_CASE_ID);
@@ -399,6 +401,8 @@ class CasesApiIntegrationTest {
         assertNotNull(sample, "expected at least one case in the dashboard payload");
         assertTrue(sample.has("starred") && sample.get("starred").isBoolean());
         assertTrue(sample.has("starredBy"));
+        // the owning account, so the row can decide whether to offer "remove"
+        assertTrue(sample.has("starredByStamp"));
         assertTrue(sample.has("starredAt"));
     }
 
@@ -412,6 +416,7 @@ class CasesApiIntegrationTest {
         JsonNode unstarred = getJson("/api/cases/" + KNOWN_CASE_ID);
         assertTrue(unstarred.has("starred") && !unstarred.get("starred").asBoolean());
         assertTrue(unstarred.get("starredBy").isNull(), "starredBy is null while unstarred");
+        assertTrue(unstarred.get("starredByStamp").isNull(), "starredByStamp is null while unstarred");
         assertTrue(unstarred.get("starredAt").isNull(), "starredAt is null while unstarred");
 
         String set = mvc.perform(post("/api/cases/{id}/star", KNOWN_CASE_ID)
@@ -423,6 +428,7 @@ class CasesApiIntegrationTest {
         JsonNode starred = getJson("/api/cases/" + KNOWN_CASE_ID);
         assertTrue(starred.get("starred").asBoolean(), "the case page sees the star the card sees");
         assertEquals(state.get("starredBy").asString(), starred.get("starredBy").asString());
+        assertEquals(state.get("starredByStamp").asString(), starred.get("starredByStamp").asString());
         assertEquals(state.get("starredAt").asString(), starred.get("starredAt").asString());
 
         mvc.perform(delete("/api/cases/{id}/star", KNOWN_CASE_ID).header("Authorization", auth()))

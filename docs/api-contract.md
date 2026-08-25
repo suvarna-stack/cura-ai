@@ -98,6 +98,7 @@ exactly one of `complete`, an `incompleteGroups` group, `reopened` or
 | `revenue_impact` | `null` | no real DRG/revenue source exists |
 | `starred` | `boolean` | `case_stars` row exists — the shared "look at this one first" flag any coder can set (see `POST /api/cases/{caseId}/star`). One star per case, everyone sees the same one |
 | `starredBy` | `string \| null` | display name of the coder who set it (`users.full_name`, else the account email); `null` when not starred |
+| `starredByStamp` | `string \| null` | the ACCOUNT that owns the star (`case_stars.starred_by`, the audit stamp / email); `null` when not starred. Only this account may clear the star, so the UI compares against this rather than the display name, which two coders can share |
 | `starredAt` | `string \| null` | `YYYY-MM-DD HH:MM:SS`; `null` when not starred |
 | `missing?` | `string` | **incomplete-origin rows only** (incomplete groups + reopened rows that came from one): human-readable labels joined with `", "`, else `"—"` |
 
@@ -178,9 +179,10 @@ real values here when the extract has them).
                   "at": "2026-07-20 09:00:00",
                   "detail": { "by": "demo.coder", "codes": 1 } }, ... ],  // coder audit trail, oldest first
   "codeEdits": <CodeEdit[] | null>,   // last PUT …/codes payload, echoed verbatim
-  "starred": true,                    // the same shared star the cards carry, so the
-  "starredBy": "Austin",              //   case's own page can show it on a deep link
-  "starredAt": "2026-08-25 10:11:12"  //   or reload; the last two null when not starred
+  "starred": true,                          // the same shared star the cards carry, so the
+  "starredBy": "Austin",                    //   case's own page can show it on a deep link
+  "starredByStamp": "austin@hospital.th",   //   or reload; the last three null when not
+  "starredAt": "2026-08-25 10:11:12"        //   starred
 }
 ```
 
@@ -320,26 +322,39 @@ Response:
 ```jsonc
 { "ok": true,
   "starred": true,
-  "starredBy": "Austin",              // display name; null when not starred
-  "starredAt": "2026-08-25 10:11:12" } // null when not starred
+  "starredBy": "Austin",                    // display name; null when not starred
+  "starredByStamp": "austin@hospital.th",   // owning account; null when not starred
+  "starredAt": "2026-08-25 10:11:12" }      // null when not starred
 ```
 
-`404` unknown case. Starring an already-starred case moves the star to the new
-coder and time. Unlike `PUT /codes` / `approve` / `reopen`, this is **allowed
-while another coder holds the case's lock** — a star annotates the case, it
-doesn't edit it, and the coder who most wants to flag a case is often the one
-locked out of it. Nothing here reaches the hospital. The star is persisted
-(`case_stars`, V8) and cleared by a demo reset along with every other case
-table.
+`404` unknown case. Re-starring a case the caller already starred just
+refreshes the time. Starring a case **another** coder starred is refused with
+`403` — see ownership below. Unlike `PUT /codes` / `approve` / `reopen`, this is
+**allowed while another coder holds the case's lock** — a star annotates the
+case, it doesn't edit it, and the coder who most wants to flag a case is often
+the one locked out of it. Nothing here reaches the hospital. The star is
+persisted (`case_stars`, V8) and cleared by a demo reset along with every other
+case table.
 
-Every card in `GET /api/cases` carries `starred` / `starredBy` / `starredAt`,
-in all four collections.
+Every card in `GET /api/cases` carries `starred` / `starredBy` /
+`starredByStamp` / `starredAt`, in all four collections.
+
+**Ownership (2026-08-25).** The star is visible to every coder — that is the
+whole feature — but it belongs to whoever left it, and **only that account may
+set or clear it**. A message anyone can delete is not one the writer can rely
+on. Both verbs enforce it (star as well as unstar: re-starting would otherwise
+hand ownership over and let the taker clear it on the next click), matching on
+`case_stars.starred_by` case-insensitively — the ACCOUNT, not the display name,
+so two coders sharing a name stay apart and renaming yourself doesn't cost you
+your stars. A star with no owner recorded is free for anyone to take. The
+refusal is `403 {"error": "starred by <name> — only they can remove it"}`.
 
 ### DELETE /api/cases/{caseId}/star
 
-Clears the star whoever set it — any coder may clear any star, the same posture
-`reopen` takes. Clearing an unstarred case is a no-op. `404` unknown case.
-Response `{"ok": true, "starred": false, "starredBy": null, "starredAt": null}`.
+Clears the star. **Only the coder who set it may** (see ownership above);
+anyone else gets `403` naming the owner. Clearing an unstarred case is a no-op.
+`404` unknown case. Response `{"ok": true, "starred": false, "starredBy": null,
+"starredByStamp": null, "starredAt": null}`.
 
 ### POST /api/demo/snapshot
 

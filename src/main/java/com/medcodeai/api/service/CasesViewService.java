@@ -341,6 +341,10 @@ public class CasesViewService {
         String[] star = stars.get(cid);
         u.put("starred", star != null);
         u.put("starredBy", star == null ? null : coderDisplay(star[0], coderNames));
+        // the account the star belongs to, beside the name it prints as: only
+        // its owner may take a star down (CaseStarService), and the row can
+        // only decide whether to offer that against a unique identity
+        u.put("starredByStamp", star == null ? null : star[0]);
         u.put("starredAt", star == null ? null : star[1]);
         return u;
     }

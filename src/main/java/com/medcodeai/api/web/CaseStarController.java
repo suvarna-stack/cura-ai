@@ -25,7 +25,8 @@ import java.util.Map;
  *
  * Unlike the write endpoints these are NOT refused while another coder holds
  * the case: a star is an annotation about the case, not an edit of it (see
- * CaseStarService).
+ * CaseStarService). They ARE refused when the star belongs to someone else —
+ * a star is that coder's message and only they can take it down.
  */
 @RestController
 @Tag(name = "cases (stars)", description = "Shared \"important\" flag on a case")
@@ -33,7 +34,8 @@ import java.util.Map;
 public class CaseStarController {
 
     private static final String STATE_EXAMPLE = """
-            {"ok": true, "starred": true, "starredBy": "Austin", "starredAt": "2026-08-25 10:11:12"}""";
+            {"ok": true, "starred": true, "starredBy": "Austin",
+             "starredByStamp": "austin@hospital.th", "starredAt": "2026-08-25 10:11:12"}""";
 
     private final CaseStarService stars;
 
@@ -45,12 +47,18 @@ public class CaseStarController {
     @Operation(summary = "Star a case as important",
             description = "Marks the case important for **everyone** — one star per case, not "
                     + "a private favourites list. No body; the starring coder is the "
-                    + "logged-in account. Starring an already-starred case moves the star to "
-                    + "the new coder and time (idempotent in effect). Returns `{ok, starred, "
-                    + "starredBy, starredAt}`, where `starredBy` is the display name. Allowed "
-                    + "even while another coder holds the case's working lock.")
+                    + "logged-in account. Re-starring a case the caller already starred just "
+                    + "refreshes the time (idempotent in effect); starring a case ANOTHER coder "
+                    + "starred is refused with 403, since that would quietly move their star. "
+                    + "Returns `{ok, starred, starredBy, starredByStamp, starredAt}`, where "
+                    + "`starredBy` is the display name and `starredByStamp` the account it "
+                    + "belongs to. Allowed even while another coder holds the case's working lock.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = STATE_EXAMPLE)))
+    @ApiResponse(responseCode = "403", description = "Another coder's star",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value =
+                            "{\"error\": \"starred by Austin — only they can remove it\"}")))
     @ApiResponse(responseCode = "404", description = "Unknown case",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"error\": \"not found\"}")))
@@ -61,18 +69,24 @@ public class CaseStarController {
 
     @DeleteMapping("/api/cases/{caseId}/star")
     @Operation(summary = "Clear a case's star",
-            description = "Removes the star whoever set it — any coder may clear any star, "
-                    + "the same posture reopen takes. Clearing an unstarred case is a no-op. "
-                    + "Returns the resulting state (`starred: false`, the other two `null`).")
+            description = "Removes the star — **only the coder who set it may**, since the star "
+                    + "is their message to the rest of the team; anyone else gets 403 naming "
+                    + "the owner. Clearing an unstarred case is a no-op. Returns the resulting "
+                    + "state (`starred: false`, the other three `null`).")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value =
-                    "{\"ok\": true, \"starred\": false, \"starredBy\": null, \"starredAt\": null}")))
+                    "{\"ok\": true, \"starred\": false, \"starredBy\": null,"
+                    + " \"starredByStamp\": null, \"starredAt\": null}")))
+    @ApiResponse(responseCode = "403", description = "Another coder's star",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value =
+                            "{\"error\": \"starred by Austin — only they can remove it\"}")))
     @ApiResponse(responseCode = "404", description = "Unknown case",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"error\": \"not found\"}")))
-    public Map<String, Object> unstar(@PathVariable String caseId) {
+    public Map<String, Object> unstar(HttpServletRequest request, @PathVariable String caseId) {
         requireCase(caseId);
-        return stars.unstar(caseId);
+        return stars.unstar(caseId, principal(request).email());
     }
 
     private void requireCase(String caseId) {
