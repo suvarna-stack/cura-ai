@@ -891,6 +891,183 @@ class CasesApiIntegrationTest {
                 .andExpect(jsonPath("$.error").value("unauthorized"));
     }
 
+    @Test
+    void everyCaseCarriesAVisitDateAndAge() throws Exception {
+        // 2026-08-25: created_at is null on every OPD row, so the list had no
+        // date. visitDate falls back to the datetime encoded in the TN.
+        JsonNode root = getJson("/api/cases");
+        int checked = 0;
+        for (JsonNode c : root.get("complete")) {
+            assertTrue(c.has("visitDate"), "every case row must carry visitDate");
+            assertTrue(c.has("age"), "every case row must carry age");
+
+            // where created_at exists, visitDate must BE it — the fallback may
+            // never override what the hospital actually sent
+            if (!c.get("created_at").isNull()) {
+                assertEquals(c.get("created_at").asString(), c.get("visitDate").asString(),
+                        "visitDate must prefer the real admissiondatetime");
+            } else if (!c.get("visitDate").isNull()) {
+                // …otherwise it is the TN decode, which must agree with the
+                // digits the id actually carries
+                String id = c.get("id").asString();
+                String vd = c.get("visitDate").asString();
+                assertEquals("20" + id.substring(3, 5) + "-" + id.substring(5, 7)
+                                + "-" + id.substring(7, 9),
+                        vd.substring(0, 10),
+                        "visitDate must decode positions 4-15 of the transaction number");
+                assertEquals(19, vd.length(), "visitDate must be YYYY-MM-DD HH:MM:SS");
+            }
+            checked++;
+        }
+        assertTrue(checked > 0, "the seeded dataset must have at least one complete case");
+    }
+
+    @Test
+    void caseFieldSettingsAreReadableByAnyoneAndWritableOnlyByAdmins() throws Exception {
+        JsonNode before = getJson("/api/case-field-settings");
+        for (String k : List.of("vn", "hn", "name")) {
+            assertTrue(before.get(k).isBoolean(), k + " must be a boolean");
+        }
+
+        // a write flips exactly the key it names and leaves the others alone
+        boolean hn = before.get("hn").asBoolean();
+        JsonNode after = putJson("/api/admin/case-field-settings", "{\"hn\": " + !hn + "}");
+        assertEquals(!hn, after.get("hn").asBoolean(), "the named key must change");
+        assertEquals(before.get("vn").asBoolean(), after.get("vn").asBoolean(),
+                "an omitted key must keep its value");
+        assertEquals(before.get("name").asBoolean(), after.get("name").asBoolean(),
+                "an omitted key must keep its value");
+        // it persists, rather than only being echoed back
+        assertEquals(!hn, getJson("/api/case-field-settings").get("hn").asBoolean());
+
+        // a bad key and a non-boolean are both 400s that change nothing
+        for (String bad : List.of("{\"age\": true}", "{\"hn\": \"yes\"}")) {
+            mvc.perform(put("/api/admin/case-field-settings")
+                            .header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON).content(bad))
+                    .andExpect(status().isBadRequest());
+        }
+        assertEquals(!hn, getJson("/api/case-field-settings").get("hn").asBoolean(),
+                "a rejected write must not have changed anything");
+
+        // put it back, so the suite leaves the database as it found it
+        putJson("/api/admin/case-field-settings", "{\"hn\": " + hn + "}");
+        assertEquals(hn, getJson("/api/case-field-settings").get("hn").asBoolean());
+    }
+
+    @Test
+    void caseFieldSettingsRequireAToken() throws Exception {
+        mvc.perform(get("/api/case-field-settings"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("unauthorized"));
+        mvc.perform(put("/api/admin/case-field-settings")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"hn\": true}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void analyticsServesTheHospitalDashboardCards() throws Exception {
+        // The 2026-08-25 additions: the coder's own dashboard widgets. Again
+        // dataset-independent invariants, so this holds on any seeded state.
+        JsonNode root = getJson("/api/analytics");
+        for (String key : List.of("range", "topPrincipalDiagnosis", "coderKpi")) {
+            assertTrue(root.has(key), "missing analytics key: " + key);
+        }
+
+        // summary: notFinished reconciles against the three unfinished queues,
+        // and finishedPct is null exactly while there is nothing to divide by
+        JsonNode sum = root.get("summary");
+        long total = sum.get("total").asLong();
+        long finished = sum.get("finished").asLong();
+        assertEquals(total - finished, sum.get("notFinished").asLong(),
+                "notFinished must be total - finished");
+        assertEquals(sum.get("complete").asLong() + sum.get("incomplete").asLong()
+                        + sum.get("reopened").asLong(),
+                sum.get("notFinished").asLong(),
+                "notFinished must also equal complete + incomplete + reopened");
+        if (total == 0) {
+            assertTrue(sum.get("finishedPct").isNull(), "no cases must read as null, not 0%");
+        } else {
+            double pct = sum.get("finishedPct").asDouble();
+            assertTrue(pct >= 0 && pct <= 100, "finishedPct out of range: " + pct);
+        }
+
+        // unfiltered: range echoes filtered=false, and summary still matches
+        // the dashboard's own stats exactly (the no-drift guarantee)
+        assertFalse(root.get("range").get("filtered").asBoolean(),
+                "a request with no from/to must report filtered=false");
+        JsonNode stats = getJson("/api/cases").get("stats");
+        for (String k : List.of("total", "complete", "incomplete", "reopened", "finished")) {
+            assertEquals(stats.get(k).asLong(), sum.get(k).asLong(),
+                    "unfiltered analytics." + k + " must match the dashboard's");
+        }
+
+        // topPrincipalDiagnosis: ICD-10 only, by construction
+        for (JsonNode c : root.get("topPrincipalDiagnosis")) {
+            assertEquals("ICD-10", c.get("system").asString(),
+                    "a principal diagnosis is never an ICD-9 row");
+            assertTrue(c.get("count").asLong() >= 1);
+            assertFalse(c.get("code").asString().isBlank());
+        }
+
+        // coderKpi: percentages are null exactly when their denominator is 0,
+        // and no numerator can exceed the denominator it is measured against
+        for (JsonNode r : root.get("coderKpi")) {
+            long touched = r.get("touched").asLong();
+            long fin = r.get("finished").asLong();
+            long measured = r.get("measured").asLong();
+            long within7 = r.get("within7Days").asLong();
+            assertTrue(fin <= touched, "a coder cannot finish more cases than they touched");
+            assertTrue(measured <= fin, "only finished cases can be measured");
+            assertTrue(within7 <= measured, "within7Days cannot exceed measured");
+            assertEquals(touched == 0, r.get("finishedPct").isNull(),
+                    "finishedPct is null exactly when touched is 0");
+            assertEquals(measured == 0, r.get("within7DaysPct").isNull(),
+                    "within7DaysPct is null exactly when measured is 0");
+        }
+    }
+
+    @Test
+    void analyticsDateFilterScopesThePageAndRejectsHalfRanges() throws Exception {
+        // A window in the future can match nothing, whatever the dataset —
+        // the strongest dataset-independent proof that the filter is applied.
+        String far = java.time.LocalDate.now().plusYears(5).toString();
+        JsonNode empty = getJson("/api/analytics?from=" + far + "&to=" + far);
+        assertTrue(empty.get("range").get("filtered").asBoolean());
+        assertEquals(far, empty.get("range").get("from").asString());
+        assertEquals(0, empty.get("summary").get("total").asLong(),
+                "no visit can fall in a window five years out");
+        assertTrue(empty.get("summary").get("finishedPct").isNull(),
+                "an empty window has nothing to take a percentage of");
+        assertEquals(0, empty.get("topPrincipalDiagnosis").size());
+        assertEquals(1, empty.get("casesOverTime").size(),
+                "a one-day range must produce exactly one point");
+
+        // …and the widest window the guard rail allows (a year ending today)
+        // cannot report fewer cases than that empty one
+        java.time.LocalDate today = java.time.LocalDate.now();
+        JsonNode wide = getJson("/api/analytics?from=" + today.minusDays(364) + "&to=" + today);
+        assertTrue(wide.get("summary").get("total").asLong()
+                        >= empty.get("summary").get("total").asLong());
+        assertEquals(365, wide.get("casesOverTime").size(),
+                "the series must carry one point per day of the range");
+
+        // half a range, a backwards range and an over-long span are all 400s
+        for (String q : List.of("?from=2026-01-01", "?to=2026-01-01",
+                "?from=2026-02-01&to=2026-01-01", "?from=1900-01-01&to=2026-01-01")) {
+            mvc.perform(get("/api/analytics" + q).header("Authorization", auth()))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    private JsonNode putJson(String url, String body) throws Exception {
+        String out = mvc.perform(put(url).header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(out);
+    }
+
     private JsonNode postJson(String url) throws Exception {
         String body = mvc.perform(post(url).header("Authorization", auth()))
                 .andExpect(status().isOk())

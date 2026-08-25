@@ -1,9 +1,11 @@
 package com.medcodeai.api.service;
 
 import com.medcodeai.api.repo.AnalyticsRepository;
+import com.medcodeai.api.repo.AnalyticsRepository.Window;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,9 +17,16 @@ import java.util.Map;
  * 2026-08-06 that page ran on hardcoded demo numbers in the frontend
  * (`USE_MOCK`); this service replaces them.
  *
- * The summary block is NOT recomputed here — it is lifted verbatim from the
- * dashboard payload (via CasesCache), so the four stat tiles can never drift
- * from the Dashboard's own counts. Everything else is a fresh roll-up.
+ * <p>Without an explicit date range the summary block is NOT recomputed here —
+ * it is lifted verbatim from the dashboard payload (via CasesCache), so the
+ * stat tiles can never drift from the Dashboard's own counts. Everything else
+ * is a fresh roll-up.
+ *
+ * <p>With a range (`from`/`to`, added 2026-08-25 for the coder's date filter)
+ * every card is scoped to it, summary included — and the summary then comes
+ * from SQL that mirrors the same queue routing, because the cache only knows
+ * the un-filtered world. Cards about the case population are windowed on the
+ * visit date; cards about what coders did are windowed on the action date.
  */
 @Service
 public class AnalyticsService {
@@ -41,30 +50,85 @@ public class AnalyticsService {
         this.users = users;
     }
 
-    public Map<String, Object> build(int days, int topCodes, LocalDate today) {
+    /**
+     * @param from first day of the range, or null for "no range" (the rolling
+     *             `days` window, and every other card un-filtered)
+     * @param to   last day of the range, inclusive; null with `from` null
+     */
+    public Map<String, Object> build(int days, int topCodes, LocalDate from, LocalDate to,
+                                     LocalDate today) {
+        boolean ranged = from != null && to != null;
+        Window w = ranged ? Window.of(from, to) : Window.all();
+        // The two series span the range when there is one, else the rolling
+        // window ending today — so a filtered page's chart matches its tiles.
+        LocalDate seriesFrom = ranged ? from : today.minusDays(days - 1L);
+        LocalDate seriesTo = ranged ? to : today;
+        int points = (int) ChronoUnit.DAYS.between(seriesFrom, seriesTo) + 1;
+
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("summary", summary());
-        out.put("casesOverTime", casesOverTime(days, today));
-        out.put("coverageCounts", coverageCounts());
-        out.put("topCodes", topCodes(topCodes));
-        out.put("documentationGaps", documentationGaps());
-        out.put("codingActivity", codingActivity(days, today));
-        out.put("finishedByCoder", finishedByCoder());
-        out.put("turnaround", turnaround());
-        out.put("codingDepth", codingDepth());
-        out.put("caseMix", caseMix());
+        out.put("range", range(ranged, seriesFrom, seriesTo));
+        out.put("summary", summary(w, ranged));
+        out.put("casesOverTime", casesOverTime(seriesFrom, seriesTo, points));
+        out.put("coverageCounts", coverageCounts(w));
+        out.put("topCodes", topCodes(w, topCodes));
+        out.put("topPrincipalDiagnosis", topPrincipalDiagnosis(w, topCodes));
+        out.put("documentationGaps", documentationGaps(w));
+        out.put("codingActivity", codingActivity(seriesFrom, seriesTo, points));
+        out.put("finishedByCoder", finishedByCoder(w));
+        out.put("coderKpi", coderKpi(w));
+        out.put("turnaround", turnaround(w));
+        out.put("codingDepth", codingDepth(w));
+        out.put("caseMix", caseMix(w));
+        return out;
+    }
+
+    /** What the page is actually showing — echoed so the UI can label itself. */
+    private static Map<String, Object> range(boolean ranged, LocalDate from, LocalDate to) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("filtered", ranged);
+        out.put("from", from.toString());
+        out.put("to", to.toString());
         return out;
     }
 
     /**
-     * The dashboard's own stats object — same keys, same numbers, including
-     * `reopened` (which the Dashboard counts separately and therefore excludes
-     * from complete/incomplete/finished; only `total` covers all four queues).
+     * The four queues plus the two figures the hospital's dashboard asks for
+     * by name: `notFinished` (everything not yet approved — complete +
+     * incomplete + reopened) and `finishedPct`.
+     *
+     * <p>Un-filtered, this is the dashboard's own stats object verbatim, so the
+     * tiles can never drift from the Dashboard. Filtered, the cache cannot
+     * answer, so the same routing is recomputed in SQL — see
+     * AnalyticsRepository.summary(). Key order is the contract either way.
      */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> summary() {
-        Object stats = cache.get(views::buildCasesPayload).get("stats");
-        return new LinkedHashMap<>((Map<String, Object>) stats);
+    private Map<String, Object> summary(Window w, boolean ranged) {
+        Map<String, Object> src = ranged
+                ? repo.summary(w)
+                : (Map<String, Object>) cache.get(views::buildCasesPayload).get("stats");
+        long total = num(src.get("total"));
+        long finished = num(src.get("finished"));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("total", total);
+        out.put("complete", num(src.get("complete")));
+        out.put("incomplete", num(src.get("incomplete")));
+        out.put("reopened", num(src.get("reopened")));
+        out.put("finished", finished);
+        out.put("notFinished", total - finished);
+        out.put("finishedPct", pct(finished, total));
+        return out;
+    }
+
+    private static long num(Object v) {
+        return v == null ? 0L : ((Number) v).longValue();
+    }
+
+    /**
+     * A percentage to one decimal, or null when the denominator is zero —
+     * "no cases yet" must not render as a confident 0%.
+     */
+    private static Double pct(long part, long whole) {
+        return whole == 0 ? null : Math.round(part * 1000.0 / whole) / 10.0;
     }
 
     /**
@@ -73,10 +137,9 @@ public class AnalyticsService {
      * local-midnight timestamp with no zone suffix: the browser must read it
      * as the hospital's calendar day, and a `Z` would shift it west of UTC.
      */
-    private List<Map<String, Object>> casesOverTime(int days, LocalDate today) {
-        LocalDate from = today.minusDays(days - 1L);
+    private List<Map<String, Object>> casesOverTime(LocalDate from, LocalDate to, int days) {
         Map<LocalDate, Long> byDay = new HashMap<>();
-        for (Map<String, Object> r : repo.casesPerDay(from, today)) {
+        for (Map<String, Object> r : repo.casesPerDay(from, to)) {
             byDay.put(((java.sql.Date) r.get("day")).toLocalDate(), ((Number) r.get("n")).longValue());
         }
         List<Map<String, Object>> series = new ArrayList<>(days);
@@ -91,9 +154,9 @@ public class AnalyticsService {
     }
 
     /** Coverage families, biggest first; the blank family gets a display label. */
-    private List<Map<String, Object>> coverageCounts() {
+    private List<Map<String, Object>> coverageCounts(Window w) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : repo.coverageCounts()) {
+        for (Map<String, Object> r : repo.coverageCounts(w)) {
             String family = (String) r.get("family");
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("label", family == null ? "ไม่ระบุสิทธิ" : family);
@@ -110,10 +173,10 @@ public class AnalyticsService {
      * (CasesViewService.missingLabels()), so "icd10" reads identically on
      * both pages; a key that map doesn't know shows raw rather than dropping.
      */
-    private Map<String, Object> documentationGaps() {
+    private Map<String, Object> documentationGaps(Window w) {
         Map<String, String> labels = CasesViewService.missingLabels();
         List<Map<String, Object>> items = new ArrayList<>();
-        for (Map<String, Object> r : repo.missingDetailCounts()) {
+        for (Map<String, Object> r : repo.missingDetailCounts(w)) {
             String key = (String) r.get("key");
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("key", key);
@@ -122,7 +185,7 @@ public class AnalyticsService {
             items.add(row);
         }
         List<Map<String, Object>> byGroup = new ArrayList<>();
-        for (Map<String, Object> r : repo.completenessByGroup()) {
+        for (Map<String, Object> r : repo.completenessByGroup(w)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("label", r.get("grp"));
             row.put("incomplete", r.get("incomplete"));
@@ -141,10 +204,9 @@ public class AnalyticsService {
      * actually happened), not by the visit date — this series answers "what
      * did the team do", the other answers "when did patients come".
      */
-    private List<Map<String, Object>> codingActivity(int days, LocalDate today) {
-        LocalDate from = today.minusDays(days - 1L);
+    private List<Map<String, Object>> codingActivity(LocalDate from, LocalDate to, int days) {
         Map<LocalDate, Map<String, Object>> byDay = new HashMap<>();
-        for (Map<String, Object> r : repo.activityPerDay(from, today)) {
+        for (Map<String, Object> r : repo.activityPerDay(from, to)) {
             byDay.put(((java.sql.Date) r.get("day")).toLocalDate(), r);
         }
         List<Map<String, Object>> series = new ArrayList<>(days);
@@ -166,10 +228,10 @@ public class AnalyticsService {
      * an email or bare username; map it to the account's display name the
      * same way the Dashboard's finished queue does.
      */
-    private List<Map<String, Object>> finishedByCoder() {
+    private List<Map<String, Object>> finishedByCoder(Window w) {
         Map<String, String> names = users.displayNameByStamp();
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : repo.finishedByCoder()) {
+        for (Map<String, Object> r : repo.finishedByCoder(w)) {
             String stamp = (String) r.get("stamp");
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("coder", names.getOrDefault(stamp, stamp));
@@ -185,8 +247,8 @@ public class AnalyticsService {
      * humanizing ("2.4 h") is display work; null median/p90 with cases = 0
      * until the first approval exists.
      */
-    private Map<String, Object> turnaround() {
-        Map<String, Object> r = repo.turnaround();
+    private Map<String, Object> turnaround(Window w) {
+        Map<String, Object> r = repo.turnaround(w);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("medianMinutes", roundMinutes(r.get("median_minutes")));
         out.put("p90Minutes", roundMinutes(r.get("p90_minutes")));
@@ -203,9 +265,9 @@ public class AnalyticsService {
      * ordered 0 → 6+, absent buckets zero-filled so the bars keep their
      * positions), the uncoded backlog, the average, and the role mix.
      */
-    private Map<String, Object> codingDepth() {
+    private Map<String, Object> codingDepth(Window w) {
         Map<String, Long> byBucket = new HashMap<>();
-        for (Map<String, Object> r : repo.codesPerCaseBuckets()) {
+        for (Map<String, Object> r : repo.codesPerCaseBuckets(w)) {
             byBucket.put((String) r.get("bucket"), ((Number) r.get("cases")).longValue());
         }
         List<Map<String, Object>> distribution = new ArrayList<>();
@@ -216,14 +278,14 @@ public class AnalyticsService {
             distribution.add(row);
         }
         List<Map<String, Object>> roleMix = new ArrayList<>();
-        for (Map<String, Object> r : repo.roleMix()) {
+        for (Map<String, Object> r : repo.roleMix(w)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("role", r.get("role"));
             row.put("label", ROLE_LABEL.getOrDefault((String) r.get("role"), (String) r.get("role")));
             row.put("count", r.get("n"));
             roleMix.add(row);
         }
-        Map<String, Object> avg = repo.codesPerCaseAvg();
+        Map<String, Object> avg = repo.codesPerCaseAvg(w);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("uncoded", ((Number) avg.get("uncoded")).longValue());
         Object avgCodes = avg.get("avg_codes");
@@ -247,9 +309,9 @@ public class AnalyticsService {
      * splits. `other` catches severity values outside low/medium/high so the
      * row total always reconciles.
      */
-    private Map<String, Object> caseMix() {
+    private Map<String, Object> caseMix(Window w) {
         List<Map<String, Object>> groups = new ArrayList<>();
-        for (Map<String, Object> r : repo.caseMixByGroup()) {
+        for (Map<String, Object> r : repo.caseMixByGroup(w)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("label", r.get("grp"));
             row.put("low", r.get("low"));
@@ -260,14 +322,14 @@ public class AnalyticsService {
             groups.add(row);
         }
         List<Map<String, Object>> sex = new ArrayList<>();
-        for (Map<String, Object> r : repo.sexCounts()) {
+        for (Map<String, Object> r : repo.sexCounts(w)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("label", r.get("sex") == null ? "unspecified" : r.get("sex"));
             row.put("count", r.get("n"));
             sex.add(row);
         }
         List<Map<String, Object>> age = new ArrayList<>();
-        for (Map<String, Object> r : repo.ageBands()) {
+        for (Map<String, Object> r : repo.ageBands(w)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("label", r.get("band"));
             row.put("count", r.get("n"));
@@ -285,9 +347,9 @@ public class AnalyticsService {
      * can relabel without re-parsing the string. A code the catalog has no
      * description for shows its code alone rather than a dangling separator.
      */
-    private List<Map<String, Object>> topCodes(int limit) {
+    private List<Map<String, Object>> topCodes(Window w, int limit) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : repo.topCodes(limit)) {
+        for (Map<String, Object> r : repo.topCodes(w, limit)) {
             String code = (String) r.get("code");
             String description = (String) r.get("description");
             Map<String, Object> row = new LinkedHashMap<>();
@@ -298,6 +360,70 @@ public class AnalyticsService {
             row.put("code", code);
             row.put("system", r.get("system"));
             row.put("description", description);
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * "Top 10 Principal Diagnosis" — the hospital's card, and NOT a filtered
+     * view of topCodes: it ranks only ICD-10 rows in the principal_diagnosis
+     * role, so a common procedure or comorbidity cannot outrank a diagnosis.
+     * Same row shape as topCodes (system is always "ICD-10") so the frontend
+     * can render both with one component.
+     */
+    private List<Map<String, Object>> topPrincipalDiagnosis(Window w, int limit) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : repo.topPrincipalDiagnosis(w, limit)) {
+            String code = (String) r.get("code");
+            String description = (String) r.get("description");
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("label", description == null || description.isBlank()
+                    ? code
+                    : code + " · " + description);
+            row.put("count", r.get("n"));
+            row.put("code", code);
+            row.put("system", "ICD-10");
+            row.put("description", description);
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * The per-coder KPI table the hospital asked for: finish % and
+     * within-7-days %.
+     *
+     * <p>`finishedPct` is finished ÷ <b>touched</b>, not ÷ assigned — we have no
+     * assignment system, so the denominator is the cases the coder acted on at
+     * all. `touched` ships alongside precisely so the UI can say which
+     * denominator it used instead of implying the hospital's.
+     *
+     * <p>`within7DaysPct` is over `measured` (finished cases that also have a
+     * recorded sync event), never over `finished` — a case whose sync predates
+     * the audit trail has no duration and must not count as "late".
+     *
+     * <p>Both percentages are null rather than 0 when their denominator is
+     * empty, so an untouched coder reads as "—" and not as a 0% failure.
+     */
+    private List<Map<String, Object>> coderKpi(Window w) {
+        Map<String, String> names = users.displayNameByStamp();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : repo.coderKpi(w)) {
+            String stamp = (String) r.get("stamp");
+            long touched = num(r.get("touched"));
+            long finished = num(r.get("finished"));
+            long measured = num(r.get("measured"));
+            long within7 = num(r.get("within7"));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("coder", names.getOrDefault(stamp, stamp));
+            row.put("coderId", stamp);
+            row.put("touched", touched);
+            row.put("finished", finished);
+            row.put("finishedPct", pct(finished, touched));
+            row.put("measured", measured);
+            row.put("within7Days", within7);
+            row.put("within7DaysPct", pct(within7, measured));
             out.add(row);
         }
         return out;

@@ -33,6 +33,10 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/admin/**", "/api/auth/me", "/api/auth/logout",
                         "/api/cases/**", "/api/cases", "/api/sync", "/api/demo/reset",
                         "/api/demo/snapshot", "/api/icd-codes", "/api/icd-codes/**",
-                        "/api/agent/**", "/api/analytics");
+                        "/api/agent/**", "/api/analytics",
+                        // display policy: readable by any signed-in account
+                        // (the coder list renders from it), writable only
+                        // through its /api/admin/** twin
+                        "/api/case-field-settings");
     }
 }

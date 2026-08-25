@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.format.annotation.DateTimeFormat;
+
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /**
@@ -58,12 +61,29 @@ public class AnalyticsController {
                     + "null with `cases: 0` until something is approved.\n"
                     + "- `codingDepth` — codes-per-case distribution (buckets 0 / 1 / 2 / 3-5 / "
                     + "6+), the uncoded backlog, the average, and the code-role mix.\n"
-                    + "- `caseMix` — disease group × severity, plus sex and age-band splits.\n\n"
-                    + "`days` defaults to 30 (max 365), `topCodes` to 10 (max 50).")
+                    + "- `caseMix` — disease group × severity, plus sex and age-band splits.\n"
+                    + "- `topPrincipalDiagnosis` — the same row shape as `topCodes`, but ICD-10 "
+                    + "rows in the `principal_diagnosis` role only, so a frequent procedure or "
+                    + "comorbidity cannot outrank a diagnosis.\n"
+                    + "- `coderKpi` — per coder: `finishedPct` (finished ÷ **touched**, because "
+                    + "no assignment system exists — `touched` ships so the UI can name its own "
+                    + "denominator) and `within7DaysPct` (finished inside 7 days ÷ `measured`, "
+                    + "the finished cases that also have a sync event). Both are null, never 0, "
+                    + "when their denominator is empty.\n"
+                    + "- `range` — the window actually applied, echoed back.\n\n"
+                    + "`days` defaults to 30 (max 365), `topCodes` to 10 (max 50).\n\n"
+                    + "**Date filter.** `from` and `to` (ISO `YYYY-MM-DD`, inclusive) must be "
+                    + "given together or not at all, and may not span more than 365 days. "
+                    + "Without them nothing is filtered and `summary` is the Dashboard's own "
+                    + "`stats` verbatim. With them EVERY card is scoped to the window — the case "
+                    + "population by visit date, the coder cards by action date — and `summary` "
+                    + "is recomputed in SQL over the same queue routing. `days` is then ignored: "
+                    + "the series spans the range instead.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = """
                     {
-                      "summary": {"total": 21, "complete": 6, "incomplete": 15, "reopened": 0, "finished": 0},
+                      "summary": {"total": 21, "complete": 6, "incomplete": 15, "reopened": 0,
+                                  "finished": 0, "notFinished": 21, "finishedPct": 0.0},
                       "casesOverTime": [
                         {"iso": "2026-07-22T00:00:00", "count": 1},
                         {"iso": "2026-07-23T00:00:00", "count": 1}
@@ -80,13 +100,39 @@ public class AnalyticsController {
                           "system": "ICD-10",
                           "description": "lipoma at back"
                         }
-                      ]
+                      ],
+                      "topPrincipalDiagnosis": [
+                        {
+                          "label": "I10 · Essential HT",
+                          "count": 9,
+                          "code": "I10",
+                          "system": "ICD-10",
+                          "description": "Essential HT"
+                        }
+                      ],
+                      "coderKpi": [
+                        {
+                          "coder": "Frank",
+                          "coderId": "frank@medcodeai.demo",
+                          "touched": 25,
+                          "finished": 20,
+                          "finishedPct": 80.0,
+                          "measured": 20,
+                          "within7Days": 17,
+                          "within7DaysPct": 85.0
+                        }
+                      ],
+                      "range": {"filtered": false, "from": "2026-07-27", "to": "2026-08-25"}
                     }
                     """)))
     public Map<String, Object> analytics(
             @RequestParam(value = "days", defaultValue = "" + AnalyticsService.DEFAULT_DAYS) int days,
             @RequestParam(value = "topCodes",
-                    defaultValue = "" + AnalyticsService.DEFAULT_TOP_CODES) int topCodes) {
+                    defaultValue = "" + AnalyticsService.DEFAULT_TOP_CODES) int topCodes,
+            @RequestParam(value = "from", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         if (days < 1 || days > MAX_DAYS) {
             throw new ApiExceptionHandler.BadRequestException("days must be between 1 and " + MAX_DAYS);
         }
@@ -94,6 +140,25 @@ public class AnalyticsController {
             throw new ApiExceptionHandler.BadRequestException(
                     "topCodes must be between 1 and " + MAX_TOP_CODES);
         }
-        return analytics.build(days, topCodes, LocalDate.now());
+        // Both or neither: one bare endpoint of a range has no defensible
+        // default — silently treating "from" alone as "from … forever" would
+        // quietly disagree with the label the page prints above the tiles.
+        if ((from == null) != (to == null)) {
+            throw new ApiExceptionHandler.BadRequestException(
+                    "from and to must be given together");
+        }
+        if (from != null) {
+            if (from.isAfter(to)) {
+                throw new ApiExceptionHandler.BadRequestException("from must not be after to");
+            }
+            // The series carries one point per day, so the range is bounded by
+            // the same guard rail as `days`.
+            long span = ChronoUnit.DAYS.between(from, to) + 1;
+            if (span > MAX_DAYS) {
+                throw new ApiExceptionHandler.BadRequestException(
+                        "the range must not exceed " + MAX_DAYS + " days");
+            }
+        }
+        return analytics.build(days, topCodes, from, to, LocalDate.now());
     }
 }
