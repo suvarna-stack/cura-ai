@@ -322,6 +322,19 @@ public class CasesViewService {
         u.put("orderNames", ordnames.getOrDefault(cid, Map.of()));
         u.put("created_at", r.get("admissiondatetime")); // real column; null where the extract lacks it
         u.put("updated_at", r.get("dischargedatetime")); // real column; null where the extract lacks it
+        // The date to PUT ON SCREEN (2026-08-25). created_at stays exactly what
+        // it always was -- the raw admissiondatetime column -- because the
+        // contract documents it that way and clients read it as "what iMed
+        // sent". But on OPD that column is null for every row, so the list
+        // showed no date at all. visitDate falls back to the datetime the
+        // hospital encodes in the transaction number: the same rule analytics
+        // and imed-mock-api already date a visit by, so one visit cannot carry
+        // two different dates on two screens.
+        u.put("visitDate", Py.or_((String) r.get("admissiondatetime"),
+                SyncRules.visitDateFromCaseId(cid), null));
+        // "y,m,d" exactly as the extract froze it at export time -- text, not a
+        // number: it is not arithmetic-friendly, and the UI prints the years.
+        u.put("age", r.get("ageyear"));
         u.put("revenue_impact", null); // no real DRG/revenue source exists
         // shared "this one matters" flag (V8) — same three keys on every card
         // in every tab, so the frontend never has to ask which lists carry it

@@ -81,4 +81,30 @@ class SyncRulesTest {
         assertEquals(List.of("abc"), SyncRules.chunk("abc", 5));
         assertEquals(List.of("abcde", "fg"), SyncRules.chunk("abcdefg", 5));
     }
+
+    @Test
+    void visitDateDecodesTheTransactionNumber() {
+        // The only date an OPD visit has: YYMMDDHHMMSS at positions 4-15.
+        // "870 260722091423 00201" -> 2026-07-22 09:14:23
+        assertEquals("2026-07-22 09:14:23",
+                SyncRules.visitDateFromCaseId("87026072209142300201"));
+        // midnight must survive rather than collapse to a bare date
+        assertEquals("2026-01-05 00:00:00",
+                SyncRules.visitDateFromCaseId("87026010500000000201"));
+        // the decode must agree with what parseDt() produces for the same
+        // instant, because callers use the two interchangeably
+        assertEquals(SyncRules.parseDt("2026-07-22T09:14:23"),
+                SyncRules.visitDateFromCaseId("87026072209142300201"));
+    }
+
+    @Test
+    void visitDateRefusesWhatItCannotDecode() {
+        assertNull(SyncRules.visitDateFromCaseId(null));
+        assertNull(SyncRules.visitDateFromCaseId(""));
+        assertNull(SyncRules.visitDateFromCaseId("87026072209"));         // too short
+        assertNull(SyncRules.visitDateFromCaseId("870abcdefghijkl0201")); // not digits
+        assertNull(SyncRules.visitDateFromCaseId("87026133109142300201")); // month 13
+        assertNull(SyncRules.visitDateFromCaseId("87026023009142300201")); // 30 Feb
+        assertNull(SyncRules.visitDateFromCaseId("87026072299142300201")); // hour 99
+    }
 }

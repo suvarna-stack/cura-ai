@@ -83,6 +83,19 @@ export interface CaseCard {
   created_at: string | null;
   /** cases.dischargedatetime — same caveat */
   updated_at: string | null;
+  /** The date to DISPLAY (2026-08-25): `created_at` when the extract carried
+   *  one, else the "YYMMDDHHMMSS" the hospital encodes at positions 4-15 of the
+   *  transaction number, as "YYYY-MM-DD HH:MM:SS". `created_at` deliberately
+   *  keeps its old meaning ("what iMed sent"), but it is null on EVERY OPD row,
+   *  so the case list had no date to show. Same decode analytics and
+   *  imed-mock-api date a visit by, so one visit cannot show two dates.
+   *  Null only when neither source yields a date. */
+  visitDate: string | null;
+  /** cases.ageyear — the patient's age as the extract FROZE it at export time,
+   *  "y,m,d" ("47,4,10"). Text, not a number: it is a snapshot, not arithmetic,
+   *  and clients should print the years rather than compute on it. Null where
+   *  the extract carries none. */
+  age: string | null;
   /** always null — no real DRG/revenue source exists */
   revenue_impact: null;
   /** the shared "look at this one first" flag — one star per case, set by any
@@ -461,7 +474,45 @@ export interface AnalyticsCoverageSlice {
   count: number;
 }
 
-/** One bar of the Top-ICD-Codes list. */
+/** The window a payload actually covers. `filtered` is false when the caller
+ *  sent no from/to — the figures then cover everything, and from/to merely
+ *  describe the rolling `days` series window. */
+export interface AnalyticsRange {
+  filtered: boolean;
+  /** ISO YYYY-MM-DD, inclusive. */
+  from: string;
+  /** ISO YYYY-MM-DD, inclusive. */
+  to: string;
+}
+
+/** One row of the per-coder KPI table (2026-08-25).
+ *
+ *  `finishedPct` is finished / **touched**, NOT / assigned — there is no
+ *  assignment system, so the denominator is the cases the coder acted on at
+ *  all. `touched` ships alongside precisely so a client can name the
+ *  denominator it used rather than implying the hospital's.
+ *
+ *  `within7DaysPct` is over `measured` — the finished cases that also carry a
+ *  sync event to measure from — never over `finished`.
+ *
+ *  Both percentages are null, never 0, when their denominator is empty. */
+export interface AnalyticsCoderKpi {
+  coder: string;
+  coderId: string;
+  /** Cases with any audit action by this coder (demo.reset excluded). */
+  touched: number;
+  finished: number;
+  /** 0-100, one decimal; null when `touched` is 0. */
+  finishedPct: number | null;
+  /** Finished cases whose sync event is known, so a duration exists. */
+  measured: number;
+  within7Days: number;
+  /** 0-100, one decimal; null when `measured` is 0. */
+  within7DaysPct: number | null;
+}
+
+/** One bar of the Top-ICD-Codes list. Also the shape of
+ *  `topPrincipalDiagnosis`, which differs in what it counts, not in shape. */
 export interface AnalyticsTopCode {
   /** "code · description", or the bare code when the catalog has none. */
   label: string;
@@ -541,12 +592,18 @@ export interface AnalyticsCaseMix {
 }
 
 /**
- * GET /api/analytics?days=…&topCodes=… — the whole Analytics page in one
- * request. Every figure covers OPD visits only, the same population
+ * GET /api/analytics?days=…&topCodes=…&from=…&to=… — the whole Analytics page
+ * in one request. Every figure covers OPD visits only, the same population
  * GET /api/cases serves.
  *
- * `summary` is the dashboard payload's `stats` verbatim, so the tiles cannot
- * drift from the Dashboard. `casesOverTime` always has exactly `days` points,
+ * WITHOUT from/to nothing is filtered and `summary` is the dashboard payload's
+ * `stats` verbatim, so the tiles cannot drift from the Dashboard.
+ * WITH from/to (ISO days, inclusive, both or neither, max 365 apart) EVERY
+ * card is scoped to the window — the case population by visit date, the coder
+ * cards by action date — `summary` is recomputed in SQL over the same queue
+ * routing, and `days` is ignored because the series spans the range instead.
+ *
+ * `casesOverTime` always has one point per day of the window it covers,
  * oldest first, zero-filled — an empty window is all-zero, never empty.
  *
  * documentationGaps / codingActivity / turnaround / codingDepth / caseMix are
@@ -554,14 +611,27 @@ export interface AnalyticsCaseMix {
  * payload, unchanged.
  */
 export interface AnalyticsResponse {
-  /** Same shape and numbers as CasesResponse["stats"]. */
-  summary: { total: number; complete: number; incomplete: number; reopened: number; finished: number };
+  /** The window actually applied — echoed so a client can label itself. */
+  range: AnalyticsRange;
+  /** CasesResponse["stats"] verbatim while unfiltered, plus the two figures
+   *  the hospital dashboard names directly. `notFinished` is total - finished
+   *  (= complete + incomplete + reopened); `finishedPct` is 0-100 to one
+   *  decimal, null (never 0) when there are no cases at all. */
+  summary: {
+    total: number; complete: number; incomplete: number; reopened: number; finished: number;
+    notFinished: number; finishedPct: number | null;
+  };
   casesOverTime: AnalyticsDayPoint[];
   coverageCounts: AnalyticsCoverageSlice[];
   topCodes: AnalyticsTopCode[];
+  /** ICD-10 rows in the principal_diagnosis role only, so a frequent
+   *  procedure or comorbidity cannot outrank a diagnosis the way it can in
+   *  `topCodes`. `system` is always "ICD-10". */
+  topPrincipalDiagnosis: AnalyticsTopCode[];
   documentationGaps: { items: AnalyticsGapItem[]; byGroup: AnalyticsGapGroup[] };
   /** Same `days` window and zero-fill as casesOverTime. */
   codingActivity: AnalyticsActivityPoint[];
+  coderKpi: AnalyticsCoderKpi[];
   turnaround: AnalyticsTurnaround;
   codingDepth: AnalyticsCodingDepth;
   caseMix: AnalyticsCaseMix;

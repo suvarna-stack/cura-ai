@@ -129,6 +129,46 @@ public final class SyncRules {
         return missing;
     }
 
+    /**
+     * The visit datetime encoded in a transaction number, or null.
+     *
+     * <p>The hospital writes YYMMDDHHMMSS at positions 4-15 of every TN, and on
+     * OPD visits that is the ONLY date we get: the extract leaves
+     * admissiondatetime null on every outpatient row (it fills it just for the
+     * handful that are admissions). imed-mock-api's visit-date window and our
+     * own analytics roll-ups already decode it, so the case list has to decode
+     * it identically or one visit carries two different dates on two screens.
+     *
+     * <p>Returns "YYYY-MM-DD HH:MM:SS" — the shape {@link #parseDt} produces,
+     * so callers can use it interchangeably with a real admissiondatetime.
+     * Null when the TN is too short, is not all digits there, or those twelve
+     * characters are not a real date. A two-digit year maps into 2000-2099,
+     * matching the {@code to_timestamp(…, 'YY…')} the SQL side uses.
+     */
+    public static String visitDateFromCaseId(String caseId) {
+        if (caseId == null || caseId.length() < 15) {
+            return null;
+        }
+        String raw = caseId.substring(3, 15);
+        for (int i = 0; i < raw.length(); i++) {
+            if (!Character.isDigit(raw.charAt(i))) {
+                return null;
+            }
+        }
+        try {
+            java.time.LocalDateTime dt = java.time.LocalDateTime.of(
+                    2000 + Integer.parseInt(raw.substring(0, 2)),
+                    Integer.parseInt(raw.substring(2, 4)),
+                    Integer.parseInt(raw.substring(4, 6)),
+                    Integer.parseInt(raw.substring(6, 8)),
+                    Integer.parseInt(raw.substring(8, 10)),
+                    Integer.parseInt(raw.substring(10, 12)));
+            return dt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (java.time.DateTimeException e) {
+            return null; // all digits, but not a real date (month 13, day 99…)
+        }
+    }
+
     /** sync.py:174 disease group (F04) [POC] — ICD-10 chapter of the primary dx. */
     public static String diseaseGroup(String primaryIcd) {
         if (primaryIcd == null || primaryIcd.isEmpty()) {

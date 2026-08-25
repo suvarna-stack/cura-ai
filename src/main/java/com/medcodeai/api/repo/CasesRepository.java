@@ -128,7 +128,7 @@ public class CasesRepository {
     // directly by ui_case() instead of synthesized placeholder data.
     public List<Map<String, Object>> opdCases() {
         return jdbc.query("""
-                SELECT case_id, sex, department, ward, disease_group, severity_level,
+                SELECT case_id, sex, ageyear, department, ward, disease_group, severity_level,
                        coverage_type, encountertype, case_status::text AS case_status,
                        completeness_status::text AS completeness_status, missing_detail,
                        fetched_at::text AS fetched_at, patient_ref,

@@ -93,6 +93,8 @@ exactly one of `complete`, an `incompleteGroups` group, `reopened` or
 | `orderNames` | `object` | `{category: [distinct order names A–Z]}`, same key order as `orders` — the items behind each count (feeds the dashboard's nested Study/Item filter). A category whose rows are all nameless is absent; `{}` when the case has no orders |
 | `created_at` | `string \| null` | `cases.admissiondatetime` (raw hospital text). OPD rows lack it → currently always `null` here |
 | `updated_at` | `string \| null` | `cases.dischargedatetime` — same caveat |
+| `visitDate` | `string \| null` | **The date to display** (2026-08-25). `created_at` when iMed sent one, else the `YYMMDDHHMMSS` encoded at positions 4-15 of the transaction number, as `YYYY-MM-DD HH:MM:SS`. `created_at` keeps its old meaning on purpose, but it is `null` on *every* OPD row, so the list had nothing to show; this is the same decode `GET /api/analytics` and imed-mock-api use, so a visit cannot carry two different dates on two screens. `null` only when neither source yields one |
+| `age` | `string \| null` | `cases.ageyear` — age as the extract **froze it at export time**, `"y,m,d"` (e.g. `"47,4,10"`). Text, not a number: print the years, do not compute on it. `null` where the extract carries none |
 | `revenue_impact` | `null` | no real DRG/revenue source exists |
 | `starred` | `boolean` | `case_stars` row exists — the shared "look at this one first" flag any coder can set (see `POST /api/cases/{caseId}/star`). One star per case, everyone sees the same one |
 | `starredBy` | `string \| null` | display name of the coder who set it (`users.full_name`, else the account email); `null` when not starred |
@@ -491,6 +493,55 @@ Since the 2026-07-28 split this reads the `icd_10` and `icd_9` tables (one
 `icd_codes` table before then); `system` in the response says which one a row
 came from, and a code may legitimately exist in both.
 
+### GET /api/case-field-settings — which identifier fields the list may show
+
+Readable by **any signed-in account** (the coder list renders from it). Always
+returns all three keys.
+
+```jsonc
+{ "vn": true, "hn": true, "name": false }
+```
+
+These are **display policy, not access control**: the case payload still
+carries `vn`, `hn` and `patient` whatever the switches say, because case
+detail, search and the audit trail all need them. Turning a field off hides it
+on the case list and nowhere else. If a hospital ever needs the *data*
+withheld, that is a different feature and belongs in the query.
+
+Global, never per account — two coders looking at the same list must see the
+same fields, or "the HN is missing" becomes unanswerable over the phone.
+
+Defaults (seeded by V9, applied when a key is absent): `vn` and `hn` on, `name`
+off. `name` is off because no patient name exists anywhere in the hospital
+extract yet (open Data-Mapping question Q1); the switch exists so it can be
+turned on the day iMed starts sending one, without a release. With `name` on
+and no name in the data, the list prints "Name not supplied by iMed" rather
+than an empty field.
+
+### PUT /api/admin/case-field-settings — turn those fields on or off
+
+**Admin only** (`403` for a coder token, like every `/api/admin/**` route).
+
+Send only the switches being changed; omitted keys keep their current value:
+
+```jsonc
+{ "hn": false }
+```
+
+Returns the full settings object as it now stands. An unknown key, or a value
+that is not a JSON boolean, is a `400` and changes **nothing** — a typo must
+not silently turn a field off:
+
+```jsonc
+{ "error": "unknown field: age" }
+```
+
+Stored in `app_settings` (V9) with the acting account's email and a
+`YYYY-MM-DD HH:MM:SS` timestamp. Deliberately **not** part of the demo
+baseline: `POST /api/demo/reset` restores hospital *data*, and an
+administrator's display policy is configuration — a reset that put the
+switches back would silently undo it before every rehearsal.
+
 ### GET /api/analytics — the Analytics page payload
 
 One request serves the whole page; every figure is a roll-up over **OPD visits
@@ -499,17 +550,42 @@ Query params:
 
 | param      | required | notes |
 |------------|----------|-------|
-| `days`     | no       | length of the `casesOverTime` window, ending today. Default `30`, capped at `365` |
-| `topCodes` | no       | rows in `topCodes`. Default `10`, capped at `50` |
+| `days`     | no       | length of the `casesOverTime` window, ending today. Default `30`, capped at `365`. **Ignored when `from`/`to` are given** |
+| `topCodes` | no       | rows in `topCodes` *and* `topPrincipalDiagnosis`. Default `10`, capped at `50` |
+| `from`     | no       | ISO `YYYY-MM-DD`, inclusive. Must be sent **with** `to` |
+| `to`       | no       | ISO `YYYY-MM-DD`, inclusive. Must be sent **with** `from` |
+
+**The date filter (2026-08-25).** `from`/`to` are both-or-neither — a half-open
+range is a `400`, because "from … forever" has no defensible default and would
+disagree with the label the page prints over the tiles. `from` after `to` is a
+`400`; a span over 365 days is a `400` (the series carries one point per day,
+so it is bounded by the same guard rail as `days`).
+
+Without them **nothing is filtered**. With them **every card is scoped to the
+window**: the case population by *visit date* (`admissiondatetime`, else the
+datetime encoded in the transaction number), the coder cards — `codingActivity`,
+`finishedByCoder`, `coderKpi`, `turnaround` — by *action date*, because
+"finished in July" means the coder finished it in July, whenever the patient
+happened to come in. Rows whose visit date cannot be derived are counted while
+unfiltered and dropped by a real window, which is the honest reading of "visits
+in this range".
 
 ```jsonc
 {
-  "summary": {"total": 21, "complete": 4, "incomplete": 16, "reopened": 0, "finished": 1},
+  "range": {"filtered": false, "from": "2026-07-27", "to": "2026-08-25"},
+  "summary": {"total": 21, "complete": 4, "incomplete": 16, "reopened": 0, "finished": 1,
+              "notFinished": 20, "finishedPct": 4.8},
   "casesOverTime": [ {"iso": "2026-07-22T00:00:00", "count": 1}, … ],
   "coverageCounts": [ {"label": "OFC", "count": 5}, … ],
   "topCodes": [ {"label": "D17.1 · lipoma at back", "count": 2,
                  "code": "D17.1", "system": "ICD-10",
                  "description": "lipoma at back"}, … ],
+  "topPrincipalDiagnosis": [ {"label": "I10 · Essential HT", "count": 9,
+                              "code": "I10", "system": "ICD-10",
+                              "description": "Essential HT"}, … ],
+  "coderKpi": [ {"coder": "Frank", "coderId": "frank@medcodeai.demo",
+                 "touched": 25, "finished": 20, "finishedPct": 80.0,
+                 "measured": 20, "within7Days": 17, "within7DaysPct": 85.0}, … ],
   "documentationGaps": {
     "items": [ {"key": "icd10", "label": "ICD-10 diagnosis codes", "count": 16}, … ],
     "byGroup": [ {"label": "Cardiovascular", "incomplete": 4, "total": 6}, … ]
@@ -535,9 +611,30 @@ Query params:
 ```
 
 - **`summary`** is the dashboard payload's `stats` object *verbatim* (served
-  from the same CasesCache), so the Analytics tiles can never drift from the
-  Dashboard's counts. `reopened` is its own exclusive queue — only `total`
-  covers all four.
+  from the same CasesCache) **while unfiltered**, so the Analytics tiles can
+  never drift from the Dashboard's counts. `reopened` is its own exclusive
+  queue — only `total` covers all four. Filtered, the cache cannot answer, so
+  the same routing is recomputed in SQL. Two derived keys were added
+  2026-08-25 because the hospital's dashboard names them directly:
+  `notFinished` (= `total` − `finished`, i.e. complete + incomplete +
+  reopened — the one figure that always reconciles against `finished`) and
+  `finishedPct` (0–100 to one decimal, **null and not 0** when there are no
+  cases, so "nothing synced yet" cannot read as a 0% failure).
+- **`range`** echoes the window actually applied: `{filtered, from, to}`.
+  `filtered` is false when no `from`/`to` was sent, and `from`/`to` then just
+  describe the rolling series window.
+- **`topPrincipalDiagnosis`** is *not* a filtered view of `topCodes`: it ranks
+  only ICD-10 rows in the `principal_diagnosis` role, so a frequent procedure
+  or comorbidity cannot outrank a diagnosis. Same row shape, `system` always
+  `"ICD-10"`, same `topCodes` limit.
+- **`coderKpi`** is the hospital's KPI table. `finishedPct` is
+  `finished ÷ touched`, **not ÷ assigned** — no assignment system exists, so
+  the denominator is the cases the coder acted on at all; `touched` is in the
+  payload precisely so a client can name that denominator instead of implying
+  the hospital's. `within7DaysPct` is over `measured` (finished cases that
+  also carry a sync event to measure from), never over `finished`, so a case
+  whose sync predates the audit trail cannot be counted as "late". Both
+  percentages are null rather than 0 on an empty denominator.
 - **`casesOverTime`** has exactly `days` points, oldest first, **zero-filled**:
   a day the hospital saw nobody is a `0`, not a missing point. A visit is dated
   by `admissiondatetime`, else by the `YYMMDDHHMMSS` encoded at positions 4-15
