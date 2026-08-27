@@ -703,6 +703,15 @@ RADIOLOGY = {
     "D17.1": ("Ultrasound soft tissue, back",
               "Well-defined oval hyperechoic lesion 4.2 x 2.1 cm in the subcutaneous plane, "
               "no internal vascularity on colour Doppler. Findings consistent with lipoma."),
+    # For the hand-written original 87026072310024100701, whose procedure really
+    # is 88.79 Ultrasound Endovaginal. Every measurement below is read off that
+    # visit's own Present Illness ("TVS today: Ut 6.3x3.2 cm, ET 3.1 mm, Lt
+    # dermoid 2.2x1.9 cm stable, ROV normal, no free fluid") -- this is the
+    # chart's own findings written out as a report, not a new clinical claim.
+    "D27": ("Ultrasound endovaginal",
+            "Uterus 6.3 x 3.2 cm, endometrial thickness 3.1 mm. Left ovary: well-defined "
+            "cyst 2.2 x 1.9 cm containing an echogenic focus with posterior shadowing, "
+            "unchanged from the previous study. Right ovary normal. No free fluid."),
     "E04.1": ("Ultrasound thyroid gland",
               "Right lobe: well-defined solid isoechoic nodule 3.1 x 2.2 cm, TIRADS 3, "
               "no microcalcification. Left lobe and isthmus normal. No cervical lymphadenopathy."),
@@ -783,6 +792,80 @@ PAST_HX = [
     "ปฏิเสธโรคประจำตัว ไม่สูบบุหรี่ ไม่ดื่มสุรา",
     "เป็นความดันโลหิตสูงและไขมันในเลือดสูง รับประทานยาต่อเนื่อง 5 ปี",
 ]
+
+
+# ------------------------------------------------- filling out the top rows
+# A demo is only as good as the first rows of each tab, and those rows were the
+# THINNEST charts in the set -- two of them carried no labs, no imaging and no
+# past history at all. This table fills them out. It changes no visit, no id and
+# no code: it only ADDS the rows the extract left out.
+#
+# Which visits are these? The ones the dashboard puts at the top, which is a
+# different rule per tab:
+#   Complete    ordered A-Z by principal ICD-10 (useCaseFilters' "code-asc").
+#   Incomplete  grouped by order type, Surgery first (ORDER_PRIORITY), then
+#               A-Z by code -- which for a case with no diagnosis is its ICD-9.
+#   Finished    empty at demo start: sync stamps every case case_status='open'
+#               and never reads the hospital's coding_status back, so nothing
+#               is there until a coder approves.
+# Re-derive the list with the query in README's *The demo dataset* if the data
+# ever changes; main() asserts every id below still exists, so a generator
+# change that moves them fails loudly instead of silently enriching nothing.
+#
+# Each entry is fixed from what the extract ACTUALLY holds for that visit, never
+# computed from the database, so a second run adds exactly what the first added
+# and the delete below takes exactly that back out. Nothing already present is
+# duplicated: a visit that already has a film gets no second film, and a panel
+# it already ran is not re-ordered.
+ENRICH_VISITS = {
+    # visit id: (scenario for lab skew + borrowed note text | None,
+    #            lab panels to add, RADIOLOGY key for a film | None,
+    #            OPD Record fields the extract left out)
+
+    # --- head of the Complete tab (rows 2 and 4 are already full) ---
+    "87026071715292512901": ("C50.9", [], "C50.9", []),
+    "87026072813401900901": ("D17.1", ["CBC", "Electrolyte", "Creatinine"], "D17.1",
+                             ["Chief Complaint", "Plan", "Family History"]),
+    "87026072310024100701": (None, ["CBC", "Electrolyte", "Creatinine"], "D27",
+                             ["Physical Examination", "Plan"]),
+
+    # --- head of the Incomplete tab: the Surgery group, then the first
+    #     CT / X-ray row, because that group holds only four cases ---
+    "87026072912152303801": ("E04.1", [], None, []),
+    "87026081316325609701": ("L02.4", ["Electrolyte", "Creatinine"], None, []),
+    "87026070209225703901": ("E11.5", [], "E11.5", []),
+    "87026060509372112701": ("S01.8", ["Electrolyte", "Creatinine"], "S01.8", []),
+    "87026072915054701201": ("R51", ["CBC", "Electrolyte", "Creatinine"], None, []),
+}
+
+# The two lines 87026072310024100701 lacks. D27 is the one visit here with no
+# scenario in S, so its text cannot be copied; these are written from the
+# visit's own Assessment ("Recurrent Lt ovarian dermoid cyst, stable size --
+# continue conservative F/U") and its own TVS measurements.
+D27_NOTES = {
+    "Physical Examination": [
+        "General Appearance: good consciousness, not distressed",
+        "Abdomen: soft, not tender, no palpable mass",
+        "Pelvic: uterus normal size, no adnexal tenderness",
+    ],
+    "Plan": "Continue conservative follow up, repeat TVS in 6 months",
+}
+
+# Past history is otherwise drawn from the pool at random, which is fine on a
+# chart where nothing in the note constrains it. Where the doctor's own words DO
+# constrain it, name the line instead. 87026070209225703901's assessment reads
+# "Infected diabetic foot ulcer, right ... glycemic control", so a past history
+# mentioning only hypertension reads as a contradiction to anyone clinical --
+# and it is the third row of the Incomplete tab, so it gets read.
+PAST_HX_FOR = {
+    "87026070209225703901": PAST_HX[1],   # type 2 DM 10 years + dyslipidaemia
+}
+
+# Child-row counter for the rows added above. build_visit numbers a visit's own
+# rows from 100, so 9000+ cannot collide -- and it puts a '9' at position 15 of
+# the generated id, which is what lets the cleanup remove an earlier run's
+# additions without touching the extract's own rows (theirs hold a '0').
+ENRICH_SEQ = 9000
 
 
 # --------------------------------------------------------------- utilities
@@ -1081,6 +1164,128 @@ def build_visit(rows, when, seq, sc, bucket, ipd=None, comorbid=0, rich=False):
     return vid
 
 
+def visit_when(vid):
+    """The datetime a visit id encodes -- positions 3..15 are YYMMDDHHMMSS."""
+    return dt.datetime.strptime(vid[3:15], "%y%m%d%H%M%S")
+
+
+def enrich_visits(rows, by_code):
+    """Fill out the charts the dashboard shows first (see ENRICH_VISITS).
+
+    Adds the panels the presentation would really have ordered, the film it
+    would really have taken, the past-history section a coder reads for
+    comorbidity, and whichever standard OPD Record fields the extract left out.
+    It never touches a visit's identity, its diagnosis or its procedure, and it
+    never rewrites a line of the hand-written Thai narrative.
+
+    Returns the DELETE statements that take a previous run's additions back out
+    so the script stays idempotent. They are only needed for the 21 originals --
+    every other visit is dropped and rebuilt wholesale further up -- and they are
+    keyed so they can never match a row the extract itself supplied.
+    """
+    deletes = []
+    orig_targets = [v for v in ENRICH_VISITS if v in ORIGINAL]
+    if orig_targets:
+        ids = ", ".join(q(v) for v in orig_targets)
+        # Lab rows added here carry a '9' at position 15 of their id, where the
+        # extract's own rows carry a '0'.
+        deletes.append(f"DELETE FROM imed.medhack_orderlab WHERE transactionnumber IN ({ids})"
+                       " AND substr(id, 15, 1) = '9';")
+
+    for vid, (code, panels, film, fields) in ENRICH_VISITS.items():
+        when = visit_when(vid)
+        ts = when.strftime("%Y-%m-%d %H:%M:%S")
+        sc = by_code[code] if code else None
+        n = ENRICH_SEQ
+
+        if vid in ORIGINAL:
+            # medicalrecord_result has no id column, so its delete is keyed on
+            # the exact (name) values this run inserts -- all of which the
+            # extract demonstrably lacks on these visits.
+            names = list(panels) + ([RADIOLOGY[film][0]] if film else [])
+            if names:
+                deletes.append(
+                    f"DELETE FROM imed.medhack_medicalrecord_result WHERE transactionnumber = {q(vid)}"
+                    f" AND name IN ({', '.join(q(x) for x in names)});")
+            deletes.append(
+                f"DELETE FROM imed.medhack_medicalrecord WHERE transactionnumber = {q(vid)}"
+                f" AND fieldname IN ({', '.join(q(f) for f in list(fields) + ['Past History'])});")
+
+        # --- labs: same shape as build_visit (orderlab + Diagnostic Report) ---
+        for panel in panels:
+            tmlt, cgd, items = PANELS[panel]
+            rts = (when + dt.timedelta(minutes=RNG.randint(25, 95))).strftime("%Y-%m-%d %H:%M:%S")
+            n += 1
+            itemid = sub_id(vid, n)
+            skew = sc.get("abn", {}) if sc else {}
+            for iname, uom, lo, hi, dec in items:
+                n += 1
+                rng_lo, rng_hi = skew.get(iname, (lo, hi))
+                val = lab_value(rng_lo, rng_hi, dec)
+                rows.add("medhack_orderlab",
+                         ("transactionnumber", "id", "panelname", "paneltmlt", "panelcgd",
+                          "collectdatetime", "reportdatetime", "itemid", "itemtmlt",
+                          "itemcgd", "itemname", "itemvalue", "itemuom"),
+                         (vid, sub_id(vid, n), panel, tmlt, cgd, ts, rts, itemid,
+                          tmlt, cgd, iname, val, uom))
+                rows.add("medhack_medicalrecord_result",
+                         ("transactionnumber", "tmlt", "cgd", "name", "documenttype",
+                          "fieldid", "fieldname", "subfieldname", "value", "uom", "recorddatetime"),
+                         (vid, tmlt, cgd, panel, "Diagnostic Report", vid[:11],
+                          "Specimen", iname, val, uom, rts))
+            n += 1
+            rows.add("medhack_orderlab",
+                     ("transactionnumber", "id", "panelname", "paneltmlt", "panelcgd",
+                      "collectdatetime", "reportdatetime", "itemid", "itemtmlt",
+                      "itemcgd", "itemname", "itemvalue", "itemuom"),
+                     (vid, sub_id(vid, n), panel, tmlt, cgd, ts, rts, itemid,
+                      tmlt, cgd, "Comment", RNG.choice(LAB_COMMENTS), None))
+
+        # --- imaging ---------------------------------------------------------
+        if film:
+            study, findings = RADIOLOGY[film]
+            read_at = (when + dt.timedelta(minutes=RNG.randint(30, 120))
+                       ).strftime("%Y-%m-%d %H:%M:%S")
+            rows.add("medhack_medicalrecord_result",
+                     ("transactionnumber", "tmlt", "cgd", "name", "documenttype",
+                      "fieldid", "fieldname", "subfieldname", "value", "uom", "recorddatetime"),
+                     (vid, "300500", "30301", study, "Radiology Report", vid[:11],
+                      "Report", "Impression", findings, None, read_at))
+
+        # --- the notes the extract left out ---------------------------------
+        def rec(field, value):
+            rows.add("medhack_medicalrecord",
+                     ("transactionnumber", "documenttype", "fieldname", "value", "recorddatetime"),
+                     (vid, "OPD Record", field, value, ts))
+
+        for field in fields:
+            if sc is None:                      # D27: written from its own chart
+                val = D27_NOTES[field]
+                for line in (val if isinstance(val, list) else [val]):
+                    rec(field, line)
+            elif field == "Chief Complaint":
+                rec(field, sc["cc"])
+            elif field == "Present Illness":
+                rec(field, sc["pi"])
+            elif field == "Physical Examination":
+                for line in sc["pe"]:
+                    rec(field, line)
+            elif field == "Assessment":
+                rec(field, sc["assess"])
+            elif field == "Plan":
+                rec(field, sc["plan"])
+            elif field == "Family History":
+                rec(field, RNG.choice(FAMILY_HX))
+            elif field == "Food-Drug Allergy":
+                rec(field, RNG.choice(ALLERGY))
+        # The draw happens either way, so naming one visit's line above cannot
+        # shift the RNG stream for the visits built after it.
+        drawn = RNG.choice(PAST_HX)
+        rec("Past History", PAST_HX_FOR.get(vid, drawn))
+
+    return deletes
+
+
 def main():
     rows = Rows()
 
@@ -1164,6 +1369,16 @@ def main():
                                      comorbid=i % 4))
         seq += 1
 
+    # The top-of-tab charts are addressed by visit id, and 129 of those ids are
+    # produced by the loops above -- deterministic, but only as long as nobody
+    # changes the bucket mix or the RNG call order. Fail loudly here rather than
+    # silently enriching nothing.
+    known = set(generated) | set(ORIGINAL)
+    unknown = [v for v in ENRICH_VISITS if v not in known]
+    assert not unknown, (
+        "ENRICH_VISITS names visits this run did not build: " + ", ".join(unknown)
+        + " -- the generator changed and the tab ordering must be re-derived")
+
     keep = ", ".join(q(v) for v in ORIGINAL)
     child_tables = [
         "medhack_bedmanagement", "medhack_billingitem", "medhack_diagnosis_icd10",
@@ -1199,6 +1414,14 @@ def main():
                   f" WHERE id IN ({SEED_DX});")
     script.append("UPDATE imed.medhack_procedure_icd9 SET is_cancelled = NULL, updated_at = NULL"
                   f" WHERE id IN ({SEED_PX});")
+    script.append("")
+    script.append("-- Undo a previous run's fill-out of the top-of-tab charts. Only the 21")
+    script.append("-- originals need it -- every other visit was dropped and rebuilt above --")
+    script.append("-- and it is keyed so it can only ever match rows this script inserted:")
+    script.append("-- the lab rows by the '9' at position 15 of their id (the extract's own")
+    script.append("-- carry '0'), the results and notes by the exact panel, study and field")
+    script.append("-- names those visits demonstrably lack.")
+    script.extend(enrich_visits(rows, by_code))
     script.append("")
     script.append(rows.sql())
     script.append("")
