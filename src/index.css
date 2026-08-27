@@ -11,6 +11,11 @@
   --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, Consolas, monospace;
 
+  /* Cura AI brand faces. Scoped to brand surfaces only — the wordmark and the
+     splash status line — so the app's existing type system is untouched. */
+  --font-brand: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-brand-mono: 'DM Mono', ui-monospace, Consolas, monospace;
+
   /* Semantic colors resolve through CSS vars so light/dark can swap values */
   --color-primary: var(--ds-primary);
   --color-primary-hover: var(--ds-primary-hover);
@@ -283,5 +288,76 @@ input[type="date"]::-webkit-datetime-edit-text {
   .hover-glow-halo::after {
     inset: -4px;
     border-radius: 7px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Cura AI loading system.
+
+   From design_handoff_cura_logo_loading/README.md — durations and easings are
+   final, copied exactly. The mark is three concentric C-arcs around a heart,
+   so the loader IS the logo in motion: each ring orbits at its own speed and
+   direction, and the heart beats on its own clock. Nothing here is decorative
+   spin-for-spin's-sake; the shapes are the brand.
+
+   The global prefers-reduced-motion block above already forces every
+   animation-duration to 0.01ms with !important, which lands each ring on
+   rotate(360deg) — visually identical to rest. So a reduced-motion user sees
+   the static mark, which is exactly what the handoff asks for. No extra rule
+   is needed here, and adding one would be dead CSS.
+   -------------------------------------------------------------------------- */
+@keyframes spinCW {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spinCCW {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes pulseHeart {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  18% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  36% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  54% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+@keyframes barSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+@keyframes dotBlink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -420px 0;
+  }
+  100% {
+    background-position: 420px 0;
   }
 }

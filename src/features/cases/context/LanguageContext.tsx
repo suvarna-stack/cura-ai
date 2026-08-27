@@ -235,10 +235,10 @@ export const dict: Record<string, { en: string; th: string }> = {
   "code.opType":           { en: "Operation Type",          th: "ประเภทหัตถการ" },
   // hospital-style laboratory results table (grouped by panel)
   "report.labs":           { en: "Laboratory",              th: "ผลตรวจทางห้องปฏิบัติการ" },
-  // per-code note, like the hospital UI's Note column — internal to MedCode AI
+  // per-code note, like the hospital UI's Note column — internal to Cura AI
   "code.noteLabel":        { en: "Note (internal)",         th: "หมายเหตุ (ภายในระบบ)" },
-  "code.notePlaceholder":  { en: "Kept in MedCode AI only — not sent to the hospital",
-                             th: "เก็บในระบบ MedCode AI เท่านั้น ไม่ส่งไปโรงพยาบาล" },
+  "code.notePlaceholder":  { en: "Kept in Cura AI only — not sent to the hospital",
+                             th: "เก็บในระบบ Cura AI เท่านั้น ไม่ส่งไปโรงพยาบาล" },
   // hospital vital-sign readings (the strip above CC/PI/PE in the original coder UI)
   "vitals.title":          { en: "Vital Signs",             th: "สัญญาณชีพ" },
   // hospital-style panel view of the record (2026-07-31), panel titles copied

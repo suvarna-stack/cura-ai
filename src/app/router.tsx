@@ -1,5 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
+import { CuraSplash } from '../components/brand/CuraSplash'
+import { useDelayedFlag } from '../hooks/useDelayedFlag'
 import { LoginForm } from '../features/auth/components/LoginForm'
 import { roleHome, useAuth } from '../features/auth/hooks/useAuth'
 import type { UserRole } from '../features/auth/types/auth.types'
@@ -26,8 +28,11 @@ import { SettingsPage } from '../features/settings/components/SettingsPage'
  */
 function RequireRole({ role }: { role: UserRole }) {
   const { user, ready } = useAuth()
+  // Nothing for the first quarter-second, so a fast token check never flashes
+  // a splash; the branded one takes over only once the wait is real.
+  const showSplash = useDelayedFlag(!ready)
 
-  if (!ready) return null // token verification in flight — avoid a flash
+  if (!ready) return showSplash ? <CuraSplash status="Loading workspace…" /> : null
 
   if (!user) {
     return <Navigate to="/login" replace />
@@ -41,7 +46,8 @@ function RequireRole({ role }: { role: UserRole }) {
 /** Everyone's landing spot: role home when logged in, /login otherwise. */
 function HomeRedirect() {
   const { user, ready } = useAuth()
-  if (!ready) return null
+  const showSplash = useDelayedFlag(!ready)
+  if (!ready) return showSplash ? <CuraSplash status="Loading workspace…" /> : null
   return <Navigate to={user ? roleHome(user.role) : '/login'} replace />
 }
 

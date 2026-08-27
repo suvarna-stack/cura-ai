@@ -567,11 +567,11 @@ function attestation(input: CaseReportInput, approvedCount: number): string {
   // new code set (simulateCoderAssignment) — so "0 codes were transmitted"
   // would be the wrong claim to put over a signature.
   const statement = approvedCount === 0
-    ? `<p>No coder-selected code was recorded for this case when it was approved in MedCode AI on
+    ? `<p>No coder-selected code was recorded for this case when it was approved in Cura AI on
         <b>${val(c.codedDate)}</b>. The diagnosis already held by the hospital was re-confirmed as
         the final code set; no new code was transmitted.</p>`
     : `<p>The ${approvedCount} code${approvedCount === 1 ? "" : "s"} listed above ${
-        approvedCount === 1 ? "was" : "were"} reviewed and approved in MedCode AI on
+        approvedCount === 1 ? "was" : "were"} reviewed and approved in Cura AI on
         <b>${val(c.codedDate)}</b> and transmitted to the hospital information system (iMed) as
         the final code set for this visit.</p>`;
 
@@ -622,7 +622,7 @@ function systemMetadata(input: CaseReportInput): string {
 export function caseReportFilename(caseData: FinishedCase, now = new Date()): string {
   const vn = (caseData.vn ?? caseData.id).replace(/[^\w-]+/g, "");
   const day = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-  return `MedCode-Coding-Summary-VN${vn}-${day}`;
+  return `Cura-Coding-Summary-VN${vn}-${day}`;
 }
 
 export interface BuildOptions {
@@ -700,7 +700,7 @@ export function buildCaseReportDocument(
   const letterhead = `
     <div class="head">
       <div>
-        <div class="brand">MedCode AI</div>
+        <div class="brand">Cura AI</div>
         <div class="brand-sub">Medical Coding Audit System · ระบบตรวจสอบการให้รหัสทางการแพทย์</div>
         <div class="stamp">Approved · Final</div>
       </div>

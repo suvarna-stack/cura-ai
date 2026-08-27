@@ -12,6 +12,7 @@ import { useToast } from "../context/ToastContext";
 import { useLang } from "../context/LanguageContext";
 import { useCaseFields } from "../context/CaseFieldsContext";
 import { ConfirmDialog } from "./global/ConfirmDialog";
+import { CuraProgressBar } from "../../../components/brand/CuraSplash";
 import { Pagination } from "./global/Pagination";
 import { EmptyState } from "./global/EmptyState";
 import { CasePreview } from "./global/CasePreview";
@@ -197,25 +198,48 @@ function CaseMeta({ c }: { c: RichCase }) {
   );
 }
 
-// pulsing placeholder row shown while iMed sync is running
-function SkeletonRow() {
+// Placeholder row shown while cases.json loads or an iMed sync runs.
+//
+// Sweeps rather than pulses (design_handoff_cura_logo_loading): a pulse makes
+// the whole card blink as one block, which reads as "broken", while a sweep
+// travelling left-to-right reads as data arriving. The handoff specifies this
+// for an 8-column table; this list renders card rows, so the treatment is
+// carried over to the bars we actually have.
+//
+// Cell delays stagger across the row and widths vary per row, so five of these
+// stacked never line up into a mechanical grid.
+function shimmerStyle(isDark: boolean, delaySec: number) {
+  const [base, peak] = isDark
+    ? ["rgba(255,255,255,0.06)", "rgba(255,255,255,0.13)"]
+    : ["#eef2ec", "#e2e9df"];
+  return {
+    background: `linear-gradient(90deg, ${base} 8%, ${peak} 20%, ${base} 34%)`,
+    backgroundSize: "420px 100%",
+    animation: `shimmer 1.5s linear ${delaySec}s infinite`,
+  };
+}
+
+function SkeletonRow({ index = 0 }: { index?: number }) {
   const { gl } = useTheme();
-  const bar = gl.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+  const cell = (delay: number) => shimmerStyle(gl.isDark, delay);
+  // Per-row width variation, straight from the handoff's dept/preview figures.
+  const dept = ["72%", "58%", "80%", "64%", "74%"][index % 5];
+  const preview = ["92%", "78%", "86%", "70%", "88%"][index % 5];
   return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl animate-pulse"
+    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
       style={{ background: gl.row, border: gl.border, boxShadow: gl.shadowSm }}>
       <div className="flex-1 min-w-0 space-y-2">
-        <div className="h-2.5 w-28 rounded" style={{ background: bar }} />
-        <div className="h-3 w-44 rounded" style={{ background: bar }} />
+        <div className="h-2.5 rounded" style={{ width: dept, maxWidth: "7rem", ...cell(0) }} />
+        <div className="h-3 rounded" style={{ width: preview, maxWidth: "11rem", ...cell(0.1) }} />
         <div className="flex gap-1.5">
-          <div className="h-3.5 w-10 rounded-md" style={{ background: bar }} />
-          <div className="h-3.5 w-10 rounded-md" style={{ background: bar }} />
-          <div className="h-3.5 w-16 rounded-md" style={{ background: bar }} />
+          <div className="h-3.5 w-10 rounded-md" style={cell(0.2)} />
+          <div className="h-3.5 w-10 rounded-md" style={cell(0.2)} />
+          <div className="h-3.5 w-16 rounded-md" style={cell(0.3)} />
         </div>
       </div>
-      <div className="h-5 w-12 rounded-full shrink-0" style={{ background: bar }} />
-      <div className="h-8 w-16 rounded-lg shrink-0" style={{ background: bar }} />
-      <div className="h-8 w-[4.5rem] rounded-lg shrink-0" style={{ background: bar }} />
+      <div className="h-5 w-12 rounded-full shrink-0" style={cell(0.1)} />
+      <div className="h-8 w-16 rounded-lg shrink-0" style={cell(0.2)} />
+      <div className="h-8 w-[4.5rem] rounded-lg shrink-0" style={cell(0.3)} />
     </div>
   );
 }
@@ -676,9 +700,17 @@ export function CasesPage({
             {/* skeletons cover both the initial cases.json fetch and the manual
                 iMed sync — but NOT the error state, which keeps its banner */}
             {(loading || syncing) ? (
-              <div className="p-3 space-y-2" role="status" aria-busy="true">
+              <div role="status" aria-busy="true">
                 <span className="sr-only">{t("a11y.loading")}</span>
-                {Array.from({ length: 7 }).map((_, i) => <SkeletonRow key={i} />)}
+                {/* Sits directly under the tab strip: the one piece of loading
+                    UI that says "still going" when every row below looks the
+                    same from one second to the next. */}
+                <CuraProgressBar label={t("a11y.loading")} />
+                <div className="p-3 space-y-2">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <SkeletonRow key={i} index={i} />
+                  ))}
+                </div>
               </div>
             ) : (
             // horizontal track: the four tab panels sit side by side and slide

@@ -115,7 +115,7 @@ export function AccountsPage() {
         </Button>
       </div>
       <p className="mb-6 text-[12px] text-muted">
-        Manage coder access to MedCode AI. Accounts are hospital-wide — a coder
+        Manage coder access to Cura AI. Accounts are hospital-wide — a coder
         is not tied to a department.
       </p>
 
@@ -239,7 +239,7 @@ export function AccountsPage() {
           message={
             toggling.status === 'Active'
               ? `Deactivate ${toggling.name}? They will lose access immediately.`
-              : `Reactivate ${toggling.name}? They will regain access to MedCode AI.`
+              : `Reactivate ${toggling.name}? They will regain access to Cura AI.`
           }
           confirmLabel={
             toggling.status === 'Active' ? 'Deactivate' : 'Activate'

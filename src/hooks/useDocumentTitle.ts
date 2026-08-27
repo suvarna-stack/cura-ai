@@ -4,7 +4,7 @@
 // ============================================================
 import { useEffect } from 'react'
 
-const SUFFIX = 'MedCode AI'
+const SUFFIX = 'Cura AI'
 
 export function useDocumentTitle(title: string | null | undefined) {
   useEffect(() => {

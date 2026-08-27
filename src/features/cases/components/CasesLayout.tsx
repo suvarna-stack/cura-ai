@@ -5,11 +5,12 @@ import {
   BarChart2,
   Bot,
   Settings,
-  Cpu,
   LogOut,
   RefreshCw,
 } from 'lucide-react'
 import { ConfirmDialog } from './global/ConfirmDialog'
+import { CuraLockup } from '../../../components/brand/CuraMark'
+import { CuraSpinner } from '../../../components/brand/CuraSpinner'
 import { DateRangeDialog } from './global/DateRangeDialog'
 import type { DateRange } from '../utils/dateRange'
 import { useTheme } from '../context/ThemeContext'
@@ -93,14 +94,12 @@ function CoderShell() {
           borderBottom: gl.sidebarBorder,
         }}
       >
-        <div className="mr-6 flex select-none items-center gap-2">
-          <Cpu size={18} style={{ color: gl.accent }} />
-          <p
-            className="text-[15px] leading-tight font-bold tracking-tight"
-            style={{ color: gl.text }}
-          >
-            MedCode <span style={{ color: gl.accent }}>AI</span>
-          </p>
+        <div className="mr-6">
+          <CuraLockup
+            markSize={20}
+            wordSize={14}
+            tone={gl.isDark ? 'dark' : 'light'}
+          />
         </div>
 
         <nav aria-label="Primary" className="flex items-center gap-1">
@@ -147,10 +146,16 @@ function CoderShell() {
               color: gl.isDark ? '#1a0a00' : '#fff',
             }}
           >
-            <RefreshCw
-              size={14}
-              className={syncing ? 'animate-spin' : undefined}
-            />
+            {syncing ? (
+              <CuraSpinner
+                variant="label"
+                size={16}
+                tone="dark"
+                label={t('sync.syncing')}
+              />
+            ) : (
+              <RefreshCw size={14} />
+            )}
             {syncing ? t('sync.syncing') : t('sync.button')}
           </button>
           {/* identity badge — quietest of the three, it is a label not a control */}

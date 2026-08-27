@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ShieldCheck } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
+import { CuraMark, CuraWordmark } from '../../../components/brand/CuraMark'
 import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
 import { extractAuthError } from '../api/authService'
@@ -60,8 +60,10 @@ export function LoginForm() {
       <Card className="w-full max-w-sm">
         {/* brand */}
         <div className="mb-8 flex flex-col items-center gap-2">
-          <ShieldCheck size={34} className="text-primary" />
-          <h1 className="text-[20px] font-bold text-text">MedCode AI</h1>
+          <CuraMark size={44} />
+          <h1>
+            <CuraWordmark size={20} />
+          </h1>
           <p className="text-[12px] font-semibold text-primary">
             Coding Audit Platform
           </p>

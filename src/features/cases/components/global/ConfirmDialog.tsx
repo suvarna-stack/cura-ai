@@ -10,6 +10,7 @@ import type { LucideIcon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useLang } from "../../context/LanguageContext";
 import { ModalShell } from "../../../../components/ui/Modal";
+import { CuraSpinner } from "../../../../components/brand/CuraSpinner";
 
 export function ConfirmDialog({
   icon: Icon, title, body, confirmLabel, danger = false, busy = false,
@@ -58,7 +59,10 @@ export function ConfirmDialog({
             style={danger
               ? { background: "#ef4444", color: "#fff" }
               : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
-            <Icon size={12} /> {busy ? t("confirm.working") : confirmLabel}
+            {busy
+              ? <CuraSpinner variant="button" size={13} label={t("confirm.working")} />
+              : <Icon size={12} />}
+            {busy ? t("confirm.working") : confirmLabel}
           </button>
         </div>
     </ModalShell>

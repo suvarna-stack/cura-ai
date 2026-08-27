@@ -7,11 +7,11 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/hooks/useAuth'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { ConfirmModal } from './ui/Modal'
+import { CuraMark, CuraWordmark } from './brand/CuraMark'
 
 // Strict role separation (Phase 3): no cross-link to the coder's /cases —
 // admins see admin pages only (the router would bounce it anyway).
@@ -44,12 +44,10 @@ export function AdminLayout() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 border-b border-border px-5 py-5">
-        <ShieldCheck size={20} className="shrink-0 text-primary" />
+        <CuraMark size={22} className="shrink-0" />
         <div>
-          <p className="text-[14px] font-bold leading-tight text-text">
-            MedCode AI
-          </p>
-          <p className="text-[12px] font-semibold leading-tight text-primary">
+          <CuraWordmark size={14} />
+          <p className="mt-1 text-[12px] font-semibold leading-tight text-primary">
             SuperAdmin
           </p>
         </div>
@@ -152,9 +150,11 @@ export function AdminLayout() {
           >
             <Menu size={18} />
           </button>
-          <p className="text-[13px] font-bold">
-            MedCode AI <span className="text-primary">SuperAdmin</span>
-          </p>
+          <span className="flex items-center gap-2">
+            <CuraMark size={18} />
+            <CuraWordmark size={13} />
+            <span className="text-[13px] font-bold text-primary">SuperAdmin</span>
+          </span>
         </div>
         <main id="main" tabIndex={-1} className="flex-1 p-6">
           <Outlet />
