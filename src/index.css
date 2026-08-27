@@ -229,3 +229,28 @@ input[type="date"]::-webkit-datetime-edit-text {
   animation: medcode-pop-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   transform-origin: bottom center;
 }
+
+/* Hover on the glass surfaces has to CHANGE colour, not lower opacity. These
+   fills are already translucent, so `hover:opacity-*` fades a control into its
+   own background and dims the label with it — hovering reads as "going
+   disabled", which is the opposite of an affordance.
+
+   The base and hover values are supplied inline, because they come from the
+   active theme's tokens (and `--ht-bd` may hold a whole `border` shorthand).
+   Only the swap lives here: a `hover:` utility class could never beat the
+   inline `background`/`border` these components would otherwise set, so the
+   components set nothing but the custom properties and let this class read
+   them. --ht-*-hover falls back to the base value, so a caller may set just
+   one of the two. */
+.hover-tint {
+  background: var(--ht-bg, transparent);
+  border: var(--ht-bd, 1px solid transparent);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    scale 150ms ease;
+}
+.hover-tint:hover:not(:disabled) {
+  background: var(--ht-bg-hover, var(--ht-bg, transparent));
+  border: var(--ht-bd-hover, var(--ht-bd, 1px solid transparent));
+}

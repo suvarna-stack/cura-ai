@@ -481,27 +481,25 @@ export function AgentPage() {
             >
               {t('agent.history.title')}
             </span>
-            {/* Hover deepens the accent tint instead of the `hover:opacity-80`
-                this used to carry: on a translucent 0.15 accent fill, dropping
-                the opacity faded the button INTO the sidebar and dimmed the +
-                with it, so hovering read as "greying out" rather than
-                "highlighting". Base and hover colours both go through CSS vars
-                because an inline `background`/`border` would outrank the class
-                a `hover:` variant compiles to. */}
+            {/* Hover deepens the accent tint (see .hover-tint in index.css)
+                instead of the `hover:opacity-80` this used to carry: on a
+                translucent 0.15 accent fill, dropping the opacity faded the
+                button INTO the sidebar and dimmed the + with it, so hovering
+                read as "greying out" rather than "highlighting". */}
             <button
               type="button"
               onClick={newChat}
               disabled={pending}
               title={t('agent.history.new')}
               aria-label={t('agent.history.new')}
-              className="group flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--nc-bd)] bg-[var(--nc-bg)] transition-[background-color,border-color,scale] duration-150 enabled:hover:border-[var(--nc-bd-hover)] enabled:hover:bg-[var(--nc-bg-hover)] enabled:active:scale-90 disabled:opacity-50"
+              className="hover-tint group flex h-7 w-7 items-center justify-center rounded-lg enabled:active:scale-90 disabled:opacity-50"
               style={
                 {
                   color: gl.accent,
-                  '--nc-bg': `rgba(${gl.accentRgb},0.15)`,
-                  '--nc-bd': `rgba(${gl.accentRgb},0.25)`,
-                  '--nc-bg-hover': `rgba(${gl.accentRgb},0.30)`,
-                  '--nc-bd-hover': `rgba(${gl.accentRgb},0.50)`,
+                  '--ht-bg': `rgba(${gl.accentRgb},0.15)`,
+                  '--ht-bd': `1px solid rgba(${gl.accentRgb},0.25)`,
+                  '--ht-bg-hover': `rgba(${gl.accentRgb},0.30)`,
+                  '--ht-bd-hover': `1px solid rgba(${gl.accentRgb},0.50)`,
                 } as CSSProperties
               }
             >
@@ -538,14 +536,28 @@ export function AgentPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void openConversation(c.id)
                   }}
-                  className="group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 transition-all hover:opacity-90"
+                  className="hover-tint group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2"
                   style={
-                    active
-                      ? {
-                          background: `rgba(${gl.accentRgb},0.14)`,
-                          border: `1px solid rgba(${gl.accentRgb},0.24)`,
-                        }
-                      : { border: '1px solid transparent' }
+                    {
+                      // An INACTIVE row had no hover surface at all before —
+                      // `hover:opacity-90` over a transparent background only
+                      // dimmed the title text, so pointing at a stored chat
+                      // gave almost no feedback. It now tints toward the
+                      // accent, landing just short of the active row so the
+                      // two never read the same.
+                      '--ht-bg': active
+                        ? `rgba(${gl.accentRgb},0.14)`
+                        : 'transparent',
+                      '--ht-bd': active
+                        ? `1px solid rgba(${gl.accentRgb},0.24)`
+                        : '1px solid transparent',
+                      '--ht-bg-hover': active
+                        ? `rgba(${gl.accentRgb},0.22)`
+                        : `rgba(${gl.accentRgb},0.08)`,
+                      '--ht-bd-hover': active
+                        ? `1px solid rgba(${gl.accentRgb},0.36)`
+                        : `1px solid rgba(${gl.accentRgb},0.16)`,
+                    } as CSSProperties
                   }
                 >
                   <ModeIcon
@@ -613,15 +625,23 @@ export function AgentPage() {
           aria-expanded={sidebarOpen}
           title={t('agent.history.title')}
           onClick={() => setSidebarOpen((s) => !s)}
-          className="flex h-9 w-9 items-center justify-center rounded-2xl transition-all hover:opacity-80"
+          className="hover-tint flex h-9 w-9 items-center justify-center rounded-2xl active:scale-90"
           style={
-            sidebarOpen
-              ? {
-                  background: `rgba(${gl.accentRgb},0.15)`,
-                  border: `1px solid rgba(${gl.accentRgb},0.28)`,
-                  color: gl.accent,
-                }
-              : { background: gl.card, border: gl.border, color: gl.muted }
+            {
+              color: sidebarOpen ? gl.accent : gl.muted,
+              '--ht-bg': sidebarOpen
+                ? `rgba(${gl.accentRgb},0.15)`
+                : gl.card,
+              '--ht-bd': sidebarOpen
+                ? `1px solid rgba(${gl.accentRgb},0.28)`
+                : gl.border,
+              // Closed, the button is plain glass, so its hover picks up the
+              // accent to preview what opening it looks like.
+              '--ht-bg-hover': `rgba(${gl.accentRgb},${sidebarOpen ? 0.3 : 0.12})`,
+              '--ht-bd-hover': `1px solid rgba(${gl.accentRgb},${
+                sidebarOpen ? 0.5 : 0.28
+              })`,
+            } as CSSProperties
           }
         >
           <History size={16} />
