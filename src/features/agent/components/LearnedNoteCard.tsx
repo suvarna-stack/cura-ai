@@ -6,11 +6,19 @@ import type { LearnedCode, LearnedNote } from '../types/agent.types'
 
 const ROLES: LearnedCode['role'][] = ['principal', 'secondary', 'exclude']
 
-/** ICD-10 ("E11.22") or ICD-9 procedure ("47.09") shape. */
-const CODE_RE = /^([A-Z]\d{2}(\.\d{1,4})?|\d{2,3}\.\d{1,2})$/
+/**
+ * ICD-10 ("E11.22"), ICD-9 procedure ("47.09"), ICD-9 bare category ("486")
+ * or ICD-9 external-cause ("E888") shape — mirrors learn.py's patterns.
+ */
+const CODE_RE = /^([A-Z]\d{2}(\.\d{1,4})?|\d{2,3}\.\d{1,2}|\d{3}|E\d{3}(\.\d)?)$/
 
-function systemOf(code: string): LearnedCode['system'] {
-  return /^[A-Z]/.test(code) ? 'ICD-10' : 'ICD-9'
+function systemOf(code: string, siblings: LearnedCode[]): LearnedCode['system'] {
+  if (/^E\d{3}/.test(code) || /^\d/.test(code)) return 'ICD-9'
+  // Letter-start shapes (T67, V70) exist in both systems: follow the note's
+  // other codes when they agree, otherwise assume ICD-10.
+  if (siblings.length > 0 && siblings.every((c) => c.system === 'ICD-9'))
+    return 'ICD-9'
+  return 'ICD-10'
 }
 
 /**
@@ -47,7 +55,7 @@ export function LearnedNoteCard({
       ...draft,
       codes: [
         ...draft.codes,
-        { code, system: systemOf(code), description: '', role: 'secondary' },
+        { code, system: systemOf(code, draft.codes), description: '', role: 'secondary' },
       ],
     })
     setNewCode('')
