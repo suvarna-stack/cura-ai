@@ -473,18 +473,29 @@ export function AgentPage() {
             >
               {t('agent.history.title')}
             </span>
+            {/* Hover deepens the accent tint instead of the `hover:opacity-80`
+                this used to carry: on a translucent 0.15 accent fill, dropping
+                the opacity faded the button INTO the sidebar and dimmed the +
+                with it, so hovering read as "greying out" rather than
+                "highlighting". Base and hover colours both go through CSS vars
+                because an inline `background`/`border` would outrank the class
+                a `hover:` variant compiles to. */}
             <button
               type="button"
               onClick={newChat}
               disabled={pending}
               title={t('agent.history.new')}
               aria-label={t('agent.history.new')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-              style={{
-                background: `rgba(${gl.accentRgb},0.15)`,
-                border: `1px solid rgba(${gl.accentRgb},0.25)`,
-                color: gl.accent,
-              }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--nc-bd)] bg-[var(--nc-bg)] transition-colors duration-150 enabled:hover:border-[var(--nc-bd-hover)] enabled:hover:bg-[var(--nc-bg-hover)] disabled:opacity-50"
+              style={
+                {
+                  color: gl.accent,
+                  '--nc-bg': `rgba(${gl.accentRgb},0.15)`,
+                  '--nc-bd': `rgba(${gl.accentRgb},0.25)`,
+                  '--nc-bg-hover': `rgba(${gl.accentRgb},0.30)`,
+                  '--nc-bd-hover': `rgba(${gl.accentRgb},0.50)`,
+                } as CSSProperties
+              }
             >
               <Plus size={14} />
             </button>
