@@ -95,6 +95,11 @@ export function AgentPage() {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [confirmId, setConfirmId] = useState<number | null>(null)
+  // Bumped whenever the transcript is replaced wholesale — new chat, mode
+  // switch, reopening a stored chat. It keys the transcript container, so
+  // React remounts it and the .rise-in mount animation replays. Without it the
+  // swap lands in a single frame and looks like a render fault.
+  const [transcriptNonce, setTranscriptNonce] = useState(0)
   // persistExchange runs after an async reply; a ref never reads stale state
   const activeIdRef = useRef<number | null>(null)
   // true from send() start to settle — `pending` drops on the FIRST delta, so
@@ -141,6 +146,7 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
+    setTranscriptNonce((v) => v + 1)
   }
 
   /** Fresh empty chat; the old one stays reachable from the sidebar. */
@@ -149,6 +155,7 @@ export function AgentPage() {
     setConvo([])
     setActive(null)
     setShowSuggestions(true)
+    setTranscriptNonce((v) => v + 1)
   }
 
   /** Reopen a stored conversation (restores its mode too). */
@@ -172,6 +179,7 @@ export function AgentPage() {
         })),
       )
       setShowSuggestions(false)
+      setTranscriptNonce((v) => v + 1)
     } catch (err) {
       console.warn('failed to open conversation', err)
     } finally {
@@ -486,7 +494,7 @@ export function AgentPage() {
               disabled={pending}
               title={t('agent.history.new')}
               aria-label={t('agent.history.new')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--nc-bd)] bg-[var(--nc-bg)] transition-colors duration-150 enabled:hover:border-[var(--nc-bd-hover)] enabled:hover:bg-[var(--nc-bg-hover)] disabled:opacity-50"
+              className="group flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--nc-bd)] bg-[var(--nc-bg)] transition-[background-color,border-color,scale] duration-150 enabled:hover:border-[var(--nc-bd-hover)] enabled:hover:bg-[var(--nc-bg-hover)] enabled:active:scale-90 disabled:opacity-50"
               style={
                 {
                   color: gl.accent,
@@ -497,7 +505,16 @@ export function AgentPage() {
                 } as CSSProperties
               }
             >
-              <Plus size={14} />
+              {/* A + rotated 90deg lands looking identical, so the spin is a
+                  pure motion cue — it never turns into an x mid-hover the way
+                  a 45deg turn would, which on a New chat control would read as
+                  close. */}
+              <Plus
+                size={14}
+                className={`transition-transform duration-300 ${
+                  pending ? '' : 'group-hover:rotate-90'
+                }`}
+              />
             </button>
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
@@ -689,7 +706,8 @@ export function AgentPage() {
       </header>
 
       <div
-        className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6"
+        key={transcriptNonce}
+        className="rise-in min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6"
         style={{ scrollbarWidth: 'none' } as CSSProperties}
       >
         <div
@@ -951,7 +969,7 @@ export function AgentPage() {
       <div className="relative shrink-0 px-6 pt-3 pb-3">
         {showSuggestions && (
           <div
-            className="absolute inset-x-6 bottom-full z-10 mb-2 flex flex-wrap gap-2 rounded-2xl p-3"
+            className="pop-in absolute inset-x-6 bottom-full z-10 mb-2 flex flex-wrap gap-2 rounded-2xl p-3"
             style={{
               background: gl.card,
               backdropFilter: gl.blur20,
