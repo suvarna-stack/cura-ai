@@ -395,7 +395,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             there is nothing to tick ("Select all (0)" invites a no-op). */}
         {selectable && !loading && pickableIdx.length > 0 && (
           <div className="flex items-center gap-2 mt-2">
-            <label className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
+            <label className="hover-glow flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
               style={{
                 background: pickedIdx.length ? `rgba(${gl.accentRgb},0.10)` : gl.inputBg,
                 border: `1px solid rgba(${gl.accentRgb},${pickedIdx.length ? 0.35 : 0.18})`,
@@ -413,7 +413,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
             </label>
             {pickedIdx.length > 0 && (
               <button onClick={() => onToggleAll?.(pickableIdx, false)}
-                className="text-[12px] font-semibold px-2 py-1.5 rounded-lg hover:opacity-80 transition-all"
+                className="hover-glow text-[12px] font-semibold px-2 py-1.5 rounded-lg transition-all"
                 style={{ color: gl.muted }}>
                 {t("sel.clear")}
               </button>
@@ -497,7 +497,7 @@ export function CodesColumn({ system, codes, onReorder, onEdit, onDelete, onAdd,
       {onAdd && (
         <div className="px-3 py-3 shrink-0" style={{ borderTop: gl.borderSm }}>
           <button onClick={() => onAdd(system)}
-            className="w-full py-2 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-all"
+            className="hover-glow w-full py-2 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all"
             style={{ color: gl.accent, border: `1px dashed rgba(${gl.accentRgb},0.40)`, background: `rgba(${gl.accentRgb},0.05)` }}>
             <Plus size={12} /> {t("code.addTo", { system: LABEL[system] })}
           </button>

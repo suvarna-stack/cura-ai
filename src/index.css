@@ -230,27 +230,58 @@ input[type="date"]::-webkit-datetime-edit-text {
   transform-origin: bottom center;
 }
 
-/* Hover on the glass surfaces has to CHANGE colour, not lower opacity. These
-   fills are already translucent, so `hover:opacity-*` fades a control into its
-   own background and dims the label with it — hovering reads as "going
-   disabled", which is the opposite of an affordance.
+/* --------------------------------------------------------------------------
+   Hover state layer.
 
-   The base and hover values are supplied inline, because they come from the
-   active theme's tokens (and `--ht-bd` may hold a whole `border` shorthand).
-   Only the swap lives here: a `hover:` utility class could never beat the
-   inline `background`/`border` these components would otherwise set, so the
-   components set nothing but the custom properties and let this class read
-   them. --ht-*-hover falls back to the base value, so a caller may set just
-   one of the two. */
-.hover-tint {
-  background: var(--ht-bg, transparent);
-  border: var(--ht-bd, 1px solid transparent);
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    scale 150ms ease;
-}
-.hover-tint:hover:not(:disabled) {
-  background: var(--ht-bg-hover, var(--ht-bg, transparent));
-  border: var(--ht-bd-hover, var(--ht-bd, 1px solid transparent));
+   Controls on the glass surfaces used to hover with `hover:opacity-*`, which
+   is backwards. These fills are translucent, so lowering the opacity fades a
+   control INTO its own background and dims its label with it: hovering read as
+   "going disabled" rather than as an affordance. On the fully transparent
+   controls — ghost buttons, the chat-history rows — it was worse still, since
+   there was no surface to fade and it did nothing but grey the text.
+
+   So add ink instead of removing it. The wash is painted as an ::after, which
+   composes over ANY base without needing to know what that base is: a solid
+   accent gradient, a translucent glass tint, or nothing at all. Defaulting it
+   to currentColor keeps it on-brand for free — an accent chip deepens toward
+   the accent, a solid accent button with white text lifts toward white, a
+   muted ghost button greys. Set --hg-ink to wash with another colour and
+   --hg-strength to change how far it goes.
+
+   In @layer components so a positioning utility on the element still beats the
+   `position: relative` here, the same way @layer base lets `cursor-grab` beat
+   the pointer rule above.
+
+   The wash sits above non-positioned children on purpose: at 11% of a colour
+   the label is already painted in, it is invisible on the text and reads only
+   on the surface around it. --hg-strength is there for the cases where it
+   isn't.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .hover-glow {
+    position: relative;
+  }
+  .hover-glow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--hg-ink, currentColor);
+    opacity: 0;
+    transition: opacity 150ms ease;
+    pointer-events: none;
+  }
+  .hover-glow:hover:not(:disabled):not([aria-disabled='true'])::after {
+    opacity: var(--hg-strength, 0.11);
+  }
+
+  /* A bare icon button — the X on the search field, the mute bell, the trash
+     on a draft code — has no box of its own, so `inset: 0` would paint a hard
+     little square tight around the glyph. This pushes the wash out into a
+     halo instead. 4px is chosen to stay inside the gap-2 (8px) these sit in,
+     so two adjacent icons never touch. */
+  .hover-glow-halo::after {
+    inset: -4px;
+    border-radius: 7px;
+  }
 }

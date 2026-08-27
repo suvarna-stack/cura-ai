@@ -44,7 +44,7 @@ export function CaseLockedScreen({
       </p>
       <button
         onClick={onBack}
-        className="mt-4 rounded-lg px-4 py-2 text-[12px] font-bold transition-all hover:opacity-90"
+        className="hover-glow mt-4 rounded-lg px-4 py-2 text-[12px] font-bold transition-all"
         style={{
           background: `rgba(${gl.accentRgb},0.12)`,
           color: gl.accent,

@@ -58,7 +58,7 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
   return (
     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 pb-1">
       <button onClick={goPrev} disabled={current <= 1}
-        className="text-[12px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
+        className="hover-glow text-[12px] font-medium px-3 py-1 rounded-lg transition-all disabled:opacity-40"
         style={btn}>
         {t("page.prev")}
       </button>
@@ -70,7 +70,7 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
             <span key={`gap-${i}`} className="text-[12px] font-medium px-1 select-none" style={{ color: gl.muted }}>…</span>
           ) : (
             <button key={p} onClick={() => go(p)}
-              className="text-[12px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+              className="hover-glow text-[12px] font-bold px-2.5 py-1 rounded-lg transition-all"
               style={{ minWidth: "1.9rem", ...(p === current ? activeBtn : btn) }}>
               {p}
             </button>
@@ -85,7 +85,7 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
       )}
 
       <button onClick={goNext} disabled={current >= pages}
-        className="text-[12px] font-medium px-3 py-1 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
+        className="hover-glow text-[12px] font-medium px-3 py-1 rounded-lg transition-all disabled:opacity-40"
         style={btn}>
         {t("page.next")}
       </button>
@@ -103,7 +103,7 @@ export function Pagination({ current, total, perPage, onPage, onPrev, onNext }: 
             className="text-[12px] font-semibold w-11 px-2 py-1 rounded-lg outline-none text-center"
             style={{ background: gl.inputBg, border: gl.border, color: gl.text }} />
           <button onClick={submitJump}
-            className="text-[12px] font-bold px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow text-[12px] font-bold px-2.5 py-1 rounded-lg transition-all"
             style={{ border: `1px solid rgba(${gl.accentRgb},0.30)`, color: gl.accent, background: `rgba(${gl.accentRgb},0.08)` }}>
             {t("page.go")}
           </button>

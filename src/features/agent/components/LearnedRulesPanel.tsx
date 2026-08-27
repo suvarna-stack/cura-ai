@@ -59,7 +59,7 @@ export function LearnedRulesPanel({
           type="button"
           onClick={onClose}
           aria-label={t('agent.learn.rules.close')}
-          className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:opacity-80"
+          className="hover-glow flex h-7 w-7 items-center justify-center rounded-lg transition-all"
           style={{ color: gl.muted }}
         >
           <X size={14} />
@@ -145,7 +145,7 @@ export function LearnedRulesPanel({
                         ? t('agent.learn.mute')
                         : t('agent.learn.unmute')
                     }
-                    className="ml-auto shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
+                    className="hover-glow hover-glow-halo ml-auto shrink-0 transition-all disabled:opacity-40"
                     style={{ color: note.active ? gl.muted : gl.accent }}
                   >
                     {note.active ? <BellOff size={12} /> : <Bell size={12} />}
@@ -156,7 +156,7 @@ export function LearnedRulesPanel({
                     onClick={() => onDelete(note)}
                     title={t('agent.learn.forget')}
                     aria-label={t('agent.learn.forget')}
-                    className="shrink-0 transition-all hover:opacity-70 disabled:opacity-40"
+                    className="hover-glow hover-glow-halo shrink-0 transition-all disabled:opacity-40"
                     style={{ color: gl.danger }}
                   >
                     <Trash2 size={12} />

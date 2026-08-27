@@ -30,7 +30,7 @@ export function EmptyState({ icon: Icon, title, subtext, actionLabel, onAction }
       )}
       {actionLabel && onAction && (
         <button onClick={onAction}
-          className="text-[12px] font-bold px-3.5 py-2 rounded-lg mt-3.5 hover:opacity-90 transition-all"
+          className="hover-glow text-[12px] font-bold px-3.5 py-2 rounded-lg mt-3.5 transition-all"
           style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}>
           {actionLabel}
         </button>

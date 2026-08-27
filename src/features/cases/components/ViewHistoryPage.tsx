@@ -95,7 +95,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
       <header className="shrink-0 px-6 py-3.5 flex items-center gap-3"
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
         <button onClick={onBack}
-          className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg hover:opacity-80 transition-all"
+          className="hover-glow flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg transition-all"
           style={{ background: gl.row, border: gl.borderSm, color: gl.muted }}>
           <ChevronLeft size={12} /> {t("history.back")}
         </button>
@@ -168,7 +168,7 @@ export function ViewHistoryPage({ caseId, patientName, onBack }: ViewHistoryProp
                         </span>
                       ) : canUndo && (
                         <button onClick={() => setPendingUndo({ id: log!.id, description })}
-                          className="flex items-center gap-1 text-[12px] font-bold mt-1.5 px-2.5 py-1 rounded-lg hover:opacity-80 transition-all"
+                          className="hover-glow flex items-center gap-1 text-[12px] font-bold mt-1.5 px-2.5 py-1 rounded-lg transition-all"
                           style={{ background: "transparent", color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.30)` }}>
                           <Undo2 size={10} /> {t("activity.undo")}
                         </button>

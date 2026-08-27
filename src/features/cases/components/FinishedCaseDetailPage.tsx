@@ -161,7 +161,7 @@ export function FinishedCaseDetailPage({
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
         <div className="flex items-center gap-3">
           <button onClick={onBack}
-            className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg transition-all"
             style={{ background: gl.row, border: gl.borderSm, color: gl.muted }}>
             <ArrowLeft size={12} /> Back
           </button>
@@ -186,7 +186,7 @@ export function FinishedCaseDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => onViewHistory(c.id, c.patient)}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-lg transition-all"
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
@@ -195,17 +195,17 @@ export function FinishedCaseDetailPage({
               straight to the printer, Export PDF opens it so the coder can
               save it from the dialog's "Save as PDF" destination. */}
           <button onClick={handlePrint} title={t("print.title")} aria-label={t("print.title")}
-            className="flex items-center justify-center w-9 h-9 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center justify-center w-9 h-9 rounded-lg transition-all"
             style={{ border: gl.border, color: gl.muted, background: "transparent" }}>
             <Printer size={13} />
           </button>
           <button onClick={handleExportPdf} title={t("print.exportTitle")} aria-label={t("print.exportTitle")}
-            className="flex items-center justify-center w-9 h-9 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center justify-center w-9 h-9 rounded-lg transition-all"
             style={{ border: gl.border, color: gl.muted, background: "transparent" }}>
             <Download size={13} />
           </button>
           <button onClick={() => setShowReopen(true)}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg transition-all"
             style={{ border: `1.5px solid rgba(${gl.accentRgb},0.30)`, color: gl.accent, background: `rgba(${gl.accentRgb},0.07)` }}>
             <RotateCcw size={12} /> {t("btn.reopen")}
           </button>

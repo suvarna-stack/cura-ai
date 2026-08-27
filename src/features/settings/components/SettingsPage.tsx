@@ -167,7 +167,7 @@ export function SettingsPage() {
                   key={id}
                   type="button"
                   onClick={() => setThemeId(id)}
-                  className="relative flex flex-col gap-3 rounded-2xl p-4 text-left transition-all hover:opacity-90"
+                  className="hover-glow relative flex flex-col gap-3 rounded-2xl p-4 text-left transition-all"
                   style={
                     active
                       ? {
@@ -270,7 +270,7 @@ export function SettingsPage() {
                   key={o.id}
                   type="button"
                   onClick={() => setLang(o.id)}
-                  className="flex items-center justify-between rounded-2xl p-4 text-left transition-all hover:opacity-90"
+                  className="hover-glow flex items-center justify-between rounded-2xl p-4 text-left transition-all"
                   style={
                     active
                       ? {
@@ -386,7 +386,7 @@ export function SettingsPage() {
               type="button"
               onClick={() => setConfirmingReset(true)}
               disabled={approvedCount === 0 || resetting}
-              className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-bold transition-all hover:opacity-90 disabled:opacity-40"
+              className="hover-glow flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-bold transition-all disabled:opacity-40"
               style={{
                 background: gl.accentGrad,
                 color: gl.isDark ? '#1a0a00' : '#fff',

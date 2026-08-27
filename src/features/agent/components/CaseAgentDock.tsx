@@ -610,7 +610,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
       }
 
   const iconBtn =
-    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:opacity-75'
+    'hover-glow flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all'
 
   return (
     <section
@@ -762,7 +762,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
               onClick={() => switchMode(id)}
               disabled={chat.busy || teaching}
               aria-pressed={on}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-bold transition-all hover:opacity-90 disabled:opacity-50"
+              className="hover-glow flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-bold transition-all disabled:opacity-50"
               style={
                 on
                   ? {
@@ -825,7 +825,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
                       submit(s)
                     }
                   }}
-                  className="rounded-xl px-3 py-2 text-left text-[12px] leading-snug font-medium transition-all hover:opacity-80"
+                  className="hover-glow rounded-xl px-3 py-2 text-left text-[12px] leading-snug font-medium transition-all"
                   style={{
                     background: gl.row,
                     border: gl.borderSm,
@@ -991,7 +991,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
                       onClick={() => copy(m.id, m.text)}
                       title={t('dock.copy')}
                       aria-label={t('dock.copy')}
-                      className="shrink-0 rounded-md p-1 transition-all hover:opacity-70"
+                      className="hover-glow shrink-0 rounded-md p-1 transition-all"
                       style={{ color: copiedId === m.id ? gl.accent : gl.muted }}
                     >
                       {copiedId === m.id ? (
@@ -1036,7 +1036,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
           onClick={() => setPrefs((p) => ({ ...p, ground: !p.ground }))}
           aria-pressed={prefs.ground}
           title={prefs.ground ? t('dock.ctx.on') : t('dock.ctx.off')}
-          className="mb-2 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition-all hover:opacity-85"
+          className="hover-glow mb-2 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition-all"
           style={
             prefs.ground
               ? {
@@ -1098,7 +1098,7 @@ export function CaseAgentDock({ ctx }: CaseAgentDockProps) {
               onClick={chat.stop}
               title={t('dock.stop')}
               aria-label={t('dock.stop')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all hover:opacity-80"
+              className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
               style={{
                 background: `rgba(${gl.accentRgb},0.16)`,
                 border: `1px solid rgba(${gl.accentRgb},0.28)`,

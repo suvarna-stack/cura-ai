@@ -47,7 +47,7 @@ export function SortMenu({
         aria-expanded={open}
         aria-haspopup="true"
         title={t("sort.title")}
-        className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
+        className="hover-glow flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all"
         style={{ background: gl.inputBg, border: gl.border, color: gl.text }}
       >
         <ArrowUpDown size={14} style={{ color: gl.accent }} />
@@ -92,7 +92,7 @@ export function SortMenu({
                   onPick(o.mode);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-all hover:opacity-90"
+                className="hover-glow flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-all"
                 style={
                   on
                     ? {

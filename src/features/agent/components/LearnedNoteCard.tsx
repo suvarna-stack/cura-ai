@@ -122,7 +122,7 @@ export function LearnedNoteCard({
         <button
           type="button"
           onClick={() => setEditing((e) => !e)}
-          className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all hover:opacity-80"
+          className="hover-glow ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all"
           style={{ background: gl.row, border: gl.borderSm, color: gl.muted }}
         >
           {editing ? <Check size={11} /> : <Pencil size={11} />}
@@ -199,7 +199,7 @@ export function LearnedNoteCard({
                         codes: draft.codes.filter((x) => x.code !== c.code),
                       })
                     }
-                    className="shrink-0 transition-all hover:opacity-70"
+                    className="hover-glow hover-glow-halo shrink-0 transition-all"
                     style={{ color: gl.danger }}
                   >
                     <Trash2 size={11} />
@@ -240,7 +240,7 @@ export function LearnedNoteCard({
               <button
                 type="button"
                 onClick={addCode}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all hover:opacity-80"
+                className="hover-glow flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold transition-all"
                 style={{
                   background: gl.row,
                   border: gl.borderSm,
@@ -279,7 +279,7 @@ export function LearnedNoteCard({
           type="button"
           onClick={onDiscard}
           disabled={saving}
-          className="ml-auto flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all hover:opacity-80 disabled:opacity-50"
+          className="hover-glow ml-auto flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all disabled:opacity-50"
           style={{ background: gl.row, border: gl.borderSm, color: gl.muted }}
         >
           <X size={11} />
@@ -291,7 +291,7 @@ export function LearnedNoteCard({
           disabled={
             saving || (draft.codes.length === 0 && !draft.scenario.trim())
           }
-          className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all hover:opacity-90 disabled:opacity-50"
+          className="hover-glow flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all disabled:opacity-50"
           style={{
             background: gl.accentGrad,
             color: gl.isDark ? '#1a0a00' : '#fff',

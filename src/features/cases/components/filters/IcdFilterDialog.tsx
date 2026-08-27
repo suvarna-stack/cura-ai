@@ -105,7 +105,7 @@ export function IcdFilterDialog({
           {t("filter.icd.dialogTitle")}
         </h3>
         <button onClick={onClose} aria-label={t("a11y.close")}
-          className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+          className="hover-glow hover-glow-halo transition-all" style={{ color: gl.muted }}>
           <X size={16} />
         </button>
       </div>
@@ -118,7 +118,7 @@ export function IcdFilterDialog({
           const n = selectedCount(key);
           return (
             <button key={key} type="button" onClick={() => { setTab(key); setQ(""); }}
-              className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[12px] font-bold transition-all hover:opacity-90"
+              className="hover-glow flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[12px] font-bold transition-all"
               style={active
                 ? { background: gl.accentGrad, color: "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.30)` }
                 : { background: gl.inputBg, color: gl.muted, border: gl.borderSm }}>
@@ -150,7 +150,7 @@ export function IcdFilterDialog({
           style={{ color: gl.text }} />
         {q !== "" && (
           <button onClick={() => setQ("")} aria-label={t("list.clearSearch")}
-            className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+            className="hover-glow hover-glow-halo shrink-0 transition-all" style={{ color: gl.muted }}>
             <X size={12} />
           </button>
         )}
@@ -165,7 +165,7 @@ export function IcdFilterDialog({
         )}
         {visible.map((o) => (
           <label key={o.value}
-            className="flex items-center gap-2.5 cursor-pointer rounded-xl px-2.5 py-2 transition-all hover:opacity-90"
+            className="hover-glow flex items-center gap-2.5 cursor-pointer rounded-xl px-2.5 py-2 transition-all"
             style={o.selected
               ? { background: `rgba(${gl.accentRgb},0.10)`, border: `1px solid rgba(${gl.accentRgb},0.22)` }
               : { border: "1px solid transparent" }}>
@@ -201,13 +201,13 @@ export function IcdFilterDialog({
         {selectedCount(tab) > 0 && (
           <button type="button"
             onClick={() => facet?.options.filter((o) => o.selected).forEach((o) => f.toggle(tab, o.value))}
-            className="text-[12px] font-semibold px-3 py-2 rounded-xl hover:opacity-80 transition-all"
+            className="hover-glow text-[12px] font-semibold px-3 py-2 rounded-xl transition-all"
             style={{ color: gl.accent, background: `rgba(${gl.accentRgb},0.10)` }}>
             {t("filter.icd.clear", { s: t(`facet.${tab}`) })}
           </button>
         )}
         <button type="button" onClick={onClose}
-          className="flex-1 text-[13px] font-bold px-4 py-2 rounded-xl transition-all hover:opacity-90"
+          className="hover-glow flex-1 text-[13px] font-bold px-4 py-2 rounded-xl transition-all"
           style={{ background: gl.accentGrad, color: "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.30)` }}>
           {t("filter.icd.show", { n: matchCount })}
         </button>

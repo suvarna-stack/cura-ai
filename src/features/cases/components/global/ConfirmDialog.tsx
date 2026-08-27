@@ -49,12 +49,12 @@ export function ConfirmDialog({
         <p className="text-[12px] font-normal leading-relaxed mb-4" style={{ color: gl.muted }}>{body}</p>
         <div className="flex items-center justify-end gap-2">
           <button onClick={close} disabled={busy}
-            className="text-[12px] font-semibold px-4 py-2 rounded-lg hover:opacity-80 transition-all disabled:opacity-40"
+            className="hover-glow text-[12px] font-semibold px-4 py-2 rounded-lg transition-all disabled:opacity-40"
             style={{ border: gl.border, color: gl.text, background: gl.inputBg }}>
             {t("confirm.cancel")}
           </button>
           <button onClick={onConfirm} disabled={busy}
-            className="flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:opacity-60"
+            className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg transition-all disabled:opacity-60"
             style={danger
               ? { background: "#ef4444", color: "#fff" }
               : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>

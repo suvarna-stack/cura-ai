@@ -102,7 +102,7 @@ export function DateRangeDialog({
             <button
               key={t.id}
               onClick={() => setMode(t.id)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] font-semibold transition-all hover:opacity-90"
+              className="hover-glow flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] font-semibold transition-all"
               style={
                 on
                   ? {
@@ -129,7 +129,7 @@ export function DateRangeDialog({
                 onApply(p.range());
                 onClose();
               }}
-              className="rounded-lg px-3 py-2.5 text-left text-[12px] font-semibold transition-all hover:opacity-90"
+              className="hover-glow rounded-lg px-3 py-2.5 text-left text-[12px] font-semibold transition-all"
               style={{ background: gl.inputBg, border: gl.border, color: gl.text }}
             >
               {p.id === "all" ? allLabel : p.label}
@@ -196,7 +196,7 @@ export function DateRangeDialog({
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-[12px] font-semibold transition-all hover:opacity-80"
+            className="hover-glow rounded-lg px-4 py-2 text-[12px] font-semibold transition-all"
             style={{ border: gl.border, color: gl.text, background: gl.inputBg }}
           >
             Cancel
@@ -204,7 +204,7 @@ export function DateRangeDialog({
           <button
             onClick={apply}
             disabled={invalid}
-            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold transition-all hover:opacity-90 disabled:opacity-40"
+            className="hover-glow flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold transition-all disabled:opacity-40"
             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}
           >
             <Check size={12} /> {confirmLabel}

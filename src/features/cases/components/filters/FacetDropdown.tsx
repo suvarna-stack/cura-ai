@@ -81,7 +81,7 @@ export function FacetDropdown({
         <button
           onClick={() => setQuery((p) => ({ ...p, [qk]: "" }))}
           aria-label={t("list.clearSearch")}
-          className="shrink-0 transition-all hover:opacity-70"
+          className="hover-glow hover-glow-halo shrink-0 transition-all"
           style={{ color: gl.muted }}
         >
           <X size={12} />
@@ -97,7 +97,7 @@ export function FacetDropdown({
   ) => (
     <label
       key={o.value}
-      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 transition-all hover:opacity-80"
+      className="hover-glow flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 transition-all"
     >
       <input
         type="checkbox"
@@ -133,7 +133,7 @@ export function FacetDropdown({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
+        className="hover-glow flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all"
         style={
           picked > 0
             ? {

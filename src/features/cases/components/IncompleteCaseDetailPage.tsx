@@ -159,7 +159,7 @@ function EditCodeModal({ entry, onSave, onClose, localHits, icd10PrimaryTaken }:
             </div>
           </div>
           <button onClick={onClose} aria-label={t("a11y.close")}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:opacity-70 transition-all"
+            className="hover-glow w-8 h-8 flex items-center justify-center rounded-xl transition-all"
             style={{ background: `rgba(${gl.accentRgb},0.10)`, border: `1px solid rgba(${gl.accentRgb},0.20)`, color: gl.muted }}>
             <X size={14} />
           </button>
@@ -254,10 +254,10 @@ function EditCodeModal({ entry, onSave, onClose, localHits, icd10PrimaryTaken }:
         </div>
         <div className="px-5 py-4 flex gap-2.5"
           style={{ borderTop: `1px solid rgba(${gl.accentRgb},0.15)`, background: `rgba(${gl.accentRgb},0.03)` }}>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold hover:opacity-80 transition-all"
+          <button onClick={onClose} className="hover-glow flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
             style={{ border: `1.5px solid rgba(${gl.accentRgb},0.30)`, color: gl.text, background: "transparent" }}>Cancel</button>
           <button onClick={() => onSave(normalized())}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+            className="hover-glow flex-1 py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all"
             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 4px 16px rgba(${gl.accentRgb},0.35)` }}>
             <Check size={13} /> Save Changes
           </button>
@@ -566,7 +566,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         style={{ background: gl.headerBg, backdropFilter: gl.blur20, borderBottom: gl.borderSm }}>
         <div className="flex items-center gap-3">
           <button onClick={onBack}
-            className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg transition-all"
             style={{ background: gl.row, border: gl.borderSm, color: gl.muted }}>
             <ArrowLeft size={12} /> Back
           </button>
@@ -600,7 +600,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
         {/* actions at the top right */}
         <div className="flex items-center gap-2">
           <button onClick={() => onViewHistory(c.id, c.patient)}
-            className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2 rounded-lg transition-all"
             style={{ background: "transparent", border: gl.border, color: gl.text }}>
             <Clock size={12} /> {t("btn.viewHistory")}
           </button>
@@ -614,7 +614,7 @@ export function IncompleteCaseDetailPage({ caseData, onBack, onViewHistory }: {
               : missing === "both" ? t("code.pickNone")
               : missing === "icd10" ? t("code.pickNo10")
               : t("code.pickNo9")}
-            className="flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:cursor-not-allowed"
+            className="hover-glow flex items-center gap-1.5 text-[13px] font-bold px-4 py-2 rounded-lg transition-all disabled:cursor-not-allowed"
             style={!approved && missing !== null
               ? { background: `rgba(${gl.accentRgb},0.10)`, color: gl.muted, border: `1px solid rgba(${gl.accentRgb},0.20)` }
               : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff", boxShadow: `0 2px 10px rgba(${gl.accentRgb},0.25)` }}>

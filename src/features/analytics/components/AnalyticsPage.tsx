@@ -467,7 +467,7 @@ export function AnalyticsPage() {
           {range && (
             <button
               onClick={() => setRange(null)}
-              className="rounded-lg px-3 py-2 text-[12px] font-semibold transition-all hover:opacity-80"
+              className="hover-glow rounded-lg px-3 py-2 text-[12px] font-semibold transition-all"
               style={{ border: gl.border, color: gl.muted, background: gl.inputBg }}
             >
               Clear
@@ -475,7 +475,7 @@ export function AnalyticsPage() {
           )}
           <button
             onClick={() => setPickerOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all hover:opacity-90"
+            className="hover-glow flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all"
             style={
               range
                 ? {

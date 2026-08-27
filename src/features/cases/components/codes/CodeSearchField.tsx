@@ -249,7 +249,7 @@ export function CodeSearchField({
               tabIndex={-1}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(h)}
-              className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors hover:opacity-90"
+              className="hover-glow flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors"
               style={{
                 borderBottom: `1px solid rgba(${gl.accentRgb},0.10)`,
                 background: i === highlighted ? `rgba(${gl.accentRgb},0.12)` : 'transparent',

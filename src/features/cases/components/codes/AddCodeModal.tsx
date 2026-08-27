@@ -119,7 +119,7 @@ export function AddCodeModal({
             <p className="text-[12px] font-normal" style={{ color: gl.muted }}>{only ? "" : t("code.addHint")}</p>
           </div>
           <button onClick={onClose} aria-label={t("a11y.close")}
-            className="hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+            className="hover-glow hover-glow-halo transition-all" style={{ color: gl.muted }}>
             <X size={15} />
           </button>
         </div>
@@ -225,12 +225,12 @@ export function AddCodeModal({
 
         <div className="flex items-center justify-end gap-2">
           <button onClick={onClose}
-            className="text-[12px] font-semibold px-4 py-2 rounded-lg hover:opacity-80 transition-all"
+            className="hover-glow text-[12px] font-semibold px-4 py-2 rounded-lg transition-all"
             style={{ border: gl.border, color: gl.text, background: gl.inputBg }}>
             {t("confirm.cancel")}
           </button>
           <button onClick={submit} disabled={ready.length === 0}
-            className="flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-all disabled:opacity-40"
+            className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg transition-all disabled:opacity-40"
             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
             <Plus size={12} /> {ready.length > 1 ? t("code.addBoth") : t("confirm.addCode")}
           </button>

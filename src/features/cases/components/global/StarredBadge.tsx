@@ -119,7 +119,7 @@ export function StarredBadge({ caseId, detail, fallback }: {
     <button type="button" onClick={toggle} disabled={busy}
       aria-pressed={starred}
       title={starred ? t("star.unmark") : t("star.mark")}
-      className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full transition-all hover:opacity-80"
+      className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full transition-all"
       style={{ ...style, opacity: busy ? 0.6 : 1 }}>
       <Star size={12} fill={starred ? gl.warning : "none"} />
       {starred && at ? `${label} · ${at}` : label}

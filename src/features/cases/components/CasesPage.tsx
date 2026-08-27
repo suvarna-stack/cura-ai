@@ -659,7 +659,7 @@ export function CasesPage({
                 placeholder={t("list.search")} className="bg-transparent text-[12px] font-normal outline-none w-full" style={{ color: gl.text }} />
               {filters.query !== "" && (
                 <button onClick={() => filters.setQuery("")} aria-label={t("list.clearSearch")}
-                  className="shrink-0 hover:opacity-70 transition-all" style={{ color: gl.muted }}>
+                  className="hover-glow hover-glow-halo shrink-0 transition-all" style={{ color: gl.muted }}>
                   <X size={12} />
                 </button>
               )}
@@ -715,7 +715,7 @@ export function CasesPage({
                       <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
                         {t("filter.emptyHidden", { n: unfilteredComplete })}
                       </p>
-                      <button onClick={filters.clearAll} className="text-[12px] font-bold mt-1.5 hover:opacity-80 transition-all"
+                      <button onClick={filters.clearAll} className="hover:underline underline-offset-2 text-[12px] font-bold mt-1.5 transition-all"
                         style={{ color: gl.accent }}>
                         {t("filter.showAll")}
                       </button>
@@ -726,7 +726,7 @@ export function CasesPage({
                       Hidden at zero rows — "Select all (0)" invites a no-op. */}
                   {filters.totalComplete > 0 && (
                   <div className="flex items-center gap-2.5 px-1 py-0.5">
-                    <label className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
+                    <label className="hover-glow flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer transition-all"
                       style={{ background: gl.inputBg, border: gl.border }}>
                       <input type="checkbox" checked={allSelected}
                         ref={el => { if (el) el.indeterminate = selectionActive && !allSelected; }}
@@ -744,7 +744,7 @@ export function CasesPage({
                     <div className="flex-1" />
                     {selectionActive && (
                       <button onClick={approveSelected}
-                        className="flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                        className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-lg transition-all"
                         style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
                         <CheckCircle2 size={12} /> {t("sel.approve", { n: selectedIds.size })}
                       </button>
@@ -780,10 +780,10 @@ export function CasesPage({
                         {/* col 3 — actions */}
                         <div className="flex items-center gap-2 shrink-0 self-stretch">
                           <button onClick={() => openCase(c)}
-                            className="text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition-all"
+                            className="hover-glow text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all"
                             style={viewBtn}><Eye size={10} /> {t("btn.view")}</button>
                           <button onClick={() => approveOne(c.id)}
-                            className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                            className="hover-glow text-[12px] font-bold px-3.5 py-2 rounded-lg transition-all"
                             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
                             {t("btn.approve")}
                           </button>
@@ -816,7 +816,7 @@ export function CasesPage({
                       <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
                         {t("filter.emptyHidden", { n: unfilteredIncomplete })}
                       </p>
-                      <button onClick={filters.clearAll} className="text-[12px] font-bold mt-1.5 hover:opacity-80 transition-all"
+                      <button onClick={filters.clearAll} className="hover:underline underline-offset-2 text-[12px] font-bold mt-1.5 transition-all"
                         style={{ color: gl.accent }}>
                         {t("filter.showAll")}
                       </button>
@@ -824,7 +824,7 @@ export function CasesPage({
                   )}
                   {filters.totalIncomplete > 0 && (
                   <div className="flex items-center gap-2.5 px-1 py-0.5">
-                    <label className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer hover:opacity-90 transition-all"
+                    <label className="hover-glow flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-lg cursor-pointer transition-all"
                       style={{ background: gl.inputBg, border: gl.border }}>
                       <input type="checkbox" checked={allIncompleteSelected}
                         ref={el => { if (el) el.indeterminate = incompleteSelectionActive && !allIncompleteSelected; }}
@@ -842,7 +842,7 @@ export function CasesPage({
                     <div className="flex-1" />
                     {incompleteSelectionActive && (
                       <button onClick={approveSelectedIncomplete}
-                        className="flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                        className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-lg transition-all"
                         style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
                         <CheckCircle2 size={12} /> {t("sel.approve", { n: selectedIncomplete.size })}
                       </button>
@@ -886,10 +886,10 @@ export function CasesPage({
                       </div>
                       <div className="flex items-center gap-2 shrink-0 self-stretch">
                         <button onClick={() => openIncompleteCase({ ...c, group: c.group })}
-                          className="text-[12px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-80 transition-all"
+                          className="hover-glow text-[12px] font-semibold px-3.5 py-2 rounded-lg transition-all"
                           style={viewBtn}>{t("btn.review")}</button>
                         <button onClick={() => approveOne(c.id)}
-                          className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                          className="hover-glow text-[12px] font-bold px-3.5 py-2 rounded-lg transition-all"
                           style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
                           {t("btn.approve")}
                         </button>
@@ -917,7 +917,7 @@ export function CasesPage({
                       <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
                         {t("filter.emptyHidden", { n: reopenRows.length })}
                       </p>
-                      <button onClick={filters.clearAll} className="text-[12px] font-bold mt-1.5 hover:opacity-80 transition-all"
+                      <button onClick={filters.clearAll} className="hover:underline underline-offset-2 text-[12px] font-bold mt-1.5 transition-all"
                         style={{ color: gl.accent }}>
                         {t("filter.showAll")}
                       </button>
@@ -975,10 +975,10 @@ export function CasesPage({
                         {/* col 3 — actions */}
                         <div className="flex items-center gap-2 shrink-0 self-stretch">
                           <button onClick={view}
-                            className="text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 hover:opacity-80 transition-all"
+                            className="hover-glow text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all"
                             style={viewBtn}><Eye size={10} /> {t("btn.view")}</button>
                           <button onClick={() => approveOne(c.id)}
-                            className="text-[12px] font-bold px-3.5 py-2 rounded-lg hover:opacity-90 transition-all"
+                            className="hover-glow text-[12px] font-bold px-3.5 py-2 rounded-lg transition-all"
                             style={{ background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
                             {t("btn.approve")}
                           </button>
@@ -1009,7 +1009,7 @@ export function CasesPage({
                       <p className="text-[12px] font-medium" style={{ color: gl.muted }}>
                         {t("filter.emptyHidden", { n: displayFinished.length })}
                       </p>
-                      <button onClick={filters.clearAll} className="text-[12px] font-bold mt-1.5 hover:opacity-80 transition-all"
+                      <button onClick={filters.clearAll} className="hover:underline underline-offset-2 text-[12px] font-bold mt-1.5 transition-all"
                         style={{ color: gl.accent }}>
                         {t("filter.showAll")}
                       </button>
@@ -1019,7 +1019,7 @@ export function CasesPage({
                     // whole-row click is a mouse convenience; the View button below
                     // is the keyboard/screen-reader path to the same action
                     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer hover:opacity-90"
+                    <div key={c.id} className="hover-glow flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer"
                       style={{ background: gl.row, backdropFilter: gl.blur16, boxShadow: gl.shadowSm,
                         border: starOf(c).starred ? `1px solid ${gl.warning}4D` : gl.border }}
                       onClick={() => openFinishedCase(c)}>
@@ -1050,7 +1050,7 @@ export function CasesPage({
                           <span className="text-[12px] font-bold" style={{ color: gl.accent }}>{c.drg}</span>
                         </div>
                       </div>
-                      <button className="text-[12px] font-bold px-3.5 py-2 rounded-lg shrink-0 hover:opacity-90 transition-all"
+                      <button className="hover-glow text-[12px] font-bold px-3.5 py-2 rounded-lg shrink-0 transition-all"
                         style={{ background: `rgba(${gl.accentRgb},0.12)`, color: gl.accent, border: `1px solid rgba(${gl.accentRgb},0.25)` }}
                         onClick={e => {
                           e.stopPropagation();
@@ -1058,7 +1058,7 @@ export function CasesPage({
                         }}>
                         {t("btn.reopen")}
                       </button>
-                      <button className="text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-all"
+                      <button className="hover-glow text-[12px] font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shrink-0 transition-all"
                         style={viewBtn} onClick={e => { e.stopPropagation(); openFinishedCase(c); }}>
                         <Eye size={10} /> {t("btn.view")}
                       </button>

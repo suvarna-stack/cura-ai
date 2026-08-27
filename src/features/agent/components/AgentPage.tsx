@@ -481,27 +481,18 @@ export function AgentPage() {
             >
               {t('agent.history.title')}
             </span>
-            {/* Hover deepens the accent tint (see .hover-tint in index.css)
-                instead of the `hover:opacity-80` this used to carry: on a
-                translucent 0.15 accent fill, dropping the opacity faded the
-                button INTO the sidebar and dimmed the + with it, so hovering
-                read as "greying out" rather than "highlighting". */}
             <button
               type="button"
               onClick={newChat}
               disabled={pending}
               title={t('agent.history.new')}
               aria-label={t('agent.history.new')}
-              className="hover-tint group flex h-7 w-7 items-center justify-center rounded-lg enabled:active:scale-90 disabled:opacity-50"
-              style={
-                {
-                  color: gl.accent,
-                  '--ht-bg': `rgba(${gl.accentRgb},0.15)`,
-                  '--ht-bd': `1px solid rgba(${gl.accentRgb},0.25)`,
-                  '--ht-bg-hover': `rgba(${gl.accentRgb},0.30)`,
-                  '--ht-bd-hover': `1px solid rgba(${gl.accentRgb},0.50)`,
-                } as CSSProperties
-              }
+              className="hover-glow group flex h-7 w-7 items-center justify-center rounded-lg transition-[scale] duration-150 enabled:active:scale-90 disabled:opacity-50"
+              style={{
+                background: `rgba(${gl.accentRgb},0.15)`,
+                border: `1px solid rgba(${gl.accentRgb},0.25)`,
+                color: gl.accent,
+              }}
             >
               {/* A + rotated 90deg lands looking identical, so the spin is a
                   pure motion cue — it never turns into an x mid-hover the way
@@ -536,27 +527,20 @@ export function AgentPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void openConversation(c.id)
                   }}
-                  className="hover-tint group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2"
+                  className="hover-glow group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2"
                   style={
                     {
-                      // An INACTIVE row had no hover surface at all before —
-                      // `hover:opacity-90` over a transparent background only
-                      // dimmed the title text, so pointing at a stored chat
-                      // gave almost no feedback. It now tints toward the
-                      // accent, landing just short of the active row so the
-                      // two never read the same.
-                      '--ht-bg': active
+                      // An INACTIVE row has no surface of its own, so it takes
+                      // the wash in the accent rather than in the inherited
+                      // body text colour — a stored chat lights up on hover
+                      // instead of just going grey.
+                      '--hg-ink': `rgb(${gl.accentRgb})`,
+                      background: active
                         ? `rgba(${gl.accentRgb},0.14)`
-                        : 'transparent',
-                      '--ht-bd': active
+                        : undefined,
+                      border: active
                         ? `1px solid rgba(${gl.accentRgb},0.24)`
                         : '1px solid transparent',
-                      '--ht-bg-hover': active
-                        ? `rgba(${gl.accentRgb},0.22)`
-                        : `rgba(${gl.accentRgb},0.08)`,
-                      '--ht-bd-hover': active
-                        ? `1px solid rgba(${gl.accentRgb},0.36)`
-                        : `1px solid rgba(${gl.accentRgb},0.16)`,
                     } as CSSProperties
                   }
                 >
@@ -625,22 +609,20 @@ export function AgentPage() {
           aria-expanded={sidebarOpen}
           title={t('agent.history.title')}
           onClick={() => setSidebarOpen((s) => !s)}
-          className="hover-tint flex h-9 w-9 items-center justify-center rounded-2xl active:scale-90"
+          className="hover-glow flex h-9 w-9 items-center justify-center rounded-2xl transition-[scale] duration-150 active:scale-90"
           style={
             {
-              color: sidebarOpen ? gl.accent : gl.muted,
-              '--ht-bg': sidebarOpen
+              // Closed, the button is plain glass with a muted icon, so the
+              // wash is pinned to the accent instead of the icon colour: the
+              // hover previews what opening the sidebar looks like.
+              '--hg-ink': `rgb(${gl.accentRgb})`,
+              background: sidebarOpen
                 ? `rgba(${gl.accentRgb},0.15)`
                 : gl.card,
-              '--ht-bd': sidebarOpen
+              border: sidebarOpen
                 ? `1px solid rgba(${gl.accentRgb},0.28)`
                 : gl.border,
-              // Closed, the button is plain glass, so its hover picks up the
-              // accent to preview what opening it looks like.
-              '--ht-bg-hover': `rgba(${gl.accentRgb},${sidebarOpen ? 0.3 : 0.12})`,
-              '--ht-bd-hover': `1px solid rgba(${gl.accentRgb},${
-                sidebarOpen ? 0.5 : 0.28
-              })`,
+              color: sidebarOpen ? gl.accent : gl.muted,
             } as CSSProperties
           }
         >
@@ -682,7 +664,7 @@ export function AgentPage() {
             type="button"
             onClick={() => setRulesOpen((o) => !o)}
             title={t('agent.learn.rules')}
-            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold transition-all hover:opacity-90"
+            className="hover-glow flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold transition-all"
             style={
               rulesOpen
                 ? {
@@ -703,7 +685,7 @@ export function AgentPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => switchMode(tab.id)}
-                className="rounded-full px-4 py-2 text-[12px] font-bold transition-all hover:opacity-90"
+                className="hover-glow rounded-full px-4 py-2 text-[12px] font-bold transition-all"
                 style={
                   active
                     ? {
@@ -1012,7 +994,7 @@ export function AgentPage() {
                     setShowSuggestions(false)
                     void send(p)
                   }}
-                  className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:opacity-80 disabled:opacity-50"
+                  className="hover-glow rounded-full px-3 py-1.5 text-[11px] font-medium transition-all disabled:opacity-50"
                   style={{
                     background: gl.row,
                     backdropFilter: gl.blur16,
@@ -1072,7 +1054,7 @@ export function AgentPage() {
             aria-label="Toggle suggested questions"
             aria-expanded={showSuggestions}
             onClick={() => setShowSuggestions((s) => !s)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all hover:opacity-80"
+            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
             style={
               showSuggestions
                 ? {

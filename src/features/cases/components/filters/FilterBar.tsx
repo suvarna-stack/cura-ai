@@ -89,7 +89,7 @@ export function FilterBar({
             <button
               key={key}
               onClick={() => setIcdDialog(key)}
-              className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all hover:opacity-90"
+              className="hover-glow flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-all"
               style={picked > 0 ? onStyle : offStyle}
             >
               <ListFilter size={14} style={{ color: gl.accent }} />
@@ -115,7 +115,7 @@ export function FilterBar({
             </span>
             <button
               onClick={f.clearAll}
-              className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition-all hover:opacity-80"
+              className="hover-glow ml-auto flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition-all"
               style={{ color: gl.accent, background: `rgba(${gl.accentRgb},0.10)` }}
             >
               <FilterX size={13} /> {t("filter.clearAll")}
@@ -132,7 +132,7 @@ export function FilterBar({
               <button
                 key={`${c.key}:${c.value}`}
                 onClick={() => f.toggle(c.key, c.value)}
-                className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold transition-all hover:opacity-80"
+                className="hover-glow flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold transition-all"
                 style={{
                   background: `rgba(${gl.accentRgb},0.15)`,
                   color: gl.accent,
