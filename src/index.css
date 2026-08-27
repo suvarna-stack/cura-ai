@@ -76,6 +76,65 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* --------------------------------------------------------------------------
+   Pointer cursor on interactive controls (restores a Tailwind v3 behaviour).
+   v4's Preflight deliberately dropped `button { cursor: pointer }` to match
+   the bare browser default, so all ~120 <button>s in this app — every toolbar
+   action, tab, pagination arrow, modal confirm — hovered with a plain arrow.
+
+   In @layer base on purpose: layer order beats specificity, so the component
+   utilities that ask for something else (`cursor-grab` on the dock header and
+   the code grip, `cursor-ew-resize`/`cursor-nwse-resize` on the dock resize
+   grip, `disabled:cursor-not-allowed`, `cursor-default` on the inert star)
+   still win without editing any of them.
+
+   Elements are listed by role, not by looks: a control is pointer when
+   clicking it *does* something. Text inputs and textareas keep their I-beam,
+   and a <label> only joins when it owns a control that toggles or opens —
+   a caption above a text field is read as text, not as a target.
+   -------------------------------------------------------------------------- */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='radio']:not([aria-disabled='true']),
+  [role='option']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  a[href],
+  summary,
+  select:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='range']:not(:disabled),
+  input[type='file']:not(:disabled),
+  input[type='date']:not(:disabled),
+  input[type='color']:not(:disabled),
+  label:has(input[type='checkbox']:not(:disabled)),
+  label:has(input[type='radio']:not(:disabled)),
+  label:has(input[type='file']:not(:disabled)),
+  label:has(input[type='date']:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  /* Composite inputs paint their own affordance inside the field — the browse
+     button of a file input, the calendar glyph on the sync-period dates. */
+  input[type='file']::file-selector-button,
+  input[type='date']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+
+  /* The other half of the signal: a control that is present but refuses the
+     click says so, instead of silently looking identical to a live one. */
+  button:disabled,
+  select:disabled,
+  input[type='checkbox']:disabled,
+  input[type='radio']:disabled,
+  [role='button'][aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}
+
 body {
   @apply bg-bg text-text font-sans antialiased;
   color-scheme: light;
