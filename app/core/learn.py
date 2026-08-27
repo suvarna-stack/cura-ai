@@ -43,6 +43,31 @@ LEARNED_PREFIX = "learned:"
 
 _ICD10_RE = re.compile(r"\b[A-Z]\d{2}(?:\.\d{1,4})?\b")
 _ICD9_RE = re.compile(r"\b\d{2,3}\.\d{1,2}\b")
+# ICD-9-only shapes the two patterns above miss: external-cause E-codes
+# (E800–E999, four digits so _ICD10_RE never matches them) and bare
+# three-digit categories ("486"). A bare numeral also matches ordinary prose
+# ("486 patients"), so it is only believed when the sentence says ICD-9.
+_ICD9_E_RE = re.compile(r"\bE\d{3}(?:\.\d)?\b")
+_ICD9_BARE_RE = re.compile(r"\b\d{3}\b")
+# Explicit system mentions ("icd 9", "ICD-10"). rag.detect_code_system reuses
+# these, so what counts as naming a system is identical on the ask and teach
+# paths.
+_ICD10_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*10\b", re.IGNORECASE)
+_ICD9_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*9(?:[\s\-]*cm)?\b", re.IGNORECASE)
+
+
+def _mentioned_system(text: str) -> str | None:
+    """The system the sentence names outright, when it names exactly one.
+
+    "icd 9 for tik toker is T67" teaches ICD-9 no matter what shape T67 has:
+    an explicit mention outranks the first-character guess, exactly as it does
+    on the ask path (rag.detect_code_system). The coder is the authority here.
+    """
+    ten = bool(_ICD10_MENTION_RE.search(text or ""))
+    nine = bool(_ICD9_MENTION_RE.search(text or ""))
+    if ten == nine:
+        return None
+    return "ICD-10" if ten else "ICD-9"
 # Title sitting on the same line after a code, inside a retrieved reference
 # chunk — how a taught code gets its official description.
 _TITLE_RE = re.compile(
@@ -373,6 +398,7 @@ def note_summary(note: dict[str, Any]) -> str:
 def _normalize(draft: dict[str, Any]) -> dict[str, Any]:
     """Coerce an LLM draft or a coder-edited payload into the stored shape."""
     raw = str(draft.get("raw_text") or "").strip()
+    forced = _mentioned_system(raw)
     codes: list[dict[str, Any]] = []
     seen: set[str] = set()
     for c in draft.get("codes") or []:
@@ -383,13 +409,24 @@ def _normalize(draft: dict[str, Any]) -> dict[str, Any]:
         code = str(c.get("code") or "").strip().upper()
         if not code or code in seen:
             continue
-        if not (_ICD10_RE.fullmatch(code) or _ICD9_RE.fullmatch(code)):
+        # System, in order of authority: what the payload already says (a
+        # coder edit, or _regex_extract which applied the mention), then the
+        # system the raw sentence names, then the shape guess.
+        provided = str(c.get("system") or "").strip()
+        if provided not in ("ICD-10", "ICD-9"):
+            provided = ""
+        icd9_meant = "ICD-9" in (provided, forced)
+        if not (_ICD10_RE.fullmatch(code) or _ICD9_RE.fullmatch(code)
+                or _ICD9_E_RE.fullmatch(code)
+                or (icd9_meant and _ICD9_BARE_RE.fullmatch(code))):
             continue
         seen.add(code)
+        shape = ("ICD-9" if _ICD9_E_RE.fullmatch(code) or not code[0].isalpha()
+                 else "ICD-10")
         role = str(c.get("role") or "secondary").lower()
         codes.append({
             "code": code,
-            "system": "ICD-10" if code[0].isalpha() else "ICD-9",
+            "system": provided or forced or shape,
             "description": str(c.get("description") or "").strip(),
             "role": role if role in _VALID_ROLES else "secondary",
         })
@@ -595,11 +632,24 @@ def _regex_extract(text: str) -> dict[str, Any]:
 
     This is the floor the feature stands on — it works with no LLM at all.
     """
-    spans: list[tuple[str, int, int]] = []
-    for pattern in (_ICD10_RE, _ICD9_RE):
+    forced = _mentioned_system(text)
+    patterns = [_ICD10_RE, _ICD9_RE, _ICD9_E_RE]
+    if forced == "ICD-9":
+        # Bare three-digit categories ("486") are only codes when the coder
+        # said ICD-9 — otherwise they are counts, doses and ages.
+        patterns.append(_ICD9_BARE_RE)
+    raw_spans: list[tuple[str, int, int]] = []
+    for pattern in patterns:
         for m in pattern.finditer(text):
-            spans.append((m.group(0).upper(), m.start(), m.end()))
-    spans.sort(key=lambda s: s[1])
+            raw_spans.append((m.group(0).upper(), m.start(), m.end()))
+    # Longest match first at each position: the bare "967" inside "967.0" is
+    # the same code, not a second one — drop spans contained in a kept span.
+    raw_spans.sort(key=lambda s: (s[1], -(s[2] - s[1])))
+    spans: list[tuple[str, int, int]] = []
+    for code, start, end in raw_spans:
+        if any(s <= start and end <= e for _, s, e in spans):
+            continue
+        spans.append((code, start, end))
 
     roles = _assign_roles(text, spans)
     codes: list[dict[str, Any]] = []
@@ -608,8 +658,10 @@ def _regex_extract(text: str) -> dict[str, Any]:
         if code in seen:
             continue
         seen.add(code)
+        shape = ("ICD-9" if _ICD9_E_RE.fullmatch(code) or not code[0].isalpha()
+                 else "ICD-10")
         codes.append({"code": code,
-                      "system": "ICD-10" if code[0].isalpha() else "ICD-9",
+                      "system": forced or shape,
                       "description": "",
                       "role": roles.get(code, "secondary")})
     # "the code for X is Y": a single declared code is the principal answer
@@ -700,13 +752,13 @@ def _scenario_of(text: str) -> str:
     # scenario is the condition, not the boilerplate around it.
     m = _FACT_SCENARIO_RE.search(text)
     if m:
-        head = _trim(_ICD10_RE.sub("", _ICD9_RE.sub("", m.group(1))), 240)
+        head = _trim(_strip_codes(m.group(1)), 240)
         if len(head) >= 3:
             return head
 
     colon = text.find(":")
     if 8 <= colon <= 160:
-        return _trim(_ICD10_RE.sub("", _ICD9_RE.sub("", text[:colon])), 240)
+        return _trim(_strip_codes(text[:colon]), 240)
 
     low = text.lower()
     cut = len(text)
@@ -718,8 +770,14 @@ def _scenario_of(text: str) -> str:
     if len(head) < 8:                       # instruction-first phrasing
         head = re.split(r"[.\n]", text)[0]
     # Codes belong in the codes list, not in the WHEN line.
-    head = _ICD10_RE.sub("", _ICD9_RE.sub("", head))
+    head = _strip_codes(head)
     return _trim(head, 240)
+
+
+def _strip_codes(text: str) -> str:
+    for pat in (_ICD10_RE, _ICD9_RE, _ICD9_E_RE):
+        text = pat.sub("", text)
+    return text
 
 
 def _rule_of(text: str, codes: list[dict[str, Any]]) -> str:
@@ -783,7 +841,8 @@ def _tokens(text: str) -> set[str]:
 
 def _codes_in(text: str) -> set[str]:
     return {c.upper() for c in
-            (*_ICD10_RE.findall(text or ""), *_ICD9_RE.findall(text or ""))}
+            (*_ICD10_RE.findall(text or ""), *_ICD9_RE.findall(text or ""),
+             *_ICD9_E_RE.findall(text or ""))}
 
 
 def match_notes(text: str, limit: int = 3,

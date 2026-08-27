@@ -163,8 +163,10 @@ _MAX_CONTEXT_CHUNKS = 8
 _RANK_BOOST = 0.04
 
 # Explicit "ICD-10" / "ICD-9" mentions (any spacing/dash, optional "-CM").
-_ICD10_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*10\b", re.IGNORECASE)
-_ICD9_MENTION_RE = re.compile(r"\bicd[\s\-–_.]*9(?:[\s\-]*cm)?\b", re.IGNORECASE)
+# Defined in learn.py so the teach path (learn._mentioned_system) and this ask
+# path agree, by construction, on what counts as naming a system.
+_ICD10_MENTION_RE = learn._ICD10_MENTION_RE
+_ICD9_MENTION_RE = learn._ICD9_MENTION_RE
 
 
 def detect_code_system(text: str) -> str | None:

@@ -144,6 +144,34 @@ def test_icd9_procedure_rule_tags_the_right_box(store):
     assert note["doc_type"] == "icd9cm"
 
 
+def test_explicit_icd9_mention_outranks_the_shape_guess(store):
+    """"icd 9 ... is T67": the coder said ICD-9, so T67 is ICD-9 — the
+    first-character guess must not override an explicit system mention."""
+    note = learn.extract_note("icd 9 for tik toker is T67")
+    assert [(c["code"], c["system"]) for c in note["codes"]] == [
+        ("T67", "ICD-9")]
+    assert note["doc_type"] == "icd9cm"
+
+
+@pytest.mark.parametrize("text,code", [
+    ("icd9 for health checkup is V70", "V70"),        # V-code, letter-start
+    ("icd9 for accidental fall is E888", "E888"),     # external cause, E+3
+    ("icd9 for pneumonia is 486", "486"),             # bare category
+])
+def test_icd9_only_shapes_are_taught_as_icd9(store, text, code):
+    note = learn.extract_note(text)
+    assert [(c["code"], c["system"]) for c in note["codes"]] == [
+        (code, "ICD-9")]
+    assert note["doc_type"] == "icd9cm"
+
+
+def test_bare_numerals_are_not_codes_without_an_icd9_mention(store):
+    """"486 patients" is a count; only an explicit ICD-9 sentence turns a
+    bare three-digit numeral into a code."""
+    note = learn.extract_note("the ward had 486 patients")
+    assert note["codes"] == []
+
+
 def test_hallucinated_codes_are_dropped(monkeypatch, store):
     """The model may invent codes; only what the coder typed survives."""
     monkeypatch.setattr(learn, "_llm_extract", lambda text: {
