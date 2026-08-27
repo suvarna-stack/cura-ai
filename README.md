@@ -299,6 +299,31 @@ coder-owned), so these land in the dashboard's *complete* queue, not its
 the app. Reflecting `coding_status` there would be a `medcode-api` decision, not
 ours.
 
+### The rows a coder opens first
+
+A demo is only as good as the first rows of each tab, and those were the
+*thinnest* charts in the set — two of them carried no labs, no imaging and no
+past history at all. `ENRICH_VISITS` in the generator fills eight of them out:
+the panels the presentation would really have ordered, the film it would really
+have taken, the past-history section, and whichever standard `OPD Record` fields
+the extract simply lacked (copied verbatim from the matching scenario in `S`).
+
+It **adds rows only**. No visit is created or removed, no id changes, no
+diagnosis or procedure row is ever written, and no hand-written Thai narrative
+is rewritten — so the dataset stays the same 150 visits it was.
+
+The eight are chosen by where each tab's own ordering puts them:
+
+| Tab | Ordered by | So the top rows are |
+|---|---|---|
+| Complete | principal ICD-10, A–Z (`useCaseFilters` default `code-asc`) | the lowest codes |
+| Incomplete | grouped by order type, **Surgery first** (`ORDER_PRIORITY`), then A–Z — which for a case with no diagnosis is its ICD-9 | the Surgery group, then CT / X-ray |
+| Finished | *nothing* — it is empty at demo start (see above) and fills only when a coder approves | — |
+
+If the generated data ever moves, re-derive the list: `main()` asserts every id
+in `ENRICH_VISITS` still exists, so a change that displaces them fails the run
+rather than silently enriching nothing.
+
 ### Regenerating it
 
 ```bash
