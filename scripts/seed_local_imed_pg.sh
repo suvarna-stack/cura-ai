@@ -35,6 +35,14 @@ on_error() {
 }
 trap on_error ERR
 
+# The committed dump was pg_dump'd on a machine whose Postgres role is named
+# "hsuyi" — every object in it carries an "OWNER TO hsuyi", so restoring on a
+# cluster without that role aborts partway through. It only needs to exist
+# (never log in), so create it here rather than requiring a manual one-time
+# fix on every machine.
+"$PGBIN/psql" -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'hsuyi'" \
+  | grep -q 1 || "$PGBIN/psql" -d postgres -c 'CREATE ROLE hsuyi'
+
 "$PGBIN/dropdb" --if-exists "$DB"
 "$PGBIN/createdb" "$DB"
 gunzip -c "$HERE/db/seed.sql.gz" | "$PGBIN/psql" -q -o /dev/null -v ON_ERROR_STOP=1 -d "$DB"
