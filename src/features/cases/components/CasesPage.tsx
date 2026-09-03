@@ -534,6 +534,18 @@ export function CasesPage({
     window.addEventListener("approvals:blocked", onBlocked);
     return () => window.removeEventListener("approvals:blocked", onBlocked);
   }, [showToast, t]);
+  // The request itself failed (hospital write-back error or network issue) —
+  // distinct from "blocked", which is the server explicitly rejecting a case
+  // for missing codes. The provider already rolled its optimistic state back;
+  // this just tells the coder why the case bounced back.
+  useEffect(() => {
+    const onWriteFailed = (e: Event) => {
+      const ids: string[] = (e as CustomEvent).detail?.caseIds ?? [];
+      if (ids.length > 0) showToast(t("toast.writeFailed", { n: ids.length }));
+    };
+    window.addEventListener("approvals:writeFailed", onWriteFailed);
+    return () => window.removeEventListener("approvals:writeFailed", onWriteFailed);
+  }, [showToast, t]);
 
   const approveSelected = () => askApprove([...selectedIds], () => { approve([...selectedIds]); setSelectedIds(new Set()); });
   const approveOne = (id: string) => askApprove([id], () => approve([id]));

@@ -197,6 +197,8 @@ export const dict: Record<string, { en: string; th: string }> = {
                         th: "ติ๊กเลือกรหัสที่ถูกต้องสำหรับเคสนี้" },
   "toast.approveBlocked": { en: "{n} case(s) still need a code in both columns — open them to finish",
                             th: "{n} เคสยังต้องมีรหัสทั้งสองคอลัมน์ — เปิดเคสเพื่อดำเนินการต่อ" },
+  "toast.writeFailed": { en: "Couldn't confirm {n} case(s) reached the hospital record — try again",
+                         th: "ไม่สามารถยืนยันได้ว่าส่งเคส {n} รายการถึงโรงพยาบาลแล้ว — กรุณาลองใหม่อีกครั้ง" },
   "code.noProc":      { en: "No procedure was performed on this visit",
                         th: "การมารับบริการครั้งนี้ไม่มีหัตถการ" },
   "code.pickNo10":    { en: "Tick an ICD-10 diagnosis code before approving",

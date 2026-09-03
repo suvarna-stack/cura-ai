@@ -45,7 +45,20 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     // column, so anything it reports as blocked is rolled back out of the
     // optimistic set and announced (CasesPage turns this into a toast — this
     // provider sits ABOVE ToastProvider and cannot raise one itself).
-    void approveCases(ids).then(({ blocked }) => {
+    void approveCases(ids).then(({ ok, blocked }) => {
+      if (!ok) {
+        // The whole request failed — most likely the hospital write-back
+        // 500'd after our side already committed, or a network error. Don't
+        // leave the case LOOKING approved when we can't confirm the hospital
+        // agrees: roll it back and say so, same event pattern as "blocked".
+        setApprovedIds(prev => {
+          const n = new Set(prev); ids.forEach(id => n.delete(id)); return n;
+        });
+        window.dispatchEvent(new CustomEvent("approvals:writeFailed", {
+          detail: { caseIds: ids },
+        }));
+        return;
+      }
       if (blocked.length === 0) return;
       setApprovedIds(prev => {
         const n = new Set(prev); blocked.forEach(id => n.delete(id)); return n;
@@ -56,14 +69,26 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     });
   };
   const reopen = (id: string) => {
+    const wasApproved = approvedIds.has(id);
     setApprovedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     setReopenedIds(prev => new Set(prev).add(id)); // optimistic: into the Reopen tab now
     inFlight.current.add(id);
     reopenCase(id).then(ok => {
       inFlight.current.delete(id);
-      if (ok) setCasesVersion(v => v + 1); // server moved it → silent refetch
-      // failed write / no live server: the id stays in the in-memory set for
-      // this session; in live mode the next fetch's pruneReopened self-heals
+      if (ok) {
+        setCasesVersion(v => v + 1); // server moved it → silent refetch
+        return;
+      }
+      // Couldn't confirm the hospital write-back reverted — undo the optimistic
+      // move so the case doesn't sit in "Reopened" while iMed may still show it
+      // as approved, and say so (CasesPage turns this into a toast).
+      if (wasApproved) {
+        setApprovedIds(prev => new Set(prev).add(id));
+      }
+      setReopenedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+      window.dispatchEvent(new CustomEvent("approvals:writeFailed", {
+        detail: { caseIds: [id] },
+      }));
     });
   };
   const pruneReopened = useCallback((serverFinishedIds: string[]) => {
