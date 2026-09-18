@@ -1,0 +1,1748 @@
+21:04:42.900 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.medcodeai.api.web.AdminApiIntegrationTest]: AdminApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+21:04:42.955 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.AdminApiIntegrationTest
+21:04:42.982 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.medcodeai.api.web.AdminApiIntegrationTest]: AdminApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+21:04:42.984 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.AdminApiIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-09-18T21:04:43.164+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.web.AdminApiIntegrationTest      : Starting AdminApiIntegrationTest using Java 21.0.12.1 with PID 11280 (started by phyophyolay in /Users/phyophyolay/Documents/Personal_Dev/cura-ai/medcode-api)
+2026-09-18T21:04:43.165+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.web.AdminApiIntegrationTest      : No active profile set, falling back to 1 default profile: "default"
+2026-09-18T21:04:43.560+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-18T21:04:43.610+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@632d4cf2
+2026-09-18T21:04:43.610+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-18T21:04:43.671+07:00  INFO 11280 --- [medcode-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/medcode?stringtype=unspecified&binaryTransfer=false (PostgreSQL 18.6)
+2026-09-18T21:04:43.713+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 10 migrations (execution time 00:00.014s)
+2026-09-18T21:04:43.723+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 9
+2026-09-18T21:04:43.724+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+2026-09-18T21:04:43.950+07:00  INFO 11280 --- [medcode-api] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-09-18T21:04:43.950+07:00  INFO 11280 --- [medcode-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-18T21:04:43.951+07:00  INFO 11280 --- [medcode-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-18T21:04:43.960+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.web.AdminApiIntegrationTest      : Started AdminApiIntegrationTest in 0.893 seconds (process running for 1.387)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/phyophyolay/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"eR8Udk07kV7LQb5J8oVfO9FBTC-UVLr7xggCaOoxPpE","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/admin/accounts
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Authorization:"Bearer eR8Udk07kV7LQb5J8oVfO9FBTC-UVLr7xggCaOoxPpE", Content-Length:"108"]
+             Body = {"fullName":"History Guard","email":"history-guard@medcodeai.demo","password":"historypass1","role":"coder"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AdminController
+           Method = com.medcodeai.api.web.AdminController#createAccount(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"id":19,"fullName":"History Guard","email":"history-guard@medcodeai.demo","role":"coder","status":"active","createdAt":"2026-09-18 21:04:45","lastLoginAt":null}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/admin/accounts
+       Parameters = {}
+          Headers = [Authorization:"Bearer eR8Udk07kV7LQb5J8oVfO9FBTC-UVLr7xggCaOoxPpE"]
+             Body = null
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AdminController
+           Method = com.medcodeai.api.web.AdminController#listAccounts()
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = [{"id":3,"fullName":"Frank","email":"frank@email.com","role":"coder","status":"active","createdAt":"2026-08-21 05:06:33","lastLoginAt":"2026-08-27 13:12:55"},{"id":19,"fullName":"History Guard","email":"history-guard@medcodeai.demo","role":"coder","status":"active","createdAt":"2026-09-18 21:04:45","lastLoginAt":null},{"id":2,"fullName":"Ouzdim","email":"ouzdim@gmail.com","role":"coder","status":"active","createdAt":"2026-08-21 05:00:47","lastLoginAt":"2026-09-03 14:55:03"},{"id":1,"fullName":"Super Admin","email":"admin@medcodeai.demo","role":"admin","status":"active","createdAt":"2026-08-21 04:59:25","lastLoginAt":"2026-09-18 21:04:45"},{"id":14,"fullName":"Test Coder","email":"test.coder@medcodeai.demo","role":"coder","status":"inactive","createdAt":"2026-09-03 14:59:14","lastLoginAt":"2026-09-03 15:01:36"}]
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/admin/accounts/19
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Authorization:"Bearer eR8Udk07kV7LQb5J8oVfO9FBTC-UVLr7xggCaOoxPpE", Content-Length:"27"]
+             Body = {"password":"historypass1"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AdminController
+           Method = com.medcodeai.api.web.AdminController#updateAccount(String, byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"id":19,"fullName":"History Guard","email":"history-guard@medcodeai.demo","role":"coder","status":"active","createdAt":"2026-09-18 21:04:45","lastLoginAt":null}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"66"]
+             Body = {"email":"history-guard@medcodeai.demo","password":"historypass1"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"P3zBjUomZ3_fVpSn5q4yQJEh7SKANkqzO2SNfR8oZx8","user":{"id":19,"email":"history-guard@medcodeai.demo","fullName":"History Guard","role":"coder"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 11, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 2.547 s <<< FAILURE! -- in com.medcodeai.api.web.AdminApiIntegrationTest
+[ERROR] com.medcodeai.api.web.AdminApiIntegrationTest.deletingAnAccountWithCodingHistoryIs409 -- Time elapsed: 0.256 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.AdminApiIntegrationTest.deletingAnAccountWithCodingHistoryIs409(AdminApiIntegrationTest.java:242)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.syncCases(ImedApiClient.java:125)
+	at com.medcodeai.api.service.ImedWritebackService.liveCase(ImedWritebackService.java:423)
+	at com.medcodeai.api.service.ImedWritebackService.approveCase(ImedWritebackService.java:119)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:516)
+	at com.medcodeai.api.service.ApprovalService.lambda$approve$1(ApprovalService.java:131)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.approve(ApprovalService.java:91)
+	at com.medcodeai.api.web.CasesWriteController.approve(CasesWriteController.java:137)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 21 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/cases/sync": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 40 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+2026-09-18T21:04:45.386+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.web.OpenApiDocsTest]: OpenApiDocsTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:45.387+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.OpenApiDocsTest
+2026-09-18T21:04:45.388+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.web.OpenApiDocsTest]: OpenApiDocsTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:45.389+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.OpenApiDocsTest
+2026-09-18T21:04:45.513+07:00  INFO 11280 --- [medcode-api] [           main] o.springdoc.api.AbstractOpenApiResource  : Init duration for springdoc-openapi is: 121 ms
+2026-09-18T21:04:45.542+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.web.CasesApiIntegrationTest]: CasesApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:45.543+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.CasesApiIntegrationTest
+2026-09-18T21:04:45.543+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.web.CasesApiIntegrationTest]: CasesApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:45.544+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.web.CasesApiIntegrationTest
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"_g1wIelh89ahvAL-j_xgAxV_R0CUskdkU1RFxiZurII","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"wKyXcjh-xfjubss040o6PACVGSQL0H2QYUGvPqDdFBM","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"IKNM4wD5qLk8tJl76xH4Q9w8TmT18j4xOBnbIA2q88k","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"n9TeWsYhG5PtpYBdeXqxEJk1kZZoQnGnoFY66-Ii0vQ","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"dLBHlxQ990Jm8g5e1KF739CzXgYtb7RmoA2JER8vO40","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"JO4HSMIKDe97aXx_EgWHPT4qs5cHTC_LpvAsb5XQaQw","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/cases/87026072711124400801
+       Parameters = {}
+          Headers = [Authorization:"Bearer JO4HSMIKDe97aXx_EgWHPT4qs5cHTC_LpvAsb5XQaQw"]
+             Body = null
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.CasesReadController
+           Method = com.medcodeai.api.web.CasesReadController#caseDetail(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"case":{"case_id":"87026072711124400801","patient_ref":null,"encountertype":"0","sex":"male","birthdate":"1988-07-07","ageyear":"38","admissiondatetime":null,"dischargedatetime":null,"dischargetype":null,"dischargestatus":null,"ispregnant":"false","ward":null,"department":"แผนก OPD SURGICAL (ศัลยศาสตร์)","coverage_type":"UCS_89","completeness_status":"complete","missing_detail":null,"disease_group":"Skin","severity_level":"low","case_status":"approved","fetched_at":"2026-09-03 14:32:43"},"coverage":{"coverage_code":"UCS_89","scheme_family":"UCS","label_th":null,"label_en":null,"payer":"NHSO"},"sections":[{"documenttype":"OPD Record","fieldname":"Chief Complaint","value":"ฝีที่สะโพกขวา ปวดบวมแดง 5 วัน","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Skin: 3x3 cm fluctuant abscess at right buttock, erythematous, tender","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"General Appearance: good consciousness with orientation to time place and person","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"HEENT: not pale conjunctiva, anicteric sclera","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Respiratory: equal breath sound with no adventitious sound","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Cardiovascular: normal s1s2, no murmur","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Gastrointestinal: no distension soft, no tenderness no mass active bowel sound","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Extremities: no arthritis, no edema","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Skin: no rash","recorddatetime":"2026-07-27 11:12:44"}],"codes":[{"code":"L02.4","code_system":"ICD-10","description":"Abscess, hip","code_role":"principal_diagnosis","source":"imported_from_imed","operation_start":null,"operation_end":null,"operation_type":null},{"code":"86.04","code_system":"ICD-9","description":null,"code_role":"procedure","source":"imported_from_imed","operation_start":"2026-07-27 11:45:00","operation_end":"2026-07-27 12:05:00","operation_type":"OR Procedure"},{"code":"L02.4","code_system":"ICD-10","description":"Abscess, hip","code_role":"principal_diagnosis","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null},{"code":"86.04","code_system":"ICD-9","description":null,"code_role":"procedure","source":"coder_assigned","operation_start":"2026-07-27 11:45:00","operation_end":"2026-07-27 12:05:00","operation_type":"OR Procedure"}],"orders":[{"order_category":"medicine","imed_source":"MedHack_OrderDrug","order_name":"DICLOXACILLIN 500 MG CAP","ordered_at":"2026-07-27 11:12:44","detail":{"name":"DICLOXACILLIN 500 MG CAP","remark":"จ่ายยาจากห้องยาผู้ป่วยนอก","item_id":"DRG0102","quantity":"28","tmt_code":"TMT0102","object_id":"87026072711124010201","received_at":"2026-07-27T11:12:44","dosage_signature":"oral 1 cap four times daily ac","dosage_instruction":"ครั้งละ 1 แคปซูล วันละ 4 ครั้ง ก่อนอาหาร"}},{"order_category":"medicine","imed_source":"MedHack_OrderDrug","order_name":"PARACETAMOL 500 MG TAB","ordered_at":"2026-07-27 11:12:44","detail":{"name":"PARACETAMOL 500 MG TAB","remark":"จ่ายยาจากห้องยาผู้ป่วยนอก","item_id":"DRG0103","quantity":"20","tmt_code":"TMT0103","object_id":"87026072711124010301","received_at":"2026-07-27T11:12:44","dosage_signature":"oral 1 tab every 6 hours prn for pain","dosage_instruction":"ครั้งละ 1 เม็ด ทุก 6 ชั่วโมง เวลาปวด"}},{"order_category":"other","imed_source":"MedHack_BillingItem","order_name":"ค่าบริการสถานพยาบาล-Hospital Charge","ordered_at":"2026-07-27 11:12:44","detail":{"cgd":"55020","name":"ค่าบริการสถานพยาบาล-Hospital Charge","tmlt":"900001","remark":"เหมาจ่ายค่าบริการสถานพยาบาล","item_id":"NEW25","quantity":"1","object_id":"87026072711124010501","verified_at":"2026-07-27T11:12:44","fee_schedule":"55020"}},{"order_category":"other","imed_source":"MedHack_BillingItem","order_name":"ค่าบริการผู้ป่วยนอก","ordered_at":"2026-07-27 11:12:44","detail":{"cgd":"55021","name":"ค่าบริการผู้ป่วยนอก","tmlt":"900002","remark":"ค่าบริการทางการแพทย์ตามสิทธิ","item_id":"MD00199","quantity":"1","object_id":"87026072711124010601","verified_at":"2026-07-27T11:12:44","fee_schedule":"55021"}},{"order_category":"surgery","imed_source":"MedHack_Procedure(ICD9)","order_name":"Incision and drainage of abscess","ordered_at":"2026-07-27 11:45:00","detail":{"icd9_code":"86.04","object_id":"87026072711124010401","updated_at":null,"description":"Incision and drainage of abscess","operation_end":"2026-07-27T12:05:00","operation_type":"OR Procedure","operation_start":"2026-07-27T11:45:00"}}],"orderCounts":{"medicine":2,"other":2,"surgery":1},"vitals":[{"measured_at":"2026-07-27 11:12:44","temperature":"37.2","systolic":"126","diastolic":"80","heart_rate":"82","oxygen_saturation":"99","weight":"80","height":"175"}],"history":[{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo"}}],"codeEdits":null,"starred":false,"starredBy":null,"starredByStamp":null,"starredAt":null}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/cases/87026072711124400801/codes
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Authorization:"Bearer JO4HSMIKDe97aXx_EgWHPT4qs5cHTC_LpvAsb5XQaQw", Content-Length:"541"]
+             Body = [{"code":"L02.4","type":"ICD-10","desc":"Abscess, hip"},{"code":"86.04","type":"ICD-9","desc":""},{"code":"L02.4","type":"ICD-10","desc":"Abscess, hip"},{"code":"86.04","type":"ICD-9","desc":""},{"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
+ "operation_start":"2026-04-08T11:20","operation_end":"2026-04-08 12:05:00",
+ "operation_type":"OR Procedure"},{"code":"V89.2","type":"ICD-10 External Cause","note":"MVA, per ER note",
+ "desc":"Person injured in unspecified motor-vehicle accident, traffic"}]
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.CasesWriteController
+           Method = com.medcodeai.api.web.CasesWriteController#putCodes(HttpServletRequest, String, byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"ok":true}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"ZJwH4ZyxkBf5XMx78OOA7tSP__34UytjC0pZ3EO-RNM","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"vutNUeRtBnCG4cHhH1GG-08jOABuunXngCdc0RM1iHA","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/cases/87026072711124400801
+       Parameters = {}
+          Headers = [Authorization:"Bearer vutNUeRtBnCG4cHhH1GG-08jOABuunXngCdc0RM1iHA"]
+             Body = null
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.CasesReadController
+           Method = com.medcodeai.api.web.CasesReadController#caseDetail(String)
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"case":{"case_id":"87026072711124400801","patient_ref":null,"encountertype":"0","sex":"male","birthdate":"1988-07-07","ageyear":"38","admissiondatetime":null,"dischargedatetime":null,"dischargetype":null,"dischargestatus":null,"ispregnant":"false","ward":null,"department":"แผนก OPD SURGICAL (ศัลยศาสตร์)","coverage_type":"UCS_89","completeness_status":"complete","missing_detail":null,"disease_group":"Skin","severity_level":"low","case_status":"approved","fetched_at":"2026-09-03 14:32:43"},"coverage":{"coverage_code":"UCS_89","scheme_family":"UCS","label_th":null,"label_en":null,"payer":"NHSO"},"sections":[{"documenttype":"OPD Record","fieldname":"Chief Complaint","value":"ฝีที่สะโพกขวา ปวดบวมแดง 5 วัน","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Skin: 3x3 cm fluctuant abscess at right buttock, erythematous, tender","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"General Appearance: good consciousness with orientation to time place and person","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"HEENT: not pale conjunctiva, anicteric sclera","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Respiratory: equal breath sound with no adventitious sound","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Cardiovascular: normal s1s2, no murmur","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Gastrointestinal: no distension soft, no tenderness no mass active bowel sound","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Extremities: no arthritis, no edema","recorddatetime":"2026-07-27 11:12:44"},{"documenttype":"OPD Record","fieldname":"Physical Examination","value":"Skin: no rash","recorddatetime":"2026-07-27 11:12:44"}],"codes":[{"code":"L02.4","code_system":"ICD-10","description":"Abscess, hip","code_role":"principal_diagnosis","source":"imported_from_imed","operation_start":null,"operation_end":null,"operation_type":null},{"code":"86.04","code_system":"ICD-9","description":null,"code_role":"procedure","source":"imported_from_imed","operation_start":"2026-07-27 11:45:00","operation_end":"2026-07-27 12:05:00","operation_type":"OR Procedure"},{"code":"L02.4","code_system":"ICD-10","description":"Abscess, hip","code_role":"principal_diagnosis","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null},{"code":"86.04","code_system":"ICD-9","description":null,"code_role":"procedure","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null},{"code":"L02.4","code_system":"ICD-10","description":"Abscess, hip","code_role":"secondary_diagnosis","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null},{"code":"86.04","code_system":"ICD-9","description":null,"code_role":"procedure","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null},{"code":"93.22","code_system":"ICD-9","description":"Ambulation and gait training","code_role":"procedure","source":"coder_assigned","operation_start":"2026-04-08 11:20:00","operation_end":"2026-04-08 12:05:00","operation_type":"OR Procedure"},{"code":"V89.2","code_system":"ICD-10","description":"Person injured in unspecified motor-vehicle accident, traffic","code_role":"external_cause","source":"coder_assigned","operation_start":null,"operation_end":null,"operation_type":null}],"orders":[{"order_category":"medicine","imed_source":"MedHack_OrderDrug","order_name":"DICLOXACILLIN 500 MG CAP","ordered_at":"2026-07-27 11:12:44","detail":{"name":"DICLOXACILLIN 500 MG CAP","remark":"จ่ายยาจากห้องยาผู้ป่วยนอก","item_id":"DRG0102","quantity":"28","tmt_code":"TMT0102","object_id":"87026072711124010201","received_at":"2026-07-27T11:12:44","dosage_signature":"oral 1 cap four times daily ac","dosage_instruction":"ครั้งละ 1 แคปซูล วันละ 4 ครั้ง ก่อนอาหาร"}},{"order_category":"medicine","imed_source":"MedHack_OrderDrug","order_name":"PARACETAMOL 500 MG TAB","ordered_at":"2026-07-27 11:12:44","detail":{"name":"PARACETAMOL 500 MG TAB","remark":"จ่ายยาจากห้องยาผู้ป่วยนอก","item_id":"DRG0103","quantity":"20","tmt_code":"TMT0103","object_id":"87026072711124010301","received_at":"2026-07-27T11:12:44","dosage_signature":"oral 1 tab every 6 hours prn for pain","dosage_instruction":"ครั้งละ 1 เม็ด ทุก 6 ชั่วโมง เวลาปวด"}},{"order_category":"other","imed_source":"MedHack_BillingItem","order_name":"ค่าบริการสถานพยาบาล-Hospital Charge","ordered_at":"2026-07-27 11:12:44","detail":{"cgd":"55020","name":"ค่าบริการสถานพยาบาล-Hospital Charge","tmlt":"900001","remark":"เหมาจ่ายค่าบริการสถานพยาบาล","item_id":"NEW25","quantity":"1","object_id":"87026072711124010501","verified_at":"2026-07-27T11:12:44","fee_schedule":"55020"}},{"order_category":"other","imed_source":"MedHack_BillingItem","order_name":"ค่าบริการผู้ป่วยนอก","ordered_at":"2026-07-27 11:12:44","detail":{"cgd":"55021","name":"ค่าบริการผู้ป่วยนอก","tmlt":"900002","remark":"ค่าบริการทางการแพทย์ตามสิทธิ","item_id":"MD00199","quantity":"1","object_id":"87026072711124010601","verified_at":"2026-07-27T11:12:44","fee_schedule":"55021"}},{"order_category":"surgery","imed_source":"MedHack_Procedure(ICD9)","order_name":"Incision and drainage of abscess","ordered_at":"2026-07-27 11:45:00","detail":{"icd9_code":"86.04","object_id":"87026072711124010401","updated_at":null,"description":"Incision and drainage of abscess","operation_end":"2026-07-27T12:05:00","operation_type":"OR Procedure","operation_start":"2026-07-27T11:45:00"}}],"orderCounts":{"medicine":2,"other":2,"surgery":1},"vitals":[{"measured_at":"2026-07-27 11:12:44","temperature":"37.2","systolic":"126","diastolic":"80","heart_rate":"82","oxygen_saturation":"99","weight":"80","height":"175"}],"history":[{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:45","detail":{"at":"2026-09-18 21:04:45","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo","from":"hospital_codes","codes":2}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo","from":"ui_edits","codes":6}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo"}},{"action":"reopened","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo"}},{"action":"code_assigned","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo","from":"ui_edits","codes":6}},{"action":"approved_single","coder":"Super Admin","at":"2026-09-18 21:04:46","detail":{"at":"2026-09-18 21:04:46","by":"admin@medcodeai.demo"}}],"codeEdits":[{"code":"L02.4","desc":"Abscess, hip","type":"ICD-10"},{"code":"86.04","desc":"","type":"ICD-9"},{"code":"L02.4","desc":"Abscess, hip","type":"ICD-10"},{"code":"86.04","desc":"","type":"ICD-9"},{"code":"93.22","desc":"Ambulation and gait training","type":"ICD-9 Primary Diagnosis","operation_end":"2026-04-08 12:05:00","operation_type":"OR Procedure","operation_start":"2026-04-08T11:20"},{"code":"V89.2","desc":"Person injured in unspecified motor-vehicle accident, traffic","note":"MVA, per ER note","type":"ICD-10 External Cause"}],"starred":false,"starredBy":null,"starredByStamp":null,"starredAt":null}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = PUT
+      Request URI = /api/cases/87026072711124400801/codes
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Authorization:"Bearer vutNUeRtBnCG4cHhH1GG-08jOABuunXngCdc0RM1iHA", Content-Length:"838"]
+             Body = [{"code":"L02.4","desc":"Abscess, hip","type":"ICD-10","selected":true},{"code":"86.04","desc":"","type":"ICD-9","selected":true},{"code":"L02.4","desc":"Abscess, hip","type":"ICD-10","selected":true},{"code":"86.04","desc":"","type":"ICD-9","selected":true},{"code":"L02.4","desc":"Abscess, hip","type":"ICD-10","selected":true},{"code":"86.04","desc":"","type":"ICD-9","selected":true},{"code":"93.22","desc":"Ambulation and gait training","type":"ICD-9","selected":true},{"code":"V89.2","desc":"Person injured in unspecified motor-vehicle accident, traffic","type":"ICD-10","selected":true},{"code":"93.22","type":"ICD-9 Primary Diagnosis","desc":"Ambulation and gait training",
+ "selected":true},{"code":"V89.2","type":"ICD-10 External Cause","selected":false,
+ "desc":"Person injured in unspecified motor-vehicle accident, traffic"}]
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.CasesWriteController
+           Method = com.medcodeai.api.web.CasesWriteController#putCodes(HttpServletRequest, String, byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"ok":true}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"NyDJMff1HKn46MTM0iBqVhT1tDqbJyGCLq4fFuwejE0","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"gu1XY5R-2qAh45zY5bMWGtLxcBwGcK1CZ5XYVjVu0xg","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = POST
+      Request URI = /api/auth/login
+       Parameters = {}
+          Headers = [Content-Type:"application/json;charset=UTF-8", Content-Length:"55"]
+             Body = {"email":"admin@medcodeai.demo","password":"admin1234"}
+    Session Attrs = {}
+
+Handler:
+             Type = com.medcodeai.api.web.AuthController
+           Method = com.medcodeai.api.web.AuthController#login(byte[])
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 200
+    Error message = null
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", Content-Type:"application/json"]
+     Content type = application/json
+             Body = {"token":"KN-2Z6I60aRrPrIZW2jQ9gt1wkelD4lbmy-YSblPlVI","user":{"id":1,"email":"admin@medcodeai.demo","fullName":"Super Admin","role":"admin"}}
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 37, Failures: 0, Errors: 11, Skipped: 0, Time elapsed: 2.261 s <<< FAILURE! -- in com.medcodeai.api.web.CasesApiIntegrationTest
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.finishedCasesShowRealCoderIdNotRotatedFakeName -- Time elapsed: 0.067 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.approve(CasesApiIntegrationTest.java:1106)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.finishedCasesShowRealCoderIdNotRotatedFakeName(CasesApiIntegrationTest.java:183)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.syncCases(ImedApiClient.java:125)
+	at com.medcodeai.api.service.ImedWritebackService.liveCase(ImedWritebackService.java:423)
+	at com.medcodeai.api.service.ImedWritebackService.approveCase(ImedWritebackService.java:119)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:516)
+	at com.medcodeai.api.service.ApprovalService.lambda$approve$1(ApprovalService.java:131)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.approve(ApprovalService.java:91)
+	at com.medcodeai.api.web.CasesWriteController.approve(CasesWriteController.java:137)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/cases/sync": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 41 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.syncImportsTheHospitalOperationWindowOntoIcd9Codes -- Time elapsed: 0.061 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.postJson(CasesApiIntegrationTest.java:1078)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.syncImportsTheHospitalOperationWindowOntoIcd9Codes(CasesApiIntegrationTest.java:456)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.contractCheck(ImedApiClient.java:146)
+	at com.medcodeai.api.service.SyncService.preflight(SyncService.java:147)
+	at com.medcodeai.api.service.SyncService.syncOne(SyncService.java:131)
+	at com.medcodeai.api.web.SyncController.syncOne(SyncController.java:95)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/contract/check": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 37 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.syncRefreshesAnOpenCaseWithoutChangingItsStatus -- Time elapsed: 0.059 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.postJson(CasesApiIntegrationTest.java:1078)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.syncRefreshesAnOpenCaseWithoutChangingItsStatus(CasesApiIntegrationTest.java:664)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.contractCheck(ImedApiClient.java:146)
+	at com.medcodeai.api.service.SyncService.preflight(SyncService.java:147)
+	at com.medcodeai.api.service.SyncService.syncOne(SyncService.java:131)
+	at com.medcodeai.api.web.SyncController.syncOne(SyncController.java:95)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/contract/check": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 37 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache -- Time elapsed: 0.063 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache(CasesApiIntegrationTest.java:316)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.syncCases(ImedApiClient.java:125)
+	at com.medcodeai.api.service.ImedWritebackService.liveCase(ImedWritebackService.java:423)
+	at com.medcodeai.api.service.ImedWritebackService.approveCase(ImedWritebackService.java:119)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:516)
+	at com.medcodeai.api.service.ApprovalService.lambda$approve$1(ApprovalService.java:131)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.approve(ApprovalService.java:91)
+	at com.medcodeai.api.web.CasesWriteController.approve(CasesWriteController.java:137)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 21 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/cases/sync": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 40 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.caseDetailIncludesServerHistoryForApprovedCase -- Time elapsed: 0.063 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.approve(CasesApiIntegrationTest.java:1106)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.caseDetailIncludesServerHistoryForApprovedCase(CasesApiIntegrationTest.java:285)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.syncCases(ImedApiClient.java:125)
+	at com.medcodeai.api.service.ImedWritebackService.liveCase(ImedWritebackService.java:423)
+	at com.medcodeai.api.service.ImedWritebackService.approveCase(ImedWritebackService.java:119)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:516)
+	at com.medcodeai.api.service.ApprovalService.lambda$approve$1(ApprovalService.java:131)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.approve(ApprovalService.java:91)
+	at com.medcodeai.api.web.CasesWriteController.approve(CasesWriteController.java:137)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/cases/sync": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 41 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.operationTimesFlowFromSavedEditsThroughApproveAndRevertOnReopen -- Time elapsed: 0.081 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.operationTimesFlowFromSavedEditsThroughApproveAndRevertOnReopen(CasesApiIntegrationTest.java:580)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.putDiagnosis(ImedApiClient.java:94)
+	at com.medcodeai.api.service.ImedWritebackService.sendCodingStatus(ImedWritebackService.java:355)
+	at com.medcodeai.api.service.ImedWritebackService.reopenCase(ImedWritebackService.java:262)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:514)
+	at com.medcodeai.api.service.ApprovalService.lambda$reopen$3(ApprovalService.java:152)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.reopen(ApprovalService.java:143)
+	at com.medcodeai.api.web.CasesWriteController.reopen(CasesWriteController.java:161)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 21 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on PUT request for "http://localhost:8003/api/v1/diagnosis/87026072711124400801": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toBodilessEntity(DefaultRestClient.java:888)
+	at com.medcodeai.api.client.ImedApiClient.putDiagnosis(ImedApiClient.java:92)
+	... 39 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.syncSkipsAnApprovedCase -- Time elapsed: 0.066 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.approve(CasesApiIntegrationTest.java:1106)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.syncSkipsAnApprovedCase(CasesApiIntegrationTest.java:681)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.syncCases(ImedApiClient.java:125)
+	at com.medcodeai.api.service.ImedWritebackService.liveCase(ImedWritebackService.java:423)
+	at com.medcodeai.api.service.ImedWritebackService.approveCase(ImedWritebackService.java:119)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:516)
+	at com.medcodeai.api.service.ApprovalService.lambda$approve$1(ApprovalService.java:131)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.approve(ApprovalService.java:91)
+	at com.medcodeai.api.web.CasesWriteController.approve(CasesWriteController.java:137)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/cases/sync": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 41 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved -- Time elapsed: 0.072 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved(CasesApiIntegrationTest.java:645)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.putDiagnosis(ImedApiClient.java:94)
+	at com.medcodeai.api.service.ImedWritebackService.sendCodingStatus(ImedWritebackService.java:355)
+	at com.medcodeai.api.service.ImedWritebackService.reopenCase(ImedWritebackService.java:262)
+	at com.medcodeai.api.service.ApprovalService.runImedOps(ApprovalService.java:514)
+	at com.medcodeai.api.service.ApprovalService.lambda$reopen$3(ApprovalService.java:152)
+	at com.medcodeai.api.service.WriteGate.locked(WriteGate.java:21)
+	at com.medcodeai.api.service.ApprovalService.reopen(ApprovalService.java:143)
+	at com.medcodeai.api.web.CasesWriteController.reopen(CasesWriteController.java:161)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 21 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on PUT request for "http://localhost:8003/api/v1/diagnosis/87026072711124400801": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toBodilessEntity(DefaultRestClient.java:888)
+	at com.medcodeai.api.client.ImedApiClient.putDiagnosis(ImedApiClient.java:92)
+	... 39 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.bulkSyncAcceptsAVisitDatetimeWindow -- Time elapsed: 0.064 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.postSync(CasesApiIntegrationTest.java:736)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.bulkSyncAcceptsAVisitDatetimeWindow(CasesApiIntegrationTest.java:703)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.contractCheck(ImedApiClient.java:146)
+	at com.medcodeai.api.service.SyncService.preflight(SyncService.java:147)
+	at com.medcodeai.api.service.SyncService.syncAll(SyncService.java:116)
+	at com.medcodeai.api.web.SyncController.syncAll(SyncController.java:69)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/contract/check": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 37 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.syncImportsTheHospitalVitalSigns -- Time elapsed: 0.059 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.postJson(CasesApiIntegrationTest.java:1078)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.syncImportsTheHospitalVitalSigns(CasesApiIntegrationTest.java:485)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.contractCheck(ImedApiClient.java:146)
+	at com.medcodeai.api.service.SyncService.preflight(SyncService.java:147)
+	at com.medcodeai.api.service.SyncService.syncOne(SyncService.java:131)
+	at com.medcodeai.api.web.SyncController.syncOne(SyncController.java:95)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 22 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/contract/check": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 37 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+[ERROR] com.medcodeai.api.web.CasesApiIntegrationTest.syncUnknownCaseReturns404 -- Time elapsed: 0.059 s <<< ERROR!
+jakarta.servlet.ServletException: Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1008)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:649)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:874)
+	at org.springframework.test.web.servlet.TestDispatcherServlet.service(TestDispatcherServlet.java:72)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:710)
+	at org.springframework.mock.web.MockFilterChain$ServletFilterProxy.doFilter(MockFilterChain.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:199)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.test.web.servlet.setup.MockMvcFilterDecorator.doFilter(MockMvcFilterDecorator.java:160)
+	at org.springframework.mock.web.MockFilterChain.doFilter(MockFilterChain.java:127)
+	at org.springframework.test.web.servlet.MockMvc.perform(MockMvc.java:199)
+	at com.medcodeai.api.web.CasesApiIntegrationTest.syncUnknownCaseReturns404(CasesApiIntegrationTest.java:695)
+Caused by: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+	at com.medcodeai.api.client.ImedApiClient.unreachable(ImedApiClient.java:206)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:191)
+	at com.medcodeai.api.client.ImedApiClient.contractCheck(ImedApiClient.java:146)
+	at com.medcodeai.api.service.SyncService.preflight(SyncService.java:147)
+	at com.medcodeai.api.service.SyncService.syncOne(SyncService.java:131)
+	at com.medcodeai.api.web.SyncController.syncOne(SyncController.java:95)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:252)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:184)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:934)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:853)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:86)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:963)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:866)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1000)
+	... 21 more
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "http://localhost:8003/api/v1/contract/check": null
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.body(DefaultRestClient.java:847)
+	at com.medcodeai.api.client.ImedApiClient.postEnvelope(ImedApiClient.java:188)
+	... 36 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1065)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:227)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:280)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$2(PlainHttpConnection.java:238)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:202)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:786)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:874)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:210)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:571)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:212)
+	... 9 more
+
+2026-09-18T21:04:47.803+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.MedcodeApiApplicationTests]: MedcodeApiApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:47.805+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.MedcodeApiApplicationTests
+2026-09-18T21:04:47.805+07:00  INFO 11280 --- [medcode-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.medcodeai.api.MedcodeApiApplicationTests]: MedcodeApiApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-09-18T21:04:47.806+07:00  INFO 11280 --- [medcode-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.medcodeai.api.MedcodeApiApplication for test class com.medcodeai.api.MedcodeApiApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-09-18T21:04:47.814+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.MedcodeApiApplicationTests       : Starting MedcodeApiApplicationTests using Java 21.0.12.1 with PID 11280 (started by phyophyolay in /Users/phyophyolay/Documents/Personal_Dev/cura-ai/medcode-api)
+2026-09-18T21:04:47.814+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.MedcodeApiApplicationTests       : No active profile set, falling back to 1 default profile: "default"
+2026-09-18T21:04:47.865+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-09-18T21:04:47.868+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection org.postgresql.jdbc.PgConnection@d96f413
+2026-09-18T21:04:47.873+07:00  INFO 11280 --- [medcode-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-09-18T21:04:47.878+07:00  INFO 11280 --- [medcode-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/medcode?stringtype=unspecified&binaryTransfer=false (PostgreSQL 18.6)
+2026-09-18T21:04:47.886+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 10 migrations (execution time 00:00.003s)
+2026-09-18T21:04:47.894+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 9
+2026-09-18T21:04:47.895+07:00  INFO 11280 --- [medcode-api] [           main] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+2026-09-18T21:04:47.950+07:00  INFO 11280 --- [medcode-api] [           main] c.m.api.MedcodeApiApplicationTests       : Started MedcodeApiApplicationTests in 0.143 seconds (process running for 5.377)
+[ERROR] Errors: 
+[ERROR]   AdminApiIntegrationTest.deletingAnAccountWithCodingHistoryIs409:242 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache:316 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.bulkSyncAcceptsAVisitDatetimeWindow:703->postSync:736 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.caseDetailIncludesServerHistoryForApprovedCase:285->approve:1106 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.finishedCasesShowRealCoderIdNotRotatedFakeName:183->approve:1106 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.operationTimesFlowFromSavedEditsThroughApproveAndRevertOnReopen:580 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.syncImportsTheHospitalOperationWindowOntoIcd9Codes:456->postJson:1078 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.syncImportsTheHospitalVitalSigns:485->postJson:1078 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.syncRefreshesAnOpenCaseWithoutChangingItsStatus:664->postJson:1078 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.syncSkipsAnApprovedCase:681->approve:1106 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.syncUnknownCaseReturns404:695 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR]   CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved:645 » Servlet Request processing failed: java.lang.IllegalStateException: iMed API not reachable at http://localhost:8003 — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)
+[ERROR] Tests run: 91, Failures: 0, Errors: 12, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project medcode-api: 
+[ERROR] 
+[ERROR] See /Users/phyophyolay/Documents/Personal_Dev/cura-ai/medcode-api/target/surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+EXIT_CODE=0

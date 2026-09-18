@@ -1,0 +1,31 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-09-18T21:06:23.815+07:00  INFO 11894 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiApplication      : Starting ImedMockApiApplication using Java 21.0.12.1 with PID 11894 (/Users/phyophyolay/Documents/Personal_Dev/cura-ai/imed-mock-api/target/classes started by phyophyolay in /Users/phyophyolay/Documents/Personal_Dev/cura-ai/imed-mock-api)
+2026-09-18T21:06:23.816+07:00  INFO 11894 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-09-18T21:06:24.168+07:00  INFO 11894 --- [imed-mock-api] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8003 (http)
+2026-09-18T21:06:24.173+07:00  INFO 11894 --- [imed-mock-api] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-18T21:06:24.173+07:00  INFO 11894 --- [imed-mock-api] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.24]
+2026-09-18T21:06:24.189+07:00  INFO 11894 --- [imed-mock-api] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 358 ms
+2026-09-18T21:06:24.238+07:00  INFO 11894 --- [imed-mock-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-18T21:06:24.277+07:00  INFO 11894 --- [imed-mock-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@22a4ca4a
+2026-09-18T21:06:24.277+07:00  INFO 11894 --- [imed-mock-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-18T21:06:24.330+07:00  INFO 11894 --- [imed-mock-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/imed?stringtype=unspecified&binaryTransfer=false (PostgreSQL 18.6)
+2026-09-18T21:06:24.373+07:00  INFO 11894 --- [imed-mock-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 7 migrations (execution time 00:00.032s)
+2026-09-18T21:06:24.382+07:00  INFO 11894 --- [imed-mock-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "imed": 6
+2026-09-18T21:06:24.383+07:00  INFO 11894 --- [imed-mock-api] [           main] o.f.core.internal.command.DbMigrate      : Schema "imed" is up to date. No migration necessary.
+2026-09-18T21:06:24.566+07:00  INFO 11894 --- [imed-mock-api] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-09-18T21:06:24.588+07:00  INFO 11894 --- [imed-mock-api] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8003 (http) with context path '/'
+2026-09-18T21:06:24.591+07:00  INFO 11894 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiApplication      : Started ImedMockApiApplication in 0.893 seconds (process running for 0.99)
+2026-09-18T21:06:24.610+07:00  WARN 11894 --- [imed-mock-api] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-09-18T21:06:24.610+07:00  WARN 11894 --- [imed-mock-api] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /swagger-ui.html endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+2026-09-18T21:06:30.407+07:00  INFO 11894 --- [imed-mock-api] [nio-8003-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-18T21:06:30.408+07:00  INFO 11894 --- [imed-mock-api] [nio-8003-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-18T21:06:30.408+07:00  INFO 11894 --- [imed-mock-api] [nio-8003-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms

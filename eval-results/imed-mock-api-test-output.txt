@@ -1,0 +1,38 @@
+21:04:46.659 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.medcodeai.imedmock.ImedMockApiIntegrationTest]: ImedMockApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+21:04:46.687 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.medcodeai.imedmock.ImedMockApiApplication for test class com.medcodeai.imedmock.ImedMockApiIntegrationTest
+21:04:46.710 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.medcodeai.imedmock.ImedMockApiIntegrationTest]: ImedMockApiIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+21:04:46.711 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.medcodeai.imedmock.ImedMockApiApplication for test class com.medcodeai.imedmock.ImedMockApiIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-09-18T21:04:46.873+07:00  INFO 11421 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiIntegrationTest  : Starting ImedMockApiIntegrationTest using Java 21.0.12.1 with PID 11421 (started by phyophyolay in /Users/phyophyolay/Documents/Personal_Dev/cura-ai/imed-mock-api)
+2026-09-18T21:04:46.873+07:00  INFO 11421 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiIntegrationTest  : No active profile set, falling back to 1 default profile: "default"
+2026-09-18T21:04:47.234+07:00  INFO 11421 --- [imed-mock-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-18T21:04:47.271+07:00  INFO 11421 --- [imed-mock-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@6c2883b1
+2026-09-18T21:04:47.272+07:00  INFO 11421 --- [imed-mock-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-18T21:04:47.323+07:00  INFO 11421 --- [imed-mock-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/imed?stringtype=unspecified&binaryTransfer=false (PostgreSQL 18.6)
+2026-09-18T21:04:47.359+07:00  INFO 11421 --- [imed-mock-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 7 migrations (execution time 00:00.012s)
+2026-09-18T21:04:47.367+07:00  INFO 11421 --- [imed-mock-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "imed": 6
+2026-09-18T21:04:47.368+07:00  INFO 11421 --- [imed-mock-api] [           main] o.f.core.internal.command.DbMigrate      : Schema "imed" is up to date. No migration necessary.
+2026-09-18T21:04:47.614+07:00  INFO 11421 --- [imed-mock-api] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-09-18T21:04:47.615+07:00  INFO 11421 --- [imed-mock-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-18T21:04:47.616+07:00  INFO 11421 --- [imed-mock-api] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-09-18T21:04:47.618+07:00  INFO 11421 --- [imed-mock-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 3 ms
+2026-09-18T21:04:47.638+07:00  INFO 11421 --- [imed-mock-api] [           main] c.m.imedmock.ImedMockApiIntegrationTest  : Started ImedMockApiIntegrationTest in 0.856 seconds (process running for 1.243)
+2026-09-18T21:04:47.666+07:00  WARN 11421 --- [imed-mock-api] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-09-18T21:04:47.666+07:00  WARN 11421 --- [imed-mock-api] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /swagger-ui.html endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/phyophyolay/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+2026-09-18T21:04:48.298+07:00  INFO 11421 --- [imed-mock-api] [           main] o.springdoc.api.AbstractOpenApiResource  : Init duration for springdoc-openapi is: 89 ms
+EXIT_CODE=0
