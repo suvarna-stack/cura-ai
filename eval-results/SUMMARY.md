@@ -42,6 +42,41 @@ Run twice, deliberately, to separate environment errors from real failures.
   fix (e.g. reset the mock hospital DB between runs, or make the test assert
   on a delta rather than an absolute count).
 
+## Performance / load testing — `medcode-api`, Apache Bench (`ab`)
+
+Machine: local dev laptop (macOS, Apple Silicon), medcode-api + imed-mock-api
++ Postgres all running locally — **no network latency**, single instance, no
+containerization overhead. Treat these as a capacity/regression baseline for
+the app code itself, not a production-network estimate (flag this caveat in
+Ch.6/Ch.8 — see `perf/` for raw `ab` output).
+
+| Endpoint | Load | Result | p50 / p95 / p99 | Failures |
+|---|---|---|---|---|
+| `GET /api/health` (unauthenticated) | 500 req, concurrency 10 | 13,266 req/s mean | 1ms / 1ms / 2ms | 0/500 |
+| `GET /api/cases` (authenticated, real dashboard query) | 300 req, concurrency 10 | 3,426 req/s mean | 2ms / 5ms / 7ms | 0/300 |
+| `GET /api/cases` — **stress** | 2,000 req, concurrency 50 | 6,569 req/s mean | 7ms / 19ms / 28ms | 0/2000 |
+
+- Raw output: `perf/medcode-api-health.txt`, `perf/medcode-api-cases.txt`,
+  `perf/medcode-api-cases-stress.txt`.
+- **Zero failed requests** across all three runs, including the 50-concurrency
+  stress run — no errors, no degraded responses, latency grows roughly
+  linearly with concurrency (p50 2ms→7ms from c=10 to c=50), no sign of a
+  cliff at these levels.
+- Reproduce:
+  ```
+  TOKEN=$(curl -s -X POST http://localhost:8001/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@medcodeai.demo","password":"admin1234"}' \
+    | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+  ab -n 2000 -c 50 -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/cases
+  ```
+- **Not measured:** RAG suggestion latency (the AI call is the slowest part of
+  the real user flow — a coder opening a case and waiting for suggestions —
+  and isn't covered by this backend-only load test), and any test with
+  concurrent *write* traffic (approve/edit), which is the more realistic
+  multi-coder contention scenario. Both are gaps to flag honestly in Ch.6/Ch.8
+  if not completed before submission.
+
 ## Reproduce
 
 ```
@@ -49,19 +84,21 @@ Run twice, deliberately, to separate environment errors from real failures.
 cd imed-mock-api && ./mvnw spring-boot:run   # port 8003
 
 # terminal 2
-cd medcode-api && ./mvnw test
+cd medcode-api && ./mvnw spring-boot:run     # port 8001, for perf tests
+# or: ./mvnw test                            # for the JUnit suite
 ```
 
 ## Not yet run (as of this file)
 
-- RAG service test suite (pytest) — repo has no local venv on this machine;
-  needs `pip install -r requirements.txt` (+ pytest) and the bge-m3 embedding
-  model, which is a non-trivial download. Needs to be run before Ch.6/7 are
-  finalized.
+- RAG service test suite (pytest) — dependency install in progress on this
+  machine (Python 3.9 system default was too old; switched to Homebrew
+  Python 3.12; `torch` wheel is large and downloading slowly on this
+  connection). Needs to be run before Ch.6/7 are finalized.
 - `audit-chart-frontend` — no test files found in the repo; nothing to run.
-- Load/performance testing (response time, throughput under load) — not yet
-  done; required explicitly by the Ch.6 rubric.
 - AI output accuracy scoring (RAG-suggested ICD codes vs. a labeled gold set)
-  — not yet done; required explicitly by the Ch.6 rubric.
+  — not yet done; required explicitly by the Ch.6 rubric. This is the single
+  biggest remaining evaluation gap — no accuracy number exists yet for this
+  system, and Ch.2 explicitly flags this as unaddressed by any reviewed prior
+  work either.
 - Comparison against the hospital's current (manual) process — not yet done.
 - Staff feedback — not yet collected.
