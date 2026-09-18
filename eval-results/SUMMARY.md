@@ -88,17 +88,33 @@ cd medcode-api && ./mvnw spring-boot:run     # port 8001, for perf tests
 # or: ./mvnw test                            # for the JUnit suite
 ```
 
-## Not yet run (as of this file)
+## RAG service — `pytest tests/`
 
-- RAG service test suite (pytest) — dependency install in progress on this
-  machine (Python 3.9 system default was too old; switched to Homebrew
-  Python 3.12; `torch` wheel is large and downloading slowly on this
-  connection). Needs to be run before Ch.6/7 are finalized.
+- **Result: 82/82 passed, 0 failures.**
+- Raw output: `rag-test-output.txt`.
+- Environment note: system Python was 3.9 (too old for this repo's pinned
+  deps, which need ≥3.10); used Homebrew Python 3.12 in a local `.venv-eval`
+  (gitignored, not committed) instead.
+
+## AI output accuracy — `rag_accuracy_eval.py` against `POST /suggest`
+
+- **Result: ICD-10 top-1 0/42 (0.0%), top-8 3/42 (7.1%).** Full writeup,
+  root-cause analysis, and caveats: `rag-accuracy-SUMMARY.md`. Raw per-case
+  data: `rag-accuracy-raw.json`.
+- **This is a real, substantive finding, not a broken test:** manually
+  confirmed retrieval is excellent on exact-term queries (score 1.0 for
+  `"J00 common cold"`) but does not bridge natural symptom narratives to the
+  right diagnosis code — a genuine gap in the current chunking/retrieval
+  setup for the actual coder use case (a chart with symptoms, not a
+  pre-known code). Flag this specifically in Ch.7/Ch.8, it is more useful to
+  the team than a single accuracy percentage.
+
+## Not yet run / not yet possible (as of this file)
+
 - `audit-chart-frontend` — no test files found in the repo; nothing to run.
-- AI output accuracy scoring (RAG-suggested ICD codes vs. a labeled gold set)
-  — not yet done; required explicitly by the Ch.6 rubric. This is the single
-  biggest remaining evaluation gap — no accuracy number exists yet for this
-  system, and Ch.2 explicitly flags this as unaddressed by any reviewed prior
-  work either.
-- Comparison against the hospital's current (manual) process — not yet done.
-- Staff feedback — not yet collected.
+- Comparison against the hospital's current (manual) process — deferred by
+  request; revisit before submission.
+- Staff feedback — deferred by request; revisit before submission.
+- `/chat` (LLM-in-the-loop) accuracy — only `/suggest` (retrieval-only) was
+  evaluated above; the full generation path a coder actually sees was not
+  separately scored.

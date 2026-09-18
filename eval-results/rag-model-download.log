@@ -1,0 +1,12 @@
+waiting for pip install to finish...
+pip install done. verifying packages...
+deps ok
+downloading bge-m3 embedding model...
+Fetching 30 files:   0%|          | 0/30 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 30 files:   3%|▎         | 1/30 [00:00<00:14,  2.02it/s]Fetching 30 files:  27%|██▋       | 8/30 [00:00<00:02, 10.73it/s]Fetching 30 files:  37%|███▋      | 11/30 [00:00<00:01, 13.74it/s]Fetching 30 files:  50%|█████     | 15/30 [00:01<00:01, 14.68it/s]Fetching 30 files:  57%|█████▋    | 17/30 [00:01<00:00, 13.97it/s]Fetching 30 files:  63%|██████▎   | 19/30 [00:01<00:01, 10.08it/s]Fetching 30 files:  70%|███████   | 21/30 [00:02<00:01,  4.95it/s]Fetching 30 files:  77%|███████▋  | 23/30 [00:03<00:01,  4.64it/s]Fetching 30 files:  80%|████████  | 24/30 [00:05<00:02,  2.16it/s]Fetching 30 files:  83%|████████▎ | 25/30 [00:05<00:02,  2.35it/s]Fetching 30 files:  90%|█████████ | 27/30 [00:24<00:10,  3.56s/it]Fetching 30 files:  93%|█████████▎| 28/30 [01:46<00:38, 19.32s/it]Fetching 30 files:  97%|█████████▋| 29/30 [06:20<01:15, 75.75s/it]Fetching 30 files: 100%|██████████| 30/30 [08:51<00:00, 93.84s/it]Fetching 30 files: 100%|██████████| 30/30 [08:51<00:00, 17.72s/it]
+bge-m3 downloaded
+downloading Qwen2.5-0.5B-Instruct generation model...
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 10 files:  10%|█         | 1/10 [00:00<00:03,  2.34it/s]Fetching 10 files:  60%|██████    | 6/10 [00:00<00:00, 11.62it/s]Fetching 10 files:  80%|████████  | 8/10 [00:00<00:00, 11.36it/s]Fetching 10 files:  90%|█████████ | 9/10 [00:20<00:00, 11.36it/s]Fetching 10 files: 100%|██████████| 10/10 [01:59<00:00, 19.20s/it]Fetching 10 files: 100%|██████████| 10/10 [01:59<00:00, 11.93s/it]
+qwen downloaded
+ALL MODELS DOWNLOADED

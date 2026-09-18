@@ -1,0 +1,80 @@
+Extracted 42 ground-truth scenarios from generate_demo_data.py
+[1/42] J00 rank=None  (ไข้ต่ำๆ น้ำมูกไหล เจ็บคอ 3 วัน...)
+[2/42] J02.9 rank=None  (เจ็บคอมาก กลืนลำบาก 2 วัน...)
+[3/42] J20.9 rank=None  (ไอมีเสมหะ 5 วัน เหนื่อยเวลาไอ...)
+[4/42] J18.9 rank=None  (ไข้สูง ไอมีเสมหะเขียว เหนื่อย ...)
+[5/42] E11.9 rank=8  (มาตรวจตามนัด ติดตามระดับน้ำตาล...)
+[6/42] I10 rank=3  (มาตรวจตามนัด ปวดศีรษะท้ายทอยบา...)
+[7/42] E78.5 rank=None  (มาตรวจตามนัด ติดตามระดับไขมัน...)
+[8/42] K29.1 rank=None  (ปวดแสบท้องใต้ลิ้นปี่ 3 วัน...)
+[9/42] K21.9 rank=None  (แสบร้อนกลางอก เรอเปรี้ยว 2 สัป...)
+[10/42] A09.9 rank=None  (ถ่ายเหลว 6 ครั้ง อาเจียน 1 วัน...)
+[11/42] D50.9 rank=None  (อ่อนเพลีย เหนื่อยง่าย 1 เดือน...)
+[12/42] N39.0 rank=None  (ปัสสาวะแสบขัด 3 วัน...)
+[13/42] J45.9 rank=None  (หอบเหนื่อย หายใจมีเสียงวี๊ด 2 ...)
+[14/42] K64.2 rank=None  (ถ่ายเป็นเลือดสด มีก้อนยื่นที่ท...)
+[15/42] K35.8 rank=3  (ปวดท้องน้อยขวา 1 วัน...)
+[16/42] L02.4 rank=None  (ก้อนบวมแดงที่สะโพกขวา ปวดมาก 5...)
+[17/42] D17.1 rank=None  (ก้อนใต้ผิวหนังที่หลัง โตขึ้นช้...)
+[18/42] N20.0 rank=None  (ปวดบิดเอวขวาร้าวลงขาหนีบ 1 วัน...)
+[19/42] M54.5 rank=None  (ปวดหลังส่วนล่าง 2 สัปดาห์...)
+[20/42] M17.1 rank=None  (ปวดเข่าซ้าย เดินลำบาก 6 เดือน...)
+[21/42] M75.1 rank=None  (ปวดไหล่ซ้าย ยกแขนไม่ขึ้น 2 เดื...)
+[22/42] J03.9 rank=None  (เจ็บคอ กลืนลำบาก ไข้สูง 3 วัน...)
+[23/42] J32.9 rank=None  (คัดจมูก น้ำมูกข้น ปวดโหนกแก้ม ...)
+[24/42] H61.2 rank=None  (หูอื้อข้างขวา 1 สัปดาห์...)
+[25/42] J30.4 rank=None  (จาม คันจมูก น้ำมูกใส เป็นๆ หาย...)
+[26/42] R51 rank=None  (ปวดศีรษะรุนแรง 3 วัน...)
+[27/42] G43.9 rank=None  (ปวดศีรษะข้างเดียว เป็นๆ หายๆ 6...)
+[28/42] L23.9 rank=None  (ผื่นคันที่แขนทั้งสองข้าง 1 สัป...)
+[29/42] B35.4 rank=None  (ผื่นวงแหวนคันที่ลำตัว 3 สัปดาห...)
+[30/42] Z00.0 rank=None  (มาตรวจสุขภาพประจำปี...)
+[31/42] S61.0 rank=None  (มีดบาดนิ้วชี้ขวา เลือดออกมาก 1...)
+[32/42] S01.8 rank=None  (ล้มศีรษะกระแทกพื้น มีแผลที่หน้...)
+[33/42] L50.9 rank=None  (ผื่นลมพิษทั้งตัว คันมาก 3 ชั่ว...)
+[34/42] R10.4 rank=None  (ปวดท้องน้อยเป็นๆ หายๆ 1 เดือน...)
+[35/42] C50.9 rank=None  (คลำได้ก้อนที่เต้านมขวา 2 เดือน...)
+[36/42] E04.1 rank=None  (คลำได้ก้อนที่คอด้านหน้า 6 เดือ...)
+[37/42] E11.5 rank=None  (แผลที่ฝ่าเท้าขวาไม่หาย 3 สัปดา...)
+[38/42] E14.3 rank=None  (ตาขวามัวลงเรื่อยๆ 6 เดือน...)
+[39/42] G56.0 rank=None  (ชาปลายนิ้วมือขวา ตื่นกลางดึก 4...)
+[40/42] K80.2 rank=None  (ปวดจุกแน่นใต้ชายโครงขวาหลังกิน...)
+[41/42] N40 rank=None  (ปัสสาวะลำบาก ต้องเบ่ง ปัสสาวะบ...)
+[42/42] R42 rank=None  (เวียนศีรษะ บ้านหมุน 3 วัน...)
+
+# RAG AI-Accuracy Evaluation — 42 synthetic scenarios (2026-09-18)
+
+Ground truth: `imed-mock-api/scripts/generate_demo_data.py`'s `S` list — each
+scenario hardcodes the clinically-intended ICD-10 (and sometimes ICD-9) code
+alongside the Thai clinical note text used to build that demo visit. This is
+a **synthetic, template-derived gold set**, not real hospital data scored by
+a real coder — treat it as a retrieval sanity check on the RAG index, not a
+clinical validation study (that requires real hospital records and a human
+coder comparison, which is a separate, unfinished item — see Ch.8).
+
+Endpoint tested: `POST /suggest` (retrieval-only; does not use the Qwen LLM).
+
+## Results
+
+- **ICD-10 top-1 accuracy:** 0/42 (0.0%)
+- **ICD-10 top-8 (appears anywhere in the suggested list):** 3/42 (7.1%)
+- **ICD-9 top-1 accuracy** (of 23 scenarios that have a procedure code): 0/23 (0.0%)
+- **ICD-9 top-8:** 1/23 (4.3%)
+
+Raw per-case results: `rag-accuracy-raw.json` (every scenario's chief complaint,
+correct code, suggested list, and rank).
+
+## Caveats (read before citing this number in Ch.7)
+
+1. **Synthetic gold set.** These scenarios were written by the same team that
+   built the RAG index and its underlying reference PDFs; some vocabulary
+   overlap between the note text and the retrieval corpus is expected and
+   would inflate real-world accuracy estimates.
+2. **Retrieval-only.** `/suggest` never invokes the LLM — it extracts ICD
+   code tokens directly from retrieved guideline chunks. This measures the
+   embedding+retrieval quality, not the full `/chat` reasoning path a coder
+   actually sees suggestions from in the app today.
+3. **No real hospital comparison yet.** This is not a substitute for scoring
+   against real historical hospital coding (Ch.2's Klang et al. methodology)
+   — that remains an open gap.
+

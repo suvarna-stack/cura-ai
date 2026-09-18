@@ -1,0 +1,113 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/phyophyolay/Documents/Personal_Dev/cura-ai/RAG/.venv-eval/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/phyophyolay/Documents/Personal_Dev/cura-ai/RAG
+plugins: anyio-4.15.1
+collecting ... collected 82 items
+
+tests/test_api.py::test_root PASSED                                      [  1%]
+tests/test_api.py::test_health PASSED                                    [  2%]
+tests/test_api.py::test_ingest_validation PASSED                         [  3%]
+tests/test_api.py::test_stats_endpoint PASSED                            [  4%]
+tests/test_api.py::test_list_documents PASSED                            [  6%]
+tests/test_api.py::test_upload_rejects_scanned_pdf PASSED                [  7%]
+tests/test_api.py::test_upload_rejects_unsupported_extension PASSED      [  8%]
+tests/test_api.py::test_upload_rejects_empty_csv PASSED                  [  9%]
+tests/test_api.py::test_rename_document PASSED                           [ 10%]
+tests/test_api.py::test_rename_unknown_document_404 PASSED               [ 12%]
+tests/test_api.py::test_chat_mode_validation PASSED                      [ 13%]
+tests/test_api.py::test_chat_history_validation PASSED                   [ 14%]
+tests/test_api.py::test_retrieve_validation PASSED                       [ 15%]
+tests/test_chunking.py::test_short_text_single_chunk PASSED              [ 17%]
+tests/test_chunking.py::test_empty_text PASSED                           [ 18%]
+tests/test_chunking.py::test_long_text_is_split PASSED                   [ 19%]
+tests/test_chunking.py::test_overlap_present PASSED                      [ 20%]
+tests/test_graphstore.py::test_find_sections_infers_ancestors PASSED     [ 21%]
+tests/test_graphstore.py::test_find_sections_requires_dot_and_words PASSED [ 23%]
+tests/test_graphstore.py::test_add_document_builds_expected_graph PASSED [ 24%]
+tests/test_graphstore.py::test_expand_bridges_chunks_via_shared_code PASSED [ 25%]
+tests/test_graphstore.py::test_expand_is_deterministic PASSED            [ 26%]
+tests/test_graphstore.py::test_remove_document_drops_orphan_entities PASSED [ 28%]
+tests/test_graphstore.py::test_sections_namespaced_per_document PASSED   [ 29%]
+tests/test_graphstore.py::test_graph_persists_across_instances PASSED    [ 30%]
+tests/test_learn.py::test_teaching_is_detected[Always code E11.22 as principal for diabetic AKI] PASSED [ 31%]
+tests/test_learn.py::test_teaching_is_detected[For post-op wound infection do not code R50.9, use T81.4 instead] PASSED [ 32%]
+tests/test_learn.py::test_teaching_is_detected[Post-op fever with wound infection after appendectomy: use T81.4, not R50.9.] PASSED [ 34%]
+tests/test_learn.py::test_teaching_is_detected[icd 10 code for game addiction is F63.8] PASSED [ 35%]
+tests/test_learn.py::test_teaching_is_detected[\u0e1c\u0e39\u0e49\u0e1b\u0e48\u0e27\u0e22\u0e40\u0e1a\u0e32\u0e2b\u0e27\u0e32\u0e19\u0e17\u0e35\u0e48\u0e21\u0e35 AKI \u0e43\u0e2b\u0e49\u0e25\u0e07 E11.22 \u0e40\u0e1b\u0e47\u0e19\u0e2b\u0e25\u0e31\u0e01 \u0e15\u0e32\u0e21\u0e14\u0e49\u0e27\u0e22 N17.9] PASSED [ 36%]
+tests/test_learn.py::test_questions_are_not_teaching[What does code A09 cover?] PASSED [ 37%]
+tests/test_learn.py::test_questions_are_not_teaching[Which ICD-10 code applies to chest pain?] PASSED [ 39%]
+tests/test_learn.py::test_questions_are_not_teaching[Can I use T81.4 for post-op fever?] PASSED [ 40%]
+tests/test_learn.py::test_questions_are_not_teaching[What is I33?] PASSED [ 41%]
+tests/test_learn.py::test_questions_are_not_teaching[What is the icd 10 code for cholera?] PASSED [ 42%]
+tests/test_learn.py::test_questions_are_not_teaching[Patient has chest pain and ST elevation on ECG. What ICD codes apply?] PASSED [ 43%]
+tests/test_learn.py::test_questions_are_not_teaching[Diabetic patient with acute kidney injury. Suggest primary and comorbidity codes.] PASSED [ 45%]
+tests/test_learn.py::test_questions_are_not_teaching[Post-op fever after appendectomy. Chief complaint: abdominal pain.] PASSED [ 46%]
+tests/test_learn.py::test_questions_are_not_teaching[\u0e23\u0e2b\u0e31\u0e2a A09 \u0e04\u0e23\u0e2d\u0e1a\u0e04\u0e25\u0e38\u0e21\u0e2d\u0e30\u0e44\u0e23\u0e1a\u0e49\u0e32\u0e07?] PASSED [ 47%]
+tests/test_learn.py::test_extracts_codes_roles_and_scenario PASSED       [ 48%]
+tests/test_learn.py::test_thai_rule_extracts_and_marks_language PASSED   [ 50%]
+tests/test_learn.py::test_scenario_stops_before_the_instruction[Diabetic patient with acute kidney injury: code E11.22 as principal.-diabetic patient with acute kidney injury] PASSED [ 51%]
+tests/test_learn.py::test_scenario_stops_before_the_instruction[For an open appendectomy always code procedure 47.09.-for an open appendectomy] PASSED [ 52%]
+tests/test_learn.py::test_scenario_stops_before_the_instruction[\u0e1c\u0e39\u0e49\u0e1b\u0e48\u0e27\u0e22\u0e40\u0e1a\u0e32\u0e2b\u0e27\u0e32\u0e19\u0e17\u0e35\u0e48\u0e21\u0e35\u0e44\u0e15\u0e27\u0e32\u0e22\u0e40\u0e09\u0e35\u0e22\u0e1a\u0e1e\u0e25\u0e31\u0e19 \u0e43\u0e2b\u0e49\u0e25\u0e07 E11.22 \u0e40\u0e1b\u0e47\u0e19\u0e2b\u0e25\u0e31\u0e01-\u0e1c\u0e39\u0e49\u0e1b\u0e48\u0e27\u0e22\u0e40\u0e1a\u0e32\u0e2b\u0e27\u0e32\u0e19\u0e17\u0e35\u0e48\u0e21\u0e35\u0e44\u0e15\u0e27\u0e32\u0e22\u0e40\u0e09\u0e35\u0e22\u0e1a\u0e1e\u0e25\u0e31\u0e19] PASSED [ 53%]
+tests/test_learn.py::test_declarative_fact_extracts_scenario_and_principal PASSED [ 54%]
+tests/test_learn.py::test_use_x_not_y_phrasing PASSED                    [ 56%]
+tests/test_learn.py::test_icd9_procedure_rule_tags_the_right_box PASSED  [ 57%]
+tests/test_learn.py::test_explicit_icd9_mention_outranks_the_shape_guess PASSED [ 58%]
+tests/test_learn.py::test_icd9_only_shapes_are_taught_as_icd9[icd9 for health checkup is V70-V70] PASSED [ 59%]
+tests/test_learn.py::test_icd9_only_shapes_are_taught_as_icd9[icd9 for accidental fall is E888-E888] PASSED [ 60%]
+tests/test_learn.py::test_icd9_only_shapes_are_taught_as_icd9[icd9 for pneumonia is 486-486] PASSED [ 62%]
+tests/test_learn.py::test_bare_numerals_are_not_codes_without_an_icd9_mention PASSED [ 63%]
+tests/test_learn.py::test_hallucinated_codes_are_dropped PASSED          [ 64%]
+tests/test_learn.py::test_prompt_echo_is_rejected PASSED                 [ 65%]
+tests/test_learn.py::test_invented_reason_is_dropped PASSED              [ 67%]
+tests/test_learn.py::test_coder_stated_reason_is_kept PASSED             [ 68%]
+tests/test_learn.py::test_indexing_failure_does_not_lose_the_rule PASSED [ 69%]
+tests/test_learn.py::test_save_indexes_the_note_and_survives_reload PASSED [ 70%]
+tests/test_learn.py::test_resaving_replaces_instead_of_duplicating PASSED [ 71%]
+tests/test_learn.py::test_muting_removes_it_from_the_index PASSED        [ 73%]
+tests/test_learn.py::test_delete_removes_note_and_chunk PASSED           [ 74%]
+tests/test_learn.py::test_a_rule_records_the_author_id_that_taught_it PASSED [ 75%]
+tests/test_learn.py::test_editing_never_transfers_ownership PASSED       [ 76%]
+tests/test_learn.py::test_a_rule_taught_before_author_ids_keeps_none PASSED [ 78%]
+tests/test_learn.py::test_matching_narrative_finds_the_rule PASSED       [ 79%]
+tests/test_learn.py::test_unrelated_narrative_matches_nothing PASSED     [ 80%]
+tests/test_learn.py::test_shared_code_alone_is_enough_to_match PASSED    [ 81%]
+tests/test_learn.py::test_matching_chunks_are_pinned_at_full_score PASSED [ 82%]
+tests/test_learn.py::test_muted_notes_never_match PASSED                 [ 84%]
+tests/test_learn.py::test_hits_are_counted_when_a_rule_fires PASSED      [ 85%]
+tests/test_learn.py::test_saved_rule_lands_in_the_icd10_box_as_csv PASSED [ 86%]
+tests/test_learn.py::test_icd9_rule_lands_in_the_icd9_box PASSED         [ 87%]
+tests/test_learn.py::test_muting_and_deleting_shrink_the_csv PASSED      [ 89%]
+tests/test_learn.py::test_export_failure_never_breaks_saving PASSED      [ 90%]
+tests/test_suggest_boxes.py::test_each_box_is_searched_on_its_own PASSED [ 91%]
+tests/test_suggest_boxes.py::test_a_page_number_in_an_icd10_pdf_is_not_a_procedure_code PASSED [ 92%]
+tests/test_suggest_boxes.py::test_an_untagged_chunk_needs_a_title_to_offer_a_procedure PASSED [ 93%]
+tests/test_suggest_boxes.py::test_a_taught_code_keeps_the_shape_the_coder_typed PASSED [ 95%]
+tests/test_suggest_notes.py::test_excluded_code_never_reaches_the_suggestions PASSED [ 96%]
+tests/test_suggest_notes.py::test_taught_codes_lead_the_list_and_name_their_author PASSED [ 97%]
+tests/test_suggest_notes.py::test_the_rule_rides_along_for_the_callout PASSED [ 98%]
+tests/test_suggest_notes.py::test_without_a_matching_rule_nothing_changes PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv-eval/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/phyophyolay/Documents/Personal_Dev/cura-ai/RAG/.venv-eval/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv-eval/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/phyophyolay/Documents/Personal_Dev/cura-ai/RAG/.venv-eval/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_api.py::test_upload_rejects_scanned_pdf
+tests/test_api.py::test_upload_rejects_scanned_pdf
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+tests/test_api.py::test_upload_rejects_scanned_pdf
+tests/test_api.py::test_upload_rejects_scanned_pdf
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+tests/test_api.py::test_upload_rejects_scanned_pdf
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 82 passed, 7 warnings in 1.89s ========================
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
