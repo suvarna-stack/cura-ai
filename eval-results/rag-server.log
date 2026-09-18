@@ -104,3 +104,32 @@ INFO:     127.0.0.1:55824 - "POST /suggest HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55828 - "POST /suggest HTTP/1.1" 200 OK
 2026-09-18 21:54:19,894 | INFO    | app.core.graphstore | Graph loaded: 10640 nodes, 18053 edges.
 INFO:     127.0.0.1:55830 - "POST /retrieve HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56001 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56069 - "GET /documents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56070 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56108 - "POST /suggest HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56115 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56148 - "POST /suggest HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56160 - "POST /chat/stream HTTP/1.1" 200 OK
+2026-09-18 23:03:10,100 | INFO    | app.core.llm | LLM backend: transformers
+2026-09-18 23:03:10,100 | INFO    | app.core.llm | Loading LLM Qwen/Qwen2.5-0.5B-Instruct on cpu (dtype=float32) ...
+2026-09-18 23:03:10,479 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-18 23:03:10,519 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json?%2FQwen%2FQwen2.5-0.5B-Instruct%2Fresolve%2Fmain%2Fconfig.json=&etag=%220dbb161213629a23f0fc00ef286e6b1e366d180f%22 "HTTP/1.1 200 OK"
+2026-09-18 23:03:10,850 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-18 23:03:10,876 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json?%2FQwen%2FQwen2.5-0.5B-Instruct%2Fresolve%2Fmain%2Ftokenizer_config.json=&etag=%2207bfe0640cb5a0037f9322287fbfc682806cf672%22 "HTTP/1.1 200 OK"
+2026-09-18 23:03:11,160 | INFO    | httpx | HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-09-18 23:03:11,527 | INFO    | httpx | HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-09-18 23:03:11,826 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/added_tokens.json "HTTP/1.1 404 Not Found"
+2026-09-18 23:03:12,162 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/special_tokens_map.json "HTTP/1.1 404 Not Found"
+2026-09-18 23:03:12,451 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/chat_template.jinja "HTTP/1.1 404 Not Found"
+2026-09-18 23:03:12,922 | INFO    | httpx | HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct "HTTP/1.1 200 OK"
+2026-09-18 23:03:13,202 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-18 23:03:13,224 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/config.json?%2FQwen%2FQwen2.5-0.5B-Instruct%2Fresolve%2Fmain%2Fconfig.json=&etag=%220dbb161213629a23f0fc00ef286e6b1e366d180f%22 "HTTP/1.1 200 OK"
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]Loading weights:   0%|          | 1/290 [00:00<03:47,  1.27it/s]Loading weights: 100%|██████████| 290/290 [00:00<00:00, 367.04it/s]
+2026-09-18 23:03:14,369 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/main/generation_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-09-18 23:03:14,391 | INFO    | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen2.5-0.5B-Instruct/7ae557604adf67be50417f59c2c2f167def9a775/generation_config.json?%2FQwen%2FQwen2.5-0.5B-Instruct%2Fresolve%2Fmain%2Fgeneration_config.json=&etag=%22dfc11073787daf1b0f9c0f1499487ab5f4c93738%22 "HTTP/1.1 200 OK"
+2026-09-18 23:03:14,394 | INFO    | app.core.llm | LLM ready.
+INFO:     127.0.0.1:56518 - "GET /learn/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56519 - "POST /chat/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56521 - "POST /learn/classify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56521 - "POST /learn/extract HTTP/1.1" 200 OK

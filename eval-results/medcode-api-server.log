@@ -26,3 +26,5 @@
 2026-09-18T21:53:22.826+07:00  INFO 15090 --- [medcode-api] [nio-8001-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
 2026-09-18T21:53:22.826+07:00  INFO 15090 --- [medcode-api] [nio-8001-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
 2026-09-18T21:53:22.827+07:00  INFO 15090 --- [medcode-api] [nio-8001-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-09-19T01:25:58.000+07:00  WARN 15090 --- [medcode-api] [l-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=9m37s454ms).
+2026-09-19T01:30:06.211+07:00  WARN 15090 --- [medcode-api] [l-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=4m8s211ms).

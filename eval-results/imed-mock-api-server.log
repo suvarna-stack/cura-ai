@@ -29,3 +29,4 @@
 2026-09-18T21:53:22.859+07:00  INFO 14953 --- [imed-mock-api] [nio-8003-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
 2026-09-18T21:53:22.860+07:00  INFO 14953 --- [imed-mock-api] [nio-8003-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
 2026-09-18T21:53:22.860+07:00  INFO 14953 --- [imed-mock-api] [nio-8003-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2026-09-19T01:30:02.487+07:00  WARN 14953 --- [imed-mock-api] [l-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=13m15s488ms).
