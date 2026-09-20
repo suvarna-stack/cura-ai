@@ -31,6 +31,9 @@ build happens inside the images. Windows and Linux work the same as macOS (on
 Windows use Docker Desktop with the WSL2 backend, and run the commands from
 PowerShell or a WSL shell).
 
+Don't want Docker? See `medcode-api/RUN-ALL.md` for the manual, four-terminal
+path (no containers, Thai-language).
+
 ## Run it
 
 ```bash
