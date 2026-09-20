@@ -84,18 +84,16 @@ compliance reviewer — see §5.5.
   system's intended production use (hospital-internal coding operations)
   actually qualifies under, with a Thai data-protection lawyer or the
   hospital's own DPO — this report cannot determine that on its own]*.
-  — *Cookie Information, "What is the Thailand PDPA? 2026 guide to consent
-  and compliance"*, accessed 2026-09-18.
-  [https://cookieinformation.com/blog/what-is-the-thailand-pdpa/](https://cookieinformation.com/blog/what-is-the-thailand-pdpa/)
-  ; *pimlegal, "What Counts as Sensitive Data Under Thai Law?"*, 2026.
-  [https://www.pimlegal.com/2026/05/18/what-counts-as-sensitive-data-under-thai-law/](https://www.pimlegal.com/2026/05/18/what-counts-as-sensitive-data-under-thai-law/)
+  — *Tilleke & Gibbins, "Thailand Issues Guidelines on PDPA Consent and
+  Notification Requirements"*, accessed 2026-09-20.
+  [https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/](https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/)
 - **Data subject rights**: access, rectification, erasure, and portability
   must all be honored for a real patient's data. This system's current
   "erasure" mechanism (§5.4) does not satisfy this — it restores a shared
   demo baseline, it does not selectively delete one person's record.
-  — *Termly, "Thailand's Personal Data Protection Act (PDPA) Explained"*,
-  accessed 2026-09-18.
-  [https://termly.io/resources/articles/thailands-personal-data-protection-act/](https://termly.io/resources/articles/thailands-personal-data-protection-act/)
+  — *Tilleke & Gibbins, "Thailand's Public Consultation on Proposed PDPA
+  Guidelines: Key Updates"*, accessed 2026-09-20.
+  [https://www.tilleke.com/insights/thailands-public-consultation-on-proposed-pdpa-guidelines-key-updates/45/](https://www.tilleke.com/insights/thailands-public-consultation-on-proposed-pdpa-guidelines-key-updates/45/)
 - **Data minimization.** The current design already leans this direction by
   accident of the hospital's own extract (no patient name, no national ID
   are ever sent — §5.1) — but this needs to be a deliberate, reviewed
@@ -139,10 +137,14 @@ compliance reviewer — see §5.5.
   without checking the primary statute/regulations.]**
 - **DPO appointment.** Organizations processing personal data at scale,
   especially sensitive categories like health data, typically need a
-  designated Data Protection Officer under PDPA. **[TODO: confirm whether
-  the partner hospital already has a DPO, or whether standing one up for
-  this system's data flows is a new requirement — this is a hospital
-  governance question, not something the engineering team can answer.]**
+  designated Data Protection Officer under PDPA.
+  — *Tilleke & Gibbins, "Thailand's New Draft Guidance on Data Protection
+  Officers"*, accessed 2026-09-20.
+  [https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/](https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/)
+  **[TODO: confirm whether the partner hospital already has a DPO, or
+  whether standing one up for this system's data flows is a new
+  requirement — this is a hospital governance question, not something the
+  engineering team can answer.]**
 
 ## 5.3 How data is stored today, and what was verified (not assumed)
 
