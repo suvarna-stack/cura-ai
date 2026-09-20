@@ -35,6 +35,9 @@ build/
 ### macOS ###
 .DS_Store
 
+### Env / secrets ###
+.env
+
 ### medcode demo data ###
 # Emitted by scripts/generate_demo_data.py; regenerate rather than commit.
 scripts/generated_demo_data.sql
