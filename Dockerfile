@@ -10,8 +10,11 @@ COPY package.json package-lock.json ./
 # #4828): npm ci can skip platform-specific optional packages, and alpine needs
 # the musl build of rolldown's native binding or `npm run build` dies with
 # MODULE_NOT_FOUND. Version must match the lockfile's @rolldown entries.
+# Arch is detected at build time (not hardcoded to x64) so this also works
+# building natively on arm64 hosts (e.g. Apple Silicon), not just under
+# x64 emulation.
 RUN npm ci --legacy-peer-deps \
-    && npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-musl@1.1.5
+    && npm install --no-save --legacy-peer-deps "@rolldown/binding-linux-$(node -e 'console.log(process.arch)')-musl@1.1.5"
 COPY . .
 # Vite inlines env vars at BUILD time, so this is an ARG, not a runtime ENV.
 # The default "/api" makes the bundle call its own origin, which nginx below
