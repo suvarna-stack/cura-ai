@@ -1,7 +1,20 @@
-# Page count check — 2026-09-21, updated after appendices assembly
+# Page count check — 2026-09-21, updated with the actual assembled PDF
 
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
+
+## Authoritative number: 75 pages (`report/MedCode-AI-Report.pdf`)
+
+The estimates below (59–68 pages) were built by rendering each
+chapter/appendix file separately and adding up the counts. The actual
+combined document — title page, auto-generated table of contents, all 8
+chapters, all 8 appendices, one PDF — is **75 pages** when genuinely
+assembled and rendered (`report/build-report.sh` builds it; run it to
+reproduce). The gap between 59–68 and 75 is mostly the title page + 2-page
+TOC (not counted in the per-file estimates) plus real image display: the
+per-file checks understated some appendix content by letting an oversized
+image visually overflow off the page instead of properly wrapping it —
+75 pages is the number to trust, not 59–68.
 
 ## Method
 
@@ -45,21 +58,22 @@ verbatim paste — see `appendices-outline.md`'s framing note):
 | appendices-outline.md (index page) | 1 |
 | **Appendices total** | **24** |
 
-**Grand total: 59 pages (chapters flowing) to 68 pages (chapters +
-appendices each forced to a fresh page)** — even with every appendix kept
-to a compact index rather than a full verbatim embed of its source
-document. Embedding the large source docs in full instead (e.g.
-`api-contract.md`, `DEPLOYMENT-PREP.md`, as the original outline suggested)
-would add well over 20 more pages on top of this.
+(Per-file estimate: ~59–68 pages, chapters + appendices, depending on
+fresh-page choices — see method above for why the real build ran higher,
+at 75.) Embedding the large source docs in full instead of a compact index
+per appendix (e.g. `api-contract.md`, `DEPLOYMENT-PREP.md`, as the original
+outline suggested) would add well over 20 more pages on top of this.
 
 ## What this means
 
-- **The report is now clearly over 40 pages under any reading** — this
-  isn't a borderline call the way chapters-only was. Assembling the
-  appendices (even compactly) roughly doubled the chapters-only estimate.
+- **The report is now clearly over 40 pages under any reading** — 75 pages
+  actually assembled, not a borderline call. Assembling the appendices
+  (even compactly) roughly doubled the chapters-only estimate, and the real
+  build added another ~10-15 pages beyond that on top (title page, TOC,
+  proper image layout).
 - **Whether appendices count against the 25–40 cap is still not stated** in
-  the deliverable spec, but at 59–68 total pages this now matters a lot
-  more than it did before assembly — worth confirming with whoever set the
+  the deliverable spec, but at 75 total pages this now matters a lot more
+  than it did before assembly — worth confirming with whoever set the
   requirement before spending more effort either trimming or polishing.
 - Appendix E (questionnaire) is the single biggest appendix cost (8 of 24
   pages) because it carries both the Thai instrument and a full English
@@ -90,8 +104,7 @@ Two honest paths, not mutually exclusive:
 
 ```bash
 cd medcode-stack/report
-pandoc <chapter>.md -f markdown -t html5 --standalone --css=report-print.css -o <chapter>.html
-# then print <chapter>.html to PDF at A4, 2.5cm margins (Chromium/Playwright
-# page.pdf(), or any browser's print-to-PDF) and check page count with
-# `pdfinfo <chapter>.pdf`
+./build-report.sh   # needs pandoc + Node with playwright installed — see
+                     # the script's own header comment for setup
+# -> MedCode-AI-Report.pdf, check page count with `pdfinfo MedCode-AI-Report.pdf`
 ```

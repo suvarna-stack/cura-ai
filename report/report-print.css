@@ -1,6 +1,8 @@
 @page { size: A4; }
 body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 100%; }
 h1 { font-size: 18pt; page-break-before: always; margin-top: 0; }
+h1.no-break { page-break-before: auto; }
+nav#TOC { page-break-after: always; }
 h2 { font-size: 14pt; margin-top: 1.2em; }
 h3 { font-size: 12.5pt; margin-top: 1em; }
 p, li { text-align: justify; }
