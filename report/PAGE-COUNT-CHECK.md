@@ -1,4 +1,4 @@
-# Page count check — 2026-09-21
+# Page count check — 2026-09-21, updated after appendices assembly
 
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
@@ -27,42 +27,64 @@ print) to get an actual count instead of guessing from word count.
 | 7 — Results | 2 |
 | 8 — Conclusion | 4 |
 | **Chapters 1–8 total** | **35** (flowing back-to-back) / **44** (each chapter forced to start on a fresh page) |
-| Appendices-outline.md | 3 |
-| Appendix E — questionnaire | 8 |
-| **Appendices so far** | **11** (and appendices A–D, G, H aren't written yet — currently only bullet-point pointers in `appendices-outline.md`, not assembled content) |
+
+**Appendices, now all 8 assembled (2026-09-21, later same day)** — each
+kept deliberately compact (an index/summary of its source material, not a
+verbatim paste — see `appendices-outline.md`'s framing note):
+
+| Appendix | Pages (own page break) |
+|---|---|
+| A — API reference | 2 |
+| B — Architecture & data-flow (2 embedded diagram figures) | 3 |
+| C — Database schema | 2 |
+| D — Test cases / evidence | 2 |
+| E — Questionnaire (bilingual — the single biggest appendix cost) | 8 |
+| F — Screenshots index | 2 |
+| G — Production-readiness checklist | 2 |
+| H — Data provenance | 2 |
+| appendices-outline.md (index page) | 1 |
+| **Appendices total** | **24** |
+
+**Grand total: 59 pages (chapters flowing) to 68 pages (chapters +
+appendices each forced to a fresh page)** — even with every appendix kept
+to a compact index rather than a full verbatim embed of its source
+document. Embedding the large source docs in full instead (e.g.
+`api-contract.md`, `DEPLOYMENT-PREP.md`, as the original outline suggested)
+would add well over 20 more pages on top of this.
 
 ## What this means
 
-- **Chapters 1–8 alone are already at or slightly past the 40-page cap**,
-  depending only on the formatting choice of whether each chapter starts on
-  a fresh page (a normal, common choice for a formal report). This is with
-  *zero* appendix content assembled yet.
-- **Appendices are still growing.** Appendix E (this session's new
-  questionnaire) alone adds 8 pages — mostly from being bilingual (Thai
-  instrument + English reference table) plus the PDPA consent notice.
-  Appendices A–D, G, H are not written yet; assembling them (the next task)
-  will add more pages on top of the 11 already counted.
-- **Whether appendices count against the 25–40 cap is not stated** in the
-  deliverable spec (item 4 lists chapters 1–8 by name with a page range,
-  then "Appendices" as a separate bullet with no page guidance) — this is
-  worth confirming with whoever set the requirement rather than assuming
-  either way.
+- **The report is now clearly over 40 pages under any reading** — this
+  isn't a borderline call the way chapters-only was. Assembling the
+  appendices (even compactly) roughly doubled the chapters-only estimate.
+- **Whether appendices count against the 25–40 cap is still not stated** in
+  the deliverable spec, but at 59–68 total pages this now matters a lot
+  more than it did before assembly — worth confirming with whoever set the
+  requirement before spending more effort either trimming or polishing.
+- Appendix E (questionnaire) is the single biggest appendix cost (8 of 24
+  pages) because it carries both the Thai instrument and a full English
+  reference table.
 
 ## Recommendation
 
 Two honest paths, not mutually exclusive:
 
 1. **Confirm with the assessor/organizer** whether appendices count toward
-   25–40 pages. If they don't, the current chapter count (35–44) is
-   close enough to on-target that no trimming is urgent.
-2. **If everything must fit inside 40 pages**, the two easiest trims,
-   ranked by how much page they cost without losing content:
-   - Don't force a fresh page per chapter (saves ~9 pages across
-     chapters 1–8 for zero content loss — a formatting choice, not a
-     content cut).
-   - Ship the questionnaire (Appendix E) as Thai-only, with the English
-     reference table moved to a footnote/citation instead of a full
-     duplicate table (cuts roughly half of its 8 pages).
+   25–40 pages, and whether that's a hard cap or a guideline. This is now
+   the highest-leverage open question — it decides whether anything below
+   is even necessary.
+2. **If everything must fit inside 40 pages total**, ranked by pages saved
+   per unit of content lost:
+   - Don't force a fresh page per chapter/appendix (saves up to ~9 pages
+     across chapters 1–8 alone, more across appendices — pure formatting,
+     zero content loss).
+   - Ship the questionnaire (Appendix E) as Thai-only, footnoting the
+     English item table instead of a full duplicate (saves ~4 pages).
+   - Cut Appendix F's screenshot index table (the images themselves stay
+     embedded/linked in the Thai user guide either way) — saves ~2 pages.
+   - If still over, the appendices as a whole are the easiest place to cut
+     further, since they're already summaries of material that stays fully
+     available in the repository regardless of what's in the PDF.
 
 ## Reproduce
 

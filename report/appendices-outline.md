@@ -1,98 +1,29 @@
-# Appendices — outline
+# Appendices — index
 
-*Bullet outline only. Each item points at source material that already
-exists in the repos — nothing here needs to be authored from scratch except
-where marked `[TODO]`.*
+*All 8 appendices are now assembled as real files (2026-09-21), not just
+pointers. Each is deliberately compact — an index/summary of the source
+material with the full source referenced by path — rather than a verbatim
+paste, to protect the page budget (`PAGE-COUNT-CHECK.md` found chapters 1–8
+alone already near the 40-page cap). If the final page budget allows, the
+large source docs (`api-contract.md`, `DEPLOYMENT-PREP.md`, etc.) can be
+attached in full instead; each appendix says which file that would be.*
 
-## Appendix A — API reference
+| Appendix | File | Status |
+|---|---|---|
+| A — API reference | `appendix-a-api-reference.md` | Assembled: 33-endpoint index + linked source docs |
+| B — Architecture & data-flow | `appendix-b-architecture.md` | Assembled: 2 diagram figures embedded + port table |
+| C — Database schema | `appendix-c-database-schema.md` | Assembled: full migration list (both DBs) + glossary pointer |
+| D — Test cases / evidence | `appendix-d-test-evidence.md` | Assembled: suite results table + RAG test breakdown |
+| E — Questionnaires | `appendix-e-questionnaire.md` | Assembled (instrument). **`[TODO — remaining]`**: not yet administered — no real responses exist |
+| F — Screenshots | `appendix-f-screenshots.md` | Assembled: 24-image index (21 Thai/coder + 1 admin + 2 architecture figures) |
+| G — Production-readiness checklist | `appendix-g-production-readiness.md` | Assembled: TLDR + section index of `DEPLOYMENT-PREP.md` |
+| H — Data provenance | `appendix-h-data-provenance.md` | Assembled: generator sourcing table + demo lifecycle |
 
-- Link/embed `medcode-api/docs/api-contract.md` in full (the authoritative,
-  hand-maintained contract — "source of truth," per its own header) rather
-  than re-deriving endpoint tables in the appendix.
-- Link the TypeScript mirror `medcode-api/docs/types.ts` for readers who want
-  exact response shapes.
-- Attach the hospital-facing PDF:
-  `medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` — this
-  is the contract MedCode AI wrote and sent *to* the hospital for the R1–R6
-  read side.
-- Link `medcode-api/docs/imed-integration.md` (design + the 17 open
-  questions for the hospital) and `medcode-api/docs/imed-writeback-as-built.md`
-  (real request/response bodies, byte-for-byte, with the "as built vs. spec"
-  discrepancies called out).
+## Still open
 
-## Appendix B — Architecture & data-flow diagram
-
-- Embed `medcode-api/docs/dataflow.html` directly (it is already an
-  interactive, maintained diagram covering the system boundary, the case
-  pipeline, sync/approve/reopen, auth, and the RAG seam — see Chapter 3,
-  §3.2) — as a screenshot set or an embedded frame, not redrawn.
-- `medcode-stack/README.md`'s "What runs where" port table, reproduced
-  verbatim if a compact reference table is wanted alongside the diagram.
-
-## Appendix C — Database schema
-
-- List all Flyway migrations as the schema's own change log, most readable
-  in order:
-  - `medcode-api/src/main/resources/db/migrations/V1__add_password_hash.sql`
-    through `V9__app_settings.sql`
-  - `imed-mock-api/src/main/resources/db/migrations/V1__api_v1.sql` through
-    `V6__icd_catalog_data.sql`
-- `medcode-api/docs/medical-glossary.md` as the plain-language companion —
-  every table/column's real-world meaning, sourced and honest about which
-  fields are project inventions vs. hospital data (§11 of that file is a
-  direct index of "terms that are OUR rules, not medicine").
-
-## Appendix D — Test cases / automated test evidence
-
-- `eval-results/medcode-api-test-output.txt` (1,748 lines — the
-  `CasesApiIntegrationTest` / `AdminApiIntegrationTest` / etc. run) and
-  `eval-results/imed-mock-api-test-output.txt`. These are **correctness**
-  tests (46/46 green per `medcode-api/CLAUDE.md`'s own progress log), not an
-  accuracy/usability evaluation — see the Ch.6/Ch.7 stubs for that
-  distinction.
-- `medcode-api/CLAUDE.md`'s "Progress" section doubles as a dated engineering
-  changelog and could be excerpted for an appendix on development history,
-  if the assessors want evidence of iterative, tested delivery rather than a
-  single big-bang build.
-- `RAG/tests/` (chunking unit tests + API smoke tests) as the RAG service's
-  own test coverage.
-
-## Appendix E — Questionnaires
-
-- Instrument designed 2026-09-21: `report/appendix-e-questionnaire.md` — a
-  bilingual (Thai instrument + English reference table) staff feedback
-  questionnaire, adapted from three validated scales (SUS, Health-ITUES,
-  S-TIAS) plus coding-specific items, with a PDPA consent notice built in.
-  **`[TODO — remaining]`** it has not been administered yet — no real
-  responses exist. Once a pilot coder fills it out, attach the raw
-  (anonymized) responses after that file, and pull the results into
-  Ch.6/Ch.7's "feedback from medical staff" section.
-
-## Appendix F — Screenshots
-
-- All 22 screens captured 2026-09-21 from a running docker-compose stack
-  against seeded demo data:
-  `audit-chart-frontend/docs/screenshots/01-placeholder.png` through
-  `21-placeholder.png` (Thai UI, coder role — shared with the Thai user
-  guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`, which embeds them
-  inline — reuse those files here rather than recapturing), plus
-  `admin-ai-training.png` (English UI, SuperAdmin role — `03-design.md`
-  §3.4, item 7).
-
-## Appendix G — Production-readiness checklist (supporting material for Ch.8)
-
-- `medcode-api/docs/DEPLOYMENT-PREP.md` in full — the 28-item checklist
-  Chapter 8's gap list summarizes; worth including verbatim as an appendix
-  since it is already written for a non-engineering audience and tags each
-  item by owner (`[say]` / `[ask]` / `[IT]`).
-- `medcode-api/docs/PITCH-2MIN.md` — the condensed spoken version, useful if
-  the assessment includes an oral defense/pitch component.
-
-## Appendix H — Data provenance detail (supporting material for Ch.5)
-
-- `imed-mock-api/scripts/generate_demo_data.py` in full, or at minimum its
-  docstring and the domain-source citations inside it — the primary
-  evidence for every claim in Chapter 5, §5.1.
-- `imed-mock-api/DEMO-SETUP.md` — the runbook showing exactly how the
-  synthetic dataset is loaded, snapshotted, and reset, for a reader who
-  wants to reproduce the demo end to end.
+- **Appendix E has no real responses yet** — the instrument is ready
+  (bilingual, PDPA-compliant), but needs an actual pilot coder to fill it
+  out before Ch.6/Ch.7 can cite staff feedback as evidence.
+- **Page budget**: confirm with whoever set the requirement whether
+  appendices count toward the 25–40 page target (not stated in the
+  deliverable spec) — see `PAGE-COUNT-CHECK.md`.
