@@ -112,9 +112,18 @@ cd medcode-api && ./mvnw spring-boot:run     # port 8001, for perf tests
 ## Not yet run / not yet possible (as of this file)
 
 - `audit-chart-frontend` — no test files found in the repo; nothing to run.
-- Comparison against the hospital's current (manual) process — deferred by
-  request; revisit before submission.
-- Staff feedback — deferred by request; revisit before submission.
+- Comparison against the hospital's current (manual) process — **partially
+  done 2026-09-21**: Ch.6 §6.4 has the team's own small-sample self-timed
+  comparison (from `Cura AI.pdf`) plus a new §6.4.1 checking both the
+  manual-time baseline and the AI speed-up ratio against published
+  literature (AHIMA coding-productivity studies, AI-scribe time-savings
+  studies) — clearly labeled as external context, not hospital-specific
+  validation. **Still missing**: comparison against the hospital's own
+  historically-coded visits, which needs real hospital data access (Ch.6
+  §6.5) — genuinely blocked, not something further writing can resolve.
+- Staff feedback — deferred by request; revisit before submission. The
+  survey instrument now exists (`report/appendix-e-questionnaire.md`,
+  2026-09-21) but has not been administered — still no real responses.
 - `/chat` (LLM-in-the-loop) accuracy — only `/suggest` (retrieval-only) was
   evaluated above; the full generation path a coder actually sees was not
   separately scored.

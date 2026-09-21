@@ -102,6 +102,44 @@ hospital-capacity measurement. Presented in Ch.7 with that caveat attached;
 a real pilot would need to time considerably more cases, more testers, and
 ideally an actual hospital coder rather than a team member.
 
+### 6.4.1 External benchmark context (not hospital-specific)
+
+Neither figure above is hospital-specific — no partner-hospital timing or
+coding-volume data exists to compare against (§6.5). Published literature
+offers a rough sanity check on the two numbers separately, with the
+mismatches stated plainly rather than glossed over:
+
+- **The manual-coding baseline (~8 min/OPD case).** AHIMA's ICD-10-CM/PCS
+  coding productivity studies found US **inpatient** coding averaged
+  **37–44 minutes per record** shortly after ICD-10 go-live, settling around
+  37 minutes by mid-2016, against a ~20-minute ICD-9 baseline
+  ([AHIMA ICD-10 Coding Productivity Study](https://journal.ahima.org/Portals/0/archives/AHIMA%20files/ICD-10%20Coding%20Productivity%20Study%20Highlights%20Emerging%20Standards.pdf)).
+  Not a like-for-like comparison — that figure is **inpatient** (DRG-relevant,
+  longer charts, US ICD-10-CM/PCS), while this project's scope is **OPD**
+  (Ch.1 §1.5) under Thailand's ICD-10-TM. The team's 8-minute **outpatient**
+  figure sitting well under the US **inpatient** figure is directionally
+  sensible (OPD charts are shorter, fewer codes), not evidence the number
+  is accurate — it just isn't implausible on its face.
+- **The AI speed-up (~5.9×).** Published studies of AI assistance in
+  adjacent clinical workflows — AI scribes reducing physician documentation
+  time — report far more modest gains: roughly **9–10% time reduction**,
+  on the order of 12–20 minutes saved per **day** (not per case), across
+  large multi-site studies
+  ([STAT: large AI scribe study finds modest, inconsistent time savings](https://www.statnews.com/2026/04/01/ai-ambient-scribes-modest-time-savings-clinical-documentation/),
+  [Medical Economics: AI scribes cut documentation time](https://www.medicaleconomics.com/view/ai-scribes-cut-documentation-time-by-69-in-simulated-primary-care-visits-study-finds)).
+  Those studies measure a different task (physicians dictating/reviewing
+  notes) with a different AI role (transcription/drafting, not code
+  suggestion), so they aren't a direct substitute either. But the gap
+  between "~9–10% in large published studies" and "~490% in this project's
+  1–5-case, single-tester demo" is wide enough that it should be read as
+  **a reason for caution, not confirmation** — the same caveat already
+  attached to the 5.9× figure above, now with an external reference point
+  for why that caution is warranted.
+
+This subsection is **context, not validation** — it does not replace the
+missing hospital-specific comparison (§6.5), and no hospital-specific
+number is claimed or implied by citing it.
+
 ## 6.5 What was not tested
 
 - Concurrent multi-coder write contention (simultaneous approve/edit).

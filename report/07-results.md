@@ -45,7 +45,11 @@ The deck's extrapolated "260 → 1,500 cases/day, +฿421,600/day" figures
 follow directly from this 5.9× ratio applied to an assumed daily workload,
 not a second independent measurement — see Ch.6.4 for the arithmetic. They
 illustrate the *shape* of the potential business case, not a validated
-throughput number.
+throughput number. Published literature on AI assistance in adjacent
+clinical workflows (AI scribes) reports far more modest gains — roughly
+9–10%, not 5.9× — which is reason for caution about this figure, not
+confirmation of it; see Ch.6.4.1 for the full external-benchmark comparison
+(including a check on the ~8-minute manual baseline too).
 
 ## 7.4 Does it hold up under load?
 
