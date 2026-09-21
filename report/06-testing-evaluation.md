@@ -147,9 +147,24 @@ number is claimed or implied by citing it.
 - Comparison against the hospital's own historically-coded visits (the
   methodology Ch.2's Klang et al. citation uses) — no access to real hospital
   coding data.
-- Structured staff/coder feedback (survey or interview) — not collected for
-  this submission.
-- Screenshots / UI usability walkthrough with a non-team user.
+- Structured staff/coder feedback — the instrument exists
+  (Appendix E) but has not been administered to a real coder; no responses
+  to report yet.
+- UI usability walkthrough with a non-team user (screenshots exist —
+  Appendix F — but no outside user has been observed using the system).
+- **`/chat` (the full LLM-reasoning path a coder sees in the AI Agent) was
+  not separately scored** — only `/suggest` (retrieval-only) was evaluated
+  (§6.3). This is a deliberate scoping call, not an oversight: `/chat`'s
+  generation step runs on the same retrieval layer already tested in §6.3,
+  which is where the identified accuracy gap (narrative→code retrieval)
+  lives, so scoring `/chat` separately would most likely surface the same
+  root cause rather than new information. The generation model
+  (`Llama-3.1-EIRAI-8B` via Ollama) could not be pulled during this
+  evaluation pass — Ollama's client rejected a cross-host redirect from
+  Hugging Face's CDN on every retry — so this is also a real, unresolved
+  environment blocker, not purely a scoping choice; a team continuing this
+  work should fix that download path before claiming `/chat` accuracy
+  either way.
 
 ## 6.6 Test case summary
 
