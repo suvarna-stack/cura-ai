@@ -190,13 +190,17 @@ a gap the team has flagged as worth asking the hospital about
 version of the analytics page report coding backlog *by payer*, which
 matters given the DRG/reimbursement framing in Chapter 1.
 
-## 3.4 Wireframes and screenshots — placeholder
+## 3.4 Wireframes and screenshots
 
-**[TODO — screenshots required]**: this report needs real screenshots of the
-running `audit-chart-frontend` application to be useful as a design chapter.
-None are captured yet. When capturing them, the following screens are the
-ones the rest of this report already assumes exist and describes by
-behavior (so captions can be written against this list):
+Real screenshots were captured 2026-09-21 from a running `docker compose up`
+stack against the seeded demo data (Thai UI, coder role), and live at
+`audit-chart-frontend/docs/screenshots/01-placeholder.png` through
+`21-placeholder.png` (filenames kept as-is; they are shared with the Thai
+user guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`, which embeds them
+inline). 7 of the 8 screens below are covered; **item 7 (Admin — AI Training
+page) is still missing** — it's a SuperAdmin-role screen the coder-focused
+capture pass didn't touch. The list below is kept as the shot list this
+report assumes exists and describes by behavior:
 
 1. **Dashboard** — the four-bucket case list (complete / incomplete groups /
    reopened / finished) with the coding-status stats strip.
@@ -219,7 +223,7 @@ behavior (so captions can be written against this list):
 8. **Analytics page** — coding backlog, coder KPIs, turnaround time,
    documentation-gaps cards.
 
-Capture these from a running `docker compose up` stack
-(`medcode-stack/README.md`) against the seeded demo data, at a consistent
-browser width, and insert them directly into this section (or into a
-dedicated Appendix — see `appendices-outline.md`) before final submission.
+**[TODO — remaining]**: capture the Admin — AI Training page (item 7, requires
+the `admin@medcodeai.demo` SuperAdmin login rather than a coder account), then
+embed the final set directly into this section or into a dedicated Appendix
+(see `appendices-outline.md`) before final submission.
