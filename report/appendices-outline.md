@@ -59,11 +59,14 @@ where marked `[TODO]`.*
 
 ## Appendix E — Questionnaires
 
-- **`[TODO]`** — none exist yet. This project has not run a coder
-  usability survey, a clinician validation questionnaire, or a hospital
-  stakeholder interview protocol. If Chapter 6/7 end up including a real
-  evaluation before submission, the questionnaire instrument used should be
-  appended here, along with raw (anonymized) responses if permitted.
+- Instrument designed 2026-09-21: `report/appendix-e-questionnaire.md` — a
+  bilingual (Thai instrument + English reference table) staff feedback
+  questionnaire, adapted from three validated scales (SUS, Health-ITUES,
+  S-TIAS) plus coding-specific items, with a PDPA consent notice built in.
+  **`[TODO — remaining]`** it has not been administered yet — no real
+  responses exist. Once a pilot coder fills it out, attach the raw
+  (anonymized) responses after that file, and pull the results into
+  Ch.6/Ch.7's "feedback from medical staff" section.
 
 ## Appendix F — Screenshots
 
