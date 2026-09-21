@@ -67,15 +67,14 @@ where marked `[TODO]`.*
 
 ## Appendix F — Screenshots
 
-- All 21 screens captured 2026-09-21 from a running docker-compose stack
-  against seeded demo data, Thai UI, coder role:
+- All 22 screens captured 2026-09-21 from a running docker-compose stack
+  against seeded demo data:
   `audit-chart-frontend/docs/screenshots/01-placeholder.png` through
-  `21-placeholder.png`. Shared with the Thai user guide
-  (`audit-chart-frontend/docs/USER-GUIDE-TH.md`), which embeds them inline —
-  reuse those files here rather than recapturing.
-- **`[TODO — remaining]`** the Admin — AI Training page (`03-design.md`
-  §3.4, item 7) still needs capturing; it requires the SuperAdmin login
-  (`admin@medcodeai.demo`), not the coder account used for the rest.
+  `21-placeholder.png` (Thai UI, coder role — shared with the Thai user
+  guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`, which embeds them
+  inline — reuse those files here rather than recapturing), plus
+  `admin-ai-training.png` (English UI, SuperAdmin role — `03-design.md`
+  §3.4, item 7).
 
 ## Appendix G — Production-readiness checklist (supporting material for Ch.8)
 

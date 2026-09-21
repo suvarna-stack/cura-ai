@@ -193,14 +193,15 @@ matters given the DRG/reimbursement framing in Chapter 1.
 ## 3.4 Wireframes and screenshots
 
 Real screenshots were captured 2026-09-21 from a running `docker compose up`
-stack against the seeded demo data (Thai UI, coder role), and live at
-`audit-chart-frontend/docs/screenshots/01-placeholder.png` through
-`21-placeholder.png` (filenames kept as-is; they are shared with the Thai
-user guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`, which embeds them
-inline). 7 of the 8 screens below are covered; **item 7 (Admin — AI Training
-page) is still missing** — it's a SuperAdmin-role screen the coder-focused
-capture pass didn't touch. The list below is kept as the shot list this
-report assumes exists and describes by behavior:
+stack against the seeded demo data. All 8 screens below are covered:
+1–6 and 8 as `audit-chart-frontend/docs/screenshots/01-placeholder.png`
+through `21-placeholder.png` (Thai UI, coder role; filenames kept as-is —
+shared with the Thai user guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`,
+which embeds them inline), and item 7 (SuperAdmin role, English UI — the
+admin console has no Thai translation) as
+`audit-chart-frontend/docs/screenshots/admin-ai-training.png`. The list below
+is kept as the shot list this report assumes exists and describes by
+behavior:
 
 1. **Dashboard** — the four-bucket case list (complete / incomplete groups /
    reopened / finished) with the coding-status stats strip.
@@ -218,12 +219,14 @@ report assumes exists and describes by behavior:
    the "unverified codes" warning state, and a "Coder note" callout when a
    taught rule applies.
 7. **Admin — AI Training page** — uploaded reference documents (ICD-10 PDF,
-   ICD-9 PDF, ICD-10-TM-for-PCU PDF), index stats, and the Suggest & Learn
-   rules list.
+   ICD-9 PDF, ICD-10-TM-for-PCU PDF), index stats, train/sync controls, and
+   the test-retrieval search box. (Correction from the original placeholder
+   description: there is no "Suggest & Learn rules list" on this page — the
+   coder-taught rules feature lives on the coder-facing AI Agent page
+   instead, screenshot 21.)
 8. **Analytics page** — coding backlog, coder KPIs, turnaround time,
    documentation-gaps cards.
 
-**[TODO — remaining]**: capture the Admin — AI Training page (item 7, requires
-the `admin@medcodeai.demo` SuperAdmin login rather than a coder account), then
-embed the final set directly into this section or into a dedicated Appendix
-(see `appendices-outline.md`) before final submission.
+All 8 screens are now captured. Remaining work is just embedding the final
+set directly into this section or into a dedicated Appendix (see
+`appendices-outline.md`) before final submission.
