@@ -1,14 +1,78 @@
-@page { size: A4; }
+/* Standard report layout via CSS Paged Media (rendered by paged.js).
+   Margins, running header, and a footer page number follow the common
+   thesis/report convention: 1in margins, page number bottom-center,
+   report title as a running header, suppressed on the title page. */
+
+@page {
+  size: A4;
+  margin: 2.54cm 2.54cm 3cm 2.54cm;
+
+  @top-center {
+    content: "MedCode AI — Final Report";
+    font-family: "Times New Roman", Times, serif;
+    font-size: 9pt;
+    color: #555;
+  }
+  @bottom-center {
+    content: counter(page);
+    font-family: "Times New Roman", Times, serif;
+    font-size: 10pt;
+    color: #000;
+  }
+}
+
+/* No running header/footer on the title page. */
+@page :first {
+  @top-center { content: none; }
+  @bottom-center { content: none; }
+}
+
 body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 100%; }
+
 h1 { font-size: 18pt; page-break-before: always; margin-top: 0; }
 h1.no-break { page-break-before: auto; }
-nav#TOC { page-break-after: always; }
 h2 { font-size: 14pt; margin-top: 1.2em; }
 h3 { font-size: 12.5pt; margin-top: 1em; }
 p, li { text-align: justify; }
+
+img { height: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 10pt; margin: 1em 0; }
+table, tr, td, th { page-break-inside: avoid; }
 th, td { border: 1px solid #999; padding: 4px 6px; text-align: left; }
 code, pre { font-family: "Courier New", monospace; font-size: 9.5pt; }
 pre { white-space: pre-wrap; word-break: break-word; background: #f5f5f5; padding: 8px; }
 .pagebreak { page-break-before: always; }
 a { color: #000; text-decoration: underline; }
+
+/* Table of contents: standard dot-leader + right-aligned page number,
+   resolved against each entry's own target heading (paged.js
+   cross-reference support). */
+nav#TOC { page-break-after: always; }
+nav#TOC > h2#toc-title {
+  font-size: 18pt;
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+#TOC ul { list-style: none; padding-left: 1.4em; }
+#TOC > ul { padding-left: 0; }
+#TOC li { margin: 0.35em 0; }
+#TOC a {
+  display: flex;
+  align-items: baseline;
+  color: #000;
+  text-decoration: none;
+}
+/* leader() isn't supported by paged.js, so fake dot-leaders with a flexed,
+   bottom-dotted-border spacer between the link text and the page number. */
+#TOC a::before {
+  content: "";
+  order: 1;
+  flex: 1 1 auto;
+  border-bottom: 1px dotted #999;
+  margin: 0 0.35em 0.2em 0.35em;
+}
+#TOC a::after {
+  content: target-counter(attr(href), page);
+  order: 2;
+  font-variant-numeric: tabular-nums;
+}

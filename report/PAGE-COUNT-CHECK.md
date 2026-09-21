@@ -1,20 +1,38 @@
-# Page count check — 2026-09-21, updated with the actual assembled PDF
+# Page count check — 2026-09-21, updated after standard formatting pass
 
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 75 pages (`report/MedCode-AI-Report.pdf`)
+## Authoritative number: 86 pages (`report/MedCode-AI-Report.pdf`)
 
-The estimates below (59–68 pages) were built by rendering each
-chapter/appendix file separately and adding up the counts. The actual
-combined document — title page, auto-generated table of contents, all 8
-chapters, all 8 appendices, one PDF — is **75 pages** when genuinely
-assembled and rendered (`report/build-report.sh` builds it; run it to
-reproduce). The gap between 59–68 and 75 is mostly the title page + 2-page
-TOC (not counted in the per-file estimates) plus real image display: the
-per-file checks understated some appendix content by letting an oversized
-image visually overflow off the page instead of properly wrapping it —
-75 pages is the number to trust, not 59–68.
+Went through two rendering passes:
+
+1. **First real build**: 75 pages (plain CSS print via Chromium — no page
+   numbers, no running header, TOC was just a linked list with no page
+   references).
+2. **Standard-formatting pass** (this update): switched to
+   [paged.js](https://pagedjs.org/) — a CSS Paged Media polyfill — to add
+   the formatting elements a real report is expected to have: a running
+   header (report title), bottom-center page numbers, and a proper table of
+   contents with dot leaders and *correct, per-entry page numbers*
+   (`target-counter()`), instead of a bare link list. **86 pages** with all
+   of that in place — the ~11-page increase from 75 is legitimate: a
+   1-page-longer TOC (dot-leader rows take marginally more vertical space)
+   plus the page-number/header margin boxes nudging some pages' content
+   just past their own boundary. 86 is the number to trust.
+
+See `report/build-report.sh` for the build (needs `pandoc`, Node with
+`playwright` + `pagedjs` installed — script header has the exact commands).
+Two implementation notes worth keeping if anyone touches this later:
+- paged.js needs its stylesheet fetched via XHR to parse `@page` rules;
+  `file://` URLs are blocked by CORS for that in Chromium, so the script
+  serves the repo over a throwaway local HTTP server instead of opening the
+  HTML file directly.
+- paged.js does not support the CSS `leader()` function (used the
+  documented `target-counter()` syntax fine, but `leader(dotted)` silently
+  invalidated the whole `content` declaration, killing the TOC page numbers
+  too until removed) — the dot-leader look is built instead with a flexed,
+  dotted-bottom-border spacer between the link text and the page number.
 
 ## Method
 
