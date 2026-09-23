@@ -9,12 +9,12 @@ captured statically below for this appendix.
 ## Figure B.1 — System boundary (Level 0 context)
 
 ![System boundary diagram — Medical coder and Administrator browsers on
-top, MedCode AI backend in the center, Hospital iMed API and MedCode RAG
+top, CURA AI backend in the center, Hospital iMed API and MedCode RAG
 service below](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-context.png)
 
 Four actors: the coder's browser, the admin console, the hospital's iMed
 API (read/write, one direction is irreversible — diagnosis POST/PUT/DELETE),
-and the RAG service (clinical text in, code candidates out). MedCode AI's
+and the RAG service (clinical text in, code candidates out). CURA AI's
 backend is the only component with write access to its own database and the
 only one that owns the API contract.
 

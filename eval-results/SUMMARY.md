@@ -1,4 +1,4 @@
-# Automated Test Evidence — MedCode AI (2026-09-18)
+# Automated Test Evidence — CURA AI (2026-09-18)
 
 Raw evidence for Ch.6 (Testing & evaluation). Every number below traces to a
 file in this directory or to `target/surefire-reports/` in the respective repo

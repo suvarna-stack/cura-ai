@@ -1,5 +1,10 @@
 # Chapter 1 — Problem
 
+This report describes **CURA AI**, built by team Suvarna Stack. The product
+was developed under the working name *MedCode AI*, which its repositories,
+services and databases still use (`medcode-api`, `medcode-stack`, the
+`medcode` database), as do some project documents quoted in this report.
+
 ## 1.1 The setting: how a Thai hospital visit becomes a paid claim
 
 Every patient visit at the partner hospital produces a chart: the doctor's notes

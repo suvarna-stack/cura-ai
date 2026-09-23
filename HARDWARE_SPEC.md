@@ -1,6 +1,6 @@
 # HARDWARE_SPEC.md — MediHack Extension infrastructure
 
-*Prepared 2026-09-21 (sections 0, the resource profile, VAT totals, 6.1 and 6.2 added 2026-09-23), from the repos as they exist today (MedCode AI: `medcode-api`,
+*Prepared 2026-09-21 (sections 0, the resource profile, VAT totals, 6.1 and 6.2 added 2026-09-23), from the repos as they exist today (CURA AI: `medcode-api`,
 `imed-mock-api`, `audit-chart-frontend`, `RAG`, `medcode-stack`) plus
 `medcode-api/docs/DEPLOYMENT-PREP.md` (the team's own production checklist, 24 Aug
 2026). Where the prompt's template asked for something not in any repo or doc, it is
@@ -36,12 +36,12 @@ listed under **Open Questions** instead of guessed.*
 
 ## 2. Prototype covered by this spec
 
-Only **one** working prototype exists in the repos: **MedCode AI**, a medical-coding
+Only **one** working prototype exists in the repos: **CURA AI**, a medical-coding
 audit dashboard.
 
 | Field | Value |
 |---|---|
-| Name / function | MedCode AI — pulls a hospital visit, an AI suggests ICD-10/ICD-9 codes, a coder reviews and approves, approved codes write back to the hospital system |
+| Name / function | CURA AI (team Suvarna Stack) — pulls a hospital visit, an AI suggests ICD-10/ICD-9 codes, a coder reviews and approves, approved codes write back to the hospital system |
 | Type | Web app (React SPA + Spring Boot API) + AI microservice (retrieval-augmented generation) |
 | AI use | **Inference only**, no training. Generation model: `Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M` (8B params, 4-bit quantized) via Ollama. Embedding/retrieval model: bge-m3 (HuggingFace `transformers`), CPU-only in the container. |
 | Users | Hospital medical coders (roles: coder, admin). Headcount: **[OPEN — see Q4]** |
@@ -183,7 +183,7 @@ Only the hospital, the university, or the project's own leadership can answer th
 none of them are answerable from the code.
 
 1. **How many prototypes does this hardware spec need to cover?** The repos contain
-   exactly one working system (MedCode AI). The hackathon template names 3. If two more
+   exactly one working system (CURA AI). The hackathon template names 3. If two more
    exist elsewhere, their hardware needs are not in this document.
 2. Does the target maturity include specific **intellectual property outputs** (patent
    filing, disclosure, licensing plan)? Not mentioned in any repo.

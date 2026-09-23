@@ -42,6 +42,6 @@ Full request/response shapes, error codes, and the auth model are in
 |---|---|
 | `api-contract.md` | Full contract — endpoints, shapes, errors, auth (source of truth) |
 | `types.ts` | TypeScript mirror of every response shape, for exact typing |
-| `MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | The contract MedCode AI wrote and sent *to* the hospital for the R1–R6 read side |
+| `MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | The contract our team wrote and sent *to* the hospital for the R1–R6 read side |
 | `imed-integration.md` | Integration design + 17 open questions still owed to the hospital |
 | `imed-writeback-as-built.md` | Real request/response bodies, byte-for-byte, with "as-built vs. spec" discrepancies called out |

@@ -1,6 +1,6 @@
 # API Reference
 
-The HTTP surface of MedCode AI. This is the curated reference: the endpoint
+The HTTP surface of CURA AI. This is the curated reference: the endpoint
 index, the auth model, the error model, the streaming protocol, the hospital
 contract and what the AI is sent.
 

@@ -1,6 +1,6 @@
 # Setup Guide
 
-From a clean `git clone` to a working MedCode AI. Follow it in order.
+From a clean `git clone` to a working CURA AI. Follow it in order.
 
 Everything runs **on your own machine**: no cloud account, no API key, and no
 credentials in any repository. The only thing you install is Docker. The

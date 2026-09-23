@@ -3,7 +3,7 @@
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 81 pages (`report/MedCode-AI-Report.pdf`)
+## Authoritative number: 81 pages (`report/CURA-AI-Report.pdf`)
 
 Latest pass (2026-09-23, later): restructured after the other MediHack team's
 submitted report — cover with the MFU emblem, Thai + English abstract, a
@@ -145,5 +145,5 @@ Two honest paths, not mutually exclusive:
 cd medcode-stack/report
 ./build-report.sh   # needs pandoc + Node with playwright installed — see
                      # the script's own header comment for setup
-# -> MedCode-AI-Report.pdf, check page count with `pdfinfo MedCode-AI-Report.pdf`
+# -> CURA-AI-Report.pdf, check page count with `pdfinfo CURA-AI-Report.pdf`
 ```

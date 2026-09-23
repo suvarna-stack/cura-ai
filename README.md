@@ -1,4 +1,4 @@
-# medcode-stack — the whole MedCode AI system in containers
+# medcode-stack — the whole CURA AI system in containers
 
 One `docker compose` file that runs all four repos plus Postgres. It contains no
 application code: each repo builds its own image from its own `Dockerfile`, and
@@ -13,7 +13,7 @@ that point the services at each other, the shared database, and the volumes.
 | [`docs/architecture.md`](docs/architecture.md) | Topology, the coding flow, approve/write-back, the AI pipeline, data model, known gaps |
 | [`docs/api-reference.md`](docs/api-reference.md) | Endpoints, auth, errors, streaming, the hospital contract |
 | [`HARDWARE_SPEC.md`](HARDWARE_SPEC.md) | What to buy for a pilot, with costs and open questions |
-| [`report/MedCode-AI-Report.pdf`](report/MedCode-AI-Report.pdf) | The final report (build: `report/build-report.sh`) |
+| [`report/CURA-AI-Report.pdf`](report/CURA-AI-Report.pdf) | The final report (build: `report/build-report.sh`) |
 | `audit-chart-frontend/docs/USER-GUIDE-TH.pdf` | คู่มือการใช้งาน — Thai user guide for coders and administrators |
 | [`eval-results/`](eval-results/) | Raw test, load-test and AI-accuracy evidence |
 

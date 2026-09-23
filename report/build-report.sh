@@ -12,7 +12,7 @@
 #   they're installed)
 #
 # Usage: ./build-report.sh
-# Output: MedCode-AI-Report.md, MedCode-AI-Report.html, MedCode-AI-Report.pdf
+# Output: CURA-AI-Report.md, CURA-AI-Report.html, CURA-AI-Report.pdf
 #   (this directory). Only the .pdf is meant to be committed as the actual
 #   submission artifact -- the .md/.html are regenerable intermediates.
 
@@ -40,26 +40,26 @@ FILES=(
 )
 
 echo "Concatenating ${#FILES[@]} files..."
-> MedCode-AI-Report.md
+> CURA-AI-Report.md
 for f in "${FILES[@]}"; do
-  { echo; echo; echo '<div class="pagebreak"></div>'; echo; echo; cat "$f"; } >> MedCode-AI-Report.md
+  { echo; echo; echo '<div class="pagebreak"></div>'; echo; echo; cat "$f"; } >> CURA-AI-Report.md
 done
 
 echo "Converting to HTML (pandoc)..."
 # The cover and abstract go in through --include-before-body, which pandoc
 # places BEFORE the table of contents: cover, abstract, contents, chapters.
 pandoc front-matter.md -f markdown -t html5 -o .front-matter.html
-pandoc MedCode-AI-Report.md \
+pandoc CURA-AI-Report.md \
   -f markdown -t html5 --standalone \
   --css=report-print.css \
   --include-before-body=.front-matter.html \
-  --metadata pagetitle="MedCode AI — Final Report" \
+  --metadata pagetitle="CURA AI — Final Report" \
   --toc --toc-depth=2 --metadata toc-title="Table of Contents" \
-  -o MedCode-AI-Report.html
+  -o CURA-AI-Report.html
 rm -f .front-matter.html
 # The TOC links are flex rows (for the dot leaders), and flex drops the spaces
 # around inline <em>/<code> children, so plain-text the TOC entries.
-perl -0pi -e 's{(<nav id="TOC".*?</nav>)}{ (my $t = $1) =~ s#</?(?:em|code|strong)>##g; $t }se' MedCode-AI-Report.html
+perl -0pi -e 's{(<nav id="TOC".*?</nav>)}{ (my $t = $1) =~ s#</?(?:em|code|strong)>##g; $t }se' CURA-AI-Report.html
 
 echo "Rendering to PDF via paged.js (needs Node + playwright + pagedjs)..."
 # paged.js fetches its stylesheet via XHR to parse @page rules; file:// URLs
@@ -101,7 +101,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.png': 
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
-  const url = `http://127.0.0.1:${port}/${REPORT_REL}/MedCode-AI-Report.html`;
+  const url = `http://127.0.0.1:${port}/${REPORT_REL}/CURA-AI-Report.html`;
   console.log('serving at', url);
 
   const browser = await chromium.launch();
@@ -121,14 +121,14 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.png': 
   await page.waitForTimeout(500); // let final layout settle
 
   await page.pdf({
-    path: 'MedCode-AI-Report.pdf',
+    path: 'CURA-AI-Report.pdf',
     printBackground: true,
     preferCSSPageSize: true, // respect paged.js's own @page size/margins
   });
   await browser.close();
   server.close();
-  console.log('Wrote MedCode-AI-Report.pdf');
+  console.log('Wrote CURA-AI-Report.pdf');
 })();
 NODE
 
-echo "Done: MedCode-AI-Report.md, MedCode-AI-Report.html, MedCode-AI-Report.pdf"
+echo "Done: CURA-AI-Report.md, CURA-AI-Report.html, CURA-AI-Report.pdf"

@@ -1,6 +1,6 @@
 # Architecture
 
-How MedCode AI is put together: the runtime topology, the coding flow, the
+How CURA AI is put together: the runtime topology, the coding flow, the
 write-back to the hospital, the AI pipeline and the data model.
 
 The single most important thing to know before reading any of it:
