@@ -42,13 +42,13 @@ https://arxiv.org/pdf/2505.01146
 *RuCCoD: Towards automated ICD coding in Russian*. (2025). arXiv:2502.21263.
 https://arxiv.org/pdf/2502.21263
 
-Tilleke & Gibbins. (n.d.). *Thailand issues guidelines on PDPA consent and
+Tilleke & Gibbins. (n.d.-a). *Thailand issues guidelines on PDPA consent and
 notification requirements*. https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/
 
-Tilleke & Gibbins. (n.d.). *Thailand's new draft guidance on data protection
+Tilleke & Gibbins. (n.d.-b). *Thailand's new draft guidance on data protection
 officers*. https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/
 
-Tilleke & Gibbins. (n.d.). *Thailand's public consultation on proposed PDPA
+Tilleke & Gibbins. (n.d.-c). *Thailand's public consultation on proposed PDPA
 guidelines: Key updates*. https://www.tilleke.com/insights/thailands-public-consultation-on-proposed-pdpa-guidelines-key-updates/45/
 
 *To RAG, or not to RAG? A comparative evaluation of retrieval-augmented

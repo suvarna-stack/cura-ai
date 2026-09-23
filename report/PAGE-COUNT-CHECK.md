@@ -3,9 +3,26 @@
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 90 pages (`report/CURA-AI-Report.pdf`, Thai)
+## Authoritative number: 54 pages; chapters 1–8 = 36 pages (pp. 5–40)
 
-Latest pass (2026-09-23, final): the report was translated into Thai, as the
+Within the 25–40 target for the chapter body, with every chapter still
+starting on a new page (Thai report convention, and what the other MediHack
+team's 50-page report does: chapters ≈35 pp, short appendices after).
+Latest pass (2026-09-23, page cut), 90 → 54:
+
+- **Blank pages removed (−9):** the build put a page-break div before every
+  file AND every file opens with an h1 that breaks the page, so paged.js
+  emitted an empty page after each chapter; same double break between the
+  abstract and the TOC. This had been inflating every count in this file.
+- **Appendices (−~10):** kept the other team's set (API, database, tests,
+  screenshots) as ก–ง; dropped architecture, production readiness and data
+  provenance, whose sources stay in the repos and are named in the index.
+- **Chapter text trimmed ~35%** (Thai translation was wordy): every heading,
+  figure, table row, result number and limitation kept; inline web links in
+  Ch.2/5 became author–year citations to the บรรณานุกรม.
+- Line height 1.5 → 1.4; Ch.3 dropped a screenshot that ภาคผนวก ง repeats.
+
+Previous pass (2026-09-23, Thai): the report was translated into Thai, as the
 deliverable requires. Sarabun is now the only body font and the line height
 went from 1.4 to 1.5 for Thai vowel and tone marks, and Thai prose runs about
 7% longer than the same English (measured on the Thai and English abstracts

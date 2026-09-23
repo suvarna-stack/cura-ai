@@ -39,7 +39,9 @@ FILES=(
 echo "Concatenating ${#FILES[@]} files..."
 > CURA-AI-Report.md
 for f in "${FILES[@]}"; do
-  { echo; echo; echo '<div class="pagebreak"></div>'; echo; echo; cat "$f"; } >> CURA-AI-Report.md
+  # No page-break marker here: every file opens with an h1, which already
+  # starts a new page (report-print.css); a second break left a blank page.
+  { echo; echo; cat "$f"; } >> CURA-AI-Report.md
 done
 
 # Thai has no spaces between words, but pandoc turns every soft line break
