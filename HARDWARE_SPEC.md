@@ -71,7 +71,7 @@ app server is a scale-up box, never a cluster.
 
 | Field | Value |
 |---|---|
-| Developers | Git history shows **4 distinct contributor identities** across the 5 repos (`BMW`, `Phyo Wai Yan Lin Zaw`, `ouzdim`, `zwethu`/`Zwe Thura Aung`) — a lower bound; doesn't count non-committing members (design, PM, clinical advisor). Confirmed headcount: **[OPEN — see Q5]** |
+| Developers | Team of **5**, School of Applied Digital Technology: Guntidamas Sangsawat (DTBI), Aung Kyaw Si (Software Engineering), Zwe Thura Aung (Software Engineering), Phyo Wai Yan Lin Zaw (Software Engineering), Xin Li (DTBI). How many continue past the hackathon, and so need a development laptop, is still **[OPEN — see Q5]** |
 | Hackathon teams continuing | **[OPEN — see Q6]** |
 | On-site equipment at the hospital | **None found in the repo.** The product is a browser-based SPA — coders use it from their existing hospital workstation, no tablet/kiosk/sensor exists in the code. Confirm those workstations meet the browser requirement (any modern Chrome/Edge/Firefox; no special hardware) — **[OPEN — see Q7]** |
 

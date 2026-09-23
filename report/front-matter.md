@@ -6,7 +6,7 @@
 
 <p class="cover-title-en">(MedCode AI: AI-Assisted ICD-10 and ICD-9 Coding System)</p>
 
-<p class="cover-names placeholder">[Team member full names — one per line]</p>
+<p class="cover-names">Guntidamas Sangsawat<br>Aung Kyaw Si<br>Zwe Thura Aung<br>Phyo Wai Yan Lin Zaw<br>Xin Li</p>
 
 <p class="cover-school">School of Applied Digital Technology</p>
 
@@ -20,7 +20,7 @@
 
 <p class="abs-title-en">(MedCode AI: AI-Assisted ICD-10 and ICD-9 Coding System)</p>
 
-<p class="abs-names placeholder">[Team member full names]</p>
+<p class="abs-names">Guntidamas Sangsawat, Aung Kyaw Si, Zwe Thura Aung, Phyo Wai Yan Lin Zaw, Xin Li</p>
 
 <p class="abs-heading">บทคัดย่อ</p>
 
