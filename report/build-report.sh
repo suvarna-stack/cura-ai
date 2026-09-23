@@ -31,12 +31,9 @@ FILES=(
   references.md
   appendices-outline.md
   appendix-a-api-reference.md
-  appendix-b-architecture.md
-  appendix-c-database-schema.md
-  appendix-d-test-evidence.md
-  appendix-e-screenshots.md
-  appendix-f-production-readiness.md
-  appendix-g-data-provenance.md
+  appendix-b-database-schema.md
+  appendix-c-test-evidence.md
+  appendix-d-screenshots.md
 )
 
 echo "Concatenating ${#FILES[@]} files..."

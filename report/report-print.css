@@ -27,7 +27,7 @@
   @bottom-center { content: none; }
 }
 
-body { font-family: "Sarabun", sans-serif; font-size: 12pt; line-height: 1.5; color: #000; max-width: 100%; }
+body { font-family: "Sarabun", sans-serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 100%; }
 
 h1 { font-size: 18pt; page-break-before: always; margin-top: 0; }
 h1.no-break { page-break-before: auto; }
