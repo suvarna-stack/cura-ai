@@ -16,7 +16,7 @@ trap 'rm -f "$HTML"' EXIT
 
 pandoc USER-GUIDE-TH.md -f markdown -t html5 --standalone \
   --css=guide-print.css \
-  --metadata pagetitle="คู่มือการใช้งาน MedCode AI" \
+  --metadata pagetitle="คู่มือการใช้งาน CURA AI" \
   --metadata lang=th \
   -o "$HTML"
 
