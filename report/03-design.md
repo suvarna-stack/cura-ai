@@ -42,7 +42,7 @@ implemented:
    (approved).
 2. **AI suggestion** (`POST /api/cases/{id}/suggest-codes`) — a coder opens
    a case and the system builds a clinical narrative from the chart's report
-   sections (capped at 6,000 characters, diagnosis-relevant sections first)
+   sections (capped at 3,500 characters, chief complaint and present illness first)
    and asks the RAG service for ICD-10/ICD-9 candidates with confidence
    scores and a cited source document. This call **writes nothing** — see
    Chapter 4, §4.3.

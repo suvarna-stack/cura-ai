@@ -24,8 +24,8 @@ live source.*
    is left untouched; already-finalized (approved) visits are skipped
    entirely, so a sync can never silently overwrite a coder's approved work.
 2. **AI suggestion** — `POST /api/cases/{id}/suggest-codes` builds a
-   clinical narrative (diagnosis-relevant chart sections first, capped at
-   6,000 characters) and calls the RAG service's `/suggest` endpoint. The
+   clinical narrative (chief complaint and present illness first, capped at
+   3,500 characters) and calls the RAG service's `/suggest` endpoint. The
    response never touches the database — see §4.3.
 3. **Coder review and save** — the coder ticks/edits/adds codes in the UI;
    `PUT /api/cases/{id}/codes` persists this as a bare JSON array, stored
