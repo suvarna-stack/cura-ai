@@ -444,7 +444,7 @@ export interface SuggestCodesResponse {
   mode: "graph" | "plain" | "none";
   /** Retrieved chunks the suggester saw. */
   hitsUsed: number;
-  /** Length of the narrative sent to RAG (capped at 6000). */
+  /** Length of the narrative sent to RAG (capped at 3500). */
   clinicalChars: number;
 }
 
@@ -766,7 +766,7 @@ export interface AgentChatRequest {
   question: string;
   /** prior turns, oldest first; server keeps the most recent 40 */
   history?: AgentChatTurn[];
-  /** 16–512; default 256 (kept low for interactive latency) */
+  /** 16–512; default 320 (kept low for interactive latency) */
   max_new_tokens?: number;
 }
 

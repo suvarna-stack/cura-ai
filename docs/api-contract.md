@@ -458,8 +458,12 @@ transaction number; same response shape (arrays hold at most that one id).
 ### POST /api/cases/{caseId}/suggest-codes — RAG code suggestions
 
 No request body. Builds a clinical narrative from the case's report sections
-(diagnosis-ish sections first, capped at 6000 chars) and asks the RAG knowledge
-index for ICD-10 diagnosis and ICD-9 procedure candidates.
+(chief complaint and present illness first, up to 2000 chars; then supporting
+sections such as assessment, diagnosis and procedure; then the rest — capped at
+3500 chars in total, the same amount the RAG side embeds, with a section that
+would overflow skipped whole rather than cut) and asks the RAG knowledge index
+for ICD-10 diagnosis and ICD-9 procedure candidates. Only the narrative is sent
+— no case id, visit number or account.
 
 **Writes nothing.** The coder accepts or edits the suggestions in the UI, then
 saves them with `PUT /api/cases/{caseId}/codes` — this endpoint never touches
@@ -868,7 +872,7 @@ RAG service's `/chat`:
     { "role": "user", "content": "..." },
     { "role": "assistant", "content": "..." }
   ],
-  "max_new_tokens": 256              // optional, 16-512, default 256
+  "max_new_tokens": 320              // optional, 16-512, default 320
 }
 // response — RAG pass-through (snake_case)
 { "question": "...", "answer": "...", "mode": "graph",
