@@ -1,0 +1,20 @@
+flowchart LR
+  subgraph ingest["Ingest (admin: AI Training)"]
+    pdf["ICD manuals<br/>PDF / CSV"] --> chunk["splitter<br/>800 chars · 120 overlap"]
+    chunk --> emb["bge-m3<br/>1024-dim"]
+    emb --> chroma[("Chroma")]
+    chunk --> kg[("knowledge graph")]
+  end
+  subgraph query["Query"]
+    q["narrative or question"] --> exact["exact code lookup"]
+    q --> vec["vector search"]
+    vec --> gexp["graph expansion<br/>3 seeds · 1 hop · budget 6"]
+    q --> rules["coder-taught rules"]
+    exact --> ctx["≤8 chunks, pinned first"]
+    gexp --> ctx
+    rules --> ctx
+  end
+  chroma --> vec
+  kg --> gexp
+  ctx --> sug["/suggest<br/>codes read from text<br/>no LLM"]
+  ctx --> chat["/chat<br/>LLM answers from context<br/>+ unverified_codes check"]

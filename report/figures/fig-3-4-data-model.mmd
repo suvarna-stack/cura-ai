@@ -1,0 +1,10 @@
+erDiagram
+  cases ||--o{ case_codes : "codes on the case"
+  cases ||--o| case_code_edits : "working list"
+  cases ||--o{ case_report_sections : "chart"
+  cases ||--o{ coding_history : "audit trail"
+  cases ||--o{ imed_write_ops : "write-back journal"
+  icd_10 ||--o{ case_codes : "ICD-10"
+  icd_9 ||--o{ case_codes : "ICD-9"
+  users ||--o{ coding_history : "actor"
+  users ||--o{ case_codes : "assigned_by"

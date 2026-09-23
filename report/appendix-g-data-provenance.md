@@ -1,4 +1,4 @@
-# Appendix H — Data provenance detail
+# Appendix G — Data provenance detail
 
 *Supporting material for Ch.5 (Data & PDPA) §5.1 — where the demo dataset
 came from and why it's synthetic, not real patient data.*

@@ -1,7 +1,5 @@
 # Chapter 1 — Problem
 
-*Status: draft skeleton, grounded in the project's own docs and code. Word count ~1,700 (≈3.5 pages at 500 words/page). Expand with hospital-specific figures once available — see `[TODO]` markers.*
-
 ## 1.1 The setting: how a Thai hospital visit becomes a paid claim
 
 Every patient visit at the partner hospital produces a chart: the doctor's notes
@@ -60,15 +58,15 @@ their decision"** (`docs/medical-glossary.md`, §1, opening scope note).
 
 The system's own dashboard vocabulary makes the scale of the problem
 concrete rather than abstract. A visit arrives from the hospital's iMed
-system already carrying **some** of its clinical documentation, but a
-majority arrive **not yet coded at all**: in the seeded demo dataset that
-mirrors the hospital's real extract, roughly half of synced visits are
-"incomplete" — missing an ICD-10 diagnosis, an ICD-9 procedure, or both
-(`imed-mock-api/DEMO-SETUP.md`: "Sync pulls... 100 OPD cases into medcode,
-50 of them already complete"; note the project's glossary is explicit that
-"complete" here means the hospital's own data already carried both code
-systems at sync time — it does **not** mean a human has reviewed it, see
-`docs/medical-glossary.md` §11).
+system carrying its clinical documentation, but often without a complete
+set of codes. In the seeded demo dataset, which is shaped after the
+hospital's real extract, a sync loads **140 outpatient visits, 60 of them
+"incomplete"** — missing an ICD-10 diagnosis, an ICD-9 procedure, or both —
+and 80 "complete" (counted on the running system, 23 September 2026). The
+project's glossary is explicit that "complete" here only means the
+hospital's own data already carried both code systems at sync time; it does
+**not** mean a human has reviewed the codes (`docs/medical-glossary.md`
+§11).
 
 The incomplete backlog is further bucketed by what kind of work drove the
 visit — medicine, surgery, CT/X-ray, other — because a coder triaging a
@@ -78,16 +76,13 @@ exists precisely because, before this system, there was no single place a
 coder (or a coding supervisor) could see the whole uncoded queue, grouped
 by type of work, across the hospital's outpatient (OPD) visits.
 
-**[TODO — hospital-specific numbers]**: this report should not state a real
-backlog size, average turnaround time, or coder headcount for the partner
-hospital, because none of that has been measured yet against real
-production data — only against the synthetic demo dataset. Chapter 7
-("Results", intentionally left unwritten here — see `eval-results/`) is
-where a real measurement belongs, once the hospital shares historical
-coding data for comparison (this is explicitly item "Proving the AI is
-accurate enough" in `medcode-api/docs/DEPLOYMENT-PREP.md`, §2 — the team
-has already flagged that it cannot make this claim without the hospital's
-own past-coded visits to compare against).
+This report deliberately states **no real backlog size, turnaround time or
+coder headcount** for the partner hospital. None of these has been measured
+against real production data, only against the synthetic demo dataset, and
+inventing them would undermine every measured number in Chapters 6 and 7.
+Measuring them needs the hospital's own historically coded visits, which is
+the item "Proving the AI is accurate enough" in
+`medcode-api/docs/DEPLOYMENT-PREP.md` §2.
 
 ## 1.4 Why decision support, and not automation
 
@@ -99,7 +94,7 @@ imagination. It searches the coding manuals, takes the codes that actually
 appear in them, and shows the text it found them in."*
 (`medcode-api/docs/DEPLOYMENT-PREP.md`, "Safety" section). This is not
 incidental UI copy — it is enforced in the API contract itself:
-`PUT /api/cases/{caseId}/suggest-codes` is documented as writing nothing at
+`POST /api/cases/{caseId}/suggest-codes` is documented as writing nothing at
 all (`medcode-api/docs/api-contract.md`), and the only path that touches the
 hospital's own database is a separate, explicit `POST /api/cases/approve`
 call made by a logged-in, audited human account.
@@ -136,3 +131,43 @@ follows in this report:
   and actual workflow vocabulary, as captured across this project's docs
   — but the demonstration of the *solution* has not yet run against real
   patient charts.
+
+## 1.6 Objectives
+
+The deliverable set out to build, and to test as a whole, a system that:
+
+1. **Brings the coding backlog into one worklist.** Pulls outpatient visits
+   from the hospital's iMed system and shows which of them still lack an
+   ICD-10 diagnosis or an ICD-9 procedure.
+2. **Suggests codes grounded in the coding manuals.** Proposes ICD-10 and
+   ICD-9 candidates from each chart, taken from the uploaded ICD references,
+   with the source shown.
+3. **Keeps the coder as the decision maker.** Nothing reaches the hospital
+   without an explicit, authenticated approval; every approval is attributed
+   and can be reversed.
+4. **Writes approved codes back into the hospital's own records** through
+   the hospital's API, not a side database.
+5. **Keeps patient data inside the hospital.** Retrieval and generation run
+   on local models, with no cloud AI service in the loop.
+6. **Reaches TRL 4.** The system is tested end to end, on realistic data,
+   with measured results.
+
+Chapter 7 judges the results against these six objectives.
+
+## 1.7 Method and timeline
+
+The work ran from 21 July to 23 September 2026 across five repositories
+(283 commits in total, per `git log`). The dated milestones below come from
+the project's own progress log (`medcode-api/CLAUDE.md`) and commit history.
+
+| Date (2026) | Milestone |
+|---|---|
+| 21–22 Jul | Backend rebuilt in Spring Boot; the API contract written down; the hospital side split into its own mock service and database |
+| 23–24 Jul | Sync from the hospital; staff login and accounts; write-back rebuilt on the hospital's real "iMed Diagnosis and Medical Discharge API" |
+| 26–27 Jul | AI (RAG) service started; the new coder web UI wired to the backend |
+| 28 Jul – 7 Aug | Catalog split, procedure time windows, hospital-style chart view, accessibility pass, selection-first code review, coding status on the hospital record |
+| 15–17 Aug | Streaming Agent chat with the grounding guard; all five services containerised in one compose stack |
+| 19–20 Aug | The read contract (R1–R6) written for the hospital and mocked; test suite re-based; Flyway made the single schema source |
+| 22–26 Aug | Coder-taught rules with ownership; shared case star; analytics filters |
+| 21 Sep | Evaluation run: test suites, load tests, AI accuracy, screenshots |
+| 23 Sep | Documentation and final report |

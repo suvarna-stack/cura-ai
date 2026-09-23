@@ -1,9 +1,8 @@
 # Chapter 2 — Related Work
 
-*Status: draft skeleton. Word count ~2,300 (≈4.5 pages). All citations below are
-real, web-verified sources (retrieved 2026-09-18) — no invented references.
-Expand the comparison table with a primary source once the team can access one
-(most CAC vendor claims below are marketing material, flagged as such).*
+Every source cited in this chapter was retrieved and checked on 18 September
+2026. Vendor descriptions in §2.1 come from product literature, which is
+marketing material and is treated as such.
 
 ## 2.1 Computer-assisted coding (CAC): the incumbent approach
 
@@ -20,11 +19,10 @@ well-known commercial examples:
   — *3M/Solventum, "360 Encompass Computer-Assisted Coding (CAC)"*, product
   literature, accessed 2026-09-18.
   [https://www.solventum.com/en-us/home/health-information-technology/solutions/360-encompass-cac/](https://www.solventum.com/en-us/home/health-information-technology/solutions/360-encompass-cac/)
-- **Nuance (Microsoft) Clinical Documentation Excellence (CDE)** — a
-  cloud-based AI documentation platform (the M*Modal CDI Engage line,
-  integrated with 3M's CAC/CDI workflow in some deployments) that helps
-  physicians capture structured documentation as they write, reducing the
-  ambiguity a downstream coder has to resolve.
+- **3M M\*Modal CDI Engage** — a cloud-based, AI-powered clinical
+  documentation improvement tool, integrated with 3M's CAC/CDI workflow,
+  that helps physicians capture structured documentation as they write,
+  reducing the ambiguity a downstream coder has to resolve.
   — *3M/M*Modal, "3M and M*Modal launch new AI-powered CDI tool"*,
   Healthcare IT News, accessed 2026-09-18.
   [https://www.healthcareitnews.com/news/3m-and-mmodal-launch-new-ai-powered-cdi-tool](https://www.healthcareitnews.com/news/3m-and-mmodal-launch-new-ai-powered-cdi-tool)
@@ -88,9 +86,10 @@ project's own architecture (Chapter 4):
   Evaluated RAG-prompted open-weight LLMs (Llama 3.1 8B, Llama 3.3 70B)
   against base (non-RAG) LLMs for ICD-10 / ICD-O-3 coding, finding RAG
   prompting substantially improved base-model performance — direct evidence
-  for this project's choice of a small local model (Qwen2.5-0.5B by
-  default, an 8B Llama variant optionally via Ollama; see Chapter 4)
-  *plus* retrieval, rather than a larger model alone.
+  for this project's choice of a small local model (an 8B Llama-3.1
+  variant via Ollama in the deployed stack, with a 0.5B in-process
+  fallback; see Chapter 4) *plus* retrieval, rather than a larger model
+  alone.
   [https://www.medrxiv.org/content/10.64898/2026.05.27.26353695v1.full](https://www.medrxiv.org/content/10.64898/2026.05.27.26353695v1.full)
 - **RuCCoD: "Towards Automated ICD Coding in Russian"** (2025), arXiv.
   Another non-English-language ICD-coding system combining retrieval over
@@ -107,15 +106,17 @@ evaluates against a *specific* health system's language, coding variant,
 and data, and none of the sources found evaluate Thai or ICD-10-TM data.
 That gap is exactly what this project's demo dataset and RAG index (ICD-10,
 ICD-9, and an ICD-10-TM-for-PCU reference PDF — see `RAG/data/documents.json`)
-are built to start closing, but no comparable accuracy figure exists yet
-for this system (flagged again in Chapter 6/7 stubs and Chapter 8).
+are built to start closing. This system's own first accuracy measurement,
+on synthetic data only, is reported in Chapter 6 (§6.3); no measurement
+against real hospital coding exists yet.
 
 ## 2.3 Why a local RAG stack instead of a cloud LLM API
 
 The team chose a **fully local** pipeline — `BAAI/bge-m3` embeddings,
-a persistent on-disk Chroma vector store, and a small local LLM
-(`Qwen/Qwen2.5-0.5B-Instruct` via `transformers`, or an 8B model via a
-host-native Ollama server) — over calling a cloud LLM API (OpenAI, Anthropic,
+a persistent on-disk Chroma vector store, and a small local LLM (an 8B
+Llama-3.1 model served by a host-native Ollama server in the deployed stack,
+or `Qwen/Qwen2.5-0.5B-Instruct` in-process as a fallback) — over calling a
+cloud LLM API (OpenAI, Anthropic,
 Google, etc.). This is a real architecture decision with three grounded
 reasons, not an assumption:
 
@@ -135,8 +136,9 @@ cross-border-transfer consultation — both re-verified as real sources in
 Chapter 5). A local model sidesteps this question entirely: nothing leaves
 the hospital's network.
 **2. Cost shape.** A cloud LLM API bills per token, per request, indefinitely.
-A local model, once downloaded (~3 GB total for the default stack —
-`RAG/README.md`), costs nothing per suggestion — the team's own pitch
+A local model, once downloaded (a few gigabytes of model files: ~2.3 GB
+for the bge-m3 embedding model plus the generation model), costs nothing
+per suggestion — the team's own pitch
 material states this as a deliberate design property: *"No fee per code. No
 fee per user. No cloud bill if it runs inside the hospital... The cost does
 not grow as the hospital codes more"* (`DEPLOYMENT-PREP.md`, "What it
@@ -177,8 +179,7 @@ project is positioned against:
    are deployed as a live, human-in-the-loop coder tool with a reversible
    write-back to a real hospital information system — which is what Chapter 4
    describes this project as having built (approve/reopen, audit journal,
-   diff-based write-back). **[TODO]**: once available, a head-to-head accuracy
-   comparison of this system's suggestions against the partner hospital's own
-   historical coding (the same methodology as the Klang et al. ED study
-   above) would be the strongest possible addition to this chapter and to
-   Chapter 7 — it does not exist yet and must not be fabricated here.
+   diff-based write-back). The complementary measurement — this system's
+   suggestions scored against the partner hospital's own historical coding,
+   using the Klang et al. methodology — has not been done, because it needs
+   real hospital data (Chapter 8).

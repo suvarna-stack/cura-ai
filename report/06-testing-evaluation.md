@@ -43,7 +43,7 @@ Zero failed requests at every load level tested, including 50 concurrent
 clients. Latency grows roughly linearly with concurrency, no cliff observed
 in this range. **Not measured:** RAG suggestion latency (the slowest step in
 the real coder flow) and concurrent-write contention (multiple coders
-approving/editing simultaneously) — both flagged as gaps in 6.6. Raw output
+approving/editing simultaneously) — both listed as gaps in §6.4. Raw output
 and reproduce steps: `eval-results/perf/`.
 
 ## 6.3 AI-suggestion accuracy (retrieval evaluation)
@@ -97,7 +97,7 @@ substitute for scoring against real historical hospital coding.
   No real coder was available to pilot a feedback instrument before the
   deadline.
 - UI usability walkthrough with a non-team user (screenshots exist —
-  Appendix F — but no outside user has been observed using the system).
+  Appendix E — but no outside user has been observed using the system).
 - **`/chat` (the full LLM-reasoning path a coder sees in the AI Agent) was
   not separately scored** — only `/suggest` (retrieval-only) was evaluated
   (§6.3). Out of scope for this submission: the generation model

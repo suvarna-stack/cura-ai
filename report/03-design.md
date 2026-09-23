@@ -1,9 +1,8 @@
 # Chapter 3 — Design
 
-*Status: draft skeleton. Word count ~2,900 (≈6 pages). Architecture and data-model
-facts are pulled directly from the repos' own docs and Flyway migrations —
-file paths are cited inline so this chapter can be re-verified against the
-live code at any time.*
+Architecture and data-model facts in this chapter come from the repositories'
+own documentation and Flyway migrations, cited inline so each can be checked
+against the code.
 
 ## 3.1 Workflow: before and after
 
@@ -71,18 +70,22 @@ implemented:
    not just the local copy (`medcode-api/docs/imed-integration.md`,
    "Reopen").
 
+<p align="center"><img src="figures/fig-3-1-workflow.png" alt="Coding workflow before and after"><br><em>Figure 3.1 · The coding workflow before and after this system</em></p>
+
 ## 3.2 Architecture: five services, one Postgres, an optional AI
 
 The system is five independently-built, independently-deployable services,
 composed for local/demo use by a sixth, code-free repo
-(`medcode-stack/README.md`):
+(`medcode-stack/README.md`). Figure 3.2 shows how they connect.
+
+<p align="center"><img src="figures/fig-3-2-architecture.png" alt="System architecture"><br><em>Figure 3.2 · System architecture: five containers, the hospital behind one setting, generation on the host</em></p>
 
 | Service | Repo | Role | Host port (compose) |
 |---|---|---|---|
 | `web` | `audit-chart-frontend` | React + TypeScript + Vite coder UI, built and served by nginx; proxies `/api` to the backend so the browser only ever talks to one origin (no CORS) | 8080 |
 | `medcode-api` | `medcode-api` | Spring Boot 4.1 / Java 21 backend. Owns the API contract, the `medcode` database, the single write-lock to the hospital, and the sync/approve/reopen orchestration | 8001 |
 | `imed-mock-api` | `imed-mock-api` | Stands in for the hospital's real iMed system, implementing its read (R1–R6) and write (W1–W4, `/api/v1/diagnosis`) contracts field-for-field, against its own `imed` database | 8003 |
-| `rag` | `RAG` | FastAPI Python service: embeddings, vector store, retrieval, and local LLM generation for code suggestions and the coder Agent chat | 8000 |
+| `rag` | `RAG` | FastAPI Python service: embeddings, vector store and retrieval for code suggestions (no language model involved), plus local LLM generation for the coder Agent chat | 8000 |
 | `db` | — (stock `postgres:18`) | One Postgres server hosting **both** application databases, `medcode` and `imed` (schema-isolated), matching the target production deploy shape | 5433→5432 |
 
 Two architectural decisions are worth stating explicitly because they shape
@@ -103,18 +106,17 @@ everything downstream:
   documented scaling ceiling for the current design, not an oversight — see
   Chapter 8 for how it affects the production deployment gap list.
 
-**Where the full data-flow diagram belongs:** `medcode-api/docs/dataflow.html`
-is a maintained, interactive architecture diagram already covering: the
-system boundary, the case-coding pipeline, identity/admin/knowledge/analytics
-flows, sync (pulling a visit from the hospital), approve (its two commit
-phases and the write lock), reopen (replaying the write journal backwards),
-authentication (minting and spending a token), "the RAG seam" (four flows
-through one service), the single-writer/single-cache design, and a full
-process × table matrix. **This report references that diagram rather than
-redrawing it** — it should be embedded or linked directly in the assembled
-report (e.g., as a rendered screenshot or an iframe in the final document),
-since it already encodes more architectural detail, correctly, than a static
-reproduction here would.
+Figure 3.3 follows one case through the system, from the hospital back to
+the hospital.
+
+<p align="center"><img src="figures/fig-3-3-coding-flow.png" alt="The coding flow"><br><em>Figure 3.3 · One case through the system: sync, suggest, save, approve</em></p>
+
+A more detailed, interactive set of data-flow diagrams is maintained with the
+code in `medcode-api/docs/dataflow.html`: the system boundary, the
+case-coding pipeline, sync, the two commit phases of approve, reopen's
+backward replay of the journal, authentication, the four flows through the
+RAG service, and a process × table matrix. Two of its views are reproduced
+in Appendix B.
 
 ## 3.3 Data model
 
@@ -127,22 +129,29 @@ the hospital's, and this system's working state is disposable relative to it.
 
 Schema evolution is tracked as Flyway migrations
 (`medcode-api/src/main/resources/db/migrations/V1`–`V9`), which is itself a
-useful design record:
+useful design record. Figure 3.4 shows the core coding tables; the full
+migration list is in Appendix C.
+
+<p align="center"><img src="figures/fig-3-4-data-model.png" alt="Core data model"><br><em>Figure 3.4 · Core tables of the medcode database</em></p>
 
 - **`cases`** — one row per hospital visit (the "case"); holds hospital-sourced
   clinical fields (department, ward, severity, disease group — several of
   these are explicitly *this project's own derived buckets, not clinical
   facts*, see `docs/medical-glossary.md` §11) plus workflow state
-  (`case_status`: open → in_review → approved, or reopened).
+  (`case_status`, an enum of `open`, `in_review`, `approved`, `reopened`).
 - **`case_codes`** — one row per assigned code, pointing at exactly one of two
   catalog tables (`icd_10_id` XOR `icd_9_id`, enforced by a check constraint
   since the 2026-07-28 catalog split — V3 migration); carries `code_role`
-  (principal/secondary/other/external-cause/procedure), `source`
-  (`imported_from_imed` vs. `coder_assigned`), and — since 2026-08-07 —
-  `origin` (`manual`/`hospital`/`ai`) for the UI grouping described in §3.1.
-  ICD-9 rows additionally carry an operation time window and operation type
-  (V4, V5 migrations), because a procedure code represents something that
-  happened over a time span, which the hospital's own write API requires.
+  (principal/secondary/other/external-cause/procedure) and `source`
+  (`imported_from_imed` vs. `coder_assigned`). ICD-9 rows additionally carry
+  an operation time window and operation type (V4, V5 migrations), because a
+  procedure code represents something that happened over a time span, which
+  the hospital's own write API requires.
+- **`case_code_edits`** — the coder's working list, one JSON document per
+  case, stored and echoed verbatim. This is where the UI keeps each row's
+  `selected` tick and its `origin` (`manual`/`hospital`/`ai`), so the
+  frontend can add such fields without a schema change; approve reads it and
+  turns the ticked rows into `case_codes`.
 - **`icd_10`** / **`icd_9`** — the reference catalogs, split into two tables
   (V3) specifically because the two coding systems were expected to diverge
   in what columns they need, rather than sharing one table that grows nulls.
@@ -169,7 +178,7 @@ useful design record:
 ### 3.3.2 `imed` — the mock hospital system
 
 Mirrors the hospital's actual extract tables (`medhack_patient`,
-`medhack_diagnosis_icd10`, `medhack_diagnosis_icd9`, lab/drug/vital order
+`medhack_diagnosis_icd10`, `medhack_procedure_icd9`, lab/drug/vital order
 tables, …) plus the write-side objects the real "iMed Diagnosis and Medical
 Discharge API" defines (`imed-mock-api/src/main/resources/db/migrations/
 V1__api_v1.sql` and following). It is intentionally built **field-for-field**
@@ -190,43 +199,26 @@ a gap the team has flagged as worth asking the hospital about
 version of the analytics page report coding backlog *by payer*, which
 matters given the DRG/reimbursement framing in Chapter 1.
 
-## 3.4 Wireframes and screenshots
+## 3.4 Screen design
 
-Real screenshots were captured 2026-09-21 from a running `docker compose up`
-stack against the seeded demo data. All 8 screens below are covered:
-1–6 and 8 as `audit-chart-frontend/docs/screenshots/01-placeholder.png`
-through `21-placeholder.png` (Thai UI, coder role; filenames kept as-is —
-shared with the Thai user guide, `audit-chart-frontend/docs/USER-GUIDE-TH.md`,
-which embeds them inline), and item 7 (SuperAdmin role, English UI — the
-admin console has no Thai translation) as
-`audit-chart-frontend/docs/screenshots/admin-ai-training.png`. The list below
-is kept as the shot list this report assumes exists and describes by
-behavior:
+The coder UI is one screen per task, in Thai or English (the admin console is
+English only). Its design rules follow from Chapter 1: the coder's decision
+must be explicit, the source of every code must be visible, and nothing the
+AI proposes may look like a fact.
 
-1. **Dashboard** — the four-bucket case list (complete / incomplete groups /
-   reopened / finished) with the coding-status stats strip.
-2. **Sync dialog** — the Today / Last 7 days / All / custom-date-range
-   picker (`SyncDialog`, `medcode-api/CLAUDE.md` "Time-windowed sync").
-3. **Case detail — hospital panel view** — the six-panel layout mirroring
-   the hospital's own coder screen (CC/PI/PE, past history, lab/X-ray,
-   diagnosis/procedure, order entry, investigations/management), with the
-   toggle back to the chronological document view.
-4. **Code review columns** — AI/hospital/manual code groups, confidence
-   shown on AI rows only, per-code checkboxes, "Approve (n)" button.
-5. **Add/Edit code modal** — the ICD-10/ICD-9 typeahead, ICD-9 operation
-   time-window + operation-type fields.
-6. **Agent chat** — streaming answer, cited sources with page numbers,
-   the "unverified codes" warning state, and a "Coder note" callout when a
-   taught rule applies.
-7. **Admin — AI Training page** — uploaded reference documents (ICD-10 PDF,
-   ICD-9 PDF, ICD-10-TM-for-PCU PDF), index stats, train/sync controls, and
-   the test-retrieval search box. (Correction from the original placeholder
-   description: there is no "Suggest & Learn rules list" on this page — the
-   coder-taught rules feature lives on the coder-facing AI Agent page
-   instead, screenshot 21.)
-8. **Analytics page** — coding backlog, coder KPIs, turnaround time,
-   documentation-gaps cards.
+| Screen | What it shows | Design rule |
+|---|---|---|
+| Case list (dashboard) | Four tabs: Complete, Incomplete (with a "missing N" badge), Reopened, Finished; search, filters, a shared star | One case sits in exactly one tab; a star is visible to everyone and removable only by whoever set it |
+| Sync dialog | Quick ranges (Today … Everything), a specific date, or a date range, then a confirmation | Sync never touches an approved case, so it is safe to repeat |
+| Case detail | The hospital chart (hospital-panel or chronological view), vital signs, and one column each for ICD-10 and ICD-9 | The chart is read-only; codes are grouped by origin (coder, hospital record, AI) and only AI rows carry a confidence percentage |
+| Code selection | A checkbox per code, "Select all", a picked/total counter, drag to reorder | **Nothing is pre-ticked.** The top ticked ICD-10 is the principal diagnosis; Approve stays disabled until both columns have a pick (or "no procedure" is ticked) |
+| Approve and reopen dialogs | How many codes will be written, and that unticked codes stay behind | Both actions are confirmed and logged; reopen says plainly that codes written to iMed are withdrawn |
+| AI Agent | Code dictionary chat and Suggest & Learn, with chat history | Answers cite their sources; codes not found in any retrieved passage are flagged |
+| Admin console | Dashboard with display switches, accounts, AI Training | Accounts with coding history cannot be deleted, only deactivated |
 
-All 8 screens are now captured. Remaining work is just embedding the final
-set directly into this section or into a dedicated Appendix (see
-`appendices-outline.md`) before final submission.
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/06-placeholder.png" alt="Case list after a sync"><br><em>Figure 3.5 · The case list after a sync (Complete tab, Thai UI)</em></p>
+
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/09-placeholder.png" alt="Case detail with AI suggestions"><br><em>Figure 3.6 · Case detail: the chart on the left, AI-suggested ICD-10 and ICD-9 codes with confidence on the right, none pre-ticked</em></p>
+
+Every screen, coder and admin, is reproduced in Appendix E and explained step
+by step in the Thai user guide (`audit-chart-frontend/docs/USER-GUIDE-TH.pdf`).

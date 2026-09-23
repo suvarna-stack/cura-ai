@@ -1,0 +1,19 @@
+flowchart LR
+  browser["Coder / admin<br/>browser"]
+  subgraph stack["medcode-stack (docker compose)"]
+    web["web<br/>nginx + React SPA<br/>:8080"]
+    api["medcode-api<br/>Spring Boot 4.1 · Java 21<br/>:8001 · one instance"]
+    rag["rag<br/>FastAPI · bge-m3 · Chroma<br/>:8000"]
+    db[("db · Postgres 18<br/>medcode + imed")]
+    imed["imed-mock-api<br/>stand-in hospital (iMed)<br/>:8003"]
+  end
+  ollama["Ollama on the host<br/>Llama-3.1-EIRAI-8B"]
+  real["Real hospital iMed API<br/>same contract"]
+  browser -->|"HTTP, same origin"| web
+  web -->|"/api proxy"| api
+  api -->|"plain SQL"| db
+  imed --> db
+  api -->|"R1–R6 read · W1–W4 write"| imed
+  api -.->|"change IMED_API_BASE"| real
+  api -->|"suggest · chat · learn"| rag
+  rag -.->|"chat only"| ollama

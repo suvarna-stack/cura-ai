@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant C as Coder
+  participant A as medcode-api
+  participant H as Hospital (iMed)
+  participant R as RAG
+  participant DB as medcode DB
+  C->>A: Sync (date window)
+  A->>H: R6 contract check, then R3 / R1→R2
+  H-->>A: case objects
+  A->>DB: import new · refresh open · skip approved
+  C->>A: open case (lock, renewed every 30 s)
+  C->>A: suggest-codes
+  A->>R: /suggest {clinical_text ≤3,500 chars}
+  R-->>A: ICD-10 + ICD-9 candidates
+  A-->>C: suggestions (nothing written)
+  C->>A: save ticked / edited codes
+  A->>DB: working list stored
+  C->>A: Approve
+  A->>DB: phase 1: commit + finalize
+  A->>H: phase 2: diff → cancel / edit / create
+  A->>DB: journal each hospital row

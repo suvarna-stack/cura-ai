@@ -1,10 +1,9 @@
 # Appendix D — Test cases / automated test evidence
 
-*This appendix is the raw correctness-test evidence — cross-reference with
-Ch.6, which draws the line between correctness tests (this appendix) and
-the accuracy/performance evaluation (Ch.6's own tables), and with
-`medcode-stack/eval-results/SUMMARY.md`, the team's single source of truth
-for every number in Ch.6/Ch.7.*
+The correctness-test evidence behind Chapter 6 §6.1. Chapter 6 separates
+these correctness tests from the accuracy and performance evaluation;
+`medcode-stack/eval-results/SUMMARY.md` records every number with its raw
+output file.
 
 ## Automated test suites
 

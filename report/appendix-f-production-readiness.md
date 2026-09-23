@@ -1,19 +1,16 @@
-# Appendix G — Production-readiness checklist
+# Appendix F — Production-readiness checklist
 
-*Supporting material for Ch.8's conclusion and deployment gap list.*
+Supporting material for Chapter 8. The full 28-item checklist is
+`medcode-api/docs/DEPLOYMENT-PREP.md` (24 August 2026, about 3,100 words),
+written for a non-engineering audience. Each item carries two markers:
 
-The full 28-item checklist lives at `medcode-api/docs/DEPLOYMENT-PREP.md`
-(3,129 words) — written for a non-engineering audience, each item tagged by
-owner:
+| Marker | Meaning |
+|---|---|
+| 🟢 / 🟡 / 🔴 | Who acts: 🟢 the team does it · 🟡 needs the hospital's answer · 🔴 blocks everything until answered |
+| `[say]` / `[ask]` / `[IT]` | Audience: `[say]` for the spoken pitch · `[ask]` hospital decisions, raised as a group · `[IT]` technical handout detail |
 
-- 🟢 `[say]` — we do it (belongs in the spoken pitch)
-- 🟡 `[ask]` — needs a hospital decision (mention as a group, not item by item)
-- 🔴 `[IT]` — handout-only technical detail (not said aloud)
-
-Not reproduced in full here to protect the page budget (see
-`PAGE-COUNT-CHECK.md`) — attach it as a literal appendix at final assembly
-if the page budget allows; its own TLDR is compact enough to carry the key
-numbers on its own:
+Its own summary, quoted as written on 24 August 2026 (the test count has
+since grown to 192 across the three services, Chapter 6):
 
 > **The app is finished and tested.** It pulls a visit out of the hospital
 > system, suggests the codes, a coder checks and approves, and the approved

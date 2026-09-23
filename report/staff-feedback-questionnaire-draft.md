@@ -1,4 +1,4 @@
-# Appendix E — Staff feedback questionnaire
+# Staff feedback questionnaire (draft — not administered, not part of the submitted report)
 
 *Instrument for Ch.6/Ch.7's "feedback from medical staff" requirement. Not
 yet administered — this is the design, ready to hand to pilot coders. Once

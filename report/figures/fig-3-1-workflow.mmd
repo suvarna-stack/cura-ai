@@ -1,0 +1,16 @@
+flowchart TB
+  subgraph before["Before: manual coding"]
+    direction LR
+    b1["Visit recorded<br/>in iMed"] --> b2["Coder picks charts<br/>no shared worklist"]
+    b2 --> b3["Reads free text<br/>against ICD-10-TM"]
+    b3 --> b4["Looks codes<br/>up by hand"]
+    b4 --> b5["Types codes into iMed<br/>no record of alternatives"]
+  end
+  subgraph after["After: MedCode AI"]
+    direction LR
+    a1["Sync: one worklist<br/>complete · incomplete"] --> a2["AI suggests codes<br/>source shown"]
+    a2 --> a3["Coder ticks, edits, adds<br/>nothing pre-selected"]
+    a3 --> a4["Approve: written back<br/>to iMed, journaled"]
+    a4 -.->|"mistake"| a5["Reopen: reversed<br/>edits kept"]
+  end
+  before ~~~ after

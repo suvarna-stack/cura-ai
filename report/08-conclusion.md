@@ -1,15 +1,14 @@
 # Chapter 8 — Conclusion
 
-*Status: draft skeleton. Word count ~1,900 (≈4 pages). Deliberately structured
-as two honest lists — what can be claimed now, and what genuinely remains —
-rather than a single "summary" paragraph, so nothing here overstates the
-current state of the project.*
+This chapter is structured as two lists, what can be claimed now and what
+genuinely remains, followed by what we learned and what running the system
+would cost.
 
 ## 8.1 What is built, and what the demo actually proves
 
 The following can be stated as fact, because it is demonstrated by working
-code and a passing automated test suite (`eval-results/medcode-api-test-output.txt`),
-not by aspiration:
+code and the automated test suites (191 of 192 tests passing, Chapter 6
+§6.1; raw output in `eval-results/`), not by aspiration:
 
 - **A complete, working, human-in-the-loop coding pipeline exists**, from
   pulling a visit out of a hospital system, through AI-assisted suggestion,
@@ -30,22 +29,19 @@ not by aspiration:
 - **The demo dataset is honest about what it is**: deterministic, synthetic,
   documented, and reversible (Chapter 5) — nothing about the demo pretends to
   be real patient data or a real accuracy measurement.
-- **The team's own production-readiness thinking is unusually mature for a
-  hackathon deliverable.** `medcode-api/docs/DEPLOYMENT-PREP.md` is a
-  28-item checklist distinguishing what the team controls from what only the
-  hospital can decide, and it independently reaches several of the same
-  conclusions this report reaches in Chapters 5 and 8 — most notably, that
-  no PDPA compliance work and no real-data accuracy comparison exist yet.
-  That the team flagged these gaps *themselves*, rather than this report
-  discovering them adversarially, is itself evidence of engineering
-  discipline worth stating plainly.
+- **The path to production is written down.** `medcode-api/docs/DEPLOYMENT-PREP.md`
+  is a 28-item checklist that separates what the team controls from what
+  only the hospital can decide, including the two largest gaps this report
+  also names: no PDPA compliance work and no accuracy comparison against
+  real coded data.
 
 **What the demo does *not* prove**, stated with equal directness: it does
-not prove the AI suggestions are clinically accurate on real charts (no
-comparison against real hospital-coded data exists — Chapter 2, §2.4;
-Chapter 6/7 stubs), it does not prove the system performs acceptably under
-real hospital visit volumes or concurrent-coder load (no load test has been
-run), and it does not prove the write-back contract matches the hospital's
+not prove the AI suggestions are clinically accurate on real charts (the
+only accuracy measurement is on synthetic data, and it is weak — Chapter 6
+§6.3; no comparison against real hospital-coded data exists), it does not
+prove the system performs acceptably at real hospital volumes (the load test
+ran on one machine against the read path, and concurrent writes by several
+coders were not tested — Chapter 6 §6.2), and it does not prove the write-back contract matches the hospital's
 *actual* production behavior, because — as the team's own docs state
 outright — **"MedCode AI has never called a real iMed server"**
 (`medcode-api/docs/imed-writeback-as-built.md`, opening status note). Every
@@ -136,17 +132,53 @@ record, but it does mean this list of unknowns is a real, unresolved
 dependency on the hospital's own IT team, not a to-do the engineering team
 can close alone.
 
-## 8.3 Closing framing
+## 8.3 What we learned
 
-The honest summary this report can support: **the engineering is
-substantially done and tested against a faithful mock of the real
-integration; the path to a real hospital is now mostly non-engineering
-work** — legal/compliance review, hospital IT coordination, hardware
-procurement, and a validation study against real data — which is
-consistent with how the team itself frames it: *"To run it in a real
+- **Measuring found what reviewing missed.** The code review never caught
+  that symptom narratives retrieve the wrong manual pages. The 42-case
+  accuracy run did, in one afternoon, and turned a vague worry into a
+  specific target: chunking and retrieval on narrative text (Chapter 6 §6.3).
+- **Two copies of the truth drift.** Schema changes once lived both in Java
+  and in SQL files nothing ran; the copies diverged and two tables lost their
+  foreign keys. Moving to Flyway as the single definition fixed it. The same
+  lesson shaped the API: a test now fails the build whenever the documented
+  endpoint list and the code disagree, in either direction.
+- **Tests that touch shared data need their own fixtures.** Early write tests
+  approved and reopened visits other tests read, and silently cancelled real
+  seed procedures in the mock hospital. Splitting fixtures into
+  "sacrificial" and "read-only" visits made the suite repeatable.
+- **Keeping the AI optional kept the project on schedule.** Because coding,
+  approval and write-back never depend on the AI service, the blocked chat
+  model (Chapter 6 §6.4) cost one feature, not the product.
+
+## 8.4 Operating cost
+
+`HARDWARE_SPEC.md` prices a pilot from public listings (September 2026,
+converted at ~33 THB/USD, before VAT and reseller markup; not vendor quotes):
+
+| Scenario | Rough one-time cost (THB) |
+|---|---|
+| Minimum: reuse spare hospital servers, one 16 GB GPU, a small NAS | ~120,000–140,000 |
+| Recommended: new app and database servers, one 24 GB GPU, a redundant NAS | ~360,000–440,000 |
+
+The software itself has no per-code, per-user or cloud fee: the models are
+open and run on the hospital's own card, so the running cost does not grow
+with coding volume (`DEPLOYMENT-PREP.md`, "What it costs"). Power, backup
+storage and staff time for updates are the recurring costs; they are not
+priced here. Several inputs (coder headcount, visit volume, hosting choice)
+are open questions only the hospital can answer, listed in
+`HARDWARE_SPEC.md` §7.
+
+## 8.5 Conclusion
+
+The engineering is substantially done and tested against a faithful mock of
+the real integration: a coder can sync visits from the hospital, get
+suggestions grounded in the coding manuals, decide, approve, and see the
+codes land in the hospital's own records, with every write journaled and
+reversible. The AI's suggestion quality on symptom narratives is not yet good
+enough to rely on, and that is the first thing to fix. Everything else on the
+path to a real hospital is mostly non-engineering work: legal and compliance
+review, hospital IT coordination, hardware, and a validation study on real
+coded data. That matches the team's own framing: *"To run it in a real
 hospital, three more things are needed. None of them are code"*
-(`medcode-api/docs/DEPLOYMENT-PREP.md`, TLDR). This report's own contribution
-is to independently re-verify that framing against the actual code and docs
-rather than accept it uncritically — and, on every point checked (the
-write-back mechanics, the AI safeguards, the data provenance, the PDPA gap),
-it held up.
+(`medcode-api/docs/DEPLOYMENT-PREP.md`, TLDR).

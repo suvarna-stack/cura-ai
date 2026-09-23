@@ -161,8 +161,8 @@ Then walk the app:
 2. **The admin account cannot open the coding screens.** Coding is a coder-role
    page, and an admin is redirected to the admin console. Go to **Accounts**,
    create a coder account, sign out, and sign back in as that coder.
-3. The dashboard is empty. That is correct. Press **Sync**, choose **All**, and
-   confirm. The hospital's 140 outpatient visits load: 80 arrive already coded
+3. The dashboard is empty. That is correct. Press **Sync** (ซิงค์), choose
+   **Everything**, and confirm with **Sync now** (ซิงค์เลย). The hospital's 140 outpatient visits load: 80 arrive already coded
    with both code systems (*Complete*) and 60 are missing one (*Incomplete*).
 4. Open a case. AI suggestions appear in the ICD-10 and ICD-9 columns (the
    first time, after the ~1 minute model download). Tick codes and **Approve**.

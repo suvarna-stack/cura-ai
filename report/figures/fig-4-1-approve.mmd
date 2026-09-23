@@ -1,0 +1,15 @@
+flowchart TD
+  start(["POST /api/cases/approve"]) --> lock["take the single write lock"]
+  lock --> p1["PHASE 1 · our transaction<br/>ticked codes → case_codes<br/>case finalized · history row"]
+  p1 --> commit[("COMMIT medcode")]
+  commit --> live["read the hospital's live rows"]
+  live --> diff{"diff final set<br/>vs live rows"}
+  diff -->|removed| del["cancel (W3/W4)"]
+  diff -->|changed| put["edit (W2)"]
+  diff -->|new| post["create (W1)"]
+  del --> j["journal before-image<br/>imed_write_ops"]
+  put --> j
+  post --> j
+  j --> st["coding_status = approved"]
+  st --> done(["200 OK"])
+  diff -.->|"hospital call fails"| err(["500: our side committed<br/>approve again, the diff heals"])

@@ -233,13 +233,13 @@ flowchart LR
   subgraph ask["Query time"]
     q["narrative or question"] --> exact["exact code lookup<br/>ICD-shaped tokens"]
     q --> vec["vector search"]
-    vec --> graph["graph mode: 3 seeds →<br/>1 hop, decay 0.55, budget 6"]
+    vec --> gexp["graph mode: 3 seeds →<br/>1 hop, decay 0.55, budget 6"]
     q --> rules["coder-taught rules<br/>(pinned first)"]
-    exact & graph & rules --> ctx["≤8 chunks, pinned first"]
+    exact & gexp & rules --> ctx["≤8 chunks, pinned first"]
   end
 
   chroma --> vec
-  kg --> graph
+  kg --> gexp
   ctx --> sug["/suggest<br/>regex-read codes + titles<br/>score → confidence<br/><b>no LLM</b>"]
   ctx --> chat["/chat<br/>LLM answers from context only<br/>+ unverified_codes check"]
 ```

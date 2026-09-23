@@ -1,11 +1,9 @@
 # Chapter 5 — Data & PDPA
 
-*Status: draft skeleton. Word count ~2,400 (≈5 pages). The "no cloud
-transmission" claim below was verified against the code (not assumed) —
-see §5.3 for how. PDPA requirements are web-verified against real sources,
-retrieved 2026-09-18, cited inline. This chapter is the one most likely to
-be scrutinized in an academic/professional review — every honesty gap is
-flagged explicitly rather than smoothed over.*
+The "no cloud transmission" claim in this chapter was verified against the
+code, not assumed (§5.3). PDPA requirements are summarised from published
+sources retrieved on 18–20 September 2026 and cited inline. Every open
+compliance question is stated as open rather than smoothed over.
 
 ## 5.1 What data this demo actually uses: synthetic only
 
@@ -27,8 +25,8 @@ generate_demo_data.py`):
 - **Fixed random seed (`20260821`)** — the same script run twice produces
   byte-identical data, which is what makes the demo repeatable and auditable
   (a reviewer can regenerate the exact same dataset from the same script).
-- **Grows a small hand-written seed (21 visits) to ~100 OPD visits plus a
-  handful of IPD admissions**, specifically to exercise the hospital's own
+- **Grows a small hand-written seed (21 visits) to 150 visits — 140 OPD
+  and 10 IPD admissions**, specifically to exercise the hospital's own
   paging limits (the read contract refuses more than 20 visit ids or a
   31-day window per request — Chapter 4, §4.1) and to show the three coding
   states side by side at a realistic scale.
@@ -80,10 +78,10 @@ compliance reviewer — see §5.5.
   explicit consent, **or** falls under a narrower set of exceptions —
   necessary for medical purposes, public health, or scientific research,
   each subject to appropriate safeguards such as data minimization, access
-  controls, and security measures — *[TODO: confirm which lawful basis this
-  system's intended production use (hospital-internal coding operations)
-  actually qualifies under, with a Thai data-protection lawyer or the
-  hospital's own DPO — this report cannot determine that on its own]*.
+  controls, and security measures. Which basis this system's intended use
+  (hospital-internal coding operations) falls under is a legal
+  determination for the hospital's counsel or DPO; this report does not
+  make it (§5.5, item 2).
   — *Tilleke & Gibbins, "Thailand Issues Guidelines on PDPA Consent and
   Notification Requirements"*, accessed 2026-09-20.
   [https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/](https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/)
@@ -130,21 +128,18 @@ compliance reviewer — see §5.5.
   ; *Chambers and Partners, "Data Protection & Privacy 2026 - Thailand"*,
   accessed 2026-09-18.
   [https://practiceguides.chambers.com/practice-guides/data-protection-privacy-2026/thailand/trends-and-developments](https://practiceguides.chambers.com/practice-guides/data-protection-privacy-2026/thailand/trends-and-developments)
-  **[TODO: verify the exact notification window and monetary fine figures
-  against the PDPA's own text or the hospital's legal counsel before citing
-  a specific number in a submitted version of this report — the figures
-  found in secondary guidance above should not be treated as authoritative
-  without checking the primary statute/regulations.]**
+  These are secondary sources, so this report deliberately quotes no
+  specific notification deadline or fine amount; the statute itself and the
+  hospital's legal counsel are the authority for those figures.
 - **DPO appointment.** Organizations processing personal data at scale,
   especially sensitive categories like health data, typically need a
   designated Data Protection Officer under PDPA.
   — *Tilleke & Gibbins, "Thailand's New Draft Guidance on Data Protection
   Officers"*, accessed 2026-09-20.
   [https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/](https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/)
-  **[TODO: confirm whether the partner hospital already has a DPO, or
-  whether standing one up for this system's data flows is a new
-  requirement — this is a hospital governance question, not something the
-  engineering team can answer.]**
+  Whether the partner hospital already has a DPO who would cover this
+  system's data flows is a hospital governance question the engineering
+  team cannot answer; it is listed as open in §5.5.
 
 ## 5.3 How data is stored today, and what was verified (not assumed)
 
@@ -173,6 +168,19 @@ not simply asserted from the README:
   same shape OpenAI's API popularized — not an actual call to any OpenAI
   service (`RAG/app/models/schemas.py:70`,
   `audit-chart-frontend/src/features/agent/types/agent.types.ts:71`).
+
+What the AI service actually receives was checked the same way, in
+`medcode-api`'s `CaseSuggestService` and `AgentController`:
+
+| Call | Sent to the AI service | Not sent |
+|---|---|---|
+| Code suggestions | the chart's report-section text, complaint and present illness first, capped at 3,500 characters | visit number, hospital number, case id, account |
+| Agent chat | the coder's question and prior turns | case id, patient identifiers, account token |
+| Taught rules | the rule text, plus the teaching coder's name and account id (for authorship checks) | patient data |
+
+One honest caveat: chart text is sent as written. If a clinician typed an
+identifier into a note, it reaches the AI service unscrubbed — still on the
+local machine, but not filtered.
 
 **What this verification does *not* cover**: network egress at the
 infrastructure/firewall level (this was a source-code check, not a running

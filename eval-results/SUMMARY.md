@@ -121,7 +121,7 @@ cd medcode-api && ./mvnw spring-boot:run     # port 8001, for perf tests
   explicit scope cut in `report/06-testing-evaluation.md` §6.4 and
   `report/appendices-outline.md`.
 - Staff feedback — **cut from this submission 2026-09-23**. The survey
-  instrument still exists (`report/appendix-e-questionnaire.md`,
+  instrument still exists (`report/staff-feedback-questionnaire-draft.md`,
   2026-09-21) but was never administered and is not included in the
   submitted report PDF.
 - `/chat` (LLM-in-the-loop) accuracy — **cut from this submission

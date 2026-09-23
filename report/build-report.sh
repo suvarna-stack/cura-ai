@@ -20,7 +20,6 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 FILES=(
-  00-title.md
   01-problem.md
   02-related-work.md
   03-design.md
@@ -29,14 +28,15 @@ FILES=(
   06-testing-evaluation.md
   07-results.md
   08-conclusion.md
+  references.md
   appendices-outline.md
   appendix-a-api-reference.md
   appendix-b-architecture.md
   appendix-c-database-schema.md
   appendix-d-test-evidence.md
-  appendix-f-screenshots.md
-  appendix-g-production-readiness.md
-  appendix-h-data-provenance.md
+  appendix-e-screenshots.md
+  appendix-f-production-readiness.md
+  appendix-g-data-provenance.md
 )
 
 echo "Concatenating ${#FILES[@]} files..."
@@ -46,12 +46,20 @@ for f in "${FILES[@]}"; do
 done
 
 echo "Converting to HTML (pandoc)..."
+# The cover and abstract go in through --include-before-body, which pandoc
+# places BEFORE the table of contents: cover, abstract, contents, chapters.
+pandoc front-matter.md -f markdown -t html5 -o .front-matter.html
 pandoc MedCode-AI-Report.md \
   -f markdown -t html5 --standalone \
   --css=report-print.css \
-  --metadata title="MedCode AI — Final Report" \
+  --include-before-body=.front-matter.html \
+  --metadata pagetitle="MedCode AI — Final Report" \
   --toc --toc-depth=2 --metadata toc-title="Table of Contents" \
   -o MedCode-AI-Report.html
+rm -f .front-matter.html
+# The TOC links are flex rows (for the dot leaders), and flex drops the spaces
+# around inline <em>/<code> children, so plain-text the TOC entries.
+perl -0pi -e 's{(<nav id="TOC".*?</nav>)}{ (my $t = $1) =~ s#</?(?:em|code|strong)>##g; $t }se' MedCode-AI-Report.html
 
 echo "Rendering to PDF via paged.js (needs Node + playwright + pagedjs)..."
 # paged.js fetches its stylesheet via XHR to parse @page rules; file:// URLs
@@ -79,7 +87,8 @@ const pagedjsPath = findPagedjs();
 const REPO_ROOT = path.resolve('..', '..'); // cura-ai/
 const REPORT_REL = path.relative(REPO_ROOT, process.cwd()); // medcode-stack/report
 
-const MIME = { '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.js': 'text/javascript' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.png': 'image/png',
+               '.ttf': 'font/ttf', '.js': 'text/javascript' };
 
 (async () => {
   const server = http.createServer((req, res) => {
@@ -99,6 +108,7 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.
   const page = await browser.newPage();
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
   await page.goto(url, { waitUntil: 'networkidle' });
+  await page.evaluate(() => document.fonts.ready);
 
   await page.evaluate(() => {
     window.PagedConfig = {

@@ -1,9 +1,21 @@
-# Page count check — 2026-09-23, updated after cutting 3 sections for deadline
+# Page count check — 2026-09-23, updated after restructuring to the MFU report format
 
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 76 pages (`report/MedCode-AI-Report.pdf`)
+## Authoritative number: 81 pages (`report/MedCode-AI-Report.pdf`)
+
+Latest pass (2026-09-23, later): restructured after the other MediHack team's
+submitted report — cover with the MFU emblem, Thai + English abstract, a
+compact TOC, six rendered figures (Ch.3–4), a References section, a
+screenshot gallery for Appendix E (25 images), and appendices relettered A–G
+after the questionnaire cut. Drafting notes and `[TODO]` markers were removed
+from every chapter. Layout fixes (tables may split between rows; columns
+sized to content) offset most of the added material: 76 → 81 pages. Rough
+split: front matter + TOC 5, chapters 1–8 about 50, references 3,
+appendices about 23.
+
+Earlier passes, for history:
 
 Went through three rendering passes:
 

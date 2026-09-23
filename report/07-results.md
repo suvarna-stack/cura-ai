@@ -35,15 +35,22 @@ endpoint (Ch.6.2). Not tested: RAG suggestion latency under load, and
 concurrent write contention (two coders editing/approving at once) — both
 real gaps given the multi-coder design intent (Ch.3).
 
-## 7.4 Summary against the deliverable's own scope (Ch.1 §1.5)
+## 7.4 Results against the objectives (Ch.1 §1.6)
 
-| Scoped claim | Status |
-|---|---|
-| OPD demo flow runs end to end | Confirmed (7.1) |
-| System handles realistic concurrent load | Confirmed, within tested range (7.3) |
-| AI suggestions are clinically useful on symptom input | **Not confirmed — active gap, root cause identified (7.2)** |
-| Faster than manual coding | **Out of scope for this submission — see Ch.6.4** |
-| Validated against real hospital data/coders | **Not done — synthetic data and team-only testing throughout (Ch.1 §1.5, Ch.5)** |
+| # | Objective | Result | Evidence |
+|---|---|---|---|
+| 1 | One worklist showing which visits lack codes | **Met** | Sync loads 140 OPD visits into four mutually exclusive queues (80 complete, 60 incomplete); covered by the automated suites (Ch.6.1) |
+| 2 | Code suggestions grounded in the manuals, source shown | **Partly met** | Every suggestion comes from retrieved manual text with its source named, and nothing is invented. But ICD-10 top-1 accuracy is 0/42 and top-8 is 3/42 on symptom narratives (Ch.6.3, §7.2) |
+| 3 | The coder stays the decision maker | **Met** | Suggest writes nothing, nothing is pre-ticked, approve is explicit and attributed to the signed-in account, reopen reverses it (Ch.4 §4.3; tests in Ch.6.1) |
+| 4 | Approved codes written back into the hospital's records | **Met against the mock** | A diff-based write through the hospital's own API contract, with every row journaled; tested against the contract-faithful mock, **not yet** against the real iMed (Ch.8) |
+| 5 | Patient data stays inside the hospital | **Met by design** | No cloud AI calls in the code (Ch.5 §5.3); retrieval and generation run locally. Not verified at the network level |
+| 6 | TRL 4: tested as a whole, measured results | **Met** | 191/192 automated tests, load tests with 0 failures up to 50 concurrent clients, a measured AI accuracy baseline (Ch.6) |
+
+Outside the six objectives, two things were **not** evaluated in this
+submission: whether the system is faster than manual coding, and how staff
+rate it (Ch.6 §6.4). The system has also not been validated against real
+hospital data or real coders; every test used synthetic data and team
+members (Ch.1 §1.5, Ch.5).
 
 This is a TRL 4 result in the honest sense the assignment asks for: the
 system was tested as a whole, on realistic (if synthetic) data, with

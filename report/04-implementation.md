@@ -1,9 +1,19 @@
 # Chapter 4 — Implementation
 
-*Status: draft skeleton. Word count ~3,100 (≈6.5 pages). RAG pipeline details
-are pulled directly from `RAG/app/core/rag.py`, `chunking.py` and `config.py`
-— quoted code is exact, not paraphrased, so it can be checked against the
-live source.*
+RAG pipeline details are taken directly from `RAG/app/core/rag.py`,
+`chunking.py` and `config.py`; quoted code and prompts are exact, so they can
+be checked against the source.
+
+| Component | Technology |
+|---|---|
+| Backend | Java 21, Spring Boot 4.1, plain SQL over JDBC (no ORM), Flyway migrations, BCrypt (`spring-security-crypto`) |
+| Hospital mock | Java 21, Spring Boot 4.1, plain SQL, Flyway; OpenAPI 3.1 generated from the running code |
+| Database | PostgreSQL 18: `medcode` (ours) and `imed` (the hospital's) on one server |
+| Web UI | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, axios; built once and served by nginx, which proxies `/api` |
+| AI service | Python, FastAPI; `BAAI/bge-m3` embeddings (1024-dim, multilingual); Chroma vector store; a knowledge graph (GraphML) |
+| Generation | Ollama on the host running `Llama-3.1-EIRAI-8B` (4-bit GGUF); in-process `Qwen2.5-0.5B-Instruct` as a fallback |
+| Packaging | Docker; one image per service; one compose file in `medcode-stack` |
+| Testing | JUnit + MockMvc against real databases (both Java services), pytest (AI service), Apache Bench (load) |
 
 ## 4.1 End to end: how one case moves through the system
 
@@ -64,7 +74,16 @@ live source.*
    marker. The coder's saved edits are kept, so re-approving does not lose
    work.
 
+<p align="center"><img src="figures/fig-4-1-approve.png" alt="Approve as a two-phase, diffed write"><br><em>Figure 4.1 · Approve: our commit first, then a diff against the hospital's live rows, every write journaled</em></p>
+
 ## 4.2 The AI part: the RAG pipeline in detail
+
+Figure 4.2 summarises the pipeline. The same index serves two very different
+paths: `/suggest` reads codes straight out of the retrieved manual text with
+no language model, while `/chat` has a local model answer from the retrieved
+passages.
+
+<p align="center"><img src="figures/fig-4-2-ai-pipeline.png" alt="The RAG pipeline"><br><em>Figure 4.2 · The AI pipeline: ingestion, retrieval channels, and the two consumers</em></p>
 
 ### 4.2.1 Ingestion — chunking and indexing
 
@@ -171,15 +190,20 @@ adaptation made **because** the default local model is small — see below.
 Generation itself is pluggable between two backends
 (`RAG/app/config.py`, `RAG/README.md`):
 
-- **`transformers` (default)** — **`Qwen/Qwen2.5-0.5B-Instruct`** running
-  in-process on CPU. Tiny (≈1 GB), works with zero extra infrastructure, but
-  is explicitly documented as "much weaker output" than the alternative
-  (`medcode-stack/README.md`).
-- **`ollama`** — a larger model (the compose stack defaults to an 8B
-  Llama-3.1-based model, `hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M`)
-  served by a host-native Ollama process, because Docker on macOS has no GPU
-  passthrough and an in-container 8B model would be far slower
-  (`medcode-stack/README.md`, "AI (the RAG service)"). The team's own
+- **`ollama`: what the deployed stack uses** (`LLM_BACKEND=ollama` in the
+  compose file). An 8B Llama-3.1-based model,
+  `hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M`, served by a
+  host-native Ollama process, because Docker on macOS has no GPU passthrough
+  and an in-container 8B model would be far slower (`medcode-stack/README.md`,
+  "AI (the RAG service)").
+- **`transformers`: the fallback, and the code-level default** when no
+  backend is configured. `Qwen/Qwen2.5-0.5B-Instruct` running in-process on
+  CPU. Tiny (≈1 GB) and needs no extra infrastructure, but is documented as
+  giving "much weaker output" (`medcode-stack/README.md`).
+
+Only the Agent chat and the drafting step of Suggest & Learn use this model.
+Code suggestions do not, which is why they keep working when the model is
+unavailable. The team's own
   deployment notes also flag a Thai-tuned alternative worth evaluating
   before a real launch — SCB 10X's **Typhoon 2** family, built on Gemma 3 /
   Qwen 3 — as a one-setting swap, not a rebuild
@@ -246,10 +270,11 @@ maps to a specific, checkable mechanism in the code:
   are destructive bulk writes (`medcode-api/docs/api-contract.md`). See
   Chapter 5 for the full data-provenance discussion.
 
-**[TODO]**: none of the above safeguards have been evaluated against
-adversarial or edge-case inputs (e.g., a coder trying to approve an
-all-unselected code list, or a chart with no diagnosis-relevant text at all)
-beyond what the existing automated test suite covers — the 46/46
-`CasesApiIntegrationTest` result recorded in `eval-results/medcode-api-test-output.txt`
-is the current evidence base; a dedicated security/robustness review is not
-part of this deliverable and belongs with Chapter 8's deployment gap list.
+The evidence behind these safeguards is the automated test suites (Chapter
+6, §6.1: 191 of 192 tests passing across the three services, with raw output
+in `eval-results/`). Some edge cases are covered there, for example that an
+unticked code stays in the working list but is never written back
+(`CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved`). No
+dedicated security or adversarial
+robustness review was carried out; it belongs on the deployment list in
+Chapter 8.
