@@ -1,173 +1,65 @@
-# Chapter 4 — Implementation
+# บทที่ 4 การนำไปปฏิบัติ
 
-RAG pipeline details are taken directly from `RAG/app/core/rag.py`,
-`chunking.py` and `config.py`; quoted code and prompts are exact, so they can
-be checked against the source.
+รายละเอียดของไปป์ไลน์ (pipeline) การสร้างข้อความเสริมด้วยการค้นคืน (RAG) ในบทนี้นำมาจาก `RAG/app/core/rag.py`, `chunking.py` และ `config.py` โดยตรง โค้ดและพรอมต์ (prompt) ที่ยกมาอ้างตรงตามต้นฉบับทุกประการ จึงสามารถตรวจสอบเทียบกับซอร์สโค้ดได้
 
-| Component | Technology |
+| องค์ประกอบ | เทคโนโลยี |
 |---|---|
-| Backend | Java 21, Spring Boot 4.1, plain SQL over JDBC (no ORM), Flyway migrations, BCrypt (`spring-security-crypto`) |
-| Hospital mock | Java 21, Spring Boot 4.1, plain SQL, Flyway; OpenAPI 3.1 generated from the running code |
-| Database | PostgreSQL 18: `medcode` (ours) and `imed` (the hospital's) on one server |
-| Web UI | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, axios; built once and served by nginx, which proxies `/api` |
-| AI service | Python, FastAPI; `BAAI/bge-m3` embeddings (1024-dim, multilingual); Chroma vector store; a knowledge graph (GraphML) |
-| Generation | Ollama on the host running `Llama-3.1-EIRAI-8B` (4-bit GGUF); in-process `Qwen2.5-0.5B-Instruct` as a fallback |
-| Packaging | Docker; one image per service; one compose file in `medcode-stack` |
-| Testing | JUnit + MockMvc against real databases (both Java services), pytest (AI service), Apache Bench (load) |
+| ระบบหลังบ้าน (Backend) | Java 21, Spring Boot 4.1, SQL ล้วนผ่าน JDBC (ไม่ใช้ ORM), migration ด้วย Flyway, BCrypt (`spring-security-crypto`) |
+| ระบบจำลอง API ของโรงพยาบาล | Java 21, Spring Boot 4.1, SQL ล้วน, Flyway; OpenAPI 3.1 ที่สร้างจากโค้ดขณะทำงานจริง |
+| ฐานข้อมูล | PostgreSQL 18: `medcode` (ของคณะผู้จัดทำ) และ `imed` (ของโรงพยาบาล) บนเซิร์ฟเวอร์เดียวกัน |
+| ส่วนติดต่อผู้ใช้บนเว็บ | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, axios; build เพียงครั้งเดียวแล้วให้บริการผ่าน nginx ซึ่งทำหน้าที่เป็นพร็อกซีสำหรับ `/api` |
+| บริการ AI | Python, FastAPI; เวกเตอร์ฝังตัว (embedding) `BAAI/bge-m3` (1024 มิติ รองรับหลายภาษา); ฐานข้อมูลเวกเตอร์ (vector store) Chroma; กราฟความรู้ (knowledge graph) (GraphML) |
+| การสร้างข้อความ (generation) | Ollama บนเครื่องโฮสต์ ซึ่งรัน `Llama-3.1-EIRAI-8B` (GGUF แบบ 4 บิต); `Qwen2.5-0.5B-Instruct` ที่ทำงานภายในโพรเซสเป็นตัวสำรอง |
+| การจัดแพ็กเกจ | Docker; หนึ่งอิมเมจต่อหนึ่งบริการ; ไฟล์ compose ไฟล์เดียวใน `medcode-stack` |
+| การทดสอบ | JUnit + MockMvc กับฐานข้อมูลจริง (ทั้งสองบริการ Java), pytest (บริการ AI), Apache Bench (การทดสอบภาระงาน) |
 
-## 4.1 End to end: how one case moves through the system
+## 4.1 ลำดับการทำงานตั้งแต่ต้นจนจบ: เคสหนึ่งเคสเคลื่อนผ่านระบบอย่างไร
 
-1. **Sync** — `medcode-api`'s `SyncService` calls the hospital's read
-   contract (locally, `imed-mock-api`'s implementation of read endpoints
-   R1–R6). Because the hospital's own API has no "download everything"
-   endpoint, a windowed sync chunks into ≤31-day periods (R3), and an
-   unwindowed sync walks the full id list from R1 in ≤20-id batches through
-   R2 — limits the hospital's contract itself enforces
-   (`medcode-api/docs/api-contract.md`, `POST /api/sync`; confirmed live in
-   `imed-mock-api`'s `422 too_many_visit_ids` / `422 period_too_long`
-   responses, `medcode-api/CLAUDE.md`, "New iMed read contract" milestone).
-   Every run is preceded by an **R6 contract check** — a fixed list of
-   fields this backend actually depends on — which fails the whole sync
-   with a `500` naming any field the hospital has stopped serving, *before*
-   anything is written locally. New visits are imported; already-open
-   visits get their hospital-sourced fields refreshed while any coder work
-   is left untouched; already-finalized (approved) visits are skipped
-   entirely, so a sync can never silently overwrite a coder's approved work.
-2. **AI suggestion** — `POST /api/cases/{id}/suggest-codes` builds a
-   clinical narrative (chief complaint and present illness first, capped at
-   3,500 characters) and calls the RAG service's `/suggest` endpoint. The
-   response never touches the database — see §4.3.
-3. **Coder review and save** — the coder ticks/edits/adds codes in the UI;
-   `PUT /api/cases/{id}/codes` persists this as a bare JSON array, stored
-   and echoed **verbatim**, so new fields (like `origin` or `note`) can be
-   added by the frontend without a backend contract change
-   (`medcode-api/docs/api-contract.md`).
-4. **Approve — a two-phase, diffed write** — `POST /api/cases/approve`:
-   - Phase 1: this system's own database transaction commits first — the
-     coder's saved edits become real `coder_assigned` code rows, the case
-     is marked finalized.
-   - Phase 2 (still inside the single write-lock): the finalized code set
-     is **diffed** against the hospital's own live rows. Removed codes are
-     cancelled (`DELETE`), changed codes are edited in place (`PUT`, by the
-     hospital's own row id), and new codes are created (`POST`) — in that
-     order (cancel → update → create) specifically so a code being created
-     can never collide with a row still queued for cancellation
-     (`medcode-api/docs/imed-integration.md`, decisions 1–2;
-     `imed-writeback-as-built.md`, §4).
-   - Every touched hospital row is journaled with its before-image in
-     `imed_write_ops`. If the hospital call fails after the local commit,
-     the request 500s with the local side already committed — **the fix is
-     to approve again**, because the diff recomputes against live state
-     rather than replaying the failed request
-     (`medcode-api/docs/api-contract.md`, `POST /api/cases/approve`).
-   - The hospital visit's own row also gains a `coding_status` marker
-     (`approved`/cleared) via an optional field the team proposed and added
-     to the hospital's existing write envelope — deliberately **not**
-     written into the doctor's own `dischargestatus` field, which an
-     earlier version of this feature had mistakenly overwritten
-     (`medcode-api/docs/imed-integration.md`, "Coding status" section).
-5. **Reopen** replays the `imed_write_ops` journal **in reverse** — a
-   created row is cancelled, an updated row is restored to its pre-approve
-   values, a cancelled row is re-created (with a **new** hospital-side id,
-   since iMed has no "un-cancel" — a documented, real limitation,
-   `imed-writeback-as-built.md`, §5.7) — and clears the coding-status
-   marker. The coder's saved edits are kept, so re-approving does not lose
-   work.
+1. **ซิงค์** — `SyncService` ของ `medcode-api` เรียกใช้สัญญาการเชื่อมต่อฝั่งอ่านของโรงพยาบาล (ในสภาพแวดล้อมภายในเครื่อง คือ `imed-mock-api` ซึ่งพัฒนา endpoint ฝั่งอ่าน R1–R6 ไว้) เนื่องจาก API ของโรงพยาบาลเองไม่มี endpoint สำหรับ "ดาวน์โหลดทั้งหมด" การซิงค์แบบกำหนดช่วงเวลาจึงแบ่งเป็นช่วงละไม่เกิน 31 วัน (R3) และการซิงค์แบบไม่กำหนดช่วงเวลาจะไล่ตามรายการ id ทั้งหมดจาก R1 เป็นชุดละไม่เกิน 20 id ผ่าน R2 ซึ่งเป็นขีดจำกัดที่สัญญาการเชื่อมต่อของโรงพยาบาลบังคับใช้เอง (`medcode-api/docs/api-contract.md`, `POST /api/sync`; ยืนยันจากการทำงานจริงด้วยการตอบกลับ `422 too_many_visit_ids` / `422 period_too_long` ของ `imed-mock-api`, `medcode-api/CLAUDE.md`, milestone "New iMed read contract") ก่อนการทำงานทุกครั้งจะมี **การตรวจสอบสัญญาการเชื่อมต่อ R6** ซึ่งเป็นรายการฟิลด์คงที่ที่ระบบหลังบ้านนี้พึ่งพาจริง หากโรงพยาบาลหยุดให้บริการฟิลด์ใด การซิงค์ทั้งหมดจะล้มเหลวพร้อมรหัส `500` ที่ระบุชื่อฟิลด์นั้น *ก่อน* ที่จะมีการเขียนข้อมูลใด ๆ ลงในระบบภายใน การมารับบริการใหม่จะถูกนำเข้า การมารับบริการที่ยังเปิดอยู่จะได้รับการปรับปรุงฟิลด์ที่มาจากโรงพยาบาลโดยไม่แตะต้องงานของเจ้าหน้าที่ให้รหัสโรค (ผู้ให้รหัส) ส่วนการมารับบริการที่ปิดงานแล้ว (อนุมัติแล้ว) จะถูกข้ามไปทั้งหมด การซิงค์จึงไม่สามารถเขียนทับงานที่ผู้ให้รหัสอนุมัติแล้วโดยไม่มีผู้ใดทราบได้
+2. **AI แนะนำรหัส** — `POST /api/cases/{id}/suggest-codes` สร้างข้อความบรรยายทางคลินิก (โดยเรียงอาการสำคัญและประวัติการเจ็บป่วยปัจจุบันไว้ก่อน และจำกัดความยาวไม่เกิน 3,500 ตัวอักษร) แล้วเรียก endpoint `/suggest` ของบริการ RAG ผลตอบกลับไม่ถูกบันทึกลงฐานข้อมูลเลย ดูหัวข้อ 4.3
+3. **ผู้ให้รหัสตรวจสอบและบันทึก** — ผู้ให้รหัสติ๊กเลือก แก้ไข หรือเพิ่มรหัสบนหน้าจอ `PUT /api/cases/{id}/codes` บันทึกข้อมูลนี้เป็น JSON array ธรรมดา ซึ่งถูกจัดเก็บและส่งกลับ **ตามต้นฉบับทุกประการ** ส่วนหน้าบ้านจึงเพิ่มฟิลด์ใหม่ (เช่น `origin` หรือ `note`) ได้โดยไม่ต้องเปลี่ยนสัญญาการเชื่อมต่อของระบบหลังบ้าน (`medcode-api/docs/api-contract.md`)
+4. **อนุมัติ: การเขียนสองระยะแบบเปรียบเทียบความแตกต่าง (diff)** — `POST /api/cases/approve`:
+   - ระยะที่ 1: ธุรกรรมฐานข้อมูลของระบบนี้เองจะ commit ก่อน การแก้ไขที่ผู้ให้รหัสบันทึกไว้จะกลายเป็นแถวรหัส `coder_assigned` จริง และเคสจะถูกทำเครื่องหมายว่าปิดงานแล้ว
+   - ระยะที่ 2 (ยังอยู่ภายใน write-lock เดียวกัน): ชุดรหัสที่ปิดงานแล้วจะถูก **เปรียบเทียบความแตกต่าง** กับแถวข้อมูลปัจจุบันของโรงพยาบาลเอง รหัสที่ถูกนำออกจะถูกยกเลิก (`DELETE`) รหัสที่เปลี่ยนแปลงจะถูกแก้ไขในแถวเดิม (`PUT` โดยอ้างอิง id ของแถวฝั่งโรงพยาบาล) และรหัสใหม่จะถูกสร้าง (`POST`) ตามลำดับนี้ (ยกเลิก → ปรับปรุง → สร้าง) โดยเจตนา เพื่อไม่ให้รหัสที่กำลังสร้างชนกับแถวที่ยังอยู่ในคิวรอยกเลิก (`medcode-api/docs/imed-integration.md`, การตัดสินใจข้อ 1–2; `imed-writeback-as-built.md`, หัวข้อ 4)
+   - แถวข้อมูลของโรงพยาบาลทุกแถวที่ถูกแก้ไขจะถูกบันทึกประวัติพร้อมภาพข้อมูลก่อนแก้ไข (before-image) ไว้ใน `imed_write_ops` หากการเรียกไปยังโรงพยาบาลล้มเหลวหลังจาก commit ฝั่งภายในแล้ว คำขอจะตอบกลับด้วย 500 โดยที่ฝั่งภายในได้ commit ไปแล้ว **วิธีแก้คืออนุมัติอีกครั้ง** เพราะการเปรียบเทียบจะคำนวณใหม่จากสถานะปัจจุบันจริง แทนที่จะส่งคำขอที่ล้มเหลวซ้ำ (`medcode-api/docs/api-contract.md`, `POST /api/cases/approve`)
+   - แถวของการมารับบริการฝั่งโรงพยาบาลยังได้รับเครื่องหมาย `coding_status` (`approved`/ล้างค่า) ผ่านฟิลด์เสริมที่คณะผู้จัดทำเสนอและเพิ่มเข้าไปในโครงสร้างข้อมูลสำหรับการเขียน (write envelope) ที่โรงพยาบาลมีอยู่เดิม โดยเจตนา **ไม่** เขียนลงในฟิลด์ `dischargestatus` ของแพทย์ ซึ่งฟีเจอร์นี้ในเวอร์ชันก่อนหน้าเคยเขียนทับโดยผิดพลาด (`medcode-api/docs/imed-integration.md`, ส่วน "Coding status")
+5. **เปิดใหม่** จะเล่นย้อนบันทึกประวัติ `imed_write_ops` **ในลำดับย้อนกลับ** แถวที่ถูกสร้างจะถูกยกเลิก แถวที่ถูกปรับปรุงจะถูกคืนค่าเป็นค่าก่อนการอนุมัติ แถวที่ถูกยกเลิกจะถูกสร้างขึ้นใหม่ (โดยได้ id ฝั่งโรงพยาบาล **ใหม่** เนื่องจาก iMed ไม่มีการ "ยกเลิกการยกเลิก" ซึ่งเป็นข้อจำกัดจริงที่มีการบันทึกไว้ `imed-writeback-as-built.md`, หัวข้อ 5.7) และล้างเครื่องหมายสถานะการให้รหัส การแก้ไขที่ผู้ให้รหัสบันทึกไว้ยังคงอยู่ การอนุมัติซ้ำจึงไม่ทำให้งานสูญหาย
 
-<p align="center"><img src="figures/fig-4-1-approve.png" alt="Approve as a two-phase, diffed write"><br><em>Figure 4.1 · Approve: our commit first, then a diff against the hospital's live rows, every write journaled</em></p>
+<p align="center"><img src="figures/fig-4-1-approve.png" alt="การอนุมัติในรูปแบบการเขียนสองระยะแบบเปรียบเทียบความแตกต่าง"><br><em>ภาพที่ 4.1 · การอนุมัติ: commit ฝั่งระบบของคณะผู้จัดทำก่อน แล้วจึงเปรียบเทียบความแตกต่างกับแถวข้อมูลปัจจุบันของโรงพยาบาล โดยบันทึกประวัติการเขียนทุกครั้ง</em></p>
 
-## 4.2 The AI part: the RAG pipeline in detail
+## 4.2 ส่วน AI: รายละเอียดของไปป์ไลน์ RAG
 
-Figure 4.2 summarises the pipeline. The same index serves two very different
-paths: `/suggest` reads codes straight out of the retrieved manual text with
-no language model, while `/chat` has a local model answer from the retrieved
-passages.
+ภาพที่ 4.2 สรุปภาพรวมของไปป์ไลน์ ดัชนีชุดเดียวกันให้บริการสองเส้นทางที่แตกต่างกันมาก `/suggest` อ่านรหัสโดยตรงจากข้อความในคู่มือที่ค้นคืนได้โดยไม่ใช้โมเดลภาษา ขณะที่ `/chat` ให้โมเดลภายในเครื่องตอบจากข้อความที่ค้นคืนได้
 
-<p align="center"><img src="figures/fig-4-2-ai-pipeline.png" alt="The RAG pipeline"><br><em>Figure 4.2 · The AI pipeline: ingestion, retrieval channels, and the two consumers</em></p>
+<p align="center"><img src="figures/fig-4-2-ai-pipeline.png" alt="ไปป์ไลน์ RAG"><br><em>ภาพที่ 4.2 · ไปป์ไลน์ AI: การนำเข้าเอกสาร ช่องทางการค้นคืน และส่วนที่นำผลไปใช้ทั้งสองส่วน</em></p>
 
-### 4.2.1 Ingestion — chunking and indexing
+### 4.2.1 การนำเข้าเอกสาร (ingestion) — การแบ่งชิ้นข้อความและการทำดัชนี
 
-Reference material (the hospital's ICD-10 and ICD-9 manuals as PDFs, plus a
-Thai ICD-10-TM primary-care reference, `RAG/data/documents.json`) is chunked
-with a small, dependency-free recursive character splitter
-(`RAG/app/core/chunking.py`): it tries to break on paragraph boundaries
-first, then sentence, then word, then hard character count, greedily merges
-small fragments up to a target size, and adds a trailing overlap from the
-previous chunk to each new one so context is not lost at a chunk boundary.
-Defaults: **800-character chunks, 120-character overlap**
-(`RAG/app/config.py`), both configurable via environment variables. Each
-chunk is given a deterministic id (`"{source}:p{page}-c{i}"`) that is shared
-between the vector store and a parallel knowledge graph — the same identity
-is what lets graph-based retrieval (below) expand from a vector hit to its
-neighbors (`RAG/app/core/rag.py`, `ingest_pages`).
+เอกสารอ้างอิง (คู่มือ ICD-10 และ ICD-9 ของโรงพยาบาลในรูปแบบ PDF รวมถึงเอกสารอ้างอิง ICD-10-TM ภาษาไทยสำหรับบริการปฐมภูมิ `RAG/data/documents.json`) ถูกแบ่งเป็นชิ้นข้อความ (chunk) ด้วยตัวแบ่งอักขระแบบเวียนเกิด (recursive character splitter) ขนาดเล็กที่ไม่พึ่งพาไลบรารีภายนอก (`RAG/app/core/chunking.py`) ตัวแบ่งนี้พยายามตัดที่ขอบเขตย่อหน้าก่อน จากนั้นจึงเป็นประโยค คำ และจำนวนอักขระตายตัวตามลำดับ รวมชิ้นส่วนขนาดเล็กเข้าด้วยกันแบบละโมบ (greedy) จนถึงขนาดเป้าหมาย และเพิ่มส่วนท้ายของชิ้นข้อความก่อนหน้าเป็นส่วนซ้อนทับ (overlap) ให้กับชิ้นข้อความใหม่แต่ละชิ้น เพื่อไม่ให้บริบทสูญหายที่รอยต่อระหว่างชิ้นข้อความ ค่าเริ่มต้นคือ **ชิ้นข้อความขนาด 800 อักขระ ซ้อนทับ 120 อักขระ** (`RAG/app/config.py`) ซึ่งทั้งสองค่าปรับได้ผ่านตัวแปรสภาพแวดล้อม ชิ้นข้อความแต่ละชิ้นได้รับ id แบบกำหนดแน่นอน (deterministic) (`"{source}:p{page}-c{i}"`) ซึ่งใช้ร่วมกันระหว่างฐานข้อมูลเวกเตอร์และกราฟความรู้ที่สร้างคู่ขนานกัน อัตลักษณ์ร่วมนี้เองที่ทำให้การค้นคืน (retrieval) แบบอิงกราฟ (อธิบายด้านล่าง) ขยายจากผลลัพธ์ที่พบด้วยเวกเตอร์ไปยังชิ้นข้อความข้างเคียงได้ (`RAG/app/core/rag.py`, `ingest_pages`)
 
-### 4.2.2 Embeddings and vector store
+### 4.2.2 เวกเตอร์ฝังตัวและฐานข้อมูลเวกเตอร์
 
-Chunks are embedded with **`BAAI/bge-m3`** (a multilingual, 1024-dimension
-sentence-transformer model), chosen specifically because it supports Thai
-and English in the same embedding space — a coder can ask a question in
-Thai and retrieve English-language reference PDF passages, or vice versa,
-without a translation step (`RAG/README.md`: *"embeddings are multilingual
-so Thai retrieval works against English documents"*, also stated in
-`medcode-api/docs/api-contract.md` for the Agent chat endpoint). Vectors are
-stored in **Chroma**, a persistent on-disk vector database
-(`RAG/app/core/vectorstore.py`), so the index survives service restarts
-without re-embedding every document.
+ชิ้นข้อความถูกแปลงเป็นเวกเตอร์ฝังตัวด้วย **`BAAI/bge-m3`** (โมเดล sentence-transformer หลายภาษา ขนาด 1024 มิติ) ซึ่งเลือกใช้โดยเฉพาะเพราะรองรับภาษาไทยและภาษาอังกฤษในปริภูมิเวกเตอร์ (embedding space) เดียวกัน ผู้ให้รหัสสามารถถามคำถามเป็นภาษาไทยแล้วค้นคืนข้อความจากเอกสาร PDF อ้างอิงภาษาอังกฤษได้ หรือในทางกลับกัน โดยไม่ต้องผ่านขั้นตอนการแปล (`RAG/README.md`: *"เวกเตอร์ฝังตัวรองรับหลายภาษา การค้นคืนภาษาไทยจึงใช้ได้กับเอกสารภาษาอังกฤษ"* ซึ่งระบุไว้ใน `medcode-api/docs/api-contract.md` สำหรับ endpoint แชทของ Agent ด้วย) เวกเตอร์ถูกจัดเก็บใน **Chroma** ซึ่งเป็นฐานข้อมูลเวกเตอร์แบบถาวรบนดิสก์ (`RAG/app/core/vectorstore.py`) ดัชนีจึงคงอยู่แม้บริการจะเริ่มทำงานใหม่ โดยไม่ต้องสร้างเวกเตอร์ฝังตัวของเอกสารทุกฉบับใหม่
 
-### 4.2.3 Retrieval — two modes, plus exact-match and coder-taught layers
+### 4.2.3 การค้นคืน — สองโหมด พร้อมชั้นการค้นหาแบบตรงตัวและชั้นกฎที่ผู้ให้รหัสสอน
 
-`RAG/app/core/rag.py` implements two retrieval strategies, selectable per
-request:
+`RAG/app/core/rag.py` พัฒนากลยุทธ์การค้นคืนไว้สองแบบ ซึ่งเลือกได้ในแต่ละคำขอ:
 
-- **`plain`** — classic top-k cosine similarity search against the vector
-  store.
-- **`graph`** — vector search finds a small number of *seed* chunks
-  (`seed_k`, default 3), then a knowledge graph expands one hop outward
-  along shared codes, document sections, citations, and reading order,
-  scoring neighbors at `seed_score × hop_decay` (default decay 0.55), up to
-  a fixed `graph_budget` (default 6 chunks) — this is meant to surface
-  clinically related passages a pure similarity search might rank just
-  below the cutoff (e.g., two codes that always co-occur in the manual's
-  own cross-references).
+- **`plain`** — การค้นหาความคล้ายคลึงแบบโคไซน์ (cosine similarity) อันดับ k แรก (top-k) แบบดั้งเดิมในฐานข้อมูลเวกเตอร์
+- **`graph`** — การค้นหาด้วยเวกเตอร์จะพบชิ้นข้อความ *ตั้งต้น* (seed) จำนวนไม่มาก (`seed_k` ค่าเริ่มต้น 3) จากนั้นกราฟความรู้จะขยายออกไปหนึ่งขั้น (hop) ตามรหัสที่ใช้ร่วมกัน ส่วนของเอกสาร การอ้างอิง และลำดับการอ่าน โดยให้คะแนนชิ้นข้อความข้างเคียงเท่ากับ `seed_score × hop_decay` (ค่าการลดทอนเริ่มต้น 0.55) จนถึงขีดจำกัด `graph_budget` ที่กำหนดไว้ (ค่าเริ่มต้น 6 ชิ้นข้อความ) วิธีนี้มุ่งให้พบข้อความที่เกี่ยวข้องทางคลินิกซึ่งการค้นหาด้วยความคล้ายคลึงเพียงอย่างเดียวอาจจัดอันดับไว้ต่ำกว่าเกณฑ์ตัดเพียงเล็กน้อย (เช่น รหัสสองรหัสที่ปรากฏคู่กันเสมอในการอ้างอิงไขว้ภายในคู่มือ)
 
-On top of whichever mode is active, two extra retrieval channels are always
-applied, and are specifically what keeps this a *dictionary-grounded*
-lookup tool rather than a free-form chat model:
+ไม่ว่าจะใช้โหมดใด ระบบจะใช้ช่องทางการค้นคืนเพิ่มเติมอีกสองช่องทางเสมอ และช่องทางเหล่านี้คือสิ่งที่ทำให้ระบบเป็นเครื่องมือค้นหาที่ *ยึดโยงกับพจนานุกรม* แทนที่จะเป็นโมเดลแชทแบบอิสระ:
 
-- **Exact code lookup.** If the question names an ICD-shaped token (a regex
-  match for ICD-10's `letter + 2 digits [+ decimals]` or ICD-9's
-  `digits.digits` pattern), the literal chunk(s) containing that code are
-  fetched via a substring match and placed **ahead of** the semantic hits —
-  because, in the code's own words, *"'what is I33' is a lookup, not a
-  semantic question — embeddings are weak at short code strings"*
-  (`RAG/app/core/rag.py`, `_code_hits`).
-- **Coder-taught rules ("Suggest & Learn").** A coder can teach a rule in
-  plain language ("Diabetic patient with acute kidney injury: code E11.22
-  as principal, add N17.9, do not code N18.9") through a two-step
-  extract-then-confirm flow (`/learn/extract` produces a draft **that stores
-  nothing**; the coder must separately confirm it via `/learn/notes` before
-  it is embedded and indexed). Once stored, a matching rule is pinned
-  **above** both the semantic hits and the exact code lookups for any future
-  question or suggestion matching its scenario, cited as `"Coder note —
-  {author}"`, and any code the rule marked `exclude` is actively removed
-  from the AI's suggestions even if a reference PDF would otherwise have
-  offered it (`RAG/README.md`, "Suggest & Learn"; `medcode-api/docs/
-  api-contract.md`, `/api/agent/learn/**`). Crucially, **nothing is
-  fine-tuned** — this is a retrieval-time layer, so every rule stays listed,
-  attributed to its author, editable only by its author (or an admin), and
-  deletable — the audit trail a hospital needs for anything influencing a
-  code suggestion.
+- **การค้นหารหัสแบบตรงตัว** หากคำถามระบุโทเค็นที่มีรูปแบบเป็นรหัส ICD (ตรงกับ regex ของรูปแบบ ICD-10 `letter + 2 digits [+ decimals]` หรือรูปแบบ ICD-9 `digits.digits`) ชิ้นข้อความที่มีรหัสนั้นอยู่ตามตัวอักษรจะถูกดึงมาด้วยการจับคู่สตริงย่อย (substring match) และวาง **ไว้ก่อน** ผลลัพธ์เชิงความหมาย เพราะตามคำอธิบายในโค้ดเอง *"'what is I33' is a lookup, not a semantic question — embeddings are weak at short code strings"* (`RAG/app/core/rag.py`, `_code_hits`)
+- **กฎที่ผู้ให้รหัสสอน ("Suggest & Learn")** ผู้ให้รหัสสามารถสอนกฎด้วยภาษาธรรมดา ("ผู้ป่วยเบาหวานที่มีภาวะไตบาดเจ็บเฉียบพลัน: ให้รหัส E11.22 เป็นการวินิจฉัยหลัก เพิ่ม N17.9 และไม่ให้รหัส N18.9") ผ่านขั้นตอนสองขั้นแบบสกัดแล้วยืนยัน (`/learn/extract` สร้างร่าง **โดยไม่จัดเก็บสิ่งใดเลย** ผู้ให้รหัสต้องยืนยันแยกต่างหากผ่าน `/learn/notes` ก่อนที่กฎจะถูกแปลงเป็นเวกเตอร์ฝังตัวและทำดัชนี) เมื่อจัดเก็บแล้ว กฎที่ตรงกันจะถูกตรึงไว้ **เหนือ** ทั้งผลลัพธ์เชิงความหมายและผลการค้นหารหัสแบบตรงตัว สำหรับคำถามหรือคำแนะนำใด ๆ ในอนาคตที่ตรงกับสถานการณ์ของกฎนั้น โดยอ้างอิงเป็น `"Coder note —
+  {author}"` และรหัสใดที่กฎระบุเป็น `exclude` จะถูกนำออกจากรหัสที่ AI แนะนำ แม้ว่าเอกสาร PDF อ้างอิงจะเสนอรหัสนั้นก็ตาม (`RAG/README.md`, "Suggest & Learn"; `medcode-api/docs/
+  api-contract.md`, `/api/agent/learn/**`) ประเด็นสำคัญคือ **ไม่มีการปรับแต่งโมเดล (fine-tune) ใด ๆ** กลไกนี้เป็นชั้นที่ทำงาน ณ เวลาค้นคืน กฎทุกข้อจึงยังแสดงอยู่ในรายการ ระบุผู้เขียน แก้ไขได้เฉพาะผู้เขียน (หรือผู้ดูแลระบบ) และลบได้ ซึ่งเป็นร่องรอยการตรวจสอบ (audit trail) ที่โรงพยาบาลต้องการสำหรับสิ่งใดก็ตามที่มีอิทธิพลต่อการแนะนำรหัส
 
-Results across all channels are capped at 8 chunks total (`_MAX_CONTEXT_CHUNKS`)
-to keep the prompt small enough for CPU-budget latency, and are re-ordered so
-pinned (exact-match / coder-taught) chunks appear first in the context the
-model actually reads.
+ผลลัพธ์จากทุกช่องทางถูกจำกัดรวมไม่เกิน 8 ชิ้นข้อความ (`_MAX_CONTEXT_CHUNKS`) เพื่อให้พรอมต์มีขนาดเล็กพอสำหรับเวลาตอบสนองภายใต้งบประมาณการประมวลผลบน CPU และถูกจัดลำดับใหม่ให้ชิ้นข้อความที่ถูกตรึง (จากการค้นหาแบบตรงตัว / กฎที่ผู้ให้รหัสสอน) ปรากฏเป็นอันดับแรกในบริบทที่โมเดลอ่านจริง
 
-### 4.2.4 Generation — the prompt and the model
+### 4.2.4 การสร้างข้อความ — พรอมต์และโมเดล
 
-The system prompt sent with every request (`RAG/app/core/rag.py`,
-`SYSTEM_PROMPT`), quoted in full because its exact wording is the grounding
-mechanism:
+พรอมต์ระบบ (system prompt) ที่ส่งไปพร้อมทุกคำขอ (`RAG/app/core/rag.py`, `SYSTEM_PROMPT`) ยกมาทั้งหมดดังนี้ เพราะถ้อยคำที่ตรงตามต้นฉบับนี้เองคือกลไกการยึดโยงกับแหล่งที่มา (grounding):
 
 > *"You are MedCode, a careful assistant for medical-coding questions.
 > Answer ONLY using the provided context. If the context does not contain
@@ -178,103 +70,31 @@ mechanism:
 > Always answer in the same language the question was asked in — English
 > questions get English answers, Thai questions get Thai answers..."*
 
-The retrieved chunks are assembled into a numbered context block (each
-tagged with its source document name and page number) and appended to the
-user's question, with an explicit same-language instruction repeated
-adjacent to the question itself — the code comment explains why: *"Small
-models follow the context's language over a distant system line — an
-explicit instruction adjacent to the question is what actually works"*
-(`RAG/app/core/rag.py`, `_prepare`). This is a concrete, documented
-adaptation made **because** the default local model is small — see below.
+ชิ้นข้อความที่ค้นคืนได้จะถูกประกอบเป็นบล็อกบริบทที่มีหมายเลขกำกับ (แต่ละชิ้นระบุชื่อเอกสารต้นทางและเลขหน้า) และต่อท้ายคำถามของผู้ใช้ พร้อมคำสั่งให้ตอบเป็นภาษาเดียวกันอย่างชัดแจ้งซ้ำอีกครั้งไว้ติดกับตัวคำถาม ความเห็นในโค้ด (code comment) อธิบายเหตุผลไว้ว่า *"Small models follow the context's language over a distant system line — an explicit instruction adjacent to the question is what actually works"* (`RAG/app/core/rag.py`, `_prepare`) นี่คือการปรับแต่งที่เป็นรูปธรรมและมีการบันทึกไว้ ซึ่งทำขึ้น **เพราะ** โมเดลภายในเครื่องที่ใช้เป็นค่าเริ่มต้นมีขนาดเล็ก ดูรายละเอียดด้านล่าง
 
-Generation itself is pluggable between two backends
-(`RAG/app/config.py`, `RAG/README.md`):
+ส่วนการสร้างข้อความสามารถสลับใช้ได้ระหว่างแบ็กเอนด์สองแบบ (`RAG/app/config.py`, `RAG/README.md`):
 
-- **`ollama`: what the deployed stack uses** (`LLM_BACKEND=ollama` in the
-  compose file). An 8B Llama-3.1-based model,
-  `hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M`, served by a
-  host-native Ollama process, because Docker on macOS has no GPU passthrough
-  and an in-container 8B model would be far slower (`medcode-stack/README.md`,
-  "AI (the RAG service)").
-- **`transformers`: the fallback, and the code-level default** when no
-  backend is configured. `Qwen/Qwen2.5-0.5B-Instruct` running in-process on
-  CPU. Tiny (≈1 GB) and needs no extra infrastructure, but is documented as
-  giving "much weaker output" (`medcode-stack/README.md`).
+- **`ollama`: แบ็กเอนด์ที่ชุดระบบซึ่งติดตั้งใช้งานใช้อยู่** (`LLM_BACKEND=ollama` ในไฟล์ compose) โมเดลขนาด 8B ที่สร้างบนพื้นฐาน Llama-3.1 คือ `hf.co/mradermacher/Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M` ให้บริการโดยโพรเซส Ollama ที่ทำงานบนเครื่องโฮสต์โดยตรง เพราะ Docker บน macOS ไม่รองรับการส่งผ่าน GPU (GPU passthrough) และโมเดล 8B ที่รันภายในคอนเทนเนอร์จะช้ากว่ามาก (`medcode-stack/README.md`, "AI (the RAG service)")
+- **`transformers`: ตัวสำรอง และเป็นค่าเริ่มต้นในระดับโค้ด** เมื่อไม่ได้กำหนดแบ็กเอนด์ใด `Qwen/Qwen2.5-0.5B-Instruct` ทำงานภายในโพรเซสบน CPU มีขนาดเล็กมาก (≈1 GB) และไม่ต้องใช้โครงสร้างพื้นฐานเพิ่มเติม แต่มีการบันทึกไว้ว่าให้ "ผลลัพธ์ที่ด้อยกว่ามาก" (`medcode-stack/README.md`)
 
-Only the Agent chat and the drafting step of Suggest & Learn use this model.
-Code suggestions do not, which is why they keep working when the model is
-unavailable. The team's own
-  deployment notes also flag a Thai-tuned alternative worth evaluating
-  before a real launch — SCB 10X's **Typhoon 2** family, built on Gemma 3 /
-  Qwen 3 — as a one-setting swap, not a rebuild
-  (`medcode-api/docs/DEPLOYMENT-PREP.md`, closing note).
+มีเพียงแชทของ Agent และขั้นตอนการร่างของ Suggest & Learn เท่านั้นที่ใช้โมเดลนี้ การแนะนำรหัสไม่ได้ใช้ จึงยังทำงานต่อได้เมื่อโมเดลไม่พร้อมใช้งาน บันทึกการนำไปใช้งานจริงของคณะผู้จัดทำยังระบุทางเลือกที่ปรับแต่งสำหรับภาษาไทยซึ่งควรประเมินก่อนเปิดใช้งานจริง ได้แก่ โมเดลตระกูล **Typhoon 2** ของ SCB 10X ซึ่งสร้างบน Gemma 3 / Qwen 3 โดยเป็นการสลับด้วยการตั้งค่าเพียงค่าเดียว ไม่ใช่การสร้างระบบใหม่ (`medcode-api/docs/DEPLOYMENT-PREP.md`, หมายเหตุท้ายเอกสาร)
 
-### 4.2.5 The grounding guard: `unverified_codes`
+### 4.2.5 กลไกป้องกันด้านการยึดโยงกับแหล่งที่มา: `unverified_codes`
 
-After generation, every ICD-shaped token in the model's own answer is
-compared against every ICD-shaped token present in the retrieved context.
-Any code the model mentions that **no retrieved chunk actually contains** is
-collected into an `unverified_codes` list and returned to the caller as a
-warning, never presented as fact (`RAG/app/core/rag.py`, `_verify_codes`;
-surfaced to the coder UI per `medcode-api/docs/api-contract.md`,
-`/api/agent/chat`). This is the concrete implementation of the "AI cannot
-make up a code" safety claim in the team's own pitch material (Chapter 1,
-§1.4) — it is not a claim the model is asked to police itself; it is a
-separate, deterministic check.
+หลังการสร้างข้อความ โทเค็นทุกตัวที่มีรูปแบบเป็นรหัส ICD ในคำตอบของโมเดลจะถูกเปรียบเทียบกับโทเค็นรูปแบบรหัส ICD ทุกตัวที่ปรากฏในบริบทที่ค้นคืนได้ รหัสใดที่โมเดลกล่าวถึงแต่ **ไม่มีชิ้นข้อความที่ค้นคืนได้ชิ้นใดมีอยู่จริง** จะถูกรวบรวมไว้ในรายการรหัสที่ไม่ผ่านการตรวจสอบ `unverified_codes` และส่งกลับไปยังผู้เรียกในฐานะคำเตือน โดยไม่นำเสนอเป็นข้อเท็จจริงเลย (`RAG/app/core/rag.py`, `_verify_codes`; แสดงให้ผู้ให้รหัสเห็นบนหน้าจอตาม `medcode-api/docs/api-contract.md`, `/api/agent/chat`) นี่คือการนำข้ออ้างด้านความปลอดภัยที่ว่า "AI ไม่สามารถแต่งรหัสขึ้นเองได้" ในเอกสารนำเสนอของคณะผู้จัดทำ (บทที่ 1 หัวข้อ 1.4) มาใช้งานอย่างเป็นรูปธรรม ข้ออ้างนี้ไม่ได้อาศัยการสั่งให้โมเดลกำกับดูแลตัวเอง แต่เป็นการตรวจสอบแยกต่างหากแบบกำหนดแน่นอน
 
-## 4.3 Safeguards — how "human always approves" is actually enforced
+## 4.3 มาตรการป้องกัน — การบังคับใช้หลักการ "มนุษย์เป็นผู้อนุมัติเสมอ" ในทางปฏิบัติ
 
-The safety properties this system claims are not aspirational — each one
-maps to a specific, checkable mechanism in the code:
+คุณสมบัติด้านความปลอดภัยที่ระบบนี้กล่าวอ้างไม่ใช่เพียงเป้าหมายที่ตั้งไว้ แต่ละข้อสอดคล้องกับกลไกเฉพาะในโค้ดที่ตรวจสอบได้:
 
-- **AI suggestions write nothing.** `POST /api/cases/{id}/suggest-codes` is
-  explicitly documented as writing to neither `case_codes` nor the coder
-  history (`medcode-api/docs/api-contract.md`) — the *only* path that
-  persists a code is the coder's own `PUT /codes` save, and the *only* path
-  that reaches the hospital is `POST /approve`, a separate, explicit,
-  authenticated action.
-- **Nothing is pre-selected by AI.** Since the 2026-08-07 "selection-first"
-  change, an AI-suggested code is not ticked by default — a coder must
-  actively select it before it can be approved (§3.1.2).
-- **The AI is switchable off without breaking the app.** RAG is optional by
-  construction (Chapter 3, §3.2) — this is a safeguard as much as an
-  architectural choice, because it means a hospital is never in a position
-  where the AI must be trusted to keep the coding workflow running at all.
-- **Grounding, not invention.** The `unverified_codes` check (§4.2.5) and
-  the "answer only from context" system prompt (§4.2.4) are the mechanism
-  that prevents the model from hallucinating a plausible-looking but
-  nonexistent code.
-- **Human authorship is preserved in Suggest & Learn.** A taught rule can
-  only be edited, muted, or deleted by the coder who taught it (or an
-  admin) — even an administrator cannot silently rewrite another coder's
-  clinical judgment call (`medcode-api/CLAUDE.md`, "Learned rules belong to
-  the coder who taught them"), which matters because a rule directly steers
-  future AI suggestions.
-- **Every write is journaled and reversible.** The `imed_write_ops` table
-  (§4.1) means an approval is not a one-way door — a coder can reopen a
-  case and the hospital's own data is restored, not just this system's
-  local copy.
-- **Every coder action is attributed.** Approvals and reopens stamp the
-  authenticated account's email as the acting coder (never a client-supplied
-  name), and `coding_history` keeps an oldest-first audit trail per case
-  (`medcode-api/docs/api-contract.md`, "Authentication" / "Actor stamping").
-- **One coder at a time per case.** A 90-second renewable lock prevents two
-  coders from editing/approving/reopening the same case simultaneously —
-  though it deliberately does *not* block the shared "star" flag, since
-  flagging a case for attention is not an edit
-  (`medcode-api/docs/api-contract.md`, `POST /api/cases/{id}/lock`).
-- **Deterministic, disposable demo data.** The demo dataset is generated by
-  a seeded-RNG script and is fully reversible via a snapshot/reset pair
-  (`POST /api/demo/snapshot` / `POST /api/demo/reset`) — both gated off by
-  default outside local development (`DEMO_TOOLS_ENABLED`), because they
-  are destructive bulk writes (`medcode-api/docs/api-contract.md`). See
-  Chapter 5 for the full data-provenance discussion.
+- **รหัสที่ AI แนะนำไม่เขียนสิ่งใดลงระบบ** `POST /api/cases/{id}/suggest-codes` มีการระบุไว้ชัดเจนว่าไม่เขียนลงทั้ง `case_codes` และประวัติของผู้ให้รหัส (`medcode-api/docs/api-contract.md`) เส้นทาง *เดียว* ที่บันทึกรหัสอย่างถาวรคือการบันทึกผ่าน `PUT /codes` ของผู้ให้รหัสเอง และเส้นทาง *เดียว* ที่ส่งข้อมูลถึงโรงพยาบาลคือ `POST /approve` ซึ่งเป็นการกระทำที่แยกต่างหาก ชัดแจ้ง และผ่านการยืนยันตัวตน
+- **AI ไม่เลือกรหัสใดไว้ล่วงหน้า** นับตั้งแต่การเปลี่ยนแปลงแบบ "เลือกก่อน" (selection-first) เมื่อวันที่ 2026-08-07 รหัสที่ AI แนะนำจะไม่ถูกติ๊กเลือกโดยค่าเริ่มต้น ผู้ให้รหัสต้องเลือกรหัสนั้นเองก่อนจึงจะอนุมัติได้ (หัวข้อ 3.1.2)
+- **ปิด AI ได้โดยไม่ทำให้แอปพลิเคชันเสียหาย** RAG เป็นส่วนเสริมโดยการออกแบบ (บทที่ 3 หัวข้อ 3.2) ข้อนี้เป็นทั้งมาตรการป้องกันและทางเลือกด้านสถาปัตยกรรม เพราะหมายความว่าโรงพยาบาลจะไม่ตกอยู่ในสถานการณ์ที่ต้องไว้วางใจ AI เพื่อให้กระบวนการให้รหัสยังคงดำเนินต่อไปได้เลย
+- **ยึดโยงกับแหล่งที่มา ไม่ใช่การแต่งขึ้น** การตรวจสอบ `unverified_codes` (หัวข้อ 4.2.5) และพรอมต์ระบบที่กำหนดให้ "ตอบจากบริบทเท่านั้น" (หัวข้อ 4.2.4) คือกลไกที่ป้องกันไม่ให้โมเดลสร้างรหัสที่ดูน่าเชื่อถือแต่ไม่มีอยู่จริงขึ้นมาเอง (hallucination)
+- **รักษาความเป็นผู้เขียนของมนุษย์ใน Suggest & Learn** กฎที่ถูกสอนสามารถแก้ไข ปิดการใช้งานชั่วคราว (mute) หรือลบได้โดยผู้ให้รหัสที่สอนกฎนั้นเท่านั้น ผู้ให้รหัสคนอื่นทำได้เพียงอ่าน ผู้ดูแลระบบแก้ไขหรือลบได้เพื่อให้นำกฎที่ผิดออกได้แม้ผู้สอนจะลาออกไปแล้ว แต่การแก้ไขไม่โอนความเป็นผู้เขียน กฎยังระบุชื่อผู้ให้รหัสที่สอนไว้เดิม (`medcode-api/CLAUDE.md`, "Learned rules belong to the coder who taught them") ซึ่งมีความสำคัญเพราะกฎมีผลกำหนดทิศทางของรหัสที่ AI แนะนำในอนาคตโดยตรง
+- **การเขียนทุกครั้งถูกบันทึกประวัติและย้อนกลับได้** ตาราง `imed_write_ops` (หัวข้อ 4.1) ทำให้การอนุมัติไม่ใช่ทางเดินทางเดียว ผู้ให้รหัสสามารถเปิดเคสนั้นใหม่ได้ และข้อมูลของโรงพยาบาลเองจะถูกคืนสภาพ ไม่ใช่เพียงสำเนาภายในของระบบนี้
+- **การกระทำทุกครั้งของผู้ให้รหัสระบุตัวผู้กระทำได้** การอนุมัติและการเปิดใหม่จะประทับอีเมลของบัญชีที่ผ่านการยืนยันตัวตนเป็นผู้ให้รหัสที่ดำเนินการ (ไม่ใช้ชื่อที่ฝั่งไคลเอนต์ส่งมาเลย) และ `coding_history` เก็บร่องรอยการตรวจสอบของแต่ละเคสเรียงจากเก่าไปใหม่ (`medcode-api/docs/api-contract.md`, "Authentication" / "Actor stamping")
+- **ผู้ให้รหัสหนึ่งคนต่อหนึ่งเคสในแต่ละช่วงเวลา** การล็อกเคสแบบต่ออายุได้ 90 วินาทีป้องกันไม่ให้ผู้ให้รหัสสองคนแก้ไข อนุมัติ หรือเปิดใหม่เคสเดียวกันพร้อมกัน แต่โดยเจตนาจะ *ไม่* ปิดกั้นการติดดาวที่ใช้ร่วมกัน เพราะการทำเครื่องหมายเคสเพื่อให้ได้รับความสนใจไม่ใช่การแก้ไข (`medcode-api/docs/api-contract.md`, `POST /api/cases/{id}/lock`)
+- **ข้อมูลสาธิตที่กำหนดแน่นอนและทิ้งได้** ชุดข้อมูลสาธิตสร้างขึ้นด้วยสคริปต์ที่ใช้ตัวสร้างเลขสุ่มแบบกำหนดค่าเริ่มต้น (seeded RNG) และย้อนกลับได้ทั้งหมดผ่านคู่คำสั่ง snapshot/reset (`POST /api/demo/snapshot` / `POST /api/demo/reset`) ซึ่งทั้งสองถูกปิดไว้โดยค่าเริ่มต้นนอกสภาพแวดล้อมการพัฒนาภายในเครื่อง (`DEMO_TOOLS_ENABLED`) เพราะเป็นการเขียนข้อมูลจำนวนมากที่ทำลายข้อมูลเดิม (`medcode-api/docs/api-contract.md`) ดูบทที่ 5 สำหรับการอภิปรายเรื่องที่มาของข้อมูลโดยละเอียด
 
-The evidence behind these safeguards is the automated test suites (Chapter
-6, §6.1: 191 of 192 tests passing across the three services, with raw output
-in `eval-results/`). Some edge cases are covered there, for example that an
-unticked code stays in the working list but is never written back
-(`CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved`). No
-dedicated security or adversarial
-robustness review was carried out; it belongs on the deployment list in
-Chapter 8.
+หลักฐานที่สนับสนุนมาตรการป้องกันเหล่านี้คือชุดทดสอบอัตโนมัติ (บทที่ 6 หัวข้อ 6.1: ผ่าน 191 จาก 192 การทดสอบ ครอบคลุมทั้งสามบริการ โดยมีผลลัพธ์ดิบอยู่ใน `eval-results/`) กรณีขอบ (edge case) บางกรณีได้รับการทดสอบไว้ในชุดทดสอบดังกล่าว เช่น รหัสที่ไม่ได้ติ๊กเลือกยังคงอยู่ในรายการรหัสที่กำลังดำเนินการ แต่จะไม่ถูกบันทึกกลับ (`CasesApiIntegrationTest.unselectedCodeEditsAreKeptButNotApproved`) ยังไม่มีการทบทวนด้านความมั่นคงปลอดภัยหรือความทนทานต่อการโจมตี (adversarial robustness) โดยเฉพาะ ซึ่งงานนี้จัดอยู่ในรายการสำหรับการนำไปใช้งานจริงในบทที่ 8

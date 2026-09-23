@@ -1,60 +1,30 @@
-# Chapter 7 — Results
+# บทที่ 7 ผลลัพธ์
 
-Verdicts below are judged against what Chapter 1 actually scoped this
-deliverable to (OPD-only, synthetic demo data, TRL 4 — "tested as a whole,
-on realistic data, with measured numbers" — not a production pilot). Every
-figure traces to Chapter 6 / `eval-results/`.
+ข้อสรุปด้านล่างประเมินเทียบกับขอบเขตที่บทที่ 1 กำหนดไว้จริงสำหรับผลงานนี้ ได้แก่ เฉพาะผู้ป่วยนอก (OPD) ข้อมูลสาธิตที่เป็นข้อมูลสมมุติ และ TRL 4 — "ทดสอบทั้งระบบ บนข้อมูลที่สมจริง พร้อมตัวเลขที่วัดได้" — ไม่ใช่การทดลองใช้นำร่องในสภาพแวดล้อมใช้งานจริง ตัวเลขทุกตัวสืบย้อนไปยังบทที่ 6 / `eval-results/` ได้
 
-## 7.1 Does the system work end to end?
+## 7.1 ระบบทำงานได้ครบทั้งกระบวนการหรือไม่
 
-**Yes, for the OPD demo flow.** Sync → AI-suggested codes → coder
-review/edit → approve → write-back to the mock hospital, and reset, all
-function (Ch.6.1: 191/192 automated tests pass; the one failure is a test
-plumbing issue, not a broken feature — see 6.1). The system holds up under
-concurrent load with zero failures at 50 simultaneous clients (Ch.6.2).
+**ได้ สำหรับขั้นตอนสาธิตของผู้ป่วยนอก** ซิงค์ → รหัสที่ AI แนะนำ → เจ้าหน้าที่ให้รหัสโรคตรวจทาน/แก้ไข → อนุมัติ → บันทึกกลับ (write-back) ลงระบบจำลองของโรงพยาบาล และการรีเซ็ต ทั้งหมดทำงานได้ (หัวข้อ 6.1: การทดสอบอัตโนมัติผ่าน 191/192 รายการ รายการที่ล้มเหลวเป็นปัญหาที่โครงสร้างของการทดสอบเอง ไม่ใช่ฟีเจอร์ที่เสีย — ดูหัวข้อ 6.1) ระบบรองรับภาระงานพร้อมกันได้โดยไม่มีความล้มเหลวเลยที่ผู้ใช้พร้อมกัน 50 ราย (หัวข้อ 6.2)
 
-## 7.2 Is the AI actually useful for coding, as tested?
+## 7.2 AI มีประโยชน์ต่อการให้รหัสจริงหรือไม่ จากผลการทดสอบ
 
-**Not yet, on the evidence gathered.** ICD-10 top-1 accuracy on 42
-ground-truth scenarios was 0% (Ch.6.3). This is a genuine, specific finding:
-retrieval is strong when a query already names a code (score 1.0 on exact
-lookups) but does not currently bridge a natural symptom narrative — the
-actual shape of input a coder has — to the correct diagnosis code. The
-practical implication: **as indexed and chunked today, the RAG suggestion
-quality is not yet reliable enough to trust on symptom-only input**, which
-is precisely the case coders face. This is worth stating plainly rather than
-softening it, because it's the most useful single thing this evaluation
-found — a specific, fixable target (chunking/retrieval on narrative text)
-rather than a vague "needs more work."
+**ยังไม่มีประโยชน์ จากหลักฐานที่รวบรวมได้** ความแม่นยำอันดับแรก (top-1) ของ ICD-10 บนสถานการณ์ที่มีคำตอบอ้างอิง (ground truth) 42 สถานการณ์อยู่ที่ 0% (หัวข้อ 6.3) นี่เป็นข้อค้นพบที่แท้จริงและเฉพาะเจาะจง การค้นคืน (retrieval) ทำได้ดีเมื่อคำค้นระบุรหัสไว้แล้ว (คะแนน 1.0 ในการค้นหาแบบตรงตัว) แต่ในปัจจุบันยังไม่สามารถเชื่อมโยงข้อความบรรยายอาการตามธรรมชาติ ซึ่งเป็นรูปแบบข้อมูลนำเข้าที่ผู้ให้รหัสมีอยู่จริง ไปยังรหัสการวินิจฉัยที่ถูกต้องได้ ผลในทางปฏิบัติคือ **ด้วยการทำดัชนีและการแบ่งชิ้นข้อความ (chunking) ในปัจจุบัน คุณภาพของคำแนะนำจาก RAG ยังไม่น่าเชื่อถือพอที่จะไว้วางใจได้เมื่อข้อมูลนำเข้ามีเพียงอาการ** ซึ่งเป็นสถานการณ์ที่ผู้ให้รหัสเผชิญอยู่จริง ข้อนี้ควรกล่าวอย่างตรงไปตรงมาแทนที่จะทำให้ดูเบาลง เพราะเป็นสิ่งที่มีประโยชน์ที่สุดเพียงข้อเดียวที่การประเมินนี้ค้นพบ คือเป้าหมายที่เฉพาะเจาะจงและแก้ไขได้ (การแบ่งชิ้นข้อความ/การค้นคืนบนข้อความบรรยาย) แทนที่จะเป็นข้อสรุปคลุมเครือว่า "ต้องพัฒนาเพิ่มเติม"
 
-## 7.3 Does it hold up under load?
+## 7.3 ระบบรองรับภาระงานได้หรือไม่
 
-**Yes, within what was tested.** Zero failed requests at up to 50 concurrent
-clients / 2,000 requests against `medcode-api`'s authenticated dashboard
-endpoint (Ch.6.2). Not tested: RAG suggestion latency under load, and
-concurrent write contention (two coders editing/approving at once) — both
-real gaps given the multi-coder design intent (Ch.3).
+**ได้ ภายในขอบเขตที่ทดสอบ** ไม่มีคำขอที่ล้มเหลวเลยที่ผู้ใช้พร้อมกันสูงสุด 50 ราย / 2,000 คำขอ ต่อ endpoint แดชบอร์ดที่ต้องยืนยันตัวตนของ `medcode-api` (หัวข้อ 6.2) สิ่งที่ยังไม่ได้ทดสอบ ได้แก่ เวลาตอบสนองของคำแนะนำจาก RAG ภายใต้ภาระงาน และการแย่งกันเขียนพร้อมกัน (ผู้ให้รหัส 2 คนแก้ไข/อนุมัติในเวลาเดียวกัน) ซึ่งทั้งสองเป็นช่องว่างจริงเมื่อพิจารณาเจตนาของการออกแบบที่รองรับผู้ให้รหัสหลายคน (บทที่ 3)
 
-## 7.4 Results against the objectives (Ch.1 §1.6)
+## 7.4 ผลลัพธ์เทียบกับวัตถุประสงค์ (บทที่ 1 หัวข้อ 1.6)
 
-| # | Objective | Result | Evidence |
+| # | วัตถุประสงค์ | ผลลัพธ์ | หลักฐาน |
 |---|---|---|---|
-| 1 | One worklist showing which visits lack codes | **Met** | Sync loads 140 OPD visits into four mutually exclusive queues (80 complete, 60 incomplete); covered by the automated suites (Ch.6.1) |
-| 2 | Code suggestions grounded in the manuals, source shown | **Partly met** | Every suggestion comes from retrieved manual text with its source named, and nothing is invented. But ICD-10 top-1 accuracy is 0/42 and top-8 is 3/42 on symptom narratives (Ch.6.3, §7.2) |
-| 3 | The coder stays the decision maker | **Met** | Suggest writes nothing, nothing is pre-ticked, approve is explicit and attributed to the signed-in account, reopen reverses it (Ch.4 §4.3; tests in Ch.6.1) |
-| 4 | Approved codes written back into the hospital's records | **Met against the mock** | A diff-based write through the hospital's own API contract, with every row journaled; tested against the contract-faithful mock, **not yet** against the real iMed (Ch.8) |
-| 5 | Patient data stays inside the hospital | **Met by design** | No cloud AI calls in the code (Ch.5 §5.3); retrieval and generation run locally. Not verified at the network level |
-| 6 | TRL 4: tested as a whole, measured results | **Met** | 191/192 automated tests, load tests with 0 failures up to 50 concurrent clients, a measured AI accuracy baseline (Ch.6) |
+| 1 | รายการงานเดียวที่แสดงว่าการมารับบริการใดยังขาดรหัส | **บรรลุ** | การซิงค์โหลดการมารับบริการของผู้ป่วยนอก 140 รายการเข้าสู่คิว 4 คิวที่ไม่ซ้อนทับกัน (สมบูรณ์ 80 รายการ ไม่สมบูรณ์ 60 รายการ) และครอบคลุมโดยชุดทดสอบอัตโนมัติ (หัวข้อ 6.1) |
+| 2 | คำแนะนำรหัสที่ยึดโยงกับคู่มือ พร้อมแสดงแหล่งที่มา | **บรรลุบางส่วน** | ทุกคำแนะนำมาจากข้อความในคู่มือที่ค้นคืนได้พร้อมระบุแหล่งที่มา และไม่มีสิ่งใดถูกแต่งขึ้น แต่ความแม่นยำอันดับแรกของ ICD-10 อยู่ที่ 0/42 และภายใน 8 อันดับแรก (top-8) อยู่ที่ 3/42 บนข้อความบรรยายอาการ (หัวข้อ 6.3 และหัวข้อ 7.2) |
+| 3 | ผู้ให้รหัสยังคงเป็นผู้ตัดสินใจ | **บรรลุ** | การแนะนำไม่บันทึกข้อมูลใด ไม่มีรหัสใดถูกติ๊กไว้ล่วงหน้า การอนุมัติต้องทำอย่างชัดแจ้งและระบุเป็นของบัญชีที่เข้าสู่ระบบอยู่ และการเปิดใหม่ย้อนการอนุมัติได้ (บทที่ 4 หัวข้อ 4.3; การทดสอบในหัวข้อ 6.1) |
+| 4 | รหัสที่อนุมัติถูกบันทึกกลับลงเวชระเบียนของโรงพยาบาล | **บรรลุเมื่อเทียบกับระบบจำลอง** | การเขียนแบบอิงผลต่าง (diff) ผ่านสัญญาการเชื่อมต่อ API ของโรงพยาบาลเอง โดยทุกแถวถูกบันทึกในบันทึกประวัติ ทดสอบกับระบบจำลองที่ตรงตามสัญญาการเชื่อมต่อแล้ว แต่ **ยังไม่ได้** ทดสอบกับ iMed จริง (บทที่ 8) |
+| 5 | ข้อมูลผู้ป่วยอยู่ภายในโรงพยาบาล | **บรรลุโดยการออกแบบ** | ไม่มีการเรียกใช้บริการ AI บนคลาวด์ในโค้ด (บทที่ 5 หัวข้อ 5.3) การค้นคืนและการสร้างข้อความทำงานภายในเครื่อง ยังไม่ได้ตรวจยืนยันในระดับเครือข่าย |
+| 6 | TRL 4: ทดสอบทั้งระบบ พร้อมผลที่วัดได้ | **บรรลุ** | การทดสอบอัตโนมัติ 191/192 รายการ การทดสอบภาระงานที่ล้มเหลว 0 ครั้งที่ผู้ใช้พร้อมกันสูงสุด 50 ราย และค่าฐาน (baseline) ความแม่นยำของ AI ที่วัดได้ (บทที่ 6) |
 
-Outside the six objectives, two things were **not** evaluated in this
-submission: whether the system is faster than manual coding, and how staff
-rate it (Ch.6 §6.4). The system has also not been validated against real
-hospital data or real coders; every test used synthetic data and team
-members (Ch.1 §1.5, Ch.5).
+นอกเหนือจากวัตถุประสงค์ทั้ง 6 ข้อ มี 2 เรื่องที่ **ไม่ได้** ประเมินในการส่งผลงานครั้งนี้ ได้แก่ ระบบเร็วกว่าการให้รหัสด้วยมือหรือไม่ และบุคลากรให้คะแนนระบบอย่างไร (บทที่ 6 หัวข้อ 6.4) นอกจากนี้ ระบบยังไม่ได้รับการตรวจสอบความถูกต้องกับข้อมูลจริงของโรงพยาบาลหรือกับผู้ให้รหัสจริง การทดสอบทุกครั้งใช้ข้อมูลสมมุติและสมาชิกของคณะผู้จัดทำ (บทที่ 1 หัวข้อ 1.5 และบทที่ 5)
 
-This is a TRL 4 result in the honest sense the assignment asks for: the
-system was tested as a whole, on realistic (if synthetic) data, with
-measured numbers — some of which are good news (correctness, load headroom)
-and one of which is a real, specific problem (narrative-to-code retrieval
-accuracy) that a team continuing this project should treat as the next
-thing to fix, not paper over.
+นี่คือผลลัพธ์ระดับ TRL 4 ในความหมายที่ตรงไปตรงมาตามที่โจทย์กำหนด กล่าวคือ ระบบได้รับการทดสอบทั้งระบบ บนข้อมูลที่สมจริง (แม้จะเป็นข้อมูลสมมุติ) พร้อมตัวเลขที่วัดได้ ซึ่งบางส่วนเป็นข่าวดี (ความถูกต้องของการทำงาน และขีดความสามารถเผื่อในการรองรับภาระงาน) และมีหนึ่งส่วนที่เป็นปัญหาจริงและเฉพาะเจาะจง (ความแม่นยำของการค้นคืนจากข้อความบรรยายไปสู่รหัส) ซึ่งทีมที่จะพัฒนาโครงการนี้ต่อควรถือเป็นสิ่งถัดไปที่ต้องแก้ไข ไม่ใช่ปกปิดไว้

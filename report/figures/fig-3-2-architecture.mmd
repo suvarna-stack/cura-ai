@@ -1,19 +1,19 @@
 flowchart LR
-  browser["Coder / admin<br/>browser"]
+  browser["เบราว์เซอร์ของ<br/>ผู้ให้รหัส / ผู้ดูแลระบบ"]
   subgraph stack["medcode-stack (docker compose)"]
     web["web<br/>nginx + React SPA<br/>:8080"]
-    api["medcode-api<br/>Spring Boot 4.1 · Java 21<br/>:8001 · one instance"]
+    api["medcode-api<br/>Spring Boot 4.1 · Java 21<br/>:8001 · อินสแตนซ์เดียว"]
     rag["rag<br/>FastAPI · bge-m3 · Chroma<br/>:8000"]
     db[("db · Postgres 18<br/>medcode + imed")]
-    imed["imed-mock-api<br/>stand-in hospital (iMed)<br/>:8003"]
+    imed["imed-mock-api<br/>ระบบจำลองโรงพยาบาล (iMed)<br/>:8003"]
   end
-  ollama["Ollama on the host<br/>Llama-3.1-EIRAI-8B"]
-  real["Real hospital iMed API<br/>same contract"]
-  browser -->|"HTTP, same origin"| web
-  web -->|"/api proxy"| api
-  api -->|"plain SQL"| db
+  ollama["Ollama บนเครื่องโฮสต์<br/>Llama-3.1-EIRAI-8B"]
+  real["iMed API ของโรงพยาบาลจริง<br/>สัญญาการเชื่อมต่อเดียวกัน"]
+  browser -->|"HTTP, origin เดียวกัน"| web
+  web -->|"พร็อกซี /api"| api
+  api -->|"SQL โดยตรง"| db
   imed --> db
-  api -->|"R1–R6 read · W1–W4 write"| imed
-  api -.->|"change IMED_API_BASE"| real
+  api -->|"R1–R6 อ่าน · W1–W4 เขียน"| imed
+  api -.->|"เปลี่ยน IMED_API_BASE"| real
   api -->|"suggest · chat · learn"| rag
-  rag -.->|"chat only"| ollama
+  rag -.->|"เฉพาะ chat"| ollama

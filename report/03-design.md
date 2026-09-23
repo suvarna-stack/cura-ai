@@ -1,224 +1,99 @@
-# Chapter 3 — Design
+# บทที่ 3 การออกแบบ
 
-Architecture and data-model facts in this chapter come from the repositories'
-own documentation and Flyway migrations, cited inline so each can be checked
-against the code.
+ข้อเท็จจริงด้านสถาปัตยกรรมและแบบจำลองข้อมูลในบทนี้มาจากเอกสารประกอบของรีโพซิทอรีและ Flyway migration ของระบบเอง โดยอ้างอิงแหล่งที่มาไว้ในเนื้อความ เพื่อให้ตรวจสอบแต่ละข้อกับโค้ดได้
 
-## 3.1 Workflow: before and after
+## 3.1 ขั้นตอนการทำงาน: ก่อนและหลัง
 
-### 3.1.1 Before (manual, as described in Chapter 1)
+### 3.1.1 ก่อนมีระบบ (ทำด้วยมือ ตามที่อธิบายไว้ในบทที่ 1)
 
-1. A visit happens at the hospital; the doctor's notes, labs, orders and
-   vitals accumulate in the hospital's own iMed system.
-2. A coder — with no dashboard of what needs coding — works through charts,
-   reading free-text Thai/English notes against the five-volume ICD-10-TM
-   rulebook from memory or a paper/PDF reference.
-3. The coder manually looks up candidate codes, cross-checks the coding
-   guidelines (§1.2), and enters the final codes directly into the hospital
-   system.
-4. There is no shared, structured signal for "which visits are missing
-   codes" across coders, and no shared record of who suggested/considered
-   which code before it was chosen.
+1. เกิดการมารับบริการ (visit) ที่โรงพยาบาล บันทึกของแพทย์ ผลแล็บ คำสั่งแพทย์ และสัญญาณชีพ สะสมอยู่ในระบบ iMed ของโรงพยาบาลเอง
+2. เจ้าหน้าที่ให้รหัสโรค (coder) ซึ่งไม่มีแดชบอร์ดบอกว่ามีงานใดต้องให้รหัส ต้องไล่อ่านเวชระเบียน (chart) ทีละฉบับ โดยอ่านบันทึกข้อความอิสระภาษาไทย/อังกฤษ แล้วเทียบกับคู่มือกฎ ICD-10-TM ทั้ง 5 เล่มจากความจำ หรือจากเอกสารอ้างอิงฉบับกระดาษ/PDF
+3. ผู้ให้รหัสค้นหารหัสที่เป็นตัวเลือกด้วยตนเอง ตรวจทานกับแนวทางการให้รหัส (หัวข้อ 1.2) แล้วบันทึกรหัสสุดท้ายลงในระบบของโรงพยาบาลโดยตรง
+4. ไม่มีสัญญาณที่มีโครงสร้างและใช้ร่วมกันระหว่างผู้ให้รหัสว่า "การมารับบริการใดยังขาดรหัส" และไม่มีบันทึกร่วมว่าใครเป็นผู้แนะนำหรือพิจารณารหัสใดก่อนที่รหัสนั้นจะถูกเลือก
 
-### 3.1.2 After (this system)
+### 3.1.2 หลังมีระบบ (ระบบนี้)
 
-The same 2-minute pitch the team wrote for judges/hospital stakeholders
-compresses this well: *"It takes a patient visit out of the hospital system,
-suggests the diagnosis and procedure codes, a human coder checks them and
-approves, and the approved codes go straight back into the hospital's own
-records"* (`medcode-api/docs/PITCH-2MIN.md`). Step by step, as actually
-implemented:
+บทนำเสนอความยาว 2 นาทีที่คณะผู้จัดทำเขียนไว้สำหรับคณะกรรมการตัดสินและผู้มีส่วนได้ส่วนเสียของโรงพยาบาลสรุปภาพนี้ไว้ได้ดีว่า *"ระบบนำการมารับบริการของผู้ป่วยออกมาจากระบบของโรงพยาบาล แนะนำรหัสการวินิจฉัยและรหัสหัตถการ ผู้ให้รหัสซึ่งเป็นมนุษย์ตรวจสอบและอนุมัติ แล้วรหัสที่อนุมัติจะถูกส่งกลับเข้าสู่เวชระเบียนของโรงพยาบาลโดยตรง"* (`medcode-api/docs/PITCH-2MIN.md`) ขั้นตอนโดยละเอียดตามที่นำไปปฏิบัติจริงมีดังนี้
 
-1. **Sync** (`POST /api/sync`) pulls visits from the hospital's iMed system
-   into the coding dashboard — either everything, or a date-bounded window —
-   and simultaneously refreshes the ICD-10/ICD-9 reference catalogs from the
-   hospital's own master list (`medcode-api/docs/api-contract.md`,
-   `POST /api/sync`). Visits land in one of four mutually-exclusive
-   dashboard buckets: **complete** (arrived already carrying both code
-   systems, not yet approved), **incomplete** (missing a diagnosis and/or
-   procedure code, grouped by work type — medicine/surgery/CT-X-ray/other),
-   **reopened** (a human undid a prior approval), and **finished**
-   (approved).
-2. **AI suggestion** (`POST /api/cases/{id}/suggest-codes`) — a coder opens
-   a case and the system builds a clinical narrative from the chart's report
-   sections (capped at 3,500 characters, chief complaint and present illness first)
-   and asks the RAG service for ICD-10/ICD-9 candidates with confidence
-   scores and a cited source document. This call **writes nothing** — see
-   Chapter 4, §4.3.
-3. **Human review and selection.** The coder sees candidates grouped by
-   *origin* — added by coder, from the hospital record, suggested by AI, not
-   documented — with confidence percentages shown **only** on AI-suggested
-   rows (a 2026-08-07 design change specifically so a hospital-sourced code,
-   which needs no "confidence," is never confused with a probabilistic
-   guess; `medcode-api/docs/api-contract.md`, code-role/origin fields). Since
-   2026-08-07 the flow is explicitly **selection-first**: nothing is
-   pre-ticked except the coder's own manual entries; the coder ticks the
-   codes that belong on the case (`selected: true`), rather than the older
-   "everything is suggested, delete what's wrong" pattern
-   (`medcode-api/CLAUDE.md`, "Selection-first code review" milestone).
-4. **Save working state** (`PUT /api/cases/{id}/codes`) — persists the
-   coder's in-progress edits to *this system's own database only*; the
-   hospital is not touched yet.
-5. **Approve** (`POST /api/cases/approve`) — the only action that writes
-   back to the hospital. The system diffs the coder's final, ticked code
-   list against the hospital's live rows and issues the minimal set of
-   creates/updates/cancels needed to match (Chapter 4, §4.1 has the full
-   mechanics).
-6. **Reopen** (`POST /api/cases/{id}/reopen`) reverses an approval on both
-   sides — the coder's edits are kept, only the finalized/approved state is
-   undone — using a before-image journal so the hospital's data is restored,
-   not just the local copy (`medcode-api/docs/imed-integration.md`,
-   "Reopen").
+1. **ซิงค์** (`POST /api/sync`) ดึงการมารับบริการจากระบบ iMed ของโรงพยาบาลเข้าสู่แดชบอร์ดการให้รหัส โดยจะดึงทั้งหมดหรือเฉพาะช่วงวันที่ที่กำหนดก็ได้ และในขณะเดียวกันก็ปรับปรุงแคตตาล็อกอ้างอิง ICD-10/ICD-9 ให้เป็นปัจจุบันจากรายการหลัก (master list) ของโรงพยาบาลเอง (`medcode-api/docs/api-contract.md`, `POST /api/sync`) การมารับบริการแต่ละรายการจะถูกจัดเข้ากลุ่มใดกลุ่มหนึ่งจาก 4 กลุ่มบนแดชบอร์ดซึ่งไม่ซ้อนทับกัน ได้แก่ **สมบูรณ์** (complete: เข้ามาพร้อมรหัสครบทั้งสองระบบแล้วแต่ยังไม่ได้อนุมัติ) **ไม่สมบูรณ์** (incomplete: ขาดรหัสการวินิจฉัยและ/หรือรหัสหัตถการ จัดกลุ่มตามประเภทงาน ได้แก่ อายุรกรรม/ศัลยกรรม/CT-เอกซเรย์/อื่น ๆ) **เปิดใหม่** (reopened: มีผู้ใช้ยกเลิกการอนุมัติที่ทำไว้ก่อนหน้า) และ **เสร็จสิ้น** (finished: อนุมัติแล้ว)
+2. **คำแนะนำจาก AI** (`POST /api/cases/{id}/suggest-codes`) — ผู้ให้รหัสเปิดเคส แล้วระบบสร้างข้อความบรรยายทางคลินิก (clinical narrative) จากส่วนรายงานต่าง ๆ ในเวชระเบียน (จำกัดไม่เกิน 3,500 ตัวอักษร โดยให้อาการสำคัญและประวัติการเจ็บป่วยปัจจุบันมาก่อน) และขอรหัส ICD-10/ICD-9 ที่เป็นตัวเลือกจากบริการ RAG พร้อมคะแนนความมั่นใจและเอกสารต้นทางที่อ้างอิง การเรียกนี้ **ไม่บันทึกข้อมูลใดเลย** — ดูบทที่ 4 หัวข้อ 4.3
+3. **การตรวจทานและการเลือกโดยมนุษย์** ผู้ให้รหัสเห็นรหัสตัวเลือกที่จัดกลุ่มตาม *ที่มา* ได้แก่ ผู้ให้รหัสเพิ่มเอง จากเวชระเบียนโรงพยาบาล AI แนะนำ และไม่มีการบันทึกไว้ โดยแสดงเปอร์เซ็นต์ความมั่นใจ **เฉพาะ** แถวที่ AI แนะนำเท่านั้น (เป็นการเปลี่ยนแปลงการออกแบบเมื่อวันที่ 2026-08-07 โดยมีจุดประสงค์เฉพาะเพื่อไม่ให้รหัสที่มาจากโรงพยาบาล ซึ่งไม่จำเป็นต้องมี "ความมั่นใจ" ถูกสับสนกับการคาดเดาเชิงความน่าจะเป็น; `medcode-api/docs/api-contract.md`, ฟิลด์ code-role/origin) ตั้งแต่วันที่ 2026-08-07 ขั้นตอนนี้เป็นแบบ **เลือกก่อน (selection-first)** อย่างชัดเจน กล่าวคือ ไม่มีรหัสใดถูกติ๊กไว้ล่วงหน้า ยกเว้นรหัสที่ผู้ให้รหัสป้อนเอง ผู้ให้รหัสเป็นผู้ติ๊กรหัสที่ควรอยู่ในเคส (`selected: true`) แทนรูปแบบเดิมที่ "แนะนำทุกอย่างไว้ แล้วลบสิ่งที่ผิดออก" (`medcode-api/CLAUDE.md`, หมุดหมาย "Selection-first code review")
+4. **บันทึกสถานะงาน** (`PUT /api/cases/{id}/codes`) — เก็บการแก้ไขระหว่างทำงานของผู้ให้รหัสไว้ *ในฐานข้อมูลของระบบนี้เท่านั้น* โดยยังไม่มีการแตะต้องระบบของโรงพยาบาล
+5. **อนุมัติ** (`POST /api/cases/approve`) — เป็นการกระทำเดียวที่บันทึกกลับ (write-back) ลงระบบของโรงพยาบาล ระบบเปรียบเทียบความแตกต่าง (diff) ระหว่างรายการรหัสสุดท้ายที่ผู้ให้รหัสติ๊กไว้กับแถวข้อมูลปัจจุบันในระบบของโรงพยาบาล แล้วสั่งสร้าง/แก้ไข/ยกเลิกเท่าที่จำเป็นน้อยที่สุดเพื่อให้ตรงกัน (รายละเอียดกลไกทั้งหมดอยู่ในบทที่ 4 หัวข้อ 4.1)
+6. **เปิดใหม่** (`POST /api/cases/{id}/reopen`) ย้อนการอนุมัติทั้งสองฝั่ง โดยการแก้ไขของผู้ให้รหัสยังคงอยู่ มีเพียงสถานะสิ้นสุด/อนุมัติแล้วที่ถูกยกเลิก ระบบใช้บันทึกประวัติ (journal) ที่เก็บภาพข้อมูลก่อนการเปลี่ยนแปลง (before-image) เพื่อคืนข้อมูลของโรงพยาบาลด้วย ไม่ใช่เพียงสำเนาในระบบนี้ (`medcode-api/docs/imed-integration.md`, "Reopen")
 
-<p align="center"><img src="figures/fig-3-1-workflow.png" alt="Coding workflow before and after"><br><em>Figure 3.1 · The coding workflow before and after this system</em></p>
+<p align="center"><img src="figures/fig-3-1-workflow.png" alt="ขั้นตอนการให้รหัสก่อนและหลัง"><br><em>ภาพที่ 3.1 · ขั้นตอนการให้รหัสก่อนและหลังมีระบบนี้</em></p>
 
-## 3.2 Architecture: five services, one Postgres, an optional AI
+## 3.2 สถาปัตยกรรม: 5 บริการ Postgres 1 ชุด และ AI ที่เป็นทางเลือก
 
-The system is five independently-built, independently-deployable services,
-composed for local/demo use by a sixth, code-free repo
-(`medcode-stack/README.md`). Figure 3.2 shows how they connect.
+ระบบประกอบด้วย 5 บริการที่สร้างและนำไปใช้งานได้อย่างเป็นอิสระต่อกัน โดยมีรีโพซิทอรีที่ 6 ซึ่งไม่มีโค้ด ทำหน้าที่ประกอบบริการทั้งหมดเข้าด้วยกันสำหรับการใช้งานในเครื่องและการสาธิต (`medcode-stack/README.md`) ภาพที่ 3.2 แสดงการเชื่อมต่อระหว่างบริการเหล่านี้
 
-<p align="center"><img src="figures/fig-3-2-architecture.png" alt="System architecture"><br><em>Figure 3.2 · System architecture: five containers, the hospital behind one setting, generation on the host</em></p>
+<p align="center"><img src="figures/fig-3-2-architecture.png" alt="สถาปัตยกรรมระบบ"><br><em>ภาพที่ 3.2 · สถาปัตยกรรมระบบ: 5 คอนเทนเนอร์ ระบบของโรงพยาบาลอยู่หลังการตั้งค่าเพียงค่าเดียว และการสร้างข้อความทำงานบนเครื่องโฮสต์</em></p>
 
-| Service | Repo | Role | Host port (compose) |
+| บริการ | รีโพซิทอรี | หน้าที่ | พอร์ตบนโฮสต์ (compose) |
 |---|---|---|---|
-| `web` | `audit-chart-frontend` | React + TypeScript + Vite coder UI, built and served by nginx; proxies `/api` to the backend so the browser only ever talks to one origin (no CORS) | 8080 |
-| `medcode-api` | `medcode-api` | Spring Boot 4.1 / Java 21 backend. Owns the API contract, the `medcode` database, the single write-lock to the hospital, and the sync/approve/reopen orchestration | 8001 |
-| `imed-mock-api` | `imed-mock-api` | Stands in for the hospital's real iMed system, implementing its read (R1–R6) and write (W1–W4, `/api/v1/diagnosis`) contracts field-for-field, against its own `imed` database | 8003 |
-| `rag` | `RAG` | FastAPI Python service: embeddings, vector store and retrieval for code suggestions (no language model involved), plus local LLM generation for the coder Agent chat | 8000 |
-| `db` | — (stock `postgres:18`) | One Postgres server hosting **both** application databases, `medcode` and `imed` (schema-isolated), matching the target production deploy shape | 5433→5432 |
+| `web` | `audit-chart-frontend` | ส่วนติดต่อผู้ให้รหัสที่พัฒนาด้วย React + TypeScript + Vite สร้างและให้บริการโดย nginx ทำหน้าที่ส่งต่อ (proxy) `/api` ไปยังระบบหลังบ้าน เบราว์เซอร์จึงติดต่อกับต้นทาง (origin) เดียวเท่านั้น (ไม่ต้องใช้ CORS) | 8080 |
+| `medcode-api` | `medcode-api` | ระบบหลังบ้าน Spring Boot 4.1 / Java 21 เป็นเจ้าของสัญญาการเชื่อมต่อ API ฐานข้อมูล `medcode` การล็อกการเขียน (write-lock) ไปยังโรงพยาบาลเพียงจุดเดียว และการประสานงานการซิงค์/อนุมัติ/เปิดใหม่ | 8001 |
+| `imed-mock-api` | `imed-mock-api` | ทำหน้าที่แทนระบบ iMed จริงของโรงพยาบาล โดยพัฒนาตามสัญญาการเชื่อมต่อฝั่งอ่าน (R1–R6) และฝั่งเขียน (W1–W4, `/api/v1/diagnosis`) ครบทุกฟิลด์ และทำงานกับฐานข้อมูล `imed` ของตนเอง | 8003 |
+| `rag` | `RAG` | บริการ FastAPI ภาษา Python สำหรับเวกเตอร์ฝังตัว (embedding) ฐานข้อมูลเวกเตอร์ และการค้นคืน (retrieval) เพื่อแนะนำรหัส (ไม่ใช้โมเดลภาษา) รวมถึงการสร้างข้อความ (generation) ด้วย LLM ภายในเครื่องสำหรับแชต Agent ของผู้ให้รหัส | 8000 |
+| `db` | — (อิมเมจ `postgres:18` มาตรฐาน) | เซิร์ฟเวอร์ Postgres เครื่องเดียวที่รองรับฐานข้อมูลแอปพลิเคชัน **ทั้งสอง** คือ `medcode` และ `imed` (แยกกันด้วย schema) ตรงกับรูปแบบการนำไปใช้งานจริงที่เป็นเป้าหมาย | 5433→5432 |
 
-Two architectural decisions are worth stating explicitly because they shape
-everything downstream:
+มีการตัดสินใจเชิงสถาปัตยกรรม 2 ข้อที่ควรกล่าวไว้อย่างชัดเจน เนื่องจากส่งผลต่อทุกส่วนที่ตามมา
 
-- **RAG is optional by design.** Nothing in the compose file's `depends_on`
-  graph requires it, and the rest of the application (loading visits,
-  editing codes, syncing, approving, reopening) continues to work with it
-  switched off — only AI suggestions, the Agent chat, and the admin
-  Training page degrade (`medcode-stack/README.md`, "AI (the RAG
-  service)"). This directly supports the human-in-the-loop safety framing
-  from Chapter 1 — the coder can always finish their job without the AI.
-- **`medcode-api` must run as exactly one instance.** Its write lock
-  (`WriteGate`) and its in-process cases cache are held in memory, not in
-  the database, so horizontal scaling would corrupt approvals rather than
-  share load (`medcode-stack/README.md`, "Production is not this file";
-  `medcode-api/CLAUDE.md`, "Layout conventions"). This is a known,
-  documented scaling ceiling for the current design, not an oversight — see
-  Chapter 8 for how it affects the production deployment gap list.
+- **RAG เป็นทางเลือกโดยการออกแบบ** ไม่มีส่วนใดในกราฟ `depends_on` ของไฟล์ compose ที่ต้องพึ่งพาบริการนี้ และส่วนอื่นของแอปพลิเคชัน (การโหลดการมารับบริการ การแก้ไขรหัส การซิงค์ การอนุมัติ การเปิดใหม่) ยังทำงานต่อได้แม้ปิดบริการนี้ไว้ มีเพียงรหัสที่ AI แนะนำ แชต Agent และหน้าการฝึก AI (AI Training) ของผู้ดูแลระบบเท่านั้นที่ได้รับผลกระทบ (`medcode-stack/README.md`, "AI (the RAG service)") ข้อนี้สนับสนุนกรอบแนวคิดด้านความปลอดภัยแบบมนุษย์ร่วมตัดสินใจ (human-in-the-loop) จากบทที่ 1 โดยตรง กล่าวคือ ผู้ให้รหัสสามารถทำงานให้เสร็จได้เสมอโดยไม่ต้องพึ่ง AI
+- **`medcode-api` ต้องทำงานเพียง 1 อินสแตนซ์เท่านั้น** การล็อกการเขียน (`WriteGate`) และแคชเคสภายในโปรเซสถูกเก็บไว้ในหน่วยความจำ ไม่ใช่ในฐานข้อมูล การขยายระบบแนวนอน (horizontal scaling) จึงจะทำให้การอนุมัติเสียหายแทนที่จะช่วยกระจายภาระงาน (`medcode-stack/README.md`, "Production is not this file"; `medcode-api/CLAUDE.md`, "Layout conventions") ข้อนี้เป็นเพดานการขยายระบบของการออกแบบปัจจุบันที่ทราบและบันทึกไว้แล้ว ไม่ใช่สิ่งที่มองข้าม — ดูบทที่ 8 ว่าข้อนี้ส่งผลต่อรายการช่องว่างสำหรับการนำไปใช้งานจริงอย่างไร
 
-Figure 3.3 follows one case through the system, from the hospital back to
-the hospital.
+ภาพที่ 3.3 ติดตามเคสหนึ่งเคสผ่านระบบ ตั้งแต่ออกจากโรงพยาบาลจนกลับไปยังโรงพยาบาล
 
-<p align="center"><img src="figures/fig-3-3-coding-flow.png" alt="The coding flow"><br><em>Figure 3.3 · One case through the system: sync, suggest, save, approve</em></p>
+<p align="center"><img src="figures/fig-3-3-coding-flow.png" alt="ลำดับการให้รหัส"><br><em>ภาพที่ 3.3 · หนึ่งเคสผ่านระบบ: ซิงค์ แนะนำ บันทึก อนุมัติ</em></p>
 
-A more detailed, interactive set of data-flow diagrams is maintained with the
-code in `medcode-api/docs/dataflow.html`: the system boundary, the
-case-coding pipeline, sync, the two commit phases of approve, reopen's
-backward replay of the journal, authentication, the four flows through the
-RAG service, and a process × table matrix. Two of its views are reproduced
-in Appendix B.
+ชุดแผนภาพการไหลของข้อมูล (data-flow diagram) แบบโต้ตอบที่ละเอียดกว่านี้ดูแลรักษาไว้ร่วมกับโค้ดที่ `medcode-api/docs/dataflow.html` ได้แก่ ขอบเขตของระบบ ไปป์ไลน์การให้รหัสเคส การซิงค์ การยืนยัน (commit) 2 ระยะของการอนุมัติ การเล่นบันทึกประวัติย้อนกลับของการเปิดใหม่ การยืนยันตัวตน การไหล 4 แบบผ่านบริการ RAG และเมทริกซ์กระบวนการ × ตาราง โดยได้นำ 2 มุมมองจากชุดนี้มาแสดงไว้ในภาคผนวก ข
 
-## 3.3 Data model
+## 3.3 แบบจำลองข้อมูล
 
-The two databases mirror the two systems they represent — this system's own
-coding workspace (`medcode`), and the hospital's own extract-plus-write-API
-surface (`imed`) — kept intentionally separate so the hospital's data stays
-the hospital's, and this system's working state is disposable relative to it.
+ฐานข้อมูลทั้งสองสะท้อนระบบทั้งสองที่ฐานข้อมูลเป็นตัวแทน ได้แก่ พื้นที่ทำงานการให้รหัสของระบบนี้เอง (`medcode`) และส่วนข้อมูลสกัด (extract) รวมกับ API ฝั่งเขียนของโรงพยาบาล (`imed`) โดยตั้งใจแยกออกจากกัน เพื่อให้ข้อมูลของโรงพยาบาลยังคงเป็นของโรงพยาบาล และสถานะงานของระบบนี้เป็นสิ่งที่ทิ้งได้เมื่อเทียบกับข้อมูลของโรงพยาบาล
 
-### 3.3.1 `medcode` — the coding workspace
+### 3.3.1 `medcode` — พื้นที่ทำงานการให้รหัส
 
-Schema evolution is tracked as Flyway migrations
-(`medcode-api/src/main/resources/db/migrations/V1`–`V9`), which is itself a
-useful design record. Figure 3.4 shows the core coding tables; the full
-migration list is in Appendix C.
+วิวัฒนาการของ schema ติดตามด้วย Flyway migration (`medcode-api/src/main/resources/db/migrations/V1`–`V9`) ซึ่งในตัวเองก็เป็นบันทึกการออกแบบที่มีประโยชน์ ภาพที่ 3.4 แสดงตารางหลักของการให้รหัส ส่วนรายการ migration ทั้งหมดอยู่ในภาคผนวก ค
 
-<p align="center"><img src="figures/fig-3-4-data-model.png" alt="Core data model"><br><em>Figure 3.4 · Core tables of the medcode database</em></p>
+<p align="center"><img src="figures/fig-3-4-data-model.png" alt="แบบจำลองข้อมูลหลัก"><br><em>ภาพที่ 3.4 · ตารางหลักของฐานข้อมูล medcode</em></p>
 
-- **`cases`** — one row per hospital visit (the "case"); holds hospital-sourced
-  clinical fields (department, ward, severity, disease group — several of
-  these are explicitly *this project's own derived buckets, not clinical
-  facts*, see `docs/medical-glossary.md` §11) plus workflow state
-  (`case_status`, an enum of `open`, `in_review`, `approved`, `reopened`).
-- **`case_codes`** — one row per assigned code, pointing at exactly one of two
-  catalog tables (`icd_10_id` XOR `icd_9_id`, enforced by a check constraint
-  since the 2026-07-28 catalog split — V3 migration); carries `code_role`
-  (principal/secondary/other/external-cause/procedure) and `source`
-  (`imported_from_imed` vs. `coder_assigned`). ICD-9 rows additionally carry
-  an operation time window and operation type (V4, V5 migrations), because a
-  procedure code represents something that happened over a time span, which
-  the hospital's own write API requires.
-- **`case_code_edits`** — the coder's working list, one JSON document per
-  case, stored and echoed verbatim. This is where the UI keeps each row's
-  `selected` tick and its `origin` (`manual`/`hospital`/`ai`), so the
-  frontend can add such fields without a schema change; approve reads it and
-  turns the ticked rows into `case_codes`.
-- **`icd_10`** / **`icd_9`** — the reference catalogs, split into two tables
-  (V3) specifically because the two coding systems were expected to diverge
-  in what columns they need, rather than sharing one table that grows nulls.
-- **`case_report_sections`**, **`case_orders`**, **`case_vitals`** — the
-  chart itself: doctor's notes by document type × field name, lab/drug/
-  imaging/surgery orders, and vital-sign readings, all foreign-keyed to
-  `cases` (a 2026-08-20 migration, V6, closed a gap where two of these
-  tables had been created without that FK by hand-written code that bypassed
-  the migration system — see `medcode-api/CLAUDE.md`, "Flyway" milestone,
-  for the full incident).
-- **`coding_history`** — the audit trail: one row per coder action
-  (approved/reopened/code_assigned), oldest first, surfaced to the coder as
-  case history and to Chapter 5/8's audit-trail claims.
-- **`imed_write_ops`** (V2) — the write-back journal: a before-image of every
-  hospital row this system has ever created, edited, or cancelled, which is
-  what makes `reopen` able to *reverse* a write-back rather than merely
-  forget it happened (§4.1 has the mechanics).
-- **`users`**, **`auth_sessions`** (V1) — coder/admin accounts (BCrypt
-  password hashes) and server-side Bearer-token sessions.
-- **`case_stars`** (V8), **`app_settings`** (V9) — a shared "look at this
-  case first" flag any coder can set, and admin-configurable display-policy
-  switches (which identifier fields the case list may show).
+- **`cases`** — หนึ่งแถวต่อการมารับบริการหนึ่งครั้งที่โรงพยาบาล ("เคส") เก็บฟิลด์ทางคลินิกที่มาจากโรงพยาบาล (แผนก หอผู้ป่วย ความรุนแรง กลุ่มโรค — หลายฟิลด์ในจำนวนนี้ระบุชัดว่าเป็น *กลุ่มที่โครงการนี้จัดขึ้นเอง ไม่ใช่ข้อเท็จจริงทางคลินิก* ดู `docs/medical-glossary.md` หัวข้อ 11) พร้อมสถานะของขั้นตอนการทำงาน (`case_status` ซึ่งเป็น enum ของ `open`, `in_review`, `approved`, `reopened`)
+- **`case_codes`** — หนึ่งแถวต่อรหัสที่กำหนดหนึ่งรหัส ชี้ไปยังตารางแคตตาล็อกหนึ่งในสองตารางเท่านั้น (`icd_10_id` XOR `icd_9_id` บังคับด้วย check constraint ตั้งแต่การแยกแคตตาล็อกเมื่อวันที่ 2026-07-28 — migration V3) มีฟิลด์ `code_role` (การวินิจฉัยหลัก/การวินิจฉัยรอง/อื่น ๆ/สาเหตุภายนอก/หัตถการ) และ `source` (`imported_from_imed` เทียบกับ `coder_assigned`) แถวของ ICD-9 มีช่วงเวลาการทำหัตถการและประเภทหัตถการเพิ่มเติม (migration V4, V5) เนื่องจากรหัสหัตถการแทนสิ่งที่เกิดขึ้นในช่วงเวลาหนึ่ง ซึ่ง API ฝั่งเขียนของโรงพยาบาลกำหนดให้ต้องมี
+- **`case_code_edits`** — รายการรหัสระหว่างทำงานของผู้ให้รหัส เก็บเป็นเอกสาร JSON หนึ่งฉบับต่อเคส จัดเก็บและส่งคืนตามต้นฉบับทุกประการ ตารางนี้เป็นที่ที่ UI เก็บเครื่องหมายติ๊ก `selected` และ `origin` (`manual`/`hospital`/`ai`) ของแต่ละแถว ทำให้ส่วนหน้าบ้านเพิ่มฟิลด์ลักษณะนี้ได้โดยไม่ต้องเปลี่ยน schema เมื่ออนุมัติ ระบบจะอ่านตารางนี้และแปลงแถวที่ติ๊กไว้เป็น `case_codes`
+- **`icd_10`** / **`icd_9`** — แคตตาล็อกอ้างอิง แยกเป็น 2 ตาราง (V3) โดยเฉพาะเพราะคาดว่าระบบรหัสทั้งสองจะต้องการคอลัมน์ที่แตกต่างกันมากขึ้น แทนที่จะใช้ตารางเดียวร่วมกันซึ่งจะมีค่า null เพิ่มขึ้นเรื่อย ๆ
+- **`case_report_sections`**, **`case_orders`**, **`case_vitals`** — ตัวเวชระเบียนเอง ได้แก่ บันทึกของแพทย์แยกตามประเภทเอกสาร × ชื่อฟิลด์ คำสั่งแล็บ/ยา/ภาพถ่ายทางรังสี/ผ่าตัด และค่าสัญญาณชีพ ทั้งหมดมี foreign key ไปยัง `cases` (migration V6 เมื่อวันที่ 2026-08-20 ปิดช่องว่างที่ตาราง 2 ตารางในกลุ่มนี้เคยถูกสร้างขึ้นโดยไม่มี FK ดังกล่าว ด้วยโค้ดที่เขียนขึ้นเองซึ่งข้ามระบบ migration — ดูรายละเอียดเหตุการณ์ทั้งหมดใน `medcode-api/CLAUDE.md` หมุดหมาย "Flyway")
+- **`coding_history`** — ร่องรอยการตรวจสอบ (audit trail) หนึ่งแถวต่อการกระทำหนึ่งครั้งของผู้ให้รหัส (approved/reopened/code_assigned) เรียงจากเก่าไปใหม่ แสดงให้ผู้ให้รหัสเห็นเป็นประวัติของเคส และเป็นฐานของข้อกล่าวอ้างเรื่องร่องรอยการตรวจสอบในบทที่ 5 และบทที่ 8
+- **`imed_write_ops`** (V2) — บันทึกประวัติการบันทึกกลับ เก็บภาพข้อมูลก่อนการเปลี่ยนแปลงของทุกแถวในระบบโรงพยาบาลที่ระบบนี้เคยสร้าง แก้ไข หรือยกเลิก ซึ่งเป็นสิ่งที่ทำให้ `reopen` สามารถ *ย้อนกลับ* การบันทึกกลับได้ แทนที่จะเพียงลืมว่าเคยเกิดขึ้น (กลไกอยู่ในหัวข้อ 4.1)
+- **`users`**, **`auth_sessions`** (V1) — บัญชีผู้ให้รหัส/ผู้ดูแลระบบ (เก็บรหัสผ่านเป็นแฮช BCrypt) และเซสชันโทเค็น Bearer ฝั่งเซิร์ฟเวอร์
+- **`case_stars`** (V8), **`app_settings`** (V9) — เครื่องหมาย "ดูเคสนี้ก่อน" ที่ใช้ร่วมกันและผู้ให้รหัสคนใดก็ตั้งได้ และสวิตช์นโยบายการแสดงผลที่ผู้ดูแลระบบตั้งค่าได้ (กำหนดว่ารายการเคสแสดงฟิลด์ตัวระบุใดได้บ้าง)
 
-### 3.3.2 `imed` — the mock hospital system
+### 3.3.2 `imed` — ระบบจำลองของโรงพยาบาล
 
-Mirrors the hospital's actual extract tables (`medhack_patient`,
-`medhack_diagnosis_icd10`, `medhack_procedure_icd9`, lab/drug/vital order
-tables, …) plus the write-side objects the real "iMed Diagnosis and Medical
-Discharge API" defines (`imed-mock-api/src/main/resources/db/migrations/
-V1__api_v1.sql` and following). It is intentionally built **field-for-field**
-against the hospital's real API contract PDF
-(`medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`), so
-swapping this mock for the real hospital system in production is meant to be
-a configuration change (`IMED_API_BASE` + a token), not a rewrite —
-Chapter 8 revisits how confident that claim currently is.
+จำลองตารางข้อมูลสกัดจริงของโรงพยาบาล (`medhack_patient`, `medhack_diagnosis_icd10`, `medhack_procedure_icd9`, ตารางคำสั่งแล็บ/ยา/สัญญาณชีพ, …) รวมถึงอ็อบเจกต์ฝั่งเขียนที่ "iMed Diagnosis and Medical Discharge API" ของจริงกำหนดไว้ (`imed-mock-api/src/main/resources/db/migrations/
+V1__api_v1.sql` และไฟล์ถัดไป) ระบบจำลอง (mock) นี้ตั้งใจสร้างให้ตรงกับสัญญาการเชื่อมต่อ (contract) API จริงของโรงพยาบาลในรูปแบบ PDF **ครบทุกฟิลด์** (`medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`) เพื่อให้การเปลี่ยนจากระบบจำลองนี้ไปใช้ระบบจริงของโรงพยาบาลในสภาพแวดล้อมใช้งานจริงตั้งใจให้เป็นเพียงการเปลี่ยนการตั้งค่า (`IMED_API_BASE` + โทเค็น) ไม่ใช่การเขียนใหม่ — บทที่ 8 กลับมาพิจารณาอีกครั้งว่าข้อกล่าวอ้างนี้มีความมั่นใจเพียงใดในปัจจุบัน
 
-### 3.3.3 Coverage / financial context
+### 3.3.3 สิทธิการรักษา / บริบททางการเงิน
 
-`coverage_types` maps the hospital's raw coverage codes (e.g. `UCS_89_I`)
-to Thailand's national scheme families — UCS (~72% of the population, NHSO),
-CSMBS/`OFC` (civil servants, ~9%), and SSS (private-sector social security,
-~19%) — though the current dataset happens to contain **no SSS rows at all**,
-a gap the team has flagged as worth asking the hospital about
-(`docs/medical-glossary.md`, §8). This table is what would let a future
-version of the analytics page report coding backlog *by payer*, which
-matters given the DRG/reimbursement framing in Chapter 1.
+`coverage_types` จับคู่รหัสสิทธิการรักษาดิบของโรงพยาบาล (เช่น `UCS_89_I`) กับกลุ่มสิทธิระดับชาติของประเทศไทย ได้แก่ UCS (ประมาณ 72% ของประชากร, สำนักงานหลักประกันสุขภาพแห่งชาติ (สปสช.)) CSMBS/`OFC` (ข้าราชการ ประมาณ 9%) และ SSS (ประกันสังคมภาคเอกชน ประมาณ 19%) อย่างไรก็ตาม ชุดข้อมูลปัจจุบันบังเอิญ **ไม่มีแถว SSS เลย** ซึ่งคณะผู้จัดทำได้ระบุไว้ว่าเป็นช่องว่างที่ควรสอบถามโรงพยาบาล (`docs/medical-glossary.md`, หัวข้อ 8) ตารางนี้คือสิ่งที่จะทำให้หน้าการวิเคราะห์ในเวอร์ชันต่อไปสามารถรายงานงานค้างของการให้รหัส *แยกตามผู้จ่ายเงิน* ได้ ซึ่งมีความสำคัญเมื่อพิจารณากรอบเรื่อง DRG/การเบิกจ่ายค่ารักษาในบทที่ 1
 
-## 3.4 Screen design
+## 3.4 การออกแบบหน้าจอ
 
-The coder UI is one screen per task, in Thai or English (the admin console is
-English only). Its design rules follow from Chapter 1: the coder's decision
-must be explicit, the source of every code must be visible, and nothing the
-AI proposes may look like a fact.
+ส่วนติดต่อผู้ให้รหัสแบ่งเป็นหนึ่งหน้าจอต่อหนึ่งงาน ใช้ได้ทั้งภาษาไทยและภาษาอังกฤษ (คอนโซลผู้ดูแลระบบเป็นภาษาอังกฤษเท่านั้น) หลักการออกแบบมาจากบทที่ 1 ได้แก่ การตัดสินใจของผู้ให้รหัสต้องชัดแจ้ง ที่มาของทุกรหัสต้องมองเห็นได้ และสิ่งที่ AI เสนอต้องไม่ดูเหมือนข้อเท็จจริง
 
-| Screen | What it shows | Design rule |
+| หน้าจอ | สิ่งที่แสดง | หลักการออกแบบ |
 |---|---|---|
-| Case list (dashboard) | Four tabs: Complete, Incomplete (with a "missing N" badge), Reopened, Finished; search, filters, a shared star | One case sits in exactly one tab; a star is visible to everyone and removable only by whoever set it |
-| Sync dialog | Quick ranges (Today … Everything), a specific date, or a date range, then a confirmation | Sync never touches an approved case, so it is safe to repeat |
-| Case detail | The hospital chart (hospital-panel or chronological view), vital signs, and one column each for ICD-10 and ICD-9 | The chart is read-only; codes are grouped by origin (coder, hospital record, AI) and only AI rows carry a confidence percentage |
-| Code selection | A checkbox per code, "Select all", a picked/total counter, drag to reorder | **Nothing is pre-ticked.** The top ticked ICD-10 is the principal diagnosis; Approve stays disabled until both columns have a pick (or "no procedure" is ticked) |
-| Approve and reopen dialogs | How many codes will be written, and that unticked codes stay behind | Both actions are confirmed and logged; reopen says plainly that codes written to iMed are withdrawn |
-| AI Agent | Code dictionary chat and Suggest & Learn, with chat history | Answers cite their sources; codes not found in any retrieved passage are flagged |
-| Admin console | Dashboard with display switches, accounts, AI Training | Accounts with coding history cannot be deleted, only deactivated |
+| รายการเคส (แดชบอร์ด) | 4 แท็บ ได้แก่ สมบูรณ์ ไม่สมบูรณ์ (มีป้าย "ขาด N รายการ") เปิดใหม่ และเสร็จสิ้น พร้อมการค้นหา ตัวกรอง และดาวที่ใช้ร่วมกัน | เคสหนึ่งอยู่ในแท็บเดียวเท่านั้น ดาวมองเห็นได้โดยทุกคนและเอาออกได้เฉพาะผู้ติดดาว |
+| หน้าต่างซิงค์ | ช่วงเวลาด่วน (Today … Everything) วันที่เฉพาะ หรือช่วงวันที่ แล้วจึงยืนยัน | การซิงค์ไม่แตะต้องเคสที่อนุมัติแล้ว จึงทำซ้ำได้อย่างปลอดภัย |
+| รายละเอียดเคส | เวชระเบียนของโรงพยาบาล (มุมมองโรงพยาบาลหรือมุมมองตามลำดับเวลา) สัญญาณชีพ และคอลัมน์สำหรับ ICD-10 และ ICD-9 อย่างละหนึ่งคอลัมน์ | เวชระเบียนอ่านได้อย่างเดียว รหัสจัดกลุ่มตามที่มา (ผู้ให้รหัส เวชระเบียนโรงพยาบาล AI) และมีเพียงแถวของ AI ที่แสดงเปอร์เซ็นต์ความมั่นใจ |
+| การเลือกรหัส | ช่องติ๊กสำหรับแต่ละรหัส "เลือกทั้งหมด" ตัวนับจำนวนที่เลือก/ทั้งหมด และการลากเพื่อจัดลำดับ | **ไม่มีรหัสใดถูกติ๊กไว้ล่วงหน้า** รหัส ICD-10 ที่ติ๊กไว้บนสุดคือการวินิจฉัยหลัก ปุ่มอนุมัติจะกดไม่ได้จนกว่าทั้งสองคอลัมน์จะมีรหัสที่เลือก (หรือติ๊ก "ไม่มีหัตถการ") |
+| หน้าต่างอนุมัติและเปิดใหม่ | จำนวนรหัสที่จะถูกบันทึก และแจ้งว่ารหัสที่ไม่ได้ติ๊กจะยังคงอยู่ในเคส | ทั้งสองการกระทำต้องได้รับการยืนยันและถูกบันทึกไว้ หน้าต่างเปิดใหม่แจ้งอย่างชัดเจนว่ารหัสที่บันทึกลง iMed แล้วจะถูกเพิกถอน |
+| AI ผู้ช่วย (AI Agent) | แชตพจนานุกรมรหัส และแนะนำรหัส (Suggest & Learn) พร้อมประวัติการแชต | คำตอบระบุแหล่งที่มา รหัสที่ไม่พบในข้อความที่ค้นคืนได้ใด ๆ จะถูกทำเครื่องหมายเตือน |
+| คอนโซลผู้ดูแลระบบ | แดชบอร์ดพร้อมสวิตช์การแสดงผล บัญชีผู้ใช้ และ AI Training | บัญชีที่มีประวัติการให้รหัสไม่สามารถลบได้ ทำได้เพียงปิดใช้งาน |
 
-<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/06-placeholder.png" alt="Case list after a sync"><br><em>Figure 3.5 · The case list after a sync (Complete tab, Thai UI)</em></p>
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/06-placeholder.png" alt="รายการเคสหลังซิงค์"><br><em>ภาพที่ 3.5 · รายการเคสหลังซิงค์ (แท็บสมบูรณ์ ส่วนติดต่อภาษาไทย)</em></p>
 
-<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/09-placeholder.png" alt="Case detail with AI suggestions"><br><em>Figure 3.6 · Case detail: the chart on the left, AI-suggested ICD-10 and ICD-9 codes with confidence on the right, none pre-ticked</em></p>
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/09-placeholder.png" alt="รายละเอียดเคสพร้อมรหัสที่ AI แนะนำ"><br><em>ภาพที่ 3.6 · รายละเอียดเคส: เวชระเบียนด้านซ้าย รหัส ICD-10 และ ICD-9 ที่ AI แนะนำพร้อมความมั่นใจด้านขวา โดยไม่มีรหัสใดถูกติ๊กไว้ล่วงหน้า</em></p>
 
-Every screen, coder and admin, is reproduced in Appendix E and explained step
-by step in the Thai user guide (`audit-chart-frontend/docs/USER-GUIDE-TH.pdf`).
+ทุกหน้าจอทั้งของผู้ให้รหัสและผู้ดูแลระบบแสดงไว้ในภาคผนวก จ และอธิบายทีละขั้นตอนในคู่มือผู้ใช้ภาษาไทย (`audit-chart-frontend/docs/USER-GUIDE-TH.pdf`)

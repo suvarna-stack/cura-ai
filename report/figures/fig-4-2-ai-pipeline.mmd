@@ -1,20 +1,20 @@
 flowchart LR
-  subgraph ingest["Ingest (admin: AI Training)"]
-    pdf["ICD manuals<br/>PDF / CSV"] --> chunk["splitter<br/>800 chars · 120 overlap"]
-    chunk --> emb["bge-m3<br/>1024-dim"]
+  subgraph ingest["นำเข้าเอกสาร (ผู้ดูแลระบบ: AI Training)"]
+    pdf["คู่มือ ICD<br/>PDF / CSV"] --> chunk["แบ่งชิ้นข้อความ<br/>800 ตัวอักษร · ซ้อนทับ 120"]
+    chunk --> emb["bge-m3<br/>1024 มิติ"]
     emb --> chroma[("Chroma")]
-    chunk --> kg[("knowledge graph")]
+    chunk --> kg[("กราฟความรู้")]
   end
-  subgraph query["Query"]
-    q["narrative or question"] --> exact["exact code lookup"]
-    q --> vec["vector search"]
-    vec --> gexp["graph expansion<br/>3 seeds · 1 hop · budget 6"]
-    q --> rules["coder-taught rules"]
-    exact --> ctx["≤8 chunks, pinned first"]
+  subgraph query["การค้นหา"]
+    q["คำบรรยายอาการหรือคำถาม"] --> exact["ค้นหารหัสแบบตรงตัว"]
+    q --> vec["ค้นหาเชิงเวกเตอร์"]
+    vec --> gexp["ขยายผลผ่านกราฟ<br/>3 โหนดตั้งต้น · 1 ขั้น · สูงสุด 6"]
+    q --> rules["กฎที่ผู้ให้รหัสสอน"]
+    exact --> ctx["ไม่เกิน 8 ชิ้นข้อความ<br/>ชิ้นที่ปักหมุดมาก่อน"]
     gexp --> ctx
     rules --> ctx
   end
   chroma --> vec
   kg --> gexp
-  ctx --> sug["/suggest<br/>codes read from text<br/>no LLM"]
-  ctx --> chat["/chat<br/>LLM answers from context<br/>+ unverified_codes check"]
+  ctx --> sug["/suggest<br/>อ่านรหัสจากข้อความ<br/>ไม่ใช้ LLM"]
+  ctx --> chat["/chat<br/>LLM ตอบจากบริบท<br/>+ ตรวจ unverified_codes"]

@@ -1,52 +1,48 @@
-# Appendix G — Data provenance detail
+# ภาคผนวก ช รายละเอียดแหล่งที่มาของข้อมูล
 
-*Supporting material for Ch.5 (Data & PDPA) §5.1 — where the demo dataset
-came from and why it's synthetic, not real patient data.*
+*เอกสารประกอบบทที่ 5 (ข้อมูลและพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล) หัวข้อ 5.1 — ที่มาของชุดข้อมูลสาธิต
+และเหตุผลที่เป็นข้อมูลสมมุติ (synthetic data) ไม่ใช่ข้อมูลผู้ป่วยจริง*
 
-## The generator: `imed-mock-api/scripts/generate_demo_data.py` (1,599 lines)
+## ตัวสร้างข้อมูล: `imed-mock-api/scripts/generate_demo_data.py` (1,599 บรรทัด)
 
-From its own docstring:
+คำอธิบายใน docstring ของสคริปต์ระบุว่า
 
-> Grow the mock hospital's demo dataset to ~100 OPD visits, plus a handful
-> of IPD admissions, and backfill the columns the original extract left
-> empty. [...] It is deterministic (fixed RNG seed), so re-running it
-> reproduces byte-identical rows, and it is idempotent: it deletes
-> everything it previously generated before rebuilding.
+> ขยายชุดข้อมูลสาธิตของระบบจำลองโรงพยาบาลให้มีการมารับบริการของผู้ป่วยนอก (OPD) ประมาณ 100 ครั้ง
+> พร้อมการรับไว้รักษาเป็นผู้ป่วยใน (IPD) จำนวนเล็กน้อย และเติมข้อมูลในคอลัมน์ที่ชุดข้อมูลต้นฉบับที่สกัดมาเว้นว่างไว้
+> [...] สคริปต์ทำงานแบบกำหนดผลได้แน่นอน (deterministic) (ใช้ค่า seed ของ RNG แบบคงที่) การรันซ้ำจึงได้แถวข้อมูลที่เหมือนเดิมทุกไบต์
+> และเป็นแบบ idempotent กล่าวคือ สคริปต์จะลบทุกอย่างที่เคยสร้างไว้ก่อนสร้างใหม่
 
-**Every clinical vocabulary is copied from a cited source, not invented:**
+**คำศัพท์ทางคลินิกทุกชุดคัดลอกมาจากแหล่งที่มาที่อ้างอิงไว้ ไม่ได้คิดขึ้นเอง:**
 
-| Source | What it supplies |
+| แหล่งที่มา | ข้อมูลที่ได้ |
 |---|---|
-| `medcode-api/docs/medical-glossary.md` §5 | The ICD-10-TM Volume 5 Standard Coding Guidelines coders are judged against — binds two rules directly: exactly ONE principal diagnosis per visit, and routine work (dressing a wound, an injection, IV fluids, catheterisation) is not coded |
-| `medcode-api/docs/medical-glossary.md` §6, §9 | Defined document types; observed department/ward names |
-| `medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | Field semantics authority — e.g. `ward` is null for OPD, which is why generated OPD visits carry no ward |
-| The 21 original hand-written visits in the seed extract | ID layout, drug label format (drug/strength/form), department strings |
+| `medcode-api/docs/medical-glossary.md` หัวข้อ 5 | แนวทางการให้รหัสมาตรฐาน (Standard Coding Guidelines) ของ ICD-10-TM เล่ม 5 ซึ่งเป็นเกณฑ์ที่ใช้ประเมินงานของเจ้าหน้าที่ให้รหัสโรค — กำหนดกฎ 2 ข้อโดยตรง ได้แก่ การมารับบริการแต่ละครั้งมีการวินิจฉัยหลักได้เพียงหนึ่งรายการเท่านั้น และงานประจำ (การทำแผล การฉีดยา การให้สารน้ำทางหลอดเลือดดำ การใส่สายสวน) ไม่ต้องให้รหัส |
+| `medcode-api/docs/medical-glossary.md` หัวข้อ 6 และ 9 | ประเภทเอกสารที่นิยามไว้ และชื่อแผนก/หอผู้ป่วยที่พบจริง |
+| `medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | แหล่งอ้างอิงหลักด้านความหมายของฟิลด์ — เช่น `ward` มีค่าเป็น null สำหรับผู้ป่วยนอก ด้วยเหตุนี้การมารับบริการของผู้ป่วยนอกที่สร้างขึ้นจึงไม่มีข้อมูลหอผู้ป่วย |
+| การมารับบริการต้นฉบับ 21 รายการที่เขียนขึ้นด้วยมือในชุดข้อมูลตั้งต้น (seed extract) | รูปแบบของ ID รูปแบบฉลากยา (ชื่อยา/ความแรง/รูปแบบยา) และข้อความชื่อแผนก |
 
-**Internal consistency checks the generator applies:**
-- Every ICD code is checked against `imed.icd_10` / `imed.icd_9` before use
-  (no invented codes).
-- Lab values are keyed to the principal diagnosis, so results support the
-  documented assessment (a pneumonia chart doesn't carry a normal white
-  count) — because both the human coder and the AI read the lab panel as
-  evidence.
+**การตรวจสอบความสอดคล้องภายในที่ตัวสร้างข้อมูลใช้:**
+- รหัส ICD ทุกรหัสถูกตรวจสอบกับ `imed.icd_10` / `imed.icd_9` ก่อนนำไปใช้
+  (ไม่มีรหัสที่คิดขึ้นเอง)
+- ค่าผลตรวจทางห้องปฏิบัติการผูกกับการวินิจฉัยหลัก ผลตรวจจึงสอดคล้องกับการประเมินที่บันทึกไว้
+  (เวชระเบียนผู้ป่วยปอดอักเสบจะไม่มีจำนวนเม็ดเลือดขาวปกติ) — เนื่องจากทั้งผู้ให้รหัสที่เป็นมนุษย์และ AI
+  ต่างอ่านผลตรวจทางห้องปฏิบัติการเป็นหลักฐาน
 
-**Reproduction**: `python3 scripts/generate_demo_data.py` against a
-database at demo start, then `scripts/dump_seed.sh` to regenerate the
-committed dump.
+**การสร้างซ้ำ**: รัน `python3 scripts/generate_demo_data.py` กับฐานข้อมูลที่อยู่ในสถานะเริ่มต้นของการสาธิต
+จากนั้นรัน `scripts/dump_seed.sh` เพื่อสร้างไฟล์ dump ที่ commit ไว้ขึ้นใหม่
 
-## The demo lifecycle: `imed-mock-api/DEMO-SETUP.md` (215 lines)
+## วงจรการสาธิต: `imed-mock-api/DEMO-SETUP.md` (215 บรรทัด)
 
-The runbook covering the full loop end to end:
+คู่มือปฏิบัติงาน (runbook) ที่ครอบคลุมวงจรทั้งหมดตั้งแต่ต้นจนจบ มีขั้นตอนดังนี้
 
-1. Restore the two demo-ready Postgres dumps (`imed_demo_ready_*.dump`,
-   `medcode_demo_ready_*.dump`) — `imed-mock-api/db-backups/`.
-2. Take a baseline snapshot (`POST /api/demo/snapshot`) before the first
-   sync, so `Settings → Reset` has something to restore to.
-3. Demo flow: webapp opens **empty** → Sync pulls ICD catalogs (650
-   ICD-10 + 332 ICD-9) and 100 OPD cases (50 pre-coded) → coder codes a
-   case with AI suggestions → Approve writes back to the hospital DB →
-   Reset restores both databases to baseline. Repeatable indefinitely.
+1. กู้คืนไฟล์ dump ของ Postgres ที่พร้อมสำหรับการสาธิตทั้ง 2 ไฟล์ (`imed_demo_ready_*.dump`
+   และ `medcode_demo_ready_*.dump`) — `imed-mock-api/db-backups/`
+2. บันทึกสแนปช็อตสถานะตั้งต้น (`POST /api/demo/snapshot`) ก่อนการซิงค์ครั้งแรก
+   เพื่อให้ `Settings → Reset` มีสถานะให้กู้คืนกลับไป
+3. ลำดับการสาธิต: เว็บแอปเปิดขึ้นมาในสภาพ **ว่างเปล่า** → การซิงค์ดึงรายการรหัส ICD
+   (ICD-10 650 รหัส + ICD-9 332 รหัส) และเคสผู้ป่วยนอก 100 เคส (มีรหัสอยู่ก่อนแล้ว 50 เคส) → ผู้ให้รหัสให้รหัสเคสหนึ่งโดยใช้รหัสที่
+   AI แนะนำ → การอนุมัติบันทึกกลับลงฐานข้อมูลของโรงพยาบาล → การรีเซ็ตกู้คืนฐานข้อมูลทั้งสองกลับสู่สถานะตั้งต้น
+   ทำซ้ำได้ไม่จำกัดครั้ง
 
-This is the same demo loop the working prototype ships with — no separate
-"demo mode" exists; the pilot dataset *is* the real system running against
-synthetic data.
+วงจรนี้เป็นวงจรการสาธิตเดียวกับที่มาพร้อมกับต้นแบบที่ใช้งานได้ — ไม่มี "โหมดสาธิต" แยกต่างหาก
+ชุดข้อมูลนำร่อง *คือ* ระบบจริงที่ทำงานกับข้อมูลสมมุตินั่นเอง

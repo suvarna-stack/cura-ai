@@ -1,22 +1,22 @@
 sequenceDiagram
   autonumber
-  participant C as Coder
+  participant C as ผู้ให้รหัส
   participant A as medcode-api
-  participant H as Hospital (iMed)
+  participant H as โรงพยาบาล (iMed)
   participant R as RAG
-  participant DB as medcode DB
-  C->>A: Sync (date window)
-  A->>H: R6 contract check, then R3 / R1→R2
-  H-->>A: case objects
-  A->>DB: import new · refresh open · skip approved
-  C->>A: open case (lock, renewed every 30 s)
-  C->>A: suggest-codes
-  A->>R: /suggest {clinical_text ≤3,500 chars}
-  R-->>A: ICD-10 + ICD-9 candidates
-  A-->>C: suggestions (nothing written)
-  C->>A: save ticked / edited codes
-  A->>DB: working list stored
-  C->>A: Approve
-  A->>DB: phase 1: commit + finalize
-  A->>H: phase 2: diff → cancel / edit / create
-  A->>DB: journal each hospital row
+  participant DB as ฐานข้อมูล medcode
+  C->>A: ซิงค์ (ช่วงวันที่)
+  A->>H: R6 ตรวจสัญญาการเชื่อมต่อ แล้ว R3 / R1→R2
+  H-->>A: ข้อมูลเคส
+  A->>DB: นำเข้าเคสใหม่ · อัปเดตเคสที่ยังเปิดอยู่ · ข้ามเคสที่อนุมัติแล้ว
+  C->>A: เปิดเคส (ล็อก ต่ออายุทุก 30 วินาที)
+  C->>A: ขอคำแนะนำรหัส (suggest-codes)
+  A->>R: /suggest {clinical_text ≤3,500 ตัวอักษร}
+  R-->>A: รหัส ICD-10 + ICD-9 ที่เป็นตัวเลือก
+  A-->>C: คำแนะนำ (ไม่บันทึกข้อมูลใด)
+  C->>A: บันทึกรหัสที่ติ๊ก / แก้ไข
+  A->>DB: จัดเก็บรายการรหัสที่กำลังทำ
+  C->>A: อนุมัติ
+  A->>DB: ขั้นที่ 1: commit + ปิดเคส
+  A->>H: ขั้นที่ 2: เทียบส่วนต่าง → ยกเลิก / แก้ไข / สร้าง
+  A->>DB: บันทึกประวัติทุกแถวของโรงพยาบาล

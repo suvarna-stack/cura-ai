@@ -1,122 +1,122 @@
-# Chapter 6 — Testing & Evaluation
+# บทที่ 6 การทดสอบและการประเมินผล
 
-Every number in this chapter traces to a file in `eval-results/` (raw output,
-reproduce commands included) or to the team's own pitch deck (`Cura AI.pdf`,
-prepared by Suvarna), cited explicitly where used. Nothing here is estimated
-or invented for this report.
+ตัวเลขทุกตัวในบทนี้สืบย้อนได้ถึงไฟล์ใน `eval-results/` (ผลลัพธ์ดิบ พร้อมคำสั่งสำหรับทำซ้ำ)
+หรือถึงสไลด์นำเสนอผลงาน (pitch deck) ของคณะผู้จัดทำเอง (`Cura AI.pdf` จัดทำโดย
+Suvarna) โดยระบุแหล่งอ้างอิงไว้อย่างชัดเจน ณ จุดที่ใช้ ไม่มีตัวเลขใดในบทนี้ที่ประมาณการ
+หรือสร้างขึ้นเพื่อรายงานนี้
 
-## 6.1 Automated test suites
+## 6.1 ชุดทดสอบอัตโนมัติ
 
-| Suite | Result | Raw output |
+| ชุดทดสอบ | ผลลัพธ์ | ผลลัพธ์ดิบ |
 |---|---|---|
-| `medcode-api` JUnit (`./mvnw test`) | **90/91 passed**, 1 failure (see below) | `medcode-api-test-output-rerun-with-imed-live.txt` |
-| `imed-mock-api` JUnit (`./mvnw test`) | **19/19 passed** | `imed-mock-api-test-output.txt` |
-| RAG `pytest tests/` | **82/82 passed** | `rag-test-output.txt` |
-| `audit-chart-frontend` | No test files in the repo | — |
+| `medcode-api` JUnit (`./mvnw test`) | **ผ่าน 90/91** ล้มเหลว 1 รายการ (ดูด้านล่าง) | `medcode-api-test-output-rerun-with-imed-live.txt` |
+| `imed-mock-api` JUnit (`./mvnw test`) | **ผ่าน 19/19** | `imed-mock-api-test-output.txt` |
+| RAG `pytest tests/` | **ผ่าน 82/82** | `rag-test-output.txt` |
+| `audit-chart-frontend` | ไม่มีไฟล์ทดสอบใน repository | — |
 
-**Total: 191/192 automated tests passing (99.5%).**
+**รวม: การทดสอบอัตโนมัติผ่าน 191/192 รายการ (99.5%)**
 
-The suite was run twice for `medcode-api`, deliberately: once with
-`imed-mock-api` not started (12 tests errored with "iMed API not reachable"
-— an unstarted-dependency artifact, not a defect) and once with it running
-live (11 of those 12 then passed). The one remaining failure,
-`CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache`,
-is a test-isolation gap: it calls the live `imed-mock-api` process, whose
-writes land in the real local Postgres `imed` database and are not rolled
-back by the Spring test transaction, so running the suite twice against a
-long-lived mock-hospital instance accumulates rows the test didn't expect.
-Full root-cause detail in `eval-results/SUMMARY.md`.
+คณะผู้จัดทำรันชุดทดสอบของ `medcode-api` สองครั้งโดยเจตนา ครั้งแรกโดยไม่ได้เริ่ม
+การทำงานของ `imed-mock-api` (การทดสอบ 12 รายการเกิดข้อผิดพลาด "iMed API not reachable"
+ซึ่งเป็นผลจากบริการที่ต้องพึ่งพายังไม่ได้เริ่มทำงาน มิใช่ข้อบกพร่อง) และครั้งที่สองขณะที่
+บริการดังกล่าวทำงานอยู่จริง (การทดสอบ 11 จาก 12 รายการดังกล่าวผ่าน) ความล้มเหลว
+ที่เหลืออยู่เพียงรายการเดียว คือ
+`CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache`
+เป็นช่องว่างด้านการแยกการทดสอบ (test isolation) กล่าวคือ การทดสอบนี้เรียกโพรเซส
+`imed-mock-api` ที่ทำงานอยู่จริง ซึ่งการเขียนข้อมูลจะไปลงในฐานข้อมูล `imed` บน Postgres
+ภายในเครื่องจริง และไม่ถูกย้อนกลับ (roll back) โดย transaction ของการทดสอบใน Spring
+ดังนั้นการรันชุดทดสอบสองครั้งกับอินสแตนซ์ระบบจำลองโรงพยาบาลที่ทำงานต่อเนื่องเป็นเวลานาน
+จึงทำให้มีแถวข้อมูลสะสมซึ่งการทดสอบไม่ได้คาดไว้ รายละเอียดสาเหตุที่แท้จริงทั้งหมดอยู่ใน
+`eval-results/SUMMARY.md`
 
-## 6.2 Performance / load testing
+## 6.2 การทดสอบประสิทธิภาพ / การทดสอบภาระงาน
 
-Apache Bench (`ab`) against a locally-running `medcode-api` (localhost,
-single instance, no network latency — a code-level capacity baseline, not a
-production-network estimate):
+ใช้ Apache Bench (`ab`) ทดสอบกับ `medcode-api` ที่รันภายในเครื่อง (localhost
+อินสแตนซ์เดียว ไม่มีความหน่วงของเครือข่าย ผลที่ได้จึงเป็นค่าฐานของขีดความสามารถในระดับโค้ด
+มิใช่ค่าประมาณบนเครือข่ายของสภาพแวดล้อมใช้งานจริง):
 
-| Endpoint | Load | Throughput | p50 / p95 / p99 | Failures |
+| Endpoint | ภาระงาน | ปริมาณงานที่รองรับ (throughput) | p50 / p95 / p99 | ความล้มเหลว |
 |---|---|---|---|---|
 | `GET /api/health` | 500 req, c=10 | 13,266 req/s | 1 / 1 / 2 ms | 0/500 |
-| `GET /api/cases` (authenticated) | 300 req, c=10 | 3,426 req/s | 2 / 5 / 7 ms | 0/300 |
-| `GET /api/cases` (stress) | 2,000 req, c=50 | 6,569 req/s | 7 / 19 / 28 ms | 0/2,000 |
+| `GET /api/cases` (ยืนยันตัวตนแล้ว) | 300 req, c=10 | 3,426 req/s | 2 / 5 / 7 ms | 0/300 |
+| `GET /api/cases` (ทดสอบภาวะหนัก) | 2,000 req, c=50 | 6,569 req/s | 7 / 19 / 28 ms | 0/2,000 |
 
-Zero failed requests at every load level tested, including 50 concurrent
-clients. Latency grows roughly linearly with concurrency, no cliff observed
-in this range. **Not measured:** RAG suggestion latency (the slowest step in
-the real coder flow) and concurrent-write contention (multiple coders
-approving/editing simultaneously) — both listed as gaps in §6.4. Raw output
-and reproduce steps: `eval-results/perf/`.
+ไม่มีคำขอที่ล้มเหลวเลยในทุกระดับภาระงานที่ทดสอบ รวมถึงที่ผู้ใช้พร้อมกัน 50 ราย
+ความหน่วง (latency) เพิ่มขึ้นโดยประมาณเป็นเชิงเส้นตามจำนวนผู้ใช้พร้อมกัน และไม่พบจุดที่
+ประสิทธิภาพลดลงอย่างฉับพลันในช่วงที่ทดสอบ **สิ่งที่ไม่ได้วัด:** ความหน่วงของการแนะนำรหัส
+ด้วย RAG (ขั้นตอนที่ช้าที่สุดในลำดับการทำงานจริงของเจ้าหน้าที่ให้รหัสโรค) และการแย่งชิง
+การเขียนข้อมูลพร้อมกัน (ผู้ให้รหัสหลายคนอนุมัติ/แก้ไขในเวลาเดียวกัน) ซึ่งทั้งสองรายการ
+ระบุไว้เป็นช่องว่างในหัวข้อ 6.4 ผลลัพธ์ดิบและขั้นตอนการทำซ้ำอยู่ที่ `eval-results/perf/`
 
-## 6.3 AI-suggestion accuracy (retrieval evaluation)
+## 6.3 ความแม่นยำของรหัสที่ AI แนะนำ (การประเมินการค้นคืน)
 
-Ground truth: 42 clinical scenarios from `imed-mock-api/scripts/generate_demo_data.py`,
-each hardcoding a clinically-intended ICD-10 (and sometimes ICD-9) code
-alongside the Thai chart-note text used to build that demo visit. Each
-scenario's note text was sent to RAG's `POST /suggest` (retrieval-only; does
-not invoke the LLM) and the correct code's presence/rank in the response was
-recorded.
+ข้อมูลอ้างอิงที่ถูกต้อง (ground truth): สถานการณ์ทางคลินิก 42 สถานการณ์จาก `imed-mock-api/scripts/generate_demo_data.py`
+แต่ละสถานการณ์กำหนดรหัส ICD-10 (และในบางสถานการณ์มีรหัส ICD-9) ที่ตั้งใจไว้ทางคลินิก
+ไว้ตายตัวในโค้ด คู่กับข้อความบันทึกเวชระเบียนภาษาไทยที่ใช้สร้างการมารับบริการสาธิตนั้น
+ข้อความบันทึกของแต่ละสถานการณ์ถูกส่งไปยัง `POST /suggest` ของ RAG (เฉพาะการค้นคืน
+(retrieval) โดยไม่เรียกใช้ LLM) แล้วบันทึกว่ารหัสที่ถูกต้องปรากฏในผลตอบกลับหรือไม่
+และอยู่ในอันดับใด
 
-| Metric | Result |
+| ตัวชี้วัด | ผลลัพธ์ |
 |---|---|
-| ICD-10 top-1 accuracy | 0/42 (0.0%) |
-| ICD-10 top-8 (anywhere in the suggested list) | 3/42 (7.1%) |
-| ICD-9 top-1 (of 23 applicable scenarios) | 0/23 (0.0%) |
-| ICD-9 top-8 | 1/23 (4.3%) |
+| ความแม่นยำอันดับแรก (top-1) ของ ICD-10 | 0/42 (0.0%) |
+| ICD-10 ภายใน 8 อันดับแรก (top-8) (อยู่ตำแหน่งใดก็ได้ในรายการที่แนะนำ) | 3/42 (7.1%) |
+| ICD-9 อันดับแรก (จาก 23 สถานการณ์ที่เกี่ยวข้อง) | 0/23 (0.0%) |
+| ICD-9 ภายใน 8 อันดับแรก | 1/23 (4.3%) |
 
-**This number needs the root-cause explanation to be useful, not just cited.**
-A manual follow-up confirmed retrieval is *not* broken in general — querying
-`POST /retrieve` with `"J00 common cold"` returns the exact correct reference
-chunk with `score: 1.0` (`via: "exact match: J00"`). But the same visit's
-*actual symptom narrative* ("mild fever, clear rhinorrhea, sneezing, sore
-throat, dry cough for 3 days," no code or diagnosis name mentioned) returns
-unrelated codes pulled from an apparently mis-chunked, index-style region of
-one reference PDF. **The gap is specifically symptom-narrative → diagnosis-code
-retrieval — the actual coder use case — not code-lookup retrieval in
-general.** This is the single most actionable engineering finding in this
-evaluation. Full writeup: `eval-results/rag-accuracy-SUMMARY.md`; raw
-per-case data: `eval-results/rag-accuracy-raw.json`.
+**ตัวเลขนี้จำเป็นต้องมีคำอธิบายสาเหตุที่แท้จริงประกอบจึงจะเป็นประโยชน์ มิใช่เพียงยกมาอ้างอิง**
+การตรวจสอบติดตามด้วยตนเองยืนยันว่าการค้นคืนโดยทั่วไป *ไม่ได้* ทำงานผิดพลาด การสอบถาม
+`POST /retrieve` ด้วย `"J00 common cold"` ได้ชิ้นข้อความ (chunk) อ้างอิงที่ถูกต้องตรงกันพอดี
+กลับมา โดยมี `score: 1.0` (`via: "exact match: J00"`) แต่ *คำบรรยายอาการจริง*
+ของการมารับบริการเดียวกัน ("ไข้ต่ำ ๆ น้ำมูกใส จาม เจ็บคอ ไอแห้ง เป็นมา 3 วัน"
+โดยไม่ระบุรหัสหรือชื่อการวินิจฉัย) กลับได้รหัสที่ไม่เกี่ยวข้อง ซึ่งดึงมาจากส่วนที่มีลักษณะ
+เป็นดัชนีของเอกสาร PDF อ้างอิงฉบับหนึ่งที่ดูเหมือนจะถูกแบ่งชิ้นข้อความผิดพลาด
+**ช่องว่างนี้เกิดเฉพาะกับการค้นคืนแบบคำบรรยายอาการ → รหัสการวินิจฉัย
+ซึ่งเป็นกรณีการใช้งานจริงของผู้ให้รหัส มิใช่การค้นคืนเพื่อค้นหารหัสโดยทั่วไป**
+ข้อค้นพบนี้เป็นข้อค้นพบทางวิศวกรรมที่นำไปปฏิบัติต่อได้มากที่สุดในการประเมินครั้งนี้
+รายงานฉบับเต็ม: `eval-results/rag-accuracy-SUMMARY.md` ข้อมูลดิบรายเคส:
+`eval-results/rag-accuracy-raw.json`
 
-Caveats: this is a synthetic, template-derived gold set (written by the same
-team that built the retrieval corpus, so some vocabulary overlap is
-possible in either direction); it tests `/suggest` (retrieval-only), not the
-full `/chat` LLM-reasoning path a coder sees in the app today; it is not a
-substitute for scoring against real historical hospital coding.
+ข้อสงวน: ชุดข้อมูลอ้างอิง (gold set) นี้เป็นข้อมูลสมมุติที่สร้างจากแม่แบบ (เขียนโดยคณะผู้จัดทำ
+ซึ่งเป็นผู้สร้างคลังเอกสารสำหรับการค้นคืนด้วย จึงอาจมีคำศัพท์ทับซ้อนกันได้ในทั้งสองทิศทาง)
+การประเมินนี้ทดสอบ `/suggest` (เฉพาะการค้นคืน) มิใช่เส้นทางการให้เหตุผลด้วย LLM
+แบบเต็มผ่าน `/chat` ที่ผู้ให้รหัสเห็นในแอปพลิเคชันในปัจจุบัน และไม่สามารถใช้แทน
+การให้คะแนนเทียบกับข้อมูลการให้รหัสในอดีตของโรงพยาบาลจริงได้
 
-## 6.4 What was not tested
+## 6.4 สิ่งที่ไม่ได้ทดสอบ
 
-- Manual vs. AI-assisted coding time comparison, and comparison against the
-  hospital's own historically-coded visits — **out of scope for this
-  submission.** No partner-hospital timing or coding-volume data was
-  available in time, and the team judged extrapolating from a 1–5-case
-  internal timing sample (source: `Cura AI.pdf`) as more likely to mislead
-  than inform under this deadline, so it was cut rather than presented as
-  evidence. See Ch.2's Klang et al. citation for the methodology a real
-  comparison would need.
-- Concurrent multi-coder write contention (simultaneous approve/edit).
-- RAG suggestion latency under load.
-- Structured staff/coder feedback — **out of scope for this submission.**
-  No real coder was available to pilot a feedback instrument before the
-  deadline.
-- UI usability walkthrough with a non-team user (screenshots exist —
-  Appendix E — but no outside user has been observed using the system).
-- **`/chat` (the full LLM-reasoning path a coder sees in the AI Agent) was
-  not separately scored** — only `/suggest` (retrieval-only) was evaluated
-  (§6.3). Out of scope for this submission: the generation model
-  (`Llama-3.1-EIRAI-8B` via Ollama) could not be pulled during this
-  evaluation pass (Ollama's client rejected a cross-host redirect from
-  Hugging Face's CDN on every retry), and `/chat` shares the same retrieval
-  layer already tested in §6.3, so the team judged fixing that download path
-  under deadline pressure not worth the time versus the marginal new
-  information it would likely produce.
+- การเปรียบเทียบเวลาการให้รหัสด้วยมือกับการให้รหัสโดยมี AI ช่วย และการเปรียบเทียบกับ
+  การมารับบริการที่โรงพยาบาลเคยให้รหัสไว้ในอดีต — **อยู่นอกขอบเขตของผลงานที่ส่งครั้งนี้**
+  เนื่องจากไม่มีข้อมูลด้านเวลาหรือปริมาณงานให้รหัสจากโรงพยาบาลพันธมิตรทันเวลา
+  และคณะผู้จัดทำพิจารณาว่าการอนุมานจากตัวอย่างการจับเวลาภายในเพียง 1–5 เคส
+  (แหล่งที่มา: `Cura AI.pdf`) มีแนวโน้มจะทำให้เข้าใจผิดมากกว่าให้ข้อมูลที่เป็นประโยชน์
+  ภายใต้กำหนดส่งนี้ จึงตัดออกแทนที่จะนำเสนอเป็นหลักฐาน ดูการอ้างอิงงานของ
+  Klang et al. ในบทที่ 2 สำหรับระเบียบวิธีที่การเปรียบเทียบจริงจำเป็นต้องใช้
+- การแย่งชิงการเขียนข้อมูลเมื่อผู้ให้รหัสหลายคนทำงานพร้อมกัน (อนุมัติ/แก้ไขในเวลาเดียวกัน)
+- ความหน่วงของการแนะนำรหัสด้วย RAG ภายใต้ภาระงาน
+- ข้อเสนอแนะอย่างเป็นระบบจากบุคลากร/ผู้ให้รหัส — **อยู่นอกขอบเขตของผลงานที่ส่งครั้งนี้**
+  เนื่องจากไม่มีผู้ให้รหัสจริงที่พร้อมทดลองใช้เครื่องมือเก็บข้อเสนอแนะก่อนกำหนดส่ง
+- การทดลองใช้งานเพื่อประเมินความสามารถในการใช้งานของส่วนติดต่อผู้ใช้ (UI) กับผู้ใช้
+  ที่ไม่ได้อยู่ในคณะผู้จัดทำ (มีภาพหน้าจอแล้ว — ภาคผนวก จ — แต่ยังไม่มีการสังเกต
+  ผู้ใช้ภายนอกขณะใช้งานระบบ)
+- **ไม่ได้ให้คะแนน `/chat` (เส้นทางการให้เหตุผลด้วย LLM แบบเต็มที่ผู้ให้รหัสเห็นในเมนู
+  AI ผู้ช่วย) แยกต่างหาก** มีเพียง `/suggest` (เฉพาะการค้นคืน) ที่ได้รับการประเมิน
+  (หัวข้อ 6.3) ประเด็นนี้อยู่นอกขอบเขตของผลงานที่ส่งครั้งนี้ เนื่องจากไม่สามารถดาวน์โหลด (pull)
+  โมเดลสร้างข้อความ (`Llama-3.1-EIRAI-8B` ผ่าน Ollama) ได้ในระหว่างรอบการประเมินนี้
+  (ไคลเอนต์ของ Ollama ปฏิเสธการเปลี่ยนเส้นทาง (redirect) ข้ามโฮสต์จาก CDN ของ
+  Hugging Face ทุกครั้งที่ลองใหม่) และ `/chat` ใช้ชั้นการค้นคืนเดียวกับที่ทดสอบแล้ว
+  ในหัวข้อ 6.3 คณะผู้จัดทำจึงพิจารณาว่าการแก้ไขเส้นทางการดาวน์โหลดดังกล่าวภายใต้
+  ความกดดันของกำหนดส่งไม่คุ้มกับเวลาที่ใช้ เมื่อเทียบกับข้อมูลใหม่เพียงเล็กน้อยที่น่าจะได้รับ
 
-## 6.5 Test case summary
+## 6.5 สรุปกรณีทดสอบ
 
-| # | Test case | Result |
+| # | กรณีทดสอบ | ผลลัพธ์ |
 |---|---|---|
-| 1 | `medcode-api` correctness (91 cases: auth, cases CRUD, sync, approve/reopen, admin, docs) | 90 pass / 1 known isolation issue |
-| 2 | `imed-mock-api` correctness (19 cases: visit reads, catalog reads, write-back, dedup) | 19/19 pass |
-| 3 | RAG service correctness (82 cases: chunking, suggest boxes, learn/teach rules, API routing) | 82/82 pass |
-| 4 | `medcode-api` load: health endpoint, 500 req @ c=10 | 0 failures |
-| 5 | `medcode-api` load: cases endpoint, 300 req @ c=10 | 0 failures |
-| 6 | `medcode-api` stress: cases endpoint, 2,000 req @ c=50 | 0 failures |
-| 7 | AI accuracy: 42 scenarios, ICD-10 top-1 | 0/42 — root cause identified (6.3) |
-| 8 | AI accuracy: 42 scenarios, ICD-10 top-8 | 3/42 |
+| 1 | ความถูกต้องของ `medcode-api` (91 กรณี: การยืนยันตัวตน, CRUD ของเคส, การซิงค์, การอนุมัติ/เปิดใหม่, ผู้ดูแลระบบ, เอกสาร) | ผ่าน 90 / ปัญหาด้านการแยกการทดสอบที่ทราบแล้ว 1 รายการ |
+| 2 | ความถูกต้องของ `imed-mock-api` (19 กรณี: การอ่านข้อมูลการมารับบริการ, การอ่านแค็ตตาล็อก, การบันทึกกลับ, การขจัดข้อมูลซ้ำ) | ผ่าน 19/19 |
+| 3 | ความถูกต้องของบริการ RAG (82 กรณี: การแบ่งชิ้นข้อความ, กล่องคำแนะนำ, การเรียนรู้/การสอนกฎ, การกำหนดเส้นทาง API) | ผ่าน 82/82 |
+| 4 | ภาระงานของ `medcode-api`: endpoint health, 500 req @ c=10 | ล้มเหลว 0 รายการ |
+| 5 | ภาระงานของ `medcode-api`: endpoint cases, 300 req @ c=10 | ล้มเหลว 0 รายการ |
+| 6 | การทดสอบภาวะหนักของ `medcode-api`: endpoint cases, 2,000 req @ c=50 | ล้มเหลว 0 รายการ |
+| 7 | ความแม่นยำของ AI: 42 สถานการณ์, ICD-10 อันดับแรก (top-1) | 0/42 — ระบุสาเหตุที่แท้จริงแล้ว (หัวข้อ 6.3) |
+| 8 | ความแม่นยำของ AI: 42 สถานการณ์, ICD-10 ภายใน 8 อันดับแรก (top-8) | 3/42 |

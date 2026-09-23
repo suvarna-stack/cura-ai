@@ -1,7 +1,6 @@
-# References
+# บรรณานุกรม
 
-All sources were retrieved between 18 and 20 September 2026. Where a source
-gives no author or date, none is invented ("n.d." = no date).
+แหล่งข้อมูลทั้งหมดสืบค้นระหว่างวันที่ 18 ถึง 20 กันยายน 2026 ในกรณีที่แหล่งข้อมูลไม่ระบุผู้แต่งหรือวันที่ จะไม่มีการระบุขึ้นเอง ("n.d." = ไม่ระบุวันที่)
 
 ::: refs
 

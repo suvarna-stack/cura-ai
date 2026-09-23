@@ -1,185 +1,51 @@
-# Chapter 2 — Related Work
+# บทที่ 2 งานที่เกี่ยวข้องและเทคโนโลยีที่เลือกนำมาใช้
 
-Every source cited in this chapter was retrieved and checked on 18 September
-2026. Vendor descriptions in §2.1 come from product literature, which is
-marketing material and is treated as such.
+แหล่งอ้างอิงทุกแหล่งในบทนี้ได้รับการสืบค้นและตรวจสอบเมื่อวันที่ 18 กันยายน 2026 คำอธิบายผลิตภัณฑ์ของผู้จำหน่ายในหัวข้อ 2.1 นำมาจากเอกสารผลิตภัณฑ์ ซึ่งเป็นสื่อทางการตลาดและได้รับการพิจารณาในฐานะดังกล่าว
 
-## 2.1 Computer-assisted coding (CAC): the incumbent approach
+## 2.1 การให้รหัสโดยใช้คอมพิวเตอร์ช่วย (CAC): แนวทางที่ใช้กันอยู่เดิม
 
-Large hospital systems, especially in the US market, already run
-**computer-assisted coding (CAC)** software: rule- and NLP-based engines that
-scan a chart and suggest codes for a human coder to accept or reject. Two
-well-known commercial examples:
+ระบบโรงพยาบาลขนาดใหญ่ โดยเฉพาะในตลาดสหรัฐอเมริกา ใช้ซอฟต์แวร์ **การให้รหัสโดยใช้คอมพิวเตอร์ช่วย (computer-assisted coding: CAC)** อยู่แล้ว ซอฟต์แวร์ดังกล่าวเป็นกลไกที่อาศัยกฎและการประมวลผลภาษาธรรมชาติ (NLP) ในการอ่านเวชระเบียนและแนะนำรหัสให้เจ้าหน้าที่ให้รหัสโรคซึ่งเป็นมนุษย์ยอมรับหรือปฏิเสธ ตัวอย่างผลิตภัณฑ์เชิงพาณิชย์ที่เป็นที่รู้จัก 2 รายการ ได้แก่
 
-- **Solventum (formerly 3M) 360 Encompass** — an integrated CAC + clinical
-  documentation improvement (CDI) + coding/auditing platform. It combines
-  "3M CRS" (a computer-assisted coding decision-support engine) with
-  professional coding and revenue-integrity workflows, auto-suggesting codes
-  from patient documentation for a coder to review and complete.
-  — *3M/Solventum, "360 Encompass Computer-Assisted Coding (CAC)"*, product
-  literature, accessed 2026-09-18.
+- **Solventum (เดิมคือ 3M) 360 Encompass** — แพลตฟอร์มแบบบูรณาการที่รวม CAC การปรับปรุงคุณภาพการบันทึกเวชระเบียนทางคลินิก (clinical documentation improvement: CDI) และการให้รหัส/การตรวจสอบไว้ด้วยกัน ผลิตภัณฑ์นี้ผสาน "3M CRS" (กลไกสนับสนุนการตัดสินใจสำหรับการให้รหัสโดยใช้คอมพิวเตอร์ช่วย) เข้ากับขั้นตอนการทำงานด้านการให้รหัสระดับมืออาชีพและด้านความถูกต้องของรายได้ (revenue integrity) โดยแนะนำรหัสจากเอกสารของผู้ป่วยโดยอัตโนมัติเพื่อให้ผู้ให้รหัสตรวจทานและดำเนินการให้เสร็จสมบูรณ์
+  — *3M/Solventum, "360 Encompass Computer-Assisted Coding (CAC)"*, เอกสารผลิตภัณฑ์, เข้าถึงเมื่อ 2026-09-18.
   [https://www.solventum.com/en-us/home/health-information-technology/solutions/360-encompass-cac/](https://www.solventum.com/en-us/home/health-information-technology/solutions/360-encompass-cac/)
-- **3M M\*Modal CDI Engage** — a cloud-based, AI-powered clinical
-  documentation improvement tool, integrated with 3M's CAC/CDI workflow,
-  that helps physicians capture structured documentation as they write,
-  reducing the ambiguity a downstream coder has to resolve.
-  — *3M/M*Modal, "3M and M*Modal launch new AI-powered CDI tool"*,
-  Healthcare IT News, accessed 2026-09-18.
+- **3M M\*Modal CDI Engage** — เครื่องมือปรับปรุงคุณภาพการบันทึกเวชระเบียนทางคลินิกที่ทำงานบนคลาวด์และขับเคลื่อนด้วย AI ซึ่งบูรณาการเข้ากับขั้นตอนการทำงาน CAC/CDI ของ 3M ช่วยให้แพทย์บันทึกเอกสารอย่างมีโครงสร้างขณะเขียน จึงลดความกำกวมที่ผู้ให้รหัสในขั้นตอนถัดไปต้องแก้ไข
+  — *3M/M*Modal, "3M and M*Modal launch new AI-powered CDI tool"*, Healthcare IT News, เข้าถึงเมื่อ 2026-09-18.
   [https://www.healthcareitnews.com/news/3m-and-mmodal-launch-new-ai-powered-cdi-tool](https://www.healthcareitnews.com/news/3m-and-mmodal-launch-new-ai-powered-cdi-tool)
 
-These products are mature, enterprise-grade, and — critically for the
-architecture question in §2.3 — built around **US coding systems (ICD-10-CM,
-CPT)**, **cloud or large on-prem enterprise deployments**, and **per-seat /
-per-facility commercial licensing**. None of the public material found
-mentions ICD-10-TM (Thailand's national modification), Thai-language clinical
-notes, or the Thai national coverage-scheme vocabulary this project's
-`medical-glossary.md` documents (UCS/CSMBS/SSS). They are the closest
-production analogue to "AI-assisted coding with a human approval step," which
-is also this project's core design decision (Chapter 1, §1.4) — but they are
-not a drop-in fit for a Thai hospital's vocabulary, language mix, or
-on-premise/data-residency constraints (§2.3).
+ผลิตภัณฑ์เหล่านี้มีความสมบูรณ์และอยู่ในระดับองค์กร และที่สำคัญอย่างยิ่งต่อประเด็นด้านสถาปัตยกรรมในหัวข้อ 2.3 คือ ผลิตภัณฑ์เหล่านี้สร้างขึ้นโดยยึด **ระบบรหัสของสหรัฐอเมริกา (ICD-10-CM, CPT)** **การนำไปใช้งานจริงบนคลาวด์หรือภายในองค์กร (on-prem) ขนาดใหญ่** และ **สิทธิ์การใช้งานเชิงพาณิชย์แบบคิดตามจำนวนผู้ใช้ / ตามจำนวนสถานพยาบาล** เอกสารสาธารณะที่พบไม่มีฉบับใดกล่าวถึง ICD-10-TM (ฉบับดัดแปลงระดับชาติของประเทศไทย) บันทึกทางคลินิกภาษาไทย หรือคำศัพท์ของระบบหลักประกันสุขภาพระดับชาติของไทยที่ `medical-glossary.md` ของโครงการนี้บันทึกไว้ (UCS/CSMBS/SSS) ผลิตภัณฑ์เหล่านี้เป็นระบบที่ใช้งานจริงซึ่งใกล้เคียงที่สุดกับ "การให้รหัสโดยมี AI ช่วยพร้อมขั้นตอนการอนุมัติโดยมนุษย์" ซึ่งเป็นการตัดสินใจหลักด้านการออกแบบของโครงการนี้เช่นกัน (บทที่ 1 หัวข้อ 1.4) แต่ไม่สามารถนำมาใช้กับโรงพยาบาลในประเทศไทยได้ทันที เนื่องจากคำศัพท์ การใช้ภาษาปะปนกัน และข้อจำกัดด้านการติดตั้งภายในองค์กรและถิ่นที่อยู่ของข้อมูล (data residency) (หัวข้อ 2.3)
 
-## 2.2 RAG for automated / assisted ICD coding: the recent academic literature
+## 2.2 RAG สำหรับการให้รหัส ICD แบบอัตโนมัติ / แบบช่วยเหลือ: งานวิจัยทางวิชาการในช่วงล่าสุด
 
-Retrieval-augmented generation (RAG) — retrieving relevant reference text
-before asking a language model to answer — has an active, recent research
-line specifically applied to ICD coding, which is directly relevant to this
-project's own architecture (Chapter 4):
+การสร้างข้อความเสริมด้วยการค้นคืน (retrieval-augmented generation: RAG) คือการค้นคืน (retrieval) ข้อความอ้างอิงที่เกี่ยวข้องก่อนให้โมเดลภาษาตอบ ปัจจุบันมีสายงานวิจัยล่าสุดที่ดำเนินอยู่อย่างต่อเนื่องซึ่งประยุกต์ใช้ RAG กับการให้รหัส ICD โดยเฉพาะ และเกี่ยวข้องโดยตรงกับสถาปัตยกรรมของโครงการนี้ (บทที่ 4) ดังนี้
 
-- Deppe et al., **"Retrieval-Augmented Generation for ICD-10 Coding in
-  German Clinical Texts – A Technical Case Report"** (2025). Designs and
-  evaluates a semi-automated pipeline that assigns ICD-10 codes from
-  unstructured German clinical text by combining retrieval over a coding
-  reference corpus with generative reasoning — architecturally the closest
-  published system to this project's RAG service (retrieve reference
-  passages → LLM answers only from retrieved context).
+- Deppe et al., **"Retrieval-Augmented Generation for ICD-10 Coding in German Clinical Texts – A Technical Case Report"** (2025) ออกแบบและประเมินไปป์ไลน์ (pipeline) แบบกึ่งอัตโนมัติที่กำหนดรหัส ICD-10 จากข้อความทางคลินิกภาษาเยอรมันที่ไม่มีโครงสร้าง โดยผสานการค้นคืนจากคลังเอกสารอ้างอิงการให้รหัสเข้ากับการให้เหตุผลเชิงสร้างข้อความ (generative reasoning) งานนี้เป็นระบบที่ตีพิมพ์แล้วซึ่งมีสถาปัตยกรรมใกล้เคียงกับบริการ RAG ของโครงการนี้มากที่สุด (ค้นคืนข้อความอ้างอิง → LLM ตอบจากบริบทที่ค้นคืนมาเท่านั้น)
   [https://journals.sagepub.com/doi/10.3233/SHTI251397](https://journals.sagepub.com/doi/10.3233/SHTI251397)
-- Klang et al., **"Assessing Retrieval-Augmented Large Language Model
-  Performance in Emergency Department ICD-10-CM Coding Compared to Human
-  Coders"** (2024), PMC / SSRN. Compared RAG-enhanced LLM coding against
-  provider-assigned ICD-10-CM codes on real emergency-department records;
-  human reviewers preferred the AI-assisted codes over the providers' own
-  codes in a majority of the compared instances (447 vs. 277, p < 0.001).
-  This is the strongest published evidence found that RAG-assisted coding
-  can match or exceed baseline human coding quality on real clinical data —
-  and exactly the kind of head-to-head comparison against a hospital's own
-  historical coding that this project's own team has flagged as the one
-  measurement still missing before deployment (`DEPLOYMENT-PREP.md`, §2,
-  "Proving the AI is accurate enough" — see Chapter 8).
+- Klang et al., **"Assessing Retrieval-Augmented Large Language Model Performance in Emergency Department ICD-10-CM Coding Compared to Human Coders"** (2024), PMC / SSRN เปรียบเทียบการให้รหัสด้วย LLM ที่เสริมด้วย RAG กับรหัส ICD-10-CM ที่ผู้ให้บริการทางการแพทย์กำหนดไว้ บนเวชระเบียนจริงของแผนกฉุกเฉิน ผลปรากฏว่าผู้ตรวจทานที่เป็นมนุษย์เลือกรหัสที่ได้จาก AI ช่วยมากกว่ารหัสของผู้ให้บริการเองในกรณีที่เปรียบเทียบส่วนใหญ่ (447 ต่อ 277, p < 0.001) นี่คือหลักฐานที่ตีพิมพ์แล้วซึ่งหนักแน่นที่สุดเท่าที่พบว่า การให้รหัสโดยมี RAG ช่วยสามารถมีคุณภาพเทียบเท่าหรือสูงกว่าเกณฑ์อ้างอิงของการให้รหัสโดยมนุษย์บนข้อมูลทางคลินิกจริงได้ และเป็นการเปรียบเทียบโดยตรงกับการให้รหัสในอดีตของโรงพยาบาลในลักษณะเดียวกับที่คณะผู้จัดทำระบุว่าเป็นการวัดผลเพียงรายการเดียวที่ยังขาดอยู่ก่อนการนำไปใช้งานจริง (`DEPLOYMENT-PREP.md` หัวข้อ 2 "Proving the AI is accurate enough" — ดูบทที่ 8)
   [https://pmc.ncbi.nlm.nih.gov/articles/PMC11527068/](https://pmc.ncbi.nlm.nih.gov/articles/PMC11527068/)
-- **"Retrieval-Augmented Generation in Biomedicine: A Survey of
-  Technologies, Datasets, and Clinical Applications"** (2025), arXiv. A
-  broad survey positioning RAG's core value proposition for clinical use —
-  grounding generation in retrieved, verifiable source text rather than
-  relying on a model's parametric memory — as specifically suited to
-  high-stakes, audit-sensitive clinical tasks. This is the general
-  architectural justification this project's own RAG service implements
-  directly: `RAG/app/core/rag.py`'s system prompt instructs the model to
-  "Answer ONLY using the provided context... If the context does not
-  contain the answer, say you don't know," and a separate grounding check
-  (`_verify_codes`) flags any code the model's answer mentions that does
-  not appear in the retrieved chunks as `unverified_codes` before it ever
-  reaches a coder.
+- **"Retrieval-Augmented Generation in Biomedicine: A Survey of Technologies, Datasets, and Clinical Applications"** (2025), arXiv งานสำรวจวรรณกรรมในวงกว้างซึ่งระบุว่าคุณค่าหลักของ RAG สำหรับการใช้งานทางคลินิก ได้แก่ การยึดโยงการสร้างข้อความ (generation) กับข้อความต้นฉบับที่ค้นคืนมาและตรวจสอบได้ แทนการพึ่งพาความจำเชิงพารามิเตอร์ (parametric memory) ของโมเดล เหมาะสมเป็นพิเศษกับงานทางคลินิกที่มีความเสี่ยงสูงและอ่อนไหวต่อการตรวจสอบ นี่คือเหตุผลเชิงสถาปัตยกรรมโดยทั่วไปที่บริการ RAG ของโครงการนี้นำมาใช้โดยตรง กล่าวคือ พรอมต์ระบบ (system prompt) ใน `RAG/app/core/rag.py` สั่งให้โมเดล "Answer ONLY using the provided context... If the context does not contain the answer, say you don't know," และการตรวจสอบการยึดโยงกับแหล่งที่มา (grounding) ที่แยกต่างหาก (`_verify_codes`) จะทำเครื่องหมายรหัสใดก็ตามที่คำตอบของโมเดลกล่าวถึงแต่ไม่ปรากฏในชิ้นข้อความ (chunk) ที่ค้นคืนมา ให้เป็น `unverified_codes` ก่อนที่จะถึงมือผู้ให้รหัส
   [https://arxiv.org/pdf/2505.01146](https://arxiv.org/pdf/2505.01146)
-- **"To RAG, or Not to RAG? A Comparative Evaluation of Retrieval-Augmented
-  Generation for ICD Coding of German Tumor Diagnoses"** (2026), medRxiv.
-  Evaluated RAG-prompted open-weight LLMs (Llama 3.1 8B, Llama 3.3 70B)
-  against base (non-RAG) LLMs for ICD-10 / ICD-O-3 coding, finding RAG
-  prompting substantially improved base-model performance — direct evidence
-  for this project's choice of a small local model (an 8B Llama-3.1
-  variant via Ollama in the deployed stack, with a 0.5B in-process
-  fallback; see Chapter 4) *plus* retrieval, rather than a larger model
-  alone.
+- **"To RAG, or Not to RAG? A Comparative Evaluation of Retrieval-Augmented Generation for ICD Coding of German Tumor Diagnoses"** (2026), medRxiv ประเมิน LLM แบบเปิดเผยน้ำหนัก (open-weight) ที่ใช้พรอมต์แบบ RAG (Llama 3.1 8B, Llama 3.3 70B) เทียบกับ LLM พื้นฐานที่ไม่ใช้ RAG สำหรับการให้รหัส ICD-10 / ICD-O-3 และพบว่าการใช้พรอมต์แบบ RAG ช่วยเพิ่มประสิทธิภาพของโมเดลพื้นฐานได้อย่างมาก ซึ่งเป็นหลักฐานโดยตรงที่สนับสนุนการเลือกของโครงการนี้ในการใช้โมเดลภายในเครื่องขนาดเล็ก (โมเดลรุ่นย่อยของ Llama-3.1 ขนาด 8B ผ่าน Ollama ในระบบที่นำไปใช้งาน โดยมีโมเดลขนาด 0.5B ที่ทำงานภายในโปรเซสเดียวกันเป็นตัวสำรอง ดูบทที่ 4) *ร่วมกับ* การค้นคืน แทนการใช้โมเดลที่ใหญ่กว่าเพียงอย่างเดียว
   [https://www.medrxiv.org/content/10.64898/2026.05.27.26353695v1.full](https://www.medrxiv.org/content/10.64898/2026.05.27.26353695v1.full)
-- **RuCCoD: "Towards Automated ICD Coding in Russian"** (2025), arXiv.
-  Another non-English-language ICD-coding system combining retrieval over
-  a structured code database with an LLM reranking step — evidence that
-  the RAG-for-ICD-coding pattern generalizes beyond English/German to
-  other national coding variants, which is the same generalization this
-  project is attempting for Thai/ICD-10-TM.
+- **RuCCoD: "Towards Automated ICD Coding in Russian"** (2025), arXiv อีกระบบหนึ่งสำหรับการให้รหัส ICD ในภาษาที่ไม่ใช่ภาษาอังกฤษ ซึ่งผสานการค้นคืนจากฐานข้อมูลรหัสที่มีโครงสร้างเข้ากับขั้นตอนการจัดอันดับใหม่ (reranking) ด้วย LLM งานนี้เป็นหลักฐานว่ารูปแบบการใช้ RAG สำหรับการให้รหัส ICD สามารถขยายผลไปใช้นอกเหนือจากภาษาอังกฤษ/ภาษาเยอรมัน ไปสู่รหัสฉบับดัดแปลงระดับชาติอื่น ๆ ได้ ซึ่งเป็นการขยายผลแบบเดียวกับที่โครงการนี้พยายามทำสำหรับภาษาไทย/ICD-10-TM
   [https://arxiv.org/pdf/2502.21263](https://arxiv.org/pdf/2502.21263)
 
-Across these five sources, the published pattern is consistent: **RAG
-outperforms a bare LLM on ICD coding, and RAG-assisted coding can approach
-or exceed human-coder baselines on some cohorts** — but every study
-evaluates against a *specific* health system's language, coding variant,
-and data, and none of the sources found evaluate Thai or ICD-10-TM data.
-That gap is exactly what this project's demo dataset and RAG index (ICD-10,
-ICD-9, and an ICD-10-TM-for-PCU reference PDF — see `RAG/data/documents.json`)
-are built to start closing. This system's own first accuracy measurement,
-on synthetic data only, is reported in Chapter 6 (§6.3); no measurement
-against real hospital coding exists yet.
+จากแหล่งอ้างอิงทั้ง 5 แหล่ง รูปแบบที่ตีพิมพ์มีความสอดคล้องกัน คือ **RAG ให้ผลดีกว่า LLM ที่ใช้เพียงลำพังในการให้รหัส ICD และการให้รหัสโดยมี RAG ช่วยสามารถเข้าใกล้หรือสูงกว่าเกณฑ์อ้างอิงของผู้ให้รหัสที่เป็นมนุษย์ได้ในกลุ่มตัวอย่างบางกลุ่ม** แต่ทุกการศึกษาประเมินโดยอิงกับภาษา รหัสฉบับดัดแปลง และข้อมูลของระบบสุขภาพ *เฉพาะแห่ง* และไม่มีแหล่งอ้างอิงใดที่พบซึ่งประเมินด้วยข้อมูลภาษาไทยหรือ ICD-10-TM ชุดข้อมูลสาธิตและดัชนี RAG ของโครงการนี้ (ICD-10, ICD-9 และเอกสาร PDF อ้างอิง ICD-10-TM สำหรับ PCU — ดู `RAG/data/documents.json`) สร้างขึ้นเพื่อเริ่มต้นปิดช่องว่างนี้โดยตรง การวัดความแม่นยำครั้งแรกของระบบนี้ ซึ่งวัดบนข้อมูลสมมุติเท่านั้น รายงานไว้ในบทที่ 6 (หัวข้อ 6.3) และยังไม่มีการวัดเทียบกับการให้รหัสจริงของโรงพยาบาล
 
-## 2.3 Why a local RAG stack instead of a cloud LLM API
+## 2.3 เหตุใดจึงใช้ชุดเทคโนโลยี RAG ภายในเครื่องแทน API ของ LLM บนคลาวด์
 
-The team chose a **fully local** pipeline — `BAAI/bge-m3` embeddings,
-a persistent on-disk Chroma vector store, and a small local LLM (an 8B
-Llama-3.1 model served by a host-native Ollama server in the deployed stack,
-or `Qwen/Qwen2.5-0.5B-Instruct` in-process as a fallback) — over calling a
-cloud LLM API (OpenAI, Anthropic,
-Google, etc.). This is a real architecture decision with three grounded
-reasons, not an assumption:
+คณะผู้จัดทำเลือกใช้ไปป์ไลน์ที่ทำงาน **ภายในเครื่องทั้งหมด** ประกอบด้วยเวกเตอร์ฝังตัว (embedding) จาก `BAAI/bge-m3` ฐานข้อมูลเวกเตอร์ Chroma ที่จัดเก็บถาวรบนดิสก์ และ LLM ภายในเครื่องขนาดเล็ก (โมเดล Llama-3.1 ขนาด 8B ที่ให้บริการโดยเซิร์ฟเวอร์ Ollama ซึ่งทำงานโดยตรงบนเครื่องแม่ข่าย (host-native) ในระบบที่นำไปใช้งาน หรือ `Qwen/Qwen2.5-0.5B-Instruct` ที่ทำงานภายในโปรเซสเดียวกันเป็นตัวสำรอง) แทนการเรียกใช้ API ของ LLM บนคลาวด์ (OpenAI, Anthropic, Google เป็นต้น) นี่คือการตัดสินใจด้านสถาปัตยกรรมที่มีเหตุผลรองรับ 3 ประการ ไม่ใช่การตั้งสมมุติฐานเอาเอง
 
-**1. Data residency and Thai law.** Patient chart text — chief complaints,
-present-illness narratives, lab results — is exactly the kind of "sensitive
-personal data" Thailand's PDPA regulates most strictly (Chapter 5 covers this
-in depth). The team's own production checklist already investigated this
-question directly and found that Thailand's data regulator (the PDPC) is
-actively drafting healthcare-specific guidance and that sending data to
-servers outside Thailand is legally constrained; the same document notes
-that Google Cloud opened a Bangkok region in January 2026 for compute, but
-**that region has no GPUs**, so any GPU-accelerated cloud LLM call for this
-workload would by construction leave Thailand
-(`medcode-api/docs/DEPLOYMENT-PREP.md`, §3, "Where it runs — and the
-catch," citing the Google Cloud Bangkok launch announcement and a PDPC
-cross-border-transfer consultation — both re-verified as real sources in
-Chapter 5). A local model sidesteps this question entirely: nothing leaves
-the hospital's network.
-**2. Cost shape.** A cloud LLM API bills per token, per request, indefinitely.
-A local model, once downloaded (a few gigabytes of model files: ~2.3 GB
-for the bge-m3 embedding model plus the generation model), costs nothing
-per suggestion — the team's own pitch
-material states this as a deliberate design property: *"No fee per code. No
-fee per user. No cloud bill if it runs inside the hospital... The cost does
-not grow as the hospital codes more"* (`DEPLOYMENT-PREP.md`, "What it
-costs"). For a public hospital operating under NHSO-funded budgets (Chapter
-1, §1.1), a workload whose AI cost scales with patient volume is a much
-harder sell than a fixed one-time GPU purchase.
-**3. Availability and vendor independence.** RAG is explicitly built as an
-**optional** service in this architecture — the rest of the system keeps
-working with it switched off (Chapter 4, §4.3) — but a cloud API dependency
-would add an external network/vendor-uptime failure mode to a workflow the
-team wants to degrade gracefully, not fail hard, if AI assistance is
-unavailable.
+**1. ถิ่นที่อยู่ของข้อมูลและกฎหมายไทย** ข้อความในเวชระเบียนผู้ป่วย ได้แก่ อาการสำคัญ คำบรรยายประวัติการเจ็บป่วยปัจจุบัน และผลการตรวจทางห้องปฏิบัติการ เป็น "ข้อมูลส่วนบุคคลที่มีความอ่อนไหว" ซึ่งพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) ของประเทศไทยควบคุมเข้มงวดที่สุด (บทที่ 5 อธิบายประเด็นนี้โดยละเอียด) รายการตรวจสอบก่อนนำไปใช้งานจริงของคณะผู้จัดทำได้ศึกษาประเด็นนี้โดยตรงแล้ว และพบว่าหน่วยงานกำกับดูแลด้านข้อมูลของประเทศไทย (PDPC) กำลังร่างแนวปฏิบัติเฉพาะด้านสุขภาพ และการส่งข้อมูลไปยังเซิร์ฟเวอร์นอกประเทศไทยมีข้อจำกัดทางกฎหมาย เอกสารฉบับเดียวกันระบุว่า Google Cloud เปิดภูมิภาค (region) กรุงเทพฯ สำหรับงานประมวลผลในเดือนมกราคม 2026 แต่ **ภูมิภาคดังกล่าวไม่มี GPU** ดังนั้น การเรียกใช้ LLM บนคลาวด์ที่เร่งความเร็วด้วย GPU สำหรับงานนี้ย่อมต้องออกไปนอกประเทศไทยโดยปริยาย (`medcode-api/docs/DEPLOYMENT-PREP.md` หัวข้อ 3 "Where it runs — and the catch" ซึ่งอ้างอิงประกาศเปิดตัวภูมิภาคกรุงเทพฯ ของ Google Cloud และการรับฟังความคิดเห็นของ PDPC เรื่องการโอนข้อมูลข้ามพรมแดน โดยทั้งสองแหล่งได้รับการตรวจสอบซ้ำแล้วว่าเป็นแหล่งข้อมูลจริงในบทที่ 5) โมเดลภายในเครื่องช่วยหลีกเลี่ยงประเด็นนี้ได้ทั้งหมด เนื่องจากไม่มีข้อมูลใดออกนอกเครือข่ายของโรงพยาบาล
+**2. ลักษณะของต้นทุน** API ของ LLM บนคลาวด์คิดค่าบริการตามจำนวนโทเค็นและจำนวนคำขอไปอย่างไม่มีกำหนด ส่วนโมเดลภายในเครื่อง เมื่อดาวน์โหลดแล้ว (ไฟล์โมเดลขนาดไม่กี่กิกะไบต์ ได้แก่ ประมาณ 2.3 GB สำหรับโมเดลเวกเตอร์ฝังตัว bge-m3 รวมกับโมเดลสร้างข้อความ) จะไม่มีค่าใช้จ่ายต่อคำแนะนำแต่ละครั้ง เอกสารนำเสนอผลงานของคณะผู้จัดทำระบุว่านี่เป็นคุณสมบัติที่ตั้งใจออกแบบไว้: *"ไม่มีค่าธรรมเนียมต่อรหัส ไม่มีค่าธรรมเนียมต่อผู้ใช้ ไม่มีค่าบริการคลาวด์หากทำงานภายในโรงพยาบาล... ต้นทุนไม่เพิ่มขึ้นแม้โรงพยาบาลจะให้รหัสมากขึ้น"* (`DEPLOYMENT-PREP.md` ส่วน "What it costs") สำหรับโรงพยาบาลรัฐที่ดำเนินงานด้วยงบประมาณจากสำนักงานหลักประกันสุขภาพแห่งชาติ (สปสช.) (บทที่ 1 หัวข้อ 1.1) งานที่มีต้นทุน AI เพิ่มขึ้นตามจำนวนผู้ป่วยย่อมโน้มน้าวให้ยอมรับได้ยากกว่าการซื้อ GPU ครั้งเดียวในราคาคงที่อย่างมาก
+**3. ความพร้อมใช้งานและความเป็นอิสระจากผู้ให้บริการ** ในสถาปัตยกรรมนี้ RAG ถูกออกแบบอย่างชัดเจนให้เป็นบริการ **ทางเลือก** (optional) กล่าวคือ ส่วนอื่นของระบบยังทำงานได้แม้ปิดบริการนี้ (บทที่ 4 หัวข้อ 4.3) แต่การพึ่งพา API บนคลาวด์จะเพิ่มรูปแบบความล้มเหลวจากภายนอก ได้แก่ เครือข่ายหรือความพร้อมให้บริการของผู้ให้บริการ เข้ามาในขั้นตอนการทำงานที่คณะผู้จัดทำต้องการให้ลดระดับการทำงานลงอย่างนุ่มนวล (degrade gracefully) แทนการล้มเหลวทั้งหมด หากความช่วยเหลือจาก AI ไม่พร้อมใช้งาน
 
-The trade-off the team is making, explicitly, is **retrieval quality and
-model capability for data control and cost predictability**. A 0.5B–8B
-locally-hosted model is materially weaker than a frontier cloud model; the
-mitigation the codebase applies is to lean harder on retrieval grounding
-(the `unverified_codes` check, the system prompt's "answer only from
-context" instruction, and the coder-taught "Suggest & Learn" rules layer —
-all detailed in Chapter 4) rather than model scale, which is consistent with
-the "RAG prompting substantially improved base LLM performance" finding
-above (the German tumor-diagnosis comparative study).
+ข้อแลกเปลี่ยนที่คณะผู้จัดทำเลือกอย่างชัดแจ้ง คือ **ยอมแลกคุณภาพการค้นคืนและขีดความสามารถของโมเดล เพื่อให้ได้การควบคุมข้อมูลและต้นทุนที่คาดการณ์ได้** โมเดลขนาด 0.5B–8B ที่ติดตั้งภายในเครื่องมีขีดความสามารถด้อยกว่าโมเดลระดับแนวหน้า (frontier) บนคลาวด์อย่างเห็นได้ชัด แนวทางบรรเทาที่ซอร์สโค้ดของระบบนำมาใช้ คือการพึ่งพาการยึดโยงกับแหล่งที่มาจากการค้นคืนให้มากขึ้น (การตรวจสอบ `unverified_codes` คำสั่ง "ตอบจากบริบทเท่านั้น" ในพรอมต์ระบบ และชั้นกฎ "แนะนำรหัส (Suggest & Learn)" ที่ผู้ให้รหัสสอน ซึ่งทั้งหมดอธิบายรายละเอียดไว้ในบทที่ 4) แทนการเพิ่มขนาดโมเดล ซึ่งสอดคล้องกับข้อค้นพบข้างต้นที่ว่า "การใช้พรอมต์แบบ RAG ช่วยเพิ่มประสิทธิภาพของ LLM พื้นฐานได้อย่างมาก" (การศึกษาเปรียบเทียบด้านการวินิจฉัยเนื้องอกในภาษาเยอรมัน)
 
-## 2.4 What the reviewed related work does *not* cover — the gap this project targets
+## 2.4 สิ่งที่งานที่เกี่ยวข้องซึ่งได้ทบทวนไม่ได้ครอบคลุม — ช่องว่างที่โครงการนี้มุ่งเป้า
 
-Synthesizing §2.1–2.3, three gaps in the reviewed prior art are what this
-project is positioned against:
+เมื่อสังเคราะห์เนื้อหาจากหัวข้อ 2.1–2.3 พบช่องว่าง 3 ประการในงานก่อนหน้าที่ได้ทบทวน ซึ่งเป็นจุดที่โครงการนี้วางตำแหน่งไว้ ดังนี้
 
-1. **No Thai-language, ICD-10-TM-aware assisted-coding product or published
-   study was found.** Every CAC product and every RAG-for-ICD paper located
-   targets English, German, or Russian coding systems.
-2. **Commercial CAC (§2.1) is cloud/enterprise-first**; the local,
-   offline-capable, single-GPU-or-less deployment model this project targets
-   (Chapter 3) is a different operating point, aimed at a resource-constrained
-   public hospital rather than a large private health system.
-3. **Published RAG-for-coding studies (§2.2) measure retrospectively against
-   already-coded records** (e.g., the ED ICD-10-CM comparison); none of them
-   are deployed as a live, human-in-the-loop coder tool with a reversible
-   write-back to a real hospital information system — which is what Chapter 4
-   describes this project as having built (approve/reopen, audit journal,
-   diff-based write-back). The complementary measurement — this system's
-   suggestions scored against the partner hospital's own historical coding,
-   using the Klang et al. methodology — has not been done, because it needs
-   real hospital data (Chapter 8).
+1. **ไม่พบผลิตภัณฑ์หรืองานวิจัยที่ตีพิมพ์ด้านการให้รหัสโดยมีเครื่องมือช่วยที่รองรับภาษาไทยและ ICD-10-TM** ผลิตภัณฑ์ CAC และบทความด้าน RAG สำหรับ ICD ทุกรายการที่พบมุ่งเป้าไปที่ระบบรหัสภาษาอังกฤษ ภาษาเยอรมัน หรือภาษารัสเซีย
+2. **CAC เชิงพาณิชย์ (หัวข้อ 2.1) ให้ความสำคัญกับคลาวด์/ระดับองค์กรเป็นหลัก** ในขณะที่รูปแบบการนำไปใช้งานจริงที่โครงการนี้มุ่งเป้า (บทที่ 3) ซึ่งทำงานภายในเครื่อง ทำงานแบบออฟไลน์ได้ และใช้ GPU ไม่เกิน 1 ตัว เป็นจุดดำเนินงานที่แตกต่างออกไป โดยมุ่งเป้าไปที่โรงพยาบาลรัฐที่มีทรัพยากรจำกัด แทนที่จะเป็นระบบสุขภาพเอกชนขนาดใหญ่
+3. **งานวิจัยด้าน RAG สำหรับการให้รหัสที่ตีพิมพ์แล้ว (หัวข้อ 2.2) วัดผลแบบย้อนหลังเทียบกับเวชระเบียนที่ให้รหัสไว้แล้ว** (เช่น การเปรียบเทียบ ICD-10-CM ในแผนกฉุกเฉิน) ไม่มีงานใดที่นำไปใช้งานจริงในรูปแบบเครื่องมือสำหรับผู้ให้รหัสที่ทำงานจริงแบบมนุษย์ร่วมตัดสินใจ (human-in-the-loop) พร้อมการบันทึกกลับลงระบบสารสนเทศโรงพยาบาลจริงที่ย้อนกลับได้ ซึ่งบทที่ 4 อธิบายว่าเป็นสิ่งที่โครงการนี้ได้สร้างขึ้น (อนุมัติ/เปิดใหม่ บันทึกประวัติเพื่อการตรวจสอบ และการบันทึกกลับตามส่วนต่าง (diff)) การวัดผลในส่วนที่เสริมกัน คือการให้คะแนนรหัสที่ระบบนี้แนะนำเทียบกับการให้รหัสในอดีตของโรงพยาบาลพันธมิตร โดยใช้วิธีการของ Klang et al. ยังไม่ได้ดำเนินการ เนื่องจากต้องใช้ข้อมูลจริงของโรงพยาบาล (บทที่ 8)

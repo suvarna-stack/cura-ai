@@ -1,15 +1,15 @@
 flowchart TD
-  start(["POST /api/cases/approve"]) --> lock["take the single write lock"]
-  lock --> p1["PHASE 1 · our transaction<br/>ticked codes → case_codes<br/>case finalized · history row"]
+  start(["POST /api/cases/approve"]) --> lock["ถือล็อกการเขียนซึ่งมีเพียงตัวเดียว"]
+  lock --> p1["ขั้นที่ 1 · ทรานแซกชันฝั่ง medcode<br/>รหัสที่ติ๊ก → case_codes<br/>ปิดเคส · เพิ่มแถวประวัติ"]
   p1 --> commit[("COMMIT medcode")]
-  commit --> live["read the hospital's live rows"]
-  live --> diff{"diff final set<br/>vs live rows"}
-  diff -->|removed| del["cancel (W3/W4)"]
-  diff -->|changed| put["edit (W2)"]
-  diff -->|new| post["create (W1)"]
-  del --> j["journal before-image<br/>imed_write_ops"]
+  commit --> live["อ่านแถวปัจจุบันในระบบโรงพยาบาล"]
+  live --> diff{"เทียบชุดรหัสสุดท้าย<br/>กับแถวปัจจุบัน"}
+  diff -->|"ถูกนำออก"| del["ยกเลิก (W3/W4)"]
+  diff -->|"เปลี่ยนแปลง"| put["แก้ไข (W2)"]
+  diff -->|"ใหม่"| post["สร้าง (W1)"]
+  del --> j["บันทึกข้อมูลก่อนเปลี่ยน<br/>imed_write_ops"]
   put --> j
   post --> j
   j --> st["coding_status = approved"]
   st --> done(["200 OK"])
-  diff -.->|"hospital call fails"| err(["500: our side committed<br/>approve again, the diff heals"])
+  diff -.->|"เรียกระบบโรงพยาบาลไม่สำเร็จ"| err(["500: ฝั่ง medcode commit แล้ว<br/>อนุมัติอีกครั้ง การเทียบส่วนต่างจะแก้ให้ตรงกัน"])

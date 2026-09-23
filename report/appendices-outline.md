@@ -1,14 +1,13 @@
-# Appendices
+# ภาคผนวก
 
-| Appendix | Contents |
+| ภาคผนวก | เนื้อหา |
 |---|---|
-| A — API reference | The backend's endpoint index, auth model and the hospital contract; full reference in `medcode-stack/docs/api-reference.md` |
-| B — Architecture and data-flow diagrams | Two views from the maintained data-flow diagrams, and the service/port table |
-| C — Database schema | Every Flyway migration of both databases, and the plain-language glossary |
-| D — Test cases and evidence | Automated test suites and what each covers; raw output in `eval-results/` |
-| E — Screenshots | Every screen of the running system, coder and admin |
-| F — Production-readiness checklist | Summary of the 28-item checklist for running the system in a real hospital |
-| G — Data provenance | How the synthetic demo dataset is generated, and why it is safe to use |
+| ก — เอกสารอ้างอิง API | ดัชนี endpoint ของระบบส่วนหลัง (backend) รูปแบบการยืนยันตัวตน และสัญญาการเชื่อมต่อกับโรงพยาบาล เอกสารอ้างอิงฉบับเต็มอยู่ใน `medcode-stack/docs/api-reference.md` |
+| ข — แผนภาพสถาปัตยกรรมและการไหลของข้อมูล | มุมมอง 2 แบบจากแผนภาพการไหลของข้อมูลที่มีการดูแลปรับปรุงอยู่ และตารางบริการและพอร์ต |
+| ค — โครงสร้างฐานข้อมูล | migration ของ Flyway ทุกรายการของฐานข้อมูลทั้งสอง และอภิธานศัพท์ภาษาที่เข้าใจง่าย |
+| ง — กรณีทดสอบและหลักฐาน | ชุดทดสอบอัตโนมัติและขอบเขตที่แต่ละชุดครอบคลุม ผลลัพธ์ดิบอยู่ใน `eval-results/` |
+| จ — ภาพหน้าจอ | ทุกหน้าจอของระบบขณะทำงาน ทั้งฝั่งผู้ให้รหัสและผู้ดูแลระบบ |
+| ฉ — รายการตรวจสอบความพร้อมสำหรับการใช้งานจริง | สรุปรายการตรวจสอบ 28 รายการสำหรับการใช้งานระบบในโรงพยาบาลจริง |
+| ช — ที่มาของข้อมูล | วิธีสร้างชุดข้อมูลสมมุติสำหรับการสาธิต และเหตุผลที่ข้อมูลนี้ปลอดภัยต่อการใช้งาน |
 
-Each appendix summarises its source document and names it by path. The full
-documents stay in the repositories, where they are versioned with the code.
+ภาคผนวกแต่ละส่วนสรุปเนื้อหาจากเอกสารต้นทาง และระบุเอกสารดังกล่าวด้วยพาธ (path) ส่วนเอกสารฉบับเต็มยังคงอยู่ในคลังโค้ด (repository) ซึ่งมีการจัดการเวอร์ชันร่วมกับโค้ด

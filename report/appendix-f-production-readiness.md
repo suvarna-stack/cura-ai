@@ -1,51 +1,47 @@
-# Appendix F — Production-readiness checklist
+# ภาคผนวก ฉ รายการตรวจสอบความพร้อมสำหรับการนำไปใช้งานจริง
 
-Supporting material for Chapter 8. The full 28-item checklist is
-`medcode-api/docs/DEPLOYMENT-PREP.md` (24 August 2026, about 3,100 words),
-written for a non-engineering audience. Each item carries two markers:
+เอกสารประกอบบทที่ 8 รายการตรวจสอบฉบับเต็มจำนวน 28 รายการอยู่ที่
+`medcode-api/docs/DEPLOYMENT-PREP.md` (ลงวันที่ 24 สิงหาคม 2026 ความยาวประมาณ 3,100 คำ)
+ซึ่งเขียนสำหรับผู้อ่านที่ไม่ใช่วิศวกร แต่ละรายการมีเครื่องหมายกำกับ 2 ชนิด ดังนี้
 
-| Marker | Meaning |
+| เครื่องหมาย | ความหมาย |
 |---|---|
-| 🟢 / 🟡 / 🔴 | Who acts: 🟢 the team does it · 🟡 needs the hospital's answer · 🔴 blocks everything until answered |
-| `[say]` / `[ask]` / `[IT]` | Audience: `[say]` for the spoken pitch · `[ask]` hospital decisions, raised as a group · `[IT]` technical handout detail |
+| 🟢 / 🟡 / 🔴 | ผู้ดำเนินการ: 🟢 คณะผู้จัดทำดำเนินการเอง · 🟡 ต้องรอคำตอบจากโรงพยาบาล · 🔴 งานทั้งหมดหยุดชะงักจนกว่าจะได้คำตอบ |
+| `[say]` / `[ask]` / `[IT]` | กลุ่มผู้รับสาร: `[say]` สำหรับการนำเสนอด้วยวาจา · `[ask]` เรื่องที่โรงพยาบาลต้องตัดสินใจ ซึ่งยกขึ้นหารือรวมกันเป็นกลุ่ม · `[IT]` รายละเอียดทางเทคนิคสำหรับเอกสารแจก |
 
-Its own summary, quoted as written on 24 August 2026 (the test count has
-since grown to 192 across the three services, Chapter 6):
+บทสรุปของเอกสารดังกล่าว ยกมาตามที่เขียนไว้เมื่อวันที่ 24 สิงหาคม 2026 (หลังจากนั้นจำนวนการทดสอบเพิ่มขึ้นเป็น 192 รายการ
+ใน 3 บริการ ดูบทที่ 6) มีดังนี้
 
-> **The app is finished and tested.** It pulls a visit out of the hospital
-> system, suggests the codes, a coder checks and approves, and the approved
-> codes land back in the hospital's own records. 65 automatic tests cover
-> that path.
+> **แอปพลิเคชันพัฒนาเสร็จและผ่านการทดสอบแล้ว** ระบบดึงข้อมูลการมารับบริการออกจากระบบของโรงพยาบาล
+> แนะนำรหัส เจ้าหน้าที่ให้รหัสโรคตรวจสอบและอนุมัติ แล้วรหัสที่อนุมัติจะถูกบันทึกกลับลงในระบบข้อมูลของโรงพยาบาลเอง
+> การทดสอบอัตโนมัติ (automated test) 65 รายการครอบคลุมเส้นทางการทำงานนี้
 >
-> To run it in a real hospital, three more things are needed, none of them
-> code: **1)** the hospital's own login system, **2)** the hospital's data
-> (ID lists, code books, answers to 3 questions), **3)** machines (2 normal
-> servers + 1 GPU that stays in the hospital building — sized in
-> `HARDWARE_SPEC.md`).
+> หากจะใช้งานในโรงพยาบาลจริง ยังต้องมีอีก 3 สิ่ง ซึ่งไม่มีสิ่งใดเป็นงานเขียนโปรแกรม ได้แก่
+> **1)** ระบบยืนยันตัวตนผู้ใช้ของโรงพยาบาลเอง **2)** ข้อมูลของโรงพยาบาล (รายการ ID คู่มือรหัส และคำตอบของคำถาม 3 ข้อ)
+> **3)** เครื่องคอมพิวเตอร์ (เครื่องแม่ข่ายทั่วไป 2 เครื่อง + เครื่อง GPU 1 เครื่องที่ต้องตั้งอยู่ภายในอาคารโรงพยาบาล — ระบุขนาดไว้ใน
+> `HARDWARE_SPEC.md`)
 >
-> **28 things to do. 23 need the hospital. 5 are ours. 3 of the 28 need a
-> decision only the hospital can make** — until those come back, real-patient
-> testing can't start. Our own remaining work takes days; the waiting takes
-> weeks.
+> **มีงานที่ต้องทำ 28 รายการ ในจำนวนนี้ 23 รายการต้องอาศัยโรงพยาบาล อีก 5 รายการเป็นงานของคณะผู้จัดทำ และ 3 ใน 28
+> รายการต้องอาศัยการตัดสินใจที่มีเพียงโรงพยาบาลเท่านั้นที่ทำได้** — จนกว่าจะได้คำตอบเหล่านั้น การทดสอบกับข้อมูลผู้ป่วยจริงจะเริ่มต้นไม่ได้
+> งานที่เหลือของคณะผู้จัดทำใช้เวลาในหลักวัน ส่วนการรอคำตอบใช้เวลาในหลักสัปดาห์
 
-## Section index (`DEPLOYMENT-PREP.md`)
+## สารบัญหัวข้อ (`DEPLOYMENT-PREP.md`)
 
-| Section | Covers |
+| หัวข้อ | เนื้อหา |
 |---|---|
-| What works today | The tested, working path as of the checklist date |
-| Safety, and what the hospital gains | Why this is safe to pilot |
-| What it costs | Ties into `HARDWARE_SPEC.md` |
-| The 5 steps to the first real patient | The critical path |
-| 1 · Logging in, network, and test copies | Auth + staging |
-| 2 · Getting ready to touch real patient records | PDPA-adjacent readiness |
-| 3 · The machines, and keeping them running | Ops |
-| The whole ask, in one sentence | Single-sentence summary for a decision-maker |
-| Sources checked on 24 Aug 2026 | Citation trail for every factual claim in the doc |
+| สิ่งที่ใช้งานได้ในปัจจุบัน | เส้นทางการทำงานที่ผ่านการทดสอบและใช้งานได้ ณ วันที่จัดทำรายการตรวจสอบ |
+| ความปลอดภัย และประโยชน์ที่โรงพยาบาลได้รับ | เหตุผลที่ระบบปลอดภัยเพียงพอสำหรับการทดลองใช้นำร่อง |
+| ค่าใช้จ่าย | เชื่อมโยงกับ `HARDWARE_SPEC.md` |
+| 5 ขั้นตอนสู่ผู้ป่วยจริงรายแรก | เส้นทางวิกฤต (critical path) |
+| 1 · การเข้าสู่ระบบ เครือข่าย และสำเนาสำหรับทดสอบ | การยืนยันตัวตน (auth) + สภาพแวดล้อมทดสอบก่อนใช้งานจริง (staging) |
+| 2 · การเตรียมพร้อมก่อนเข้าถึงเวชระเบียนผู้ป่วยจริง | ความพร้อมในประเด็นที่เกี่ยวเนื่องกับ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA) |
+| 3 · เครื่องคอมพิวเตอร์ และการดูแลให้ทำงานต่อเนื่อง | งานปฏิบัติการระบบ (ops) |
+| คำขอทั้งหมดในประโยคเดียว | บทสรุปในประโยคเดียวสำหรับผู้มีอำนาจตัดสินใจ |
+| แหล่งข้อมูลที่ตรวจสอบเมื่อวันที่ 24 ส.ค. 2026 | ร่องรอยการอ้างอิงสำหรับข้อเท็จจริงทุกข้อในเอกสาร |
 
-## The 2-minute pitch script
+## บทพูดนำเสนอความยาว 2 นาที
 
-`medcode-api/docs/PITCH-2MIN.md` (1,106 words) is the condensed spoken
-version of the same material — useful if the assessment includes an oral
-defense/pitch component. Sections: the script itself, "one line to decide
-on the day," "do not say," "if asked" (anticipated questions), "if you have
-one slide."
+`medcode-api/docs/PITCH-2MIN.md` (1,106 คำ) เป็นฉบับย่อสำหรับการนำเสนอด้วยวาจาของเนื้อหาชุดเดียวกัน
+ซึ่งเป็นประโยชน์หากการประเมินมีส่วนของการสอบปากเปล่าหรือการนำเสนอ (pitch) เอกสารประกอบด้วยหัวข้อ ได้แก่
+ตัวบทพูด "ประโยคเดียวสำหรับการตัดสินใจในวันนั้น" "สิ่งที่ห้ามพูด" "หากถูกถาม" (คำถามที่คาดว่าจะพบ)
+และ "หากมีสไลด์เพียงแผ่นเดียว"

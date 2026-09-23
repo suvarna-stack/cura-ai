@@ -45,16 +45,21 @@ for f in "${FILES[@]}"; do
   { echo; echo; echo '<div class="pagebreak"></div>'; echo; echo; cat "$f"; } >> CURA-AI-Report.md
 done
 
+# Thai has no spaces between words, but pandoc turns every soft line break
+# into one, so a paragraph wrapped mid-sentence gets stray gaps. Join lines
+# where Thai meets Thai across the break (optionally through ** emphasis).
+perl -CSD -0pi -e 's/(\p{Thai}(?:\*\*)?)\n[ \t]*(?=(?:\*\*)?\p{Thai})/$1/g' CURA-AI-Report.md
+
 echo "Converting to HTML (pandoc)..."
 # The cover and abstract go in through --include-before-body, which pandoc
 # places BEFORE the table of contents: cover, abstract, contents, chapters.
 pandoc front-matter.md -f markdown -t html5 -o .front-matter.html
 pandoc CURA-AI-Report.md \
-  -f markdown -t html5 --standalone \
+  -f markdown+ascii_identifiers -t html5 --standalone \
   --css=report-print.css \
   --include-before-body=.front-matter.html \
-  --metadata pagetitle="CURA AI — Final Report" \
-  --toc --toc-depth=2 --metadata toc-title="Table of Contents" \
+  --metadata pagetitle="CURA AI — รายงานฉบับสมบูรณ์" --metadata lang=th \
+  --toc --toc-depth=2 --metadata toc-title="สารบัญ" \
   -o CURA-AI-Report.html
 rm -f .front-matter.html
 # The TOC links are flex rows (for the dot leaders), and flex drops the spaces

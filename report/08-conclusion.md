@@ -1,184 +1,57 @@
-# Chapter 8 — Conclusion
+# บทที่ 8 บทสรุป
 
-This chapter is structured as two lists, what can be claimed now and what
-genuinely remains, followed by what we learned and what running the system
-would cost.
+บทนี้จัดโครงสร้างเป็นสองรายการ ได้แก่ สิ่งที่สามารถกล่าวอ้างได้ในปัจจุบัน และสิ่งที่ยังคงเหลืออยู่จริง ตามด้วยบทเรียนที่คณะผู้จัดทำได้รับ และค่าใช้จ่ายในการดำเนินงานระบบ
 
-## 8.1 What is built, and what the demo actually proves
+## 8.1 สิ่งที่พัฒนาแล้ว และสิ่งที่การสาธิตพิสูจน์ได้จริง
 
-The following can be stated as fact, because it is demonstrated by working
-code and the automated test suites (191 of 192 tests passing, Chapter 6
-§6.1; raw output in `eval-results/`), not by aspiration:
+ข้อความต่อไปนี้สามารถกล่าวได้ในฐานะข้อเท็จจริง เนื่องจากได้รับการพิสูจน์ด้วยโค้ดที่ทำงานได้จริงและชุดทดสอบอัตโนมัติ (automated test suite) ซึ่งผ่านการทดสอบ 191 จาก 192 รายการ (บทที่ 6 หัวข้อ 6.1 โดยผลลัพธ์ดิบอยู่ใน `eval-results/`) มิใช่เพียงความคาดหวัง
 
-- **A complete, working, human-in-the-loop coding pipeline exists**, from
-  pulling a visit out of a hospital system, through AI-assisted suggestion,
-  coder review and edit, to an auditable, reversible write-back into the
-  hospital's own database — all five services running together via a single
-  `docker compose up` command (`medcode-stack/README.md`).
-- **The write-back is not a mock-only trick.** It was built field-for-field
-  against the hospital's own real API contract PDF and its request/response
-  bodies are documented exactly as the code emits them
-  (`medcode-api/docs/imed-writeback-as-built.md`) — the gap to production is
-  a base-URL and token swap plus the open hospital questions in §8.3, not a
-  rewrite.
-- **The AI-assistance safety model is enforced in code, not just policy**:
-  suggestions write nothing, nothing is pre-selected, generation is grounded
-  against retrieved reference text with an explicit `unverified_codes` check,
-  and the whole AI layer can be switched off without breaking the rest of the
-  workflow (Chapter 4, §4.3).
-- **The demo dataset is honest about what it is**: deterministic, synthetic,
-  documented, and reversible (Chapter 5) — nothing about the demo pretends to
-  be real patient data or a real accuracy measurement.
-- **The path to production is written down.** `medcode-api/docs/DEPLOYMENT-PREP.md`
-  is a 28-item checklist that separates what the team controls from what
-  only the hospital can decide, including the two largest gaps this report
-  also names: no PDPA compliance work and no accuracy comparison against
-  real coded data.
+- **มีกระบวนการให้รหัสแบบมนุษย์ร่วมตัดสินใจ (human-in-the-loop) ที่สมบูรณ์และทำงานได้จริง** ตั้งแต่การดึงข้อมูลการมารับบริการออกจากระบบของโรงพยาบาล ผ่านการแนะนำรหัสโดยมี AI ช่วย การตรวจทานและแก้ไขโดยเจ้าหน้าที่ให้รหัสโรค ไปจนถึงการบันทึกกลับ (write-back) ลงฐานข้อมูลของโรงพยาบาลเอง ซึ่งตรวจสอบย้อนหลังได้และย้อนกลับได้ โดยบริการทั้ง 5 บริการทำงานร่วมกันด้วยคำสั่ง `docker compose up` เพียงคำสั่งเดียว (`medcode-stack/README.md`)
+- **การบันทึกกลับมิใช่กลไกที่ใช้ได้เฉพาะกับระบบจำลอง** ส่วนนี้พัฒนาขึ้นโดยยึดตามเอกสาร PDF สัญญาการเชื่อมต่อ API ฉบับจริงของโรงพยาบาลทีละฟิลด์ และมีการบันทึกเนื้อหาคำขอและคำตอบ (request/response body) ไว้ตรงตามที่โค้ดส่งออกจริงทุกประการ (`medcode-api/docs/imed-writeback-as-built.md`) ช่องว่างที่เหลือก่อนนำไปใช้ในสภาพแวดล้อมใช้งานจริงคือการเปลี่ยน base URL และโทเคน รวมถึงคำถามที่ยังค้างอยู่กับโรงพยาบาลในหัวข้อ 8.2 มิใช่การเขียนระบบใหม่
+- **แนวทางความปลอดภัยของการใช้ AI ช่วยเหลือถูกบังคับใช้ในระดับโค้ด มิใช่เพียงในระดับนโยบาย**: คำแนะนำไม่บันทึกข้อมูลใด ๆ ไม่มีรายการใดถูกเลือกไว้ล่วงหน้า การสร้างข้อความ (generation) ยึดโยงกับข้อความอ้างอิงที่ได้จากการค้นคืน (retrieval) โดยมีการตรวจสอบ `unverified_codes` อย่างชัดแจ้ง และสามารถปิดชั้น AI ทั้งหมดได้โดยไม่ทำให้ขั้นตอนการทำงานส่วนอื่นเสียหาย (บทที่ 4 หัวข้อ 4.3)
+- **ชุดข้อมูลสาธิตระบุสถานะของตนเองอย่างตรงไปตรงมา**: เป็นข้อมูลที่สร้างแบบกำหนดผลได้แน่นอน (deterministic) เป็นข้อมูลสมมุติ (synthetic data) มีเอกสารกำกับ และย้อนกลับได้ (บทที่ 5) ไม่มีส่วนใดของการสาธิตที่แสร้งว่าเป็นข้อมูลผู้ป่วยจริงหรือเป็นการวัดความแม่นยำจริง
+- **เส้นทางสู่การนำไปใช้งานจริงได้รับการบันทึกเป็นลายลักษณ์อักษรแล้ว** `medcode-api/docs/DEPLOYMENT-PREP.md` เป็นรายการตรวจสอบ 28 รายการที่แยกสิ่งที่คณะผู้จัดทำควบคุมได้ออกจากสิ่งที่มีเพียงโรงพยาบาลเท่านั้นที่ตัดสินใจได้ รวมถึงช่องว่างที่ใหญ่ที่สุด 2 ประการที่รายงานฉบับนี้ระบุไว้เช่นกัน ได้แก่ การยังไม่มีการดำเนินการด้านการปฏิบัติตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) และการยังไม่มีการเปรียบเทียบความแม่นยำกับข้อมูลที่ให้รหัสแล้วจริง
 
-**What the demo does *not* prove**, stated with equal directness: it does
-not prove the AI suggestions are clinically accurate on real charts (the
-only accuracy measurement is on synthetic data, and it is weak — Chapter 6
-§6.3; no comparison against real hospital-coded data exists), it does not
-prove the system performs acceptably at real hospital volumes (the load test
-ran on one machine against the read path, and concurrent writes by several
-coders were not tested — Chapter 6 §6.2), and it does not prove the write-back contract matches the hospital's
-*actual* production behavior, because — as the team's own docs state
-outright — **"MedCode AI has never called a real iMed server"**
-(`medcode-api/docs/imed-writeback-as-built.md`, opening status note). Every
-response shape this system codes against is what the mock, built from the
-hospital's PDF, returns — not a production observation.
+**สิ่งที่การสาธิต *ไม่ได้* พิสูจน์** ซึ่งขอกล่าวอย่างตรงไปตรงมาในระดับเดียวกัน ได้แก่ การสาธิตไม่ได้พิสูจน์ว่ารหัสที่ AI แนะนำมีความแม่นยำทางคลินิกเมื่อใช้กับเวชระเบียนจริง (การวัดความแม่นยำเพียงรายการเดียวที่มีอยู่ทำบนข้อมูลสมมุติ และผลที่ได้ยังอ่อน ตามบทที่ 6 หัวข้อ 6.3 และยังไม่มีการเปรียบเทียบกับข้อมูลที่โรงพยาบาลให้รหัสไว้จริง) ไม่ได้พิสูจน์ว่าระบบมีประสิทธิภาพในระดับที่ยอมรับได้ภายใต้ปริมาณงานจริงของโรงพยาบาล (การทดสอบภาระงาน (load test) ดำเนินการบนเครื่องเดียวโดยทดสอบกับเส้นทางการอ่านข้อมูล (read path) และยังไม่ได้ทดสอบการเขียนข้อมูลพร้อมกันโดยผู้ให้รหัสหลายคน ตามบทที่ 6 หัวข้อ 6.2) และไม่ได้พิสูจน์ว่าสัญญาการเชื่อมต่อของการบันทึกกลับตรงกับพฤติกรรม *ที่แท้จริง* ของระบบโรงพยาบาลในสภาพแวดล้อมใช้งานจริง เนื่องจากดังที่เอกสารของคณะผู้จัดทำเองระบุไว้อย่างชัดเจนว่า **"MedCode AI ไม่เคยเรียกใช้เซิร์ฟเวอร์ iMed จริงเลย"** (`medcode-api/docs/imed-writeback-as-built.md` หมายเหตุสถานะในตอนต้นเอกสาร) รูปแบบคำตอบทุกแบบที่ระบบนี้เขียนโค้ดรองรับ ล้วนเป็นสิ่งที่ระบบจำลองซึ่งสร้างขึ้นจากเอกสาร PDF ของโรงพยาบาลส่งกลับมา มิใช่สิ่งที่สังเกตได้จากสภาพแวดล้อมใช้งานจริง
 
-## 8.2 What is needed for real deployment: the gap list
+## 8.2 สิ่งที่จำเป็นสำหรับการนำไปใช้งานจริง: รายการสิ่งที่ยังขาด
 
-This list intentionally mirrors the structure the team already built in
-`medcode-api/docs/DEPLOYMENT-PREP.md` (28 items, tagged by who owns each
-one) rather than inventing a new taxonomy — reproducing their own honest
-accounting is more credible than restating it in different words. Grouped
-by theme:
+รายการนี้ตั้งใจจัดให้สอดคล้องกับโครงสร้างที่คณะผู้จัดทำได้จัดทำไว้แล้วใน `medcode-api/docs/DEPLOYMENT-PREP.md` (28 รายการ โดยแต่ละรายการระบุผู้รับผิดชอบ) แทนการคิดระบบการจำแนกขึ้นใหม่ เนื่องจากการนำบัญชีรายการที่จัดทำไว้อย่างตรงไปตรงมานั้นมาใช้ซ้ำมีความน่าเชื่อถือมากกว่าการกล่าวซ้ำด้วยถ้อยคำอื่น โดยจัดกลุ่มตามประเด็นได้ดังนี้
 
-**1. Hospital data & the biggest open technical question.** Production needs
-the hospital's real ID lists (visit type, diagnosis type, operation type,
-discharge status — this system currently uses safe placeholders), a real
-feed for the 11 kinds of data this system reads (nothing currently sends
-that data automatically — sync happens against the mock), and — the single
-largest open unknown in the entire integration — **how a coding approval,
-which happens *after* a patient is discharged, interacts with the hospital's
-requirement that every write include discharge information**
-(`medcode-api/docs/imed-integration.md`, open question 3). This is not a
-minor implementation detail; until it is answered, the write-back's
-discharge-object fields remain deliberately non-clinical placeholders.
+**1. ข้อมูลของโรงพยาบาลและคำถามทางเทคนิคที่ยังค้างอยู่ซึ่งใหญ่ที่สุด** การใช้งานในสภาพแวดล้อมใช้งานจริงต้องอาศัยรายการรหัสอ้างอิง (ID) จริงของโรงพยาบาล (ประเภทการมารับบริการ ประเภทการวินิจฉัย ประเภทหัตถการ และสถานะการจำหน่าย ซึ่งปัจจุบันระบบนี้ใช้ค่าตัวยึดตำแหน่ง (placeholder) ที่ปลอดภัยแทน) แหล่งป้อนข้อมูลจริงสำหรับข้อมูล 11 ประเภทที่ระบบนี้อ่าน (ปัจจุบันยังไม่มีสิ่งใดส่งข้อมูลดังกล่าวเข้ามาโดยอัตโนมัติ การซิงค์ดำเนินการกับระบบจำลอง) และประเด็นที่ยังไม่ทราบคำตอบซึ่งใหญ่ที่สุดเพียงประเด็นเดียวในการเชื่อมต่อทั้งหมด คือ **การอนุมัติการให้รหัสซึ่งเกิดขึ้น *หลังจาก* ผู้ป่วยได้รับการจำหน่ายแล้ว จะสอดคล้องกับข้อกำหนดของโรงพยาบาลที่ให้การเขียนข้อมูลทุกครั้งต้องมีข้อมูลการจำหน่ายอย่างไร** (`medcode-api/docs/imed-integration.md` คำถามที่ยังค้างอยู่ข้อที่ 3) ประเด็นนี้มิใช่รายละเอียดเล็กน้อยในการพัฒนา และจนกว่าจะได้คำตอบ ฟิลด์ในออบเจกต์ข้อมูลการจำหน่าย (discharge object) ของการบันทึกกลับจะยังคงเป็นค่าตัวยึดตำแหน่งที่ไม่ใช่ข้อมูลทางคลินิกโดยเจตนา
 
-**2. Identity and access.** Coders currently log in with an email/password
-this system manages itself. Production needs integration with the
-hospital's own identity system (SAML or OIDC — Entra ID, AD FS, Google
-Workspace, or Keycloak, depending on what the hospital already runs), so
-access is revoked the same hour an employee leaves, rather than depending on
-someone remembering to tell this system (`DEPLOYMENT-PREP.md`, §1).
+**2. การยืนยันตัวตนและการควบคุมการเข้าถึง** ปัจจุบันผู้ให้รหัสเข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่ระบบนี้จัดการเอง การใช้งานจริงจำเป็นต้องเชื่อมต่อกับระบบยืนยันตัวตนของโรงพยาบาลเอง (SAML หรือ OIDC — Entra ID, AD FS, Google Workspace หรือ Keycloak ขึ้นอยู่กับระบบที่โรงพยาบาลใช้งานอยู่แล้ว) เพื่อให้สิทธิ์การเข้าถึงถูกเพิกถอนภายในชั่วโมงเดียวกับที่พนักงานออกจากงาน แทนที่จะขึ้นอยู่กับว่ามีผู้ใดจำได้ที่จะแจ้งระบบนี้หรือไม่ (`DEPLOYMENT-PREP.md` หัวข้อ 1)
 
-**3. Infrastructure.** Two ordinary servers and one GPU (24 GB is sized for
-headroom, not a hard minimum — a 16 GB card also works, and the system runs,
-more slowly, with no GPU at all, because the AI is optional by design).
-PostgreSQL 18.6 or newer specifically (versions 15–17 fail partway through
-loading this system's data). A decision on whether the GPU stays physically
-inside the hospital, driven directly by the PDPA cross-border-transfer
-question in Chapter 5 (`DEPLOYMENT-PREP.md`, §3).
+**3. โครงสร้างพื้นฐาน** เซิร์ฟเวอร์ทั่วไป 2 เครื่องและ GPU 1 ตัว (ขนาด 24 GB กำหนดไว้เพื่อเผื่อทรัพยากร มิใช่ขั้นต่ำที่บังคับ การ์ดขนาด 16 GB ก็ใช้งานได้ และระบบยังทำงานได้แม้ไม่มี GPU เลยแต่จะช้ากว่า เนื่องจาก AI เป็นส่วนที่ไม่บังคับตามการออกแบบ) ต้องใช้ PostgreSQL รุ่น 18.6 ขึ้นไปโดยเฉพาะ (รุ่น 15–17 จะล้มเหลวระหว่างการโหลดข้อมูลของระบบนี้) และต้องมีการตัดสินใจว่า GPU จะตั้งอยู่ภายในโรงพยาบาลทางกายภาพหรือไม่ ซึ่งเป็นผลโดยตรงจากประเด็นการโอนข้อมูลข้ามพรมแดนตาม PDPA ในบทที่ 5 (`DEPLOYMENT-PREP.md` หัวข้อ 3)
 
-**4. A real PDPA compliance review.** Restated from Chapter 5, §5.5, because
-it belongs on this list too, not only in the data chapter: a Data Protection
-Impact Assessment, a determined lawful basis, a data processing agreement,
-a real (per-record) retention/erasure policy replacing the current demo
-reset, and the hospital's DPO sign-off. **None of these exist yet.**
+**4. การตรวจสอบการปฏิบัติตาม PDPA อย่างแท้จริง** ประเด็นนี้กล่าวซ้ำจากบทที่ 5 หัวข้อ 5.5 เนื่องจากควรอยู่ในรายการนี้ด้วย มิใช่อยู่เฉพาะในบทว่าด้วยข้อมูล ได้แก่ การประเมินผลกระทบด้านการคุ้มครองข้อมูลส่วนบุคคล (Data Protection Impact Assessment) ฐานทางกฎหมายที่ได้รับการกำหนดแล้ว ข้อตกลงการประมวลผลข้อมูล (data processing agreement) นโยบายการเก็บรักษาและการลบข้อมูลที่แท้จริง (รายระเบียน) เพื่อแทนที่การรีเซ็ตข้อมูลสาธิตในปัจจุบัน และการลงนามรับรองจากเจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO) ของโรงพยาบาล **ยังไม่มีสิ่งใดในรายการเหล่านี้เลย**
 
-**5. Accuracy validation against real coded data.** The single measurement
-this report has deliberately not attempted anywhere (Chapters 6, 7): running
-this system's AI suggestions over a set of visits the hospital's own coders
-have already coded, and comparing — the same methodology the Klang et al.
-emergency-department study used (Chapter 2, §2.2), which is exactly the
-comparison the team's own checklist names as *"the one item that decides if
-the product is actually useful"* (`DEPLOYMENT-PREP.md`, §2). This requires
-the hospital to share historical, de-identified coded visits — it cannot be
-manufactured from synthetic data.
+**5. การตรวจสอบความแม่นยำเทียบกับข้อมูลที่ให้รหัสแล้วจริง** การวัดผลเพียงรายการเดียวที่รายงานฉบับนี้ตั้งใจไม่ดำเนินการในส่วนใดเลย (บทที่ 6 และ 7) คือ การให้ AI ของระบบนี้แนะนำรหัสสำหรับชุดการมารับบริการที่ผู้ให้รหัสของโรงพยาบาลได้ให้รหัสไว้แล้ว แล้วนำมาเปรียบเทียบกัน ซึ่งเป็นระเบียบวิธีเดียวกับที่งานวิจัยในแผนกฉุกเฉินของ Klang et al. ใช้ (บทที่ 2 หัวข้อ 2.2) และเป็นการเปรียบเทียบที่รายการตรวจสอบของคณะผู้จัดทำเองระบุว่าเป็น *"รายการเดียวที่ชี้ขาดว่าผลิตภัณฑ์มีประโยชน์จริงหรือไม่"* (`DEPLOYMENT-PREP.md` หัวข้อ 2) การดำเนินการนี้ต้องอาศัยให้โรงพยาบาลแบ่งปันข้อมูลการมารับบริการในอดีตที่ให้รหัสแล้วและผ่านการทำข้อมูลให้ไม่สามารถระบุตัวบุคคลได้ ซึ่งไม่สามารถสร้างขึ้นจากข้อมูลสมมุติได้
 
-**6. A real clinician/coder validation study, and a small pilot.** Beyond a
-retrospective accuracy comparison (#5), the team's own five-step rollout
-plan calls for a staged validation: a staging environment where a real coder
-signs in and opens a case, then a single real write-back the hospital can
-verify inside its own iMed system, then the hospital's head coder and
-security team both signing off, then a one-team, one-week pilot running
-alongside the existing manual process before any wider rollout
-(`DEPLOYMENT-PREP.md`, "The 5 steps to the first real patient"). None of
-these five steps have started.
+**6. การศึกษาเพื่อตรวจสอบความถูกต้องโดยบุคลากรทางคลินิก/ผู้ให้รหัสจริง และการนำร่องขนาดเล็ก** นอกเหนือจากการเปรียบเทียบความแม่นยำย้อนหลัง (ข้อ 5) แผนการเปิดใช้งาน 5 ขั้นตอนของคณะผู้จัดทำกำหนดให้มีการตรวจสอบเป็นลำดับขั้น ได้แก่ สภาพแวดล้อมทดสอบก่อนใช้งานจริง (staging environment) ที่ผู้ให้รหัสจริงเข้าสู่ระบบและเปิดเคส จากนั้นเป็นการบันทึกกลับจริง 1 ครั้งที่โรงพยาบาลสามารถตรวจสอบได้ภายในระบบ iMed ของตนเอง จากนั้นหัวหน้าผู้ให้รหัสและทีมความมั่นคงปลอดภัยของโรงพยาบาลลงนามรับรองทั้งสองฝ่าย แล้วจึงเป็นการนำร่องโดยทีมเดียวเป็นเวลา 1 สัปดาห์ ควบคู่ไปกับกระบวนการที่ทำด้วยมือแบบเดิม ก่อนการขยายการใช้งานในวงกว้าง (`DEPLOYMENT-PREP.md` "The 5 steps to the first real patient") ขั้นตอนทั้ง 5 นี้ยังไม่ได้เริ่มดำเนินการเลย
 
-**7. Load and concurrency testing at real scale.** This system's backend is
-architecturally constrained to a **single instance** — its write lock and
-cases cache live in process memory, not the database (Chapter 3, §3.2) —
-which is a workable, even principled, design for a hospital-scale
-deployment, but it has never been load-tested against real hospital visit
-volumes or a realistic number of concurrent coders. Whether one instance is
-actually sufficient at the partner hospital's real case volume is unverified.
+**7. การทดสอบภาระงานและการทำงานพร้อมกันในระดับจริง** ระบบส่วนหลัง (backend) ของระบบนี้ถูกจำกัดโดยสถาปัตยกรรมให้ทำงานแบบ **อินสแตนซ์เดียว (single instance)** เนื่องจากการล็อกการเขียนและแคชของเคสอยู่ในหน่วยความจำของโปรเซส มิใช่ในฐานข้อมูล (บทที่ 3 หัวข้อ 3.2) ซึ่งเป็นการออกแบบที่ใช้งานได้ และถึงขั้นมีหลักการรองรับ สำหรับการนำไปใช้งานในระดับโรงพยาบาล แต่ยังไม่เคยผ่านการทดสอบภาระงานกับปริมาณการมารับบริการจริงของโรงพยาบาล หรือกับจำนวนผู้ให้รหัสที่ใช้งานพร้อมกันในระดับที่สมจริง ส่วนคำถามว่าอินสแตนซ์เดียวจะเพียงพอจริงหรือไม่สำหรับปริมาณเคสจริงของโรงพยาบาลพันธมิตรนั้น ยังไม่ได้รับการพิสูจน์
 
-**8. Master-data and field-mapping confirmations from the hospital.**
-`medcode-api/docs/imed-integration.md` lists seventeen open questions for
-the hospital beyond the discharge-coupling question in #1 — including
-whether the extract's transaction number is guaranteed to be the same
-identifier the write API expects, how cancelled/duplicate rows behave, and
-several UI-parity fields (doctor name, clinic, chronic-disease flag) the
-hospital's own coder screen shows that this system currently cannot display
-because no data source for them has been confirmed. **These are correctly
-treated by the team as questions to ask, not gaps to guess around** — the
-team explicitly declined to invent placeholder clinical data for any of
-them, which is the right call for a system that writes into a real medical
-record, but it does mean this list of unknowns is a real, unresolved
-dependency on the hospital's own IT team, not a to-do the engineering team
-can close alone.
+**8. การยืนยันข้อมูลหลัก (master data) และการจับคู่ฟิลด์จากโรงพยาบาล** `medcode-api/docs/imed-integration.md` ระบุคำถามที่ยังค้างอยู่สำหรับโรงพยาบาลจำนวน 17 ข้อ นอกเหนือจากคำถามเรื่องการผูกโยงกับข้อมูลการจำหน่ายในข้อ 1 ซึ่งรวมถึงคำถามว่าเลขธุรกรรม (transaction number) ในข้อมูลที่สกัดออกมารับประกันได้หรือไม่ว่าเป็นตัวระบุเดียวกับที่ API สำหรับการเขียนข้อมูลคาดหวัง แถวที่ถูกยกเลิกหรือซ้ำซ้อนมีพฤติกรรมอย่างไร และฟิลด์หลายรายการที่ต้องมีเพื่อให้ส่วนติดต่อผู้ใช้เทียบเท่ากับระบบของโรงพยาบาล (ชื่อแพทย์ คลินิก และสัญลักษณ์โรคเรื้อรัง) ซึ่งหน้าจอผู้ให้รหัสของโรงพยาบาลแสดงอยู่ แต่ระบบนี้ยังไม่สามารถแสดงได้ในปัจจุบัน เนื่องจากยังไม่มีการยืนยันแหล่งข้อมูลสำหรับฟิลด์เหล่านั้น **คณะผู้จัดทำจัดการประเด็นเหล่านี้อย่างถูกต้องในฐานะคำถามที่ต้องสอบถาม มิใช่ช่องว่างที่จะเดาเอาเอง** โดยคณะผู้จัดทำปฏิเสธอย่างชัดเจนที่จะสร้างข้อมูลทางคลินิกแบบตัวยึดตำแหน่งขึ้นเองสำหรับประเด็นใดก็ตามในกลุ่มนี้ ซึ่งเป็นการตัดสินใจที่ถูกต้องสำหรับระบบที่เขียนข้อมูลลงเวชระเบียนจริง แต่ก็หมายความว่ารายการสิ่งที่ยังไม่ทราบนี้เป็นการพึ่งพาทีมไอทีของโรงพยาบาลที่ยังไม่ได้รับการแก้ไขอย่างแท้จริง มิใช่งานที่ทีมพัฒนาระบบจะปิดได้โดยลำพัง
 
-## 8.3 What we learned
+## 8.3 บทเรียนที่ได้รับ
 
-- **Measuring found what reviewing missed.** The code review never caught
-  that symptom narratives retrieve the wrong manual pages. The 42-case
-  accuracy run did, in one afternoon, and turned a vague worry into a
-  specific target: chunking and retrieval on narrative text (Chapter 6 §6.3).
-- **Two copies of the truth drift.** Schema changes once lived both in Java
-  and in SQL files nothing ran; the copies diverged and two tables lost their
-  foreign keys. Moving to Flyway as the single definition fixed it. The same
-  lesson shaped the API: a test now fails the build whenever the documented
-  endpoint list and the code disagree, in either direction.
-- **Tests that touch shared data need their own fixtures.** Early write tests
-  approved and reopened visits other tests read, and silently cancelled real
-  seed procedures in the mock hospital. Splitting fixtures into
-  "sacrificial" and "read-only" visits made the suite repeatable.
-- **Keeping the AI optional kept the project on schedule.** Because coding,
-  approval and write-back never depend on the AI service, the blocked chat
-  model (Chapter 6 §6.4) cost one feature, not the product.
+- **การวัดผลพบสิ่งที่การตรวจทานมองข้ามไป** การตรวจทานโค้ด (code review) ไม่เคยตรวจพบว่าข้อความบรรยายอาการ (symptom narrative) ค้นคืนหน้าคู่มือที่ไม่ถูกต้อง แต่การทดสอบความแม่นยำ 42 เคสตรวจพบได้ภายในบ่ายวันเดียว และเปลี่ยนความกังวลที่คลุมเครือให้กลายเป็นเป้าหมายที่ชัดเจน คือ การแบ่งชิ้นข้อความ (chunking) และการค้นคืนสำหรับข้อความเชิงบรรยาย (บทที่ 6 หัวข้อ 6.3)
+- **ข้อมูลต้นฉบับสองชุดย่อมคลาดเคลื่อนจากกัน** ครั้งหนึ่งการเปลี่ยนแปลงโครงสร้างฐานข้อมูล (schema) เคยถูกเก็บไว้ทั้งในโค้ด Java และในไฟล์ SQL ที่ไม่มีสิ่งใดเรียกใช้ ทั้งสองชุดจึงแตกต่างกันจนตาราง 2 ตารางสูญเสียคีย์นอก (foreign key) การย้ายไปใช้ Flyway เป็นแหล่งนิยามเพียงแหล่งเดียวช่วยแก้ปัญหานี้ได้ บทเรียนเดียวกันนี้ยังกำหนดแนวทางของ API ด้วย โดยปัจจุบันมีการทดสอบที่ทำให้การ build ล้มเหลวทุกครั้งที่รายการ endpoint ในเอกสารและโค้ดไม่ตรงกัน ไม่ว่าในทิศทางใด
+- **การทดสอบที่แตะต้องข้อมูลร่วมจำเป็นต้องมีข้อมูลสำหรับการทดสอบ (fixture) ของตนเอง** การทดสอบการเขียนข้อมูลในระยะแรกได้อนุมัติและเปิดใหม่การมารับบริการที่การทดสอบอื่นอ่านอยู่ และยกเลิกหัตถการที่เป็นข้อมูลเริ่มต้น (seed) จริงในโรงพยาบาลจำลองโดยไม่มีการแจ้งเตือน การแยกข้อมูลสำหรับการทดสอบออกเป็นการมารับบริการแบบ "ใช้แล้วทิ้ง" และแบบ "อ่านอย่างเดียว" ทำให้ชุดทดสอบให้ผลซ้ำได้
+- **การกำหนดให้ AI เป็นส่วนที่ไม่บังคับช่วยให้โครงการเป็นไปตามกำหนดเวลา** เนื่องจากการให้รหัส การอนุมัติ และการบันทึกกลับไม่เคยพึ่งพาบริการ AI ปัญหาที่โมเดลแชตใช้งานไม่ได้ (บทที่ 6 หัวข้อ 6.4) จึงทำให้เสียไปเพียงฟีเจอร์เดียว มิใช่ทั้งผลิตภัณฑ์
 
-## 8.4 Operating cost
+## 8.4 ค่าใช้จ่ายในการดำเนินงาน
 
-`HARDWARE_SPEC.md` prices a pilot from public listings (September 2026,
-converted at ~33 THB/USD, before VAT and reseller markup; not vendor quotes):
+`HARDWARE_SPEC.md` ประเมินราคาสำหรับการนำร่องจากราคาที่เผยแพร่สาธารณะ (กันยายน 2026 แปลงค่าที่อัตราประมาณ 33 บาทต่อดอลลาร์สหรัฐ ก่อนภาษีมูลค่าเพิ่มและส่วนเพิ่มราคาของผู้จัดจำหน่าย ไม่ใช่ใบเสนอราคาจากผู้ขาย)
 
-| Scenario | Rough one-time cost (THB) |
+| สถานการณ์ | ค่าใช้จ่ายครั้งเดียวโดยประมาณ (บาท) |
 |---|---|
-| Minimum: reuse spare hospital servers, one 16 GB GPU, a small NAS | ~120,000–140,000 |
-| Recommended: new app and database servers, one 24 GB GPU, a redundant NAS | ~360,000–440,000 |
+| ขั้นต่ำ: ใช้เซิร์ฟเวอร์ว่างที่มีอยู่ของโรงพยาบาล GPU ขนาด 16 GB 1 ตัว และ NAS ขนาดเล็ก | ~120,000–140,000 |
+| แนะนำ: เซิร์ฟเวอร์แอปพลิเคชันและเซิร์ฟเวอร์ฐานข้อมูลใหม่ GPU ขนาด 24 GB 1 ตัว และ NAS แบบสำรองซ้ำซ้อน (redundant) | ~360,000–440,000 |
 
-The software itself has no per-code, per-user or cloud fee: the models are
-open and run on the hospital's own card, so the running cost does not grow
-with coding volume (`DEPLOYMENT-PREP.md`, "What it costs"). Power, backup
-storage and staff time for updates are the recurring costs; they are not
-priced here. Several inputs (coder headcount, visit volume, hosting choice)
-are open questions only the hospital can answer, listed in
-`HARDWARE_SPEC.md` §7.
+ตัวซอฟต์แวร์เองไม่มีค่าธรรมเนียมต่อรหัส ต่อผู้ใช้ หรือค่าบริการคลาวด์ เนื่องจากโมเดลเป็นแบบเปิดและทำงานบนการ์ดของโรงพยาบาลเอง ค่าใช้จ่ายในการดำเนินงานจึงไม่เพิ่มขึ้นตามปริมาณการให้รหัส (`DEPLOYMENT-PREP.md` "What it costs") ค่าไฟฟ้า พื้นที่จัดเก็บข้อมูลสำรอง และเวลาของบุคลากรในการปรับปรุงระบบเป็นค่าใช้จ่ายที่เกิดขึ้นประจำ ซึ่งไม่ได้ประเมินราคาไว้ในที่นี้ ปัจจัยนำเข้าหลายประการ (จำนวนผู้ให้รหัส ปริมาณการมารับบริการ และทางเลือกในการติดตั้งระบบ) เป็นคำถามที่ยังค้างอยู่ซึ่งมีเพียงโรงพยาบาลเท่านั้นที่ตอบได้ โดยระบุไว้ใน `HARDWARE_SPEC.md` หัวข้อ 7
 
-## 8.5 Conclusion
+## 8.5 สรุป
 
-The engineering is substantially done and tested against a faithful mock of
-the real integration: a coder can sync visits from the hospital, get
-suggestions grounded in the coding manuals, decide, approve, and see the
-codes land in the hospital's own records, with every write journaled and
-reversible. The AI's suggestion quality on symptom narratives is not yet good
-enough to rely on, and that is the first thing to fix. Everything else on the
-path to a real hospital is mostly non-engineering work: legal and compliance
-review, hospital IT coordination, hardware, and a validation study on real
-coded data. That matches the team's own framing: *"To run it in a real
-hospital, three more things are needed. None of them are code"*
-(`medcode-api/docs/DEPLOYMENT-PREP.md`, TLDR).
+งานด้านวิศวกรรมเสร็จสมบูรณ์เป็นส่วนใหญ่แล้ว และผ่านการทดสอบกับระบบจำลองที่เลียนแบบการเชื่อมต่อจริงอย่างเที่ยงตรง ผู้ให้รหัสสามารถซิงค์การมารับบริการจากโรงพยาบาล รับคำแนะนำที่ยึดโยงกับคู่มือการให้รหัส ตัดสินใจ อนุมัติ และเห็นรหัสถูกบันทึกลงในระเบียนของโรงพยาบาลเอง โดยการเขียนข้อมูลทุกครั้งมีการบันทึกประวัติและย้อนกลับได้ คุณภาพของรหัสที่ AI แนะนำสำหรับข้อความบรรยายอาการยังไม่ดีพอที่จะพึ่งพาได้ และเป็นสิ่งแรกที่ต้องแก้ไข งานอื่นทั้งหมดบนเส้นทางสู่การใช้งานในโรงพยาบาลจริงส่วนใหญ่เป็นงานที่ไม่ใช่งานวิศวกรรม ได้แก่ การตรวจสอบด้านกฎหมายและการปฏิบัติตามข้อกำหนด การประสานงานกับฝ่ายไอทีของโรงพยาบาล ฮาร์ดแวร์ และการศึกษาเพื่อตรวจสอบความถูกต้องด้วยข้อมูลที่ให้รหัสแล้วจริง ซึ่งสอดคล้องกับกรอบที่คณะผู้จัดทำวางไว้เอง: *"หากจะใช้งานในโรงพยาบาลจริง ยังต้องมีอีก 3 สิ่ง และไม่มีสิ่งใดเป็นโค้ดเลย"* (`medcode-api/docs/DEPLOYMENT-PREP.md` ส่วน TLDR)

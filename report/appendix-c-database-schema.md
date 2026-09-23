@@ -1,53 +1,53 @@
-# Appendix C — Database schema
+# ภาคผนวก ค โครงสร้างฐานข้อมูล
 
-The schema is defined as Flyway migrations, which double as its own dated
-change log — more reliable than a hand-maintained ERD, since it's what
-actually ran. Two databases exist: `medcode` (this system's own data) and
-`imed` (the mock hospital, standing in for the real iMed system).
+โครงสร้างฐานข้อมูล (schema) กำหนดไว้ในรูปของ migration ของ Flyway
+ซึ่งทำหน้าที่เป็นบันทึกการเปลี่ยนแปลงที่ระบุวันที่ไปในตัว วิธีนี้เชื่อถือได้มากกว่าแผนภาพ ERD ที่ปรับปรุงด้วยมือ เนื่องจากเป็นสิ่งที่ถูกรันจริง
+ระบบมีฐานข้อมูล 2 ฐาน ได้แก่ `medcode` (ข้อมูลของระบบนี้เอง) และ
+`imed` (ระบบจำลองของโรงพยาบาล ซึ่งใช้แทนระบบ iMed จริง)
 
-## `medcode` database — `medcode-api/src/main/resources/db/migrations/`
+## ฐานข้อมูล `medcode` — `medcode-api/src/main/resources/db/migrations/`
 
-| Migration | What it adds |
+| Migration | สิ่งที่เพิ่มเข้ามา |
 |---|---|
-| `V1__add_password_hash.sql` | Auth support on the frozen seed schema |
-| `V2__imed_write_ops.sql` | The hospital write-back revert journal |
-| `V3__split_icd_codes.sql` | Splits the single `icd_codes` catalog into `icd_10` + `icd_9` |
-| `V4__case_code_operation_times.sql` | Operation time window on `case_codes` |
-| `V5__operation_type_and_case_vitals.sql` | Two hospital-UI elements the hospital asked to carry into medcode |
-| `V6__case_child_foreign_keys.sql` | Two foreign keys hand-written DDL had lost |
-| `V7__agent_chat_history.sql` | AI Agent chat history |
-| `V8__case_stars.sql` | Case "starred" flag |
-| `V9__app_settings.sql` | App-wide settings table |
+| `V1__add_password_hash.sql` | รองรับการยืนยันตัวตนบนโครงสร้างข้อมูลตั้งต้น (seed schema) ที่ตรึงไว้ |
+| `V2__imed_write_ops.sql` | บันทึกประวัติการบันทึกกลับลงระบบโรงพยาบาล สำหรับใช้ย้อนกลับ (revert) |
+| `V3__split_icd_codes.sql` | แยกแคตตาล็อก `icd_codes` ที่เดิมเป็นตารางเดียวออกเป็น `icd_10` + `icd_9` |
+| `V4__case_code_operation_times.sql` | ช่วงเวลาการทำหัตถการ (operation) ใน `case_codes` |
+| `V5__operation_type_and_case_vitals.sql` | องค์ประกอบ 2 รายการบนหน้าจอระบบของโรงพยาบาล ที่โรงพยาบาลขอให้นำมาไว้ใน medcode ด้วย |
+| `V6__case_child_foreign_keys.sql` | คีย์นอก (foreign key) 2 รายการที่ DDL ซึ่งเขียนด้วยมือทำตกหล่นไป |
+| `V7__agent_chat_history.sql` | ประวัติแชทของ AI ผู้ช่วย (AI Agent) |
+| `V8__case_stars.sql` | สถานะ "ติดดาว" ของเคส |
+| `V9__app_settings.sql` | ตารางการตั้งค่าระดับทั้งแอปพลิเคชัน |
 
-## `imed` database (mock hospital) — `imed-mock-api/src/main/resources/db/migrations/`
+## ฐานข้อมูล `imed` (ระบบจำลองของโรงพยาบาล) — `imed-mock-api/src/main/resources/db/migrations/`
 
-| Migration | What it adds |
+| Migration | สิ่งที่เพิ่มเข้ามา |
 |---|---|
-| `V1__api_v1.sql` | DDL the `/api/v1` write surface needs on top of the frozen extract |
-| `V2__icd_catalog.sql` | The hospital's ICD reference catalogs (code master tables) |
-| `V3__updated_at.sql` | `updated_at`, backing the `changed_since` sync filter |
-| `V4__precoded_demo_visits.sql` | Demo data: 5 seed visits that arrive already coded on both systems |
-| `V5__coding_status.sql` | `coding_status` on the visit row |
-| `V6__icd_catalog_data.sql` | The actual ICD-10 / ICD-9 catalog rows (code master data) |
+| `V1__api_v1.sql` | DDL ที่ส่วนการเขียนข้อมูลของ `/api/v1` ต้องใช้เพิ่มเติมจากชุดข้อมูลสกัด (extract) ที่ตรึงไว้ |
+| `V2__icd_catalog.sql` | แคตตาล็อกอ้างอิงรหัส ICD ของโรงพยาบาล (ตารางข้อมูลหลักรหัส) |
+| `V3__updated_at.sql` | คอลัมน์ `updated_at` ซึ่งใช้รองรับตัวกรองการซิงค์ `changed_since` |
+| `V4__precoded_demo_visits.sql` | ข้อมูลสาธิต: การมารับบริการตั้งต้น (seed) 5 รายการ ซึ่งมีรหัสอยู่แล้วตั้งแต่แรกในทั้งสองระบบ |
+| `V5__coding_status.sql` | คอลัมน์ `coding_status` บนแถวข้อมูลการมารับบริการ |
+| `V6__icd_catalog_data.sql` | แถวข้อมูลจริงของแคตตาล็อก ICD-10 / ICD-9 (ข้อมูลหลักรหัส) |
 
-## Plain-language companion
+## เอกสารประกอบฉบับภาษาเข้าใจง่าย
 
-`medcode-api/docs/medical-glossary.md` (381 lines) explains every
-table/column's real-world meaning, sourced and explicit about which fields
-are project inventions vs. real hospital data:
+`medcode-api/docs/medical-glossary.md` (381 บรรทัด) อธิบายความหมายในโลกจริงของทุกตาราง/คอลัมน์
+พร้อมระบุแหล่งที่มา และระบุชัดเจนว่าฟิลด์ใดเป็นสิ่งที่โครงการคิดขึ้นเอง และฟิลด์ใดเป็นข้อมูลจริงของโรงพยาบาล
+ประกอบด้วยหัวข้อต่อไปนี้:
 
-1. The job this software supports
-2. People (roles)
-3. A "case" — one patient visit
-4. The codes (ICD-10, ICD-9)
-5. The Thai coding rulebook (ICD-10-TM)
-6. The chart — note types and sections
-7. Orders — what was done and given
-8. Who pays — Thai coverage schemes
-9. Departments and wards (Thai → English)
-10. Shorthand that appears inside note text
-11. **Terms that are OUR rules, not medicine** — the honest "we invented this" index
-12. Hospital-side (iMed) terms
+1. งานที่ซอฟต์แวร์นี้สนับสนุน
+2. บุคคล (บทบาท)
+3. "เคส" — การมารับบริการของผู้ป่วย 1 ครั้ง
+4. รหัส (ICD-10, ICD-9)
+5. คู่มือกฎการให้รหัสของไทย (ICD-10-TM)
+6. เวชระเบียน — ประเภทของบันทึกและส่วนต่าง ๆ
+7. คำสั่งการรักษา (orders) — สิ่งที่ทำและสิ่งที่ให้แก่ผู้ป่วย
+8. ผู้จ่ายเงิน — สิทธิการรักษาพยาบาลของไทย
+9. แผนกและหอผู้ป่วย (ไทย → อังกฤษ)
+10. คำย่อที่ปรากฏในข้อความบันทึก
+11. **คำศัพท์ที่เป็นกฎของคณะผู้จัดทำเอง ไม่ใช่ทางการแพทย์** — ดัชนี "สิ่งที่คณะผู้จัดทำคิดขึ้นเอง" ที่เปิดเผยอย่างตรงไปตรงมา
+12. คำศัพท์ฝั่งโรงพยาบาล (iMed)
 
-Section 11 is the one worth reading first if checking what in this schema
-is a genuine hospital/clinical fact versus a project design decision.
+หากต้องการตรวจสอบว่าส่วนใดในโครงสร้างฐานข้อมูลนี้เป็นข้อเท็จจริงของโรงพยาบาล/ทางคลินิกจริง
+และส่วนใดเป็นการตัดสินใจออกแบบของโครงการ ควรอ่านหัวข้อ 11 เป็นอันดับแรก

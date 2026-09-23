@@ -1,58 +1,58 @@
-# Appendix D — Test cases / automated test evidence
+# ภาคผนวก ง กรณีทดสอบ / หลักฐานการทดสอบอัตโนมัติ
 
-The correctness-test evidence behind Chapter 6 §6.1. Chapter 6 separates
-these correctness tests from the accuracy and performance evaluation;
-`medcode-stack/eval-results/SUMMARY.md` records every number with its raw
-output file.
+หลักฐานการทดสอบความถูกต้องของการทำงานที่รองรับบทที่ 6 หัวข้อ 6.1
+ทั้งนี้ บทที่ 6 แยกการทดสอบความถูกต้องเหล่านี้ออกจากการประเมินความแม่นยำและประสิทธิภาพ โดย
+`medcode-stack/eval-results/SUMMARY.md` บันทึกตัวเลขทุกค่าพร้อมไฟล์ผลลัพธ์ดิบ (raw output)
+ที่เป็นที่มา
 
-## Automated test suites
+## ชุดทดสอบอัตโนมัติ
 
-| Suite | Result | Raw output |
+| ชุดทดสอบ | ผลลัพธ์ | ผลลัพธ์ดิบ |
 |---|---|---|
-| `imed-mock-api` — `ImedMockApiIntegrationTest` | **19/19 passed** — covers the mock hospital's REST contract (visit reads, ICD catalog reads, diagnosis/discharge write-back, request-id dedup) | `eval-results/imed-mock-api-test-output.txt` |
-| `medcode-api` — full suite | **90/91 passed, 1 flagged** (see below) | `eval-results/medcode-api-test-output-rerun-with-imed-live.txt` (1,748 lines) |
-| `RAG` — `pytest tests/` | **82/82 passed** | `eval-results/rag-test-output.txt` |
+| `imed-mock-api` — `ImedMockApiIntegrationTest` | **ผ่าน 19/19** — ครอบคลุมสัญญาการเชื่อมต่อ REST ของระบบจำลองโรงพยาบาล (การอ่านข้อมูลการมารับบริการ การอ่านแคตตาล็อก ICD การบันทึกกลับข้อมูลการวินิจฉัย/การจำหน่ายผู้ป่วย และการตัดคำขอซ้ำด้วย request-id) | `eval-results/imed-mock-api-test-output.txt` |
+| `medcode-api` — ชุดทดสอบทั้งหมด | **ผ่าน 90/91 และมี 1 รายการที่ระบุเป็นข้อสังเกต** (ดูด้านล่าง) | `eval-results/medcode-api-test-output-rerun-with-imed-live.txt` (1,748 บรรทัด) |
+| `RAG` — `pytest tests/` | **ผ่าน 82/82** | `eval-results/rag-test-output.txt` |
 
-**The one medcode-api failure**
-(`CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache`) is
-a **test-isolation gap against an out-of-process dependency**, not a
-confirmed application defect: it calls the live `imed-mock-api` process,
-whose writes land in the real local Postgres and aren't rolled back by the
-Spring test transaction. Running the suite twice against a long-lived mock
-hospital accumulates rows the test didn't expect. Flagged honestly in
-Ch.6/Ch.8 as something a real CI pipeline needs to fix (reset the mock
-hospital DB between runs, or assert on a delta instead of an absolute
-count) — full root-cause writeup in `eval-results/SUMMARY.md`.
+**การทดสอบ medcode-api ที่ไม่ผ่านเพียงรายการเดียว**
+(`CasesApiIntegrationTest.approveThenReopenRoundTripsAndInvalidatesCache`) เป็น
+**ช่องว่างด้านการแยกสภาพแวดล้อมการทดสอบ (test isolation) เมื่อพึ่งพาบริการที่ทำงานอยู่นอกโพรเซส**
+ไม่ใช่ข้อบกพร่องของแอปพลิเคชันที่ได้รับการยืนยันแล้ว กล่าวคือ การทดสอบนี้เรียกโพรเซส `imed-mock-api`
+ที่กำลังทำงานอยู่จริง ซึ่งข้อมูลที่เขียนจะลงไปยัง Postgres ภายในเครื่องจริง และไม่ถูกย้อนกลับ (roll back)
+โดยทรานแซกชันของการทดสอบ Spring การรันชุดทดสอบ 2 ครั้งกับระบบจำลองโรงพยาบาลที่ทำงานต่อเนื่องเป็นเวลานาน
+จึงทำให้มีแถวข้อมูลสะสมเกินกว่าที่การทดสอบคาดไว้ ประเด็นนี้ได้ระบุไว้อย่างตรงไปตรงมาในบทที่ 6/บทที่ 8
+ว่าเป็นสิ่งที่ไปป์ไลน์ CI จริงต้องแก้ไข (รีเซ็ตฐานข้อมูลของระบบจำลองโรงพยาบาลระหว่างการรันแต่ละครั้ง
+หรือตรวจสอบค่าผลต่างแทนจำนวนสัมบูรณ์) — รายละเอียดการวิเคราะห์สาเหตุที่แท้จริงฉบับเต็มอยู่ใน
+`eval-results/SUMMARY.md`
 
-## RAG test suite breakdown (`RAG/tests/`)
+## รายละเอียดชุดทดสอบของ RAG (`RAG/tests/`)
 
-| File | What it covers |
+| ไฟล์ | สิ่งที่ครอบคลุม |
 |---|---|
-| `test_suggest_boxes.py` | Each ICD-10/ICD-9 column only surfaces codes from its own upload box |
-| `test_suggest_notes.py` | Case suggestions respect the coder's taught rules |
-| `test_learn.py` | Suggest & Learn: rule extraction, classification, storage, matching (no embeddings/LLM — stubbed) |
-| `test_chunking.py` | The document chunker, unit-level, no heavy model deps |
-| `test_api.py` | API smoke tests via FastAPI's TestClient (excludes `/chat` and embedding paths — too heavy for a smoke test) |
-| `test_graphstore.py` | The knowledge graph, pure networkx, no models involved |
+| `test_suggest_boxes.py` | คอลัมน์ ICD-10/ICD-9 แต่ละคอลัมน์แสดงเฉพาะรหัสจากกล่องอัปโหลดของตนเองเท่านั้น |
+| `test_suggest_notes.py` | คำแนะนำรหัสสำหรับเคสเป็นไปตามกฎที่เจ้าหน้าที่ให้รหัสโรคสอนไว้ |
+| `test_learn.py` | Suggest & Learn: การสกัดกฎ การจำแนกประเภท การจัดเก็บ และการจับคู่ (ไม่ใช้เวกเตอร์ฝังตัว (embedding)/LLM — ใช้ตัวแทนจำลอง (stub) แทน) |
+| `test_chunking.py` | ตัวแบ่งชิ้นข้อความ (chunker) ของเอกสาร ทดสอบระดับหน่วย (unit) โดยไม่ต้องพึ่งพาโมเดลขนาดใหญ่ |
+| `test_api.py` | การทดสอบเบื้องต้น (smoke test) ของ API ผ่าน TestClient ของ FastAPI (ไม่รวม `/chat` และเส้นทางที่ใช้เวกเตอร์ฝังตัว — หนักเกินไปสำหรับการทดสอบเบื้องต้น) |
+| `test_graphstore.py` | กราฟความรู้ ใช้ networkx ล้วน ไม่เกี่ยวข้องกับโมเดลใด ๆ |
 
-## Development history
+## ประวัติการพัฒนา
 
-`medcode-api/CLAUDE.md`'s "Progress" section is a dated engineering
-changelog kept throughout the build — offered as evidence of iterative,
-tested delivery (matching commits to test runs) rather than a single
-big-bang build, if that matters for the TRL-4 case in Ch.6.
+ส่วน "Progress" ของ `medcode-api/CLAUDE.md` เป็นบันทึกการเปลี่ยนแปลงทางวิศวกรรมที่ระบุวันที่
+ซึ่งจัดทำต่อเนื่องตลอดการพัฒนา — นำเสนอเป็นหลักฐานของการส่งมอบแบบทำซ้ำเป็นรอบและผ่านการทดสอบ
+(มีการจับคู่ commit กับการรันทดสอบ) แทนที่จะเป็นการพัฒนาครั้งใหญ่ครั้งเดียว (big-bang)
+ในกรณีที่ประเด็นนี้มีผลต่อการพิจารณาระดับ TRL-4 ในบทที่ 6
 
-## Where this differs from Ch.6's own evidence
+## ส่วนที่แตกต่างจากหลักฐานของบทที่ 6
 
-This appendix is **correctness only** — does the code do what it's
-supposed to, structurally. It is not the same evidence as:
+ภาคผนวกนี้ครอบคลุม**เฉพาะความถูกต้องของการทำงาน** — กล่าวคือ โค้ดทำงานตามที่ควรจะเป็นในเชิงโครงสร้างหรือไม่
+ซึ่งไม่ใช่หลักฐานประเภทเดียวกับ:
 
-- **Performance/load testing** (Apache Bench results, `eval-results/perf/`) —
-  Ch.6.
-- **AI output accuracy** (ICD-10 top-1/top-8 against `/suggest`) —
-  Ch.6/Ch.7, `eval-results/rag-accuracy-SUMMARY.md` +
-  `rag-accuracy-raw.json`.
-- **Staff feedback** — cut from this submission; see `appendices-outline.md`.
+- **การทดสอบประสิทธิภาพ/การทดสอบภาระงาน** (ผลจาก Apache Bench, `eval-results/perf/`) —
+  บทที่ 6
+- **ความแม่นยำของผลลัพธ์จาก AI** (ICD-10 ในอันดับแรก/ภายใน 8 อันดับแรก หรือ top-1/top-8 เมื่อทดสอบกับ `/suggest`) —
+  บทที่ 6/บทที่ 7, `eval-results/rag-accuracy-SUMMARY.md` +
+  `rag-accuracy-raw.json`
+- **ความคิดเห็นของบุคลากร** — ตัดออกจากการส่งครั้งนี้ ดู `appendices-outline.md`
 
-Conflating "tests pass" with "the AI is accurate" or "coders like it" is
-exactly the mistake Ch.6 is written to avoid — see its own framing.
+การเหมารวมว่า "การทดสอบผ่าน" หมายถึง "AI มีความแม่นยำ" หรือ "ผู้ให้รหัสพึงพอใจ"
+คือข้อผิดพลาดที่บทที่ 6 เขียนขึ้นเพื่อหลีกเลี่ยงโดยตรง — ดูการวางกรอบของบทดังกล่าว

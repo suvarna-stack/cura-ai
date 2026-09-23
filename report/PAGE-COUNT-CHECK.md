@@ -3,9 +3,18 @@
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 81 pages (`report/CURA-AI-Report.pdf`)
+## Authoritative number: 90 pages (`report/CURA-AI-Report.pdf`, Thai)
 
-Latest pass (2026-09-23, later): restructured after the other MediHack team's
+Latest pass (2026-09-23, final): the report was translated into Thai, as the
+deliverable requires. Sarabun is now the only body font and the line height
+went from 1.4 to 1.5 for Thai vowel and tone marks, and Thai prose runs about
+7% longer than the same English (measured on the Thai and English abstracts
+at the same font size and width): 81 → 90 pages. Measured on copies of the
+English build, the two levers that do cut pages are layout, not language:
+letting chapters follow on instead of each starting a new page (81 → 64) and
+leaving the appendices out of the PDF (81 → 55); both together gave 46.
+
+Previous pass (2026-09-23, later): restructured after the other MediHack team's
 submitted report — cover with the MFU emblem, Thai + English abstract, a
 compact TOC, six rendered figures (Ch.3–4), a References section, a
 screenshot gallery for Appendix E (25 images), and appendices relettered A–G

@@ -1,16 +1,16 @@
 flowchart TB
-  subgraph before["Before: manual coding"]
+  subgraph before["ก่อน: การให้รหัสด้วยมือ"]
     direction LR
-    b1["Visit recorded<br/>in iMed"] --> b2["Coder picks charts<br/>no shared worklist"]
-    b2 --> b3["Reads free text<br/>against ICD-10-TM"]
-    b3 --> b4["Looks codes<br/>up by hand"]
-    b4 --> b5["Types codes into iMed<br/>no record of alternatives"]
+    b1["บันทึกการมารับบริการ<br/>ใน iMed"] --> b2["ผู้ให้รหัสเลือกเวชระเบียนเอง<br/>ไม่มีรายการงานร่วม"]
+    b2 --> b3["อ่านข้อความอิสระ<br/>เทียบกับ ICD-10-TM"]
+    b3 --> b4["ค้นหารหัส<br/>ด้วยตนเอง"]
+    b4 --> b5["พิมพ์รหัสลง iMed<br/>ไม่มีบันทึกตัวเลือกอื่น"]
   end
-  subgraph after["After: MedCode AI"]
+  subgraph after["หลัง: CURA AI"]
     direction LR
-    a1["Sync: one worklist<br/>complete · incomplete"] --> a2["AI suggests codes<br/>source shown"]
-    a2 --> a3["Coder ticks, edits, adds<br/>nothing pre-selected"]
-    a3 --> a4["Approve: written back<br/>to iMed, journaled"]
-    a4 -.->|"mistake"| a5["Reopen: reversed<br/>edits kept"]
+    a1["ซิงค์: รายการงานเดียว<br/>สมบูรณ์ · ไม่สมบูรณ์"] --> a2["AI แนะนำรหัส<br/>แสดงแหล่งที่มา"]
+    a2 --> a3["ผู้ให้รหัสติ๊ก แก้ไข เพิ่ม<br/>ไม่มีรหัสที่เลือกไว้ล่วงหน้า"]
+    a3 --> a4["อนุมัติ: บันทึกกลับลง iMed<br/>พร้อมบันทึกประวัติ"]
+    a4 -.->|"ผิดพลาด"| a5["เปิดใหม่: ย้อนกลับ<br/>การแก้ไขยังอยู่"]
   end
   before ~~~ after

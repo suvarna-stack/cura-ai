@@ -1,255 +1,246 @@
-# Chapter 5 — Data & PDPA
+# บทที่ 5 ข้อมูลและพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล
 
-The "no cloud transmission" claim in this chapter was verified against the
-code, not assumed (§5.3). PDPA requirements are summarised from published
-sources retrieved on 18–20 September 2026 and cited inline. Every open
-compliance question is stated as open rather than smoothed over.
+ข้อกล่าวอ้างว่า "ไม่มีการส่งข้อมูลขึ้นคลาวด์" ในบทนี้ได้รับการตรวจสอบกับโค้ดจริง
+มิได้เป็นเพียงการสันนิษฐาน (หัวข้อ 5.3) ข้อกำหนดตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA)
+สรุปจากแหล่งข้อมูลที่เผยแพร่แล้วซึ่งสืบค้นระหว่างวันที่ 18–20 กันยายน 2026 และอ้างอิงไว้ในเนื้อหา
+ประเด็นด้านการปฏิบัติตามกฎหมายที่ยังไม่ได้ข้อยุติทุกประเด็นระบุไว้ตรงไปตรงมาว่ายังเปิดอยู่
+แทนที่จะกล่าวข้ามไป
 
-## 5.1 What data this demo actually uses: synthetic only
+## 5.1 ข้อมูลที่ระบบสาธิตนี้ใช้จริง: ข้อมูลสมมุติเท่านั้น
 
-**Every case a coder can currently open in this system is synthetic.** No
-real patient was ever involved in building or demonstrating this project.
-This is not a caveat buried in a README — it is the explicit, stated design
-of the one script that owns the demo dataset,
+**ทุกเคสที่เจ้าหน้าที่ให้รหัสโรคสามารถเปิดดูในระบบนี้ได้ในปัจจุบันเป็นข้อมูลสมมุติ (synthetic data) ทั้งหมด**
+ไม่มีผู้ป่วยจริงเกี่ยวข้องกับการพัฒนาหรือการสาธิตโครงการนี้เลย
+ข้อนี้มิใช่ข้อสงวนที่ซ่อนอยู่ใน README แต่เป็นการออกแบบที่ระบุไว้อย่างชัดแจ้ง
+ในสคริปต์เพียงตัวเดียวที่รับผิดชอบชุดข้อมูลสาธิต คือ
 `imed-mock-api/scripts/generate_demo_data.py`:
 
-> *"This script is the ONE source of that bulk data. It is deterministic
-> (fixed RNG seed), so re-running it reproduces byte-identical rows, and it
-> is idempotent: it deletes everything it previously generated before
-> rebuilding."*
+> *"สคริปต์นี้เป็นแหล่งที่มาเพียงแหล่งเดียวเท่านั้นของข้อมูลจำนวนมากดังกล่าว สคริปต์ทำงานแบบกำหนดผลได้แน่นอน
+> (ใช้ค่า seed ของตัวสร้างเลขสุ่มแบบคงที่) การรันซ้ำจึงได้แถวข้อมูลที่เหมือนเดิมทุกไบต์ และสคริปต์
+> เป็นแบบ idempotent กล่าวคือ จะลบทุกอย่างที่เคยสร้างไว้ก่อนหน้าออกทั้งหมดก่อนสร้างใหม่"*
 
-Key facts about how the synthetic dataset was actually built, direct from
-the script's own docstring and code (`imed-mock-api/scripts/
-generate_demo_data.py`):
+ข้อเท็จจริงสำคัญเกี่ยวกับวิธีสร้างชุดข้อมูลสมมุติ ซึ่งนำมาจาก docstring และโค้ดของสคริปต์โดยตรง
+(`imed-mock-api/scripts/
+generate_demo_data.py`) มีดังนี้
 
-- **Fixed random seed (`20260821`)** — the same script run twice produces
-  byte-identical data, which is what makes the demo repeatable and auditable
-  (a reviewer can regenerate the exact same dataset from the same script).
-- **Grows a small hand-written seed (21 visits) to 150 visits — 140 OPD
-  and 10 IPD admissions**, specifically to exercise the hospital's own
-  paging limits (the read contract refuses more than 20 visit ids or a
-  31-day window per request — Chapter 4, §4.1) and to show the three coding
-  states side by side at a realistic scale.
-- **Clinical vocabulary is copied from real sources, not invented**: the
-  script's own docstring states it draws department/ward names, document
-  types, and the ICD-10-TM coding rules it must respect (one principal
-  diagnosis only; routine work like dressing a wound or an injection is
-  *not* coded) directly from `docs/medical-glossary.md` and the hospital's
-  real API contract PDF. ICD codes used are checked against the real
-  `icd_10`/`icd_9` catalog before use, and lab values are deliberately keyed
-  to match each scenario's principal diagnosis, "because the coder and the
-  AI both read the panel as evidence" — i.e., the synthetic charts are
-  designed to be *internally clinically consistent*, not just
-  structurally valid rows.
-- **No patient names exist anywhere in the data model.** This is not a
-  redaction step applied to real data — the hospital's own extract never
-  exports a patient name field in the first place, and the API contract
-  documents `patient` as permanently `null` with the note *"no real
-  patient-name source exists"* (`medcode-api/docs/api-contract.md`,
-  `CaseCard` field table). The one patient identifier present, **HN**
-  (hospital number), is described in the glossary as *"the patient's
-  permanent id at this hospital... Not a national ID"*
-  (`docs/medical-glossary.md`, §3) — and even that field is `null` on every
-  OPD dashboard row today, because the OPD extract this system's dashboard
-  reads does not carry it (`api-contract.md`, `hn` field note).
+- **ใช้ค่า seed สุ่มแบบคงที่ (`20260821`)** — การรันสคริปต์เดียวกันสองครั้งให้ข้อมูลที่เหมือนกัน
+  ทุกไบต์ ซึ่งทำให้การสาธิตทำซ้ำได้และตรวจสอบได้
+  (ผู้ตรวจสามารถสร้างชุดข้อมูลเดียวกันทุกประการขึ้นใหม่จากสคริปต์เดียวกัน)
+- **ขยายข้อมูลตั้งต้นขนาดเล็กที่เขียนขึ้นเอง (21 การมารับบริการ) เป็น 150 การมารับบริการ ได้แก่ ผู้ป่วยนอก (OPD)
+  140 รายการ และการรับเป็นผู้ป่วยใน (IPD) 10 รายการ** โดยมีจุดประสงค์เพื่อทดสอบข้อจำกัดการแบ่งหน้า
+  ของโรงพยาบาลเอง (สัญญาการเชื่อมต่อฝั่งการอ่านข้อมูลปฏิเสธคำขอที่มีหมายเลขการมารับบริการเกิน 20 รายการ
+  หรือช่วงเวลาเกิน 31 วันต่อคำขอ — บทที่ 4 หัวข้อ 4.1) และเพื่อแสดงสถานะการให้รหัสทั้งสามสถานะ
+  เคียงกันในขนาดที่สมจริง
+- **คำศัพท์ทางคลินิกคัดลอกมาจากแหล่งข้อมูลจริง มิได้แต่งขึ้นเอง**: docstring ของสคริปต์ระบุว่า
+  ได้นำชื่อแผนก/หอผู้ป่วย ประเภทเอกสาร และกฎการให้รหัส ICD-10-TM ที่ต้องปฏิบัติตาม
+  (การวินิจฉัยหลักมีได้เพียงหนึ่งรายการเท่านั้น งานประจำ เช่น การทำแผลหรือการฉีดยา
+  *ไม่* ต้องให้รหัส) มาจาก `docs/medical-glossary.md` และไฟล์ PDF สัญญาการเชื่อมต่อ API
+  จริงของโรงพยาบาลโดยตรง รหัส ICD ที่ใช้ได้รับการตรวจสอบกับแค็ตตาล็อก `icd_10`/`icd_9`
+  จริงก่อนนำไปใช้ และค่าผลตรวจทางห้องปฏิบัติการถูกกำหนดให้สอดคล้องกับการวินิจฉัยหลัก
+  ของแต่ละสถานการณ์โดยเจตนา "เพราะทั้งผู้ให้รหัสและ AI ต่างอ่านชุดผลตรวจนี้เป็นหลักฐาน"
+  กล่าวคือ เวชระเบียนสมมุติได้รับการออกแบบให้ *สอดคล้องกันทางคลินิกภายในตัวเอง*
+  มิใช่เป็นเพียงแถวข้อมูลที่ถูกต้องตามโครงสร้างเท่านั้น
+- **ไม่มีชื่อผู้ป่วยอยู่ในส่วนใดของแบบจำลองข้อมูลเลย** ข้อนี้มิใช่ขั้นตอนการปกปิดข้อมูล
+  (redaction) ที่ใช้กับข้อมูลจริง แต่เป็นเพราะข้อมูลที่ส่งออก (extract) จากโรงพยาบาลไม่เคยส่งออก
+  ฟิลด์ชื่อผู้ป่วยตั้งแต่แรก และสัญญาการเชื่อมต่อ API ระบุว่า `patient` มีค่าเป็น `null` เสมอ
+  พร้อมหมายเหตุว่า *"ไม่มีแหล่งข้อมูลชื่อผู้ป่วยจริง"* (`medcode-api/docs/api-contract.md`
+  ตารางฟิลด์ `CaseCard`) ตัวระบุผู้ป่วยเพียงตัวเดียวที่มีอยู่คือ **HN**
+  (เลขประจำตัวผู้ป่วยของโรงพยาบาล) ซึ่งอภิธานศัพท์อธิบายว่าเป็น *"รหัสประจำตัวถาวรของผู้ป่วย
+  ที่โรงพยาบาลนี้... ไม่ใช่เลขประจำตัวประชาชน"* (`docs/medical-glossary.md` หัวข้อ 3)
+  และแม้แต่ฟิลด์ดังกล่าวก็มีค่าเป็น `null` ในทุกแถวของแดชบอร์ดผู้ป่วยนอกในปัจจุบัน
+  เนื่องจากข้อมูลส่งออกผู้ป่วยนอกที่แดชบอร์ดของระบบนี้อ่านไม่มีฟิลด์นี้
+  (`api-contract.md` หมายเหตุของฟิลด์ `hn`)
 
-**Honest framing for this report:** this is a strength for a hackathon
-deliverable (no real PDPA exposure exists yet, no consent question exists
-yet) and simultaneously the reason nothing in Chapters 1, 6, 7 or 8 can cite
-a real accuracy, throughput, or user-satisfaction number — every one of
-those would have to come from real hospital data or a real pilot, neither
-of which has happened (Chapter 8 makes this the top item on the deployment
-gap list).
+**การวางกรอบอย่างตรงไปตรงมาสำหรับรายงานนี้:** ข้อนี้เป็นจุดแข็งสำหรับผลงานในการแข่งขันแฮกกาธอน
+(ยังไม่มีความเสี่ยงด้าน PDPA ที่เกิดขึ้นจริง และยังไม่มีประเด็นเรื่องความยินยอม)
+และในขณะเดียวกันก็เป็นเหตุผลที่ไม่มีส่วนใดในบทที่ 1, 6, 7 หรือ 8 สามารถอ้างอิงตัวเลข
+ความแม่นยำ ปริมาณงานที่ประมวลผลได้ (throughput) หรือความพึงพอใจของผู้ใช้ที่เป็นของจริงได้
+ตัวเลขเหล่านี้ทุกตัวต้องมาจากข้อมูลจริงของโรงพยาบาลหรือการทดลองใช้งานจริง
+ซึ่งยังไม่เกิดขึ้นทั้งสองอย่าง (บทที่ 8 จัดให้ประเด็นนี้เป็นรายการแรกในรายการช่องว่าง
+ก่อนการนำไปใช้งานจริง)
 
-## 5.2 What changes for a real deployment: de-identification, consent, PDPA
+## 5.2 สิ่งที่เปลี่ยนไปเมื่อนำไปใช้งานจริง: การทำข้อมูลให้ไม่สามารถระบุตัวบุคคลได้ ความยินยอม และ PDPA
 
-Moving from synthetic demo data to real patient charts is not a
-configuration change — it triggers Thailand's **Personal Data Protection
-Act (PDPA)**, the country's comprehensive data-protection law (enacted 2019,
-fully effective since 1 June 2022). The requirements below are summarized
-from currently published guidance (retrieved 2026-09-18); none of them have
-yet been checked against this specific system's design by a qualified
-compliance reviewer — see §5.5.
+การเปลี่ยนจากข้อมูลสาธิตสมมุติไปใช้เวชระเบียนผู้ป่วยจริงมิใช่เพียงการเปลี่ยนการตั้งค่า
+แต่ทำให้ต้องอยู่ภายใต้ **พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)**
+ซึ่งเป็นกฎหมายคุ้มครองข้อมูลส่วนบุคคลฉบับครอบคลุมของประเทศไทย (ตราขึ้นในปี ค.ศ. 2019
+และมีผลใช้บังคับทั้งฉบับตั้งแต่วันที่ 1 มิถุนายน ค.ศ. 2022) ข้อกำหนดด้านล่างสรุปจาก
+แนวปฏิบัติที่เผยแพร่อยู่ในปัจจุบัน (สืบค้นเมื่อ 2026-09-18) โดยยังไม่มีข้อใดได้รับการตรวจสอบ
+เทียบกับการออกแบบของระบบนี้โดยเฉพาะโดยผู้ตรวจสอบด้านการปฏิบัติตามกฎหมายที่มีคุณสมบัติเหมาะสม
+— ดูหัวข้อ 5.5
 
-- **Health data is "sensitive personal data," requiring a stronger legal
-  basis than ordinary personal data.** Thailand's data protection committee
-  (PDPC) explicitly lists health data, alongside financial and biometric
-  data, as sensitive personal data. Processing it generally requires
-  explicit consent, **or** falls under a narrower set of exceptions —
-  necessary for medical purposes, public health, or scientific research,
-  each subject to appropriate safeguards such as data minimization, access
-  controls, and security measures. Which basis this system's intended use
-  (hospital-internal coding operations) falls under is a legal
-  determination for the hospital's counsel or DPO; this report does not
-  make it (§5.5, item 2).
+- **ข้อมูลสุขภาพเป็น "ข้อมูลส่วนบุคคลที่มีความอ่อนไหว" ซึ่งต้องอาศัยฐานทางกฎหมายที่เข้มงวดกว่า
+  ข้อมูลส่วนบุคคลทั่วไป** มาตรา 26 ของ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคลกำหนดให้ข้อมูลสุขภาพ เช่นเดียวกับข้อมูลชีวภาพและข้อมูลพันธุกรรม เป็นข้อมูลส่วนบุคคลที่มีความอ่อนไหว
+  โดยทั่วไป การประมวลผลข้อมูลประเภทนี้ต้องได้รับความยินยอมโดยชัดแจ้ง (explicit consent) **หรือ**
+  ต้องเข้าข้อยกเว้นที่แคบกว่า ได้แก่ ความจำเป็นเพื่อวัตถุประสงค์ทางการแพทย์ การสาธารณสุข
+  หรือการวิจัยทางวิทยาศาสตร์ โดยแต่ละกรณีต้องมีมาตรการคุ้มครองที่เหมาะสม เช่น
+  การเก็บรวบรวมข้อมูลเท่าที่จำเป็น (data minimization) การควบคุมการเข้าถึง
+  และมาตรการรักษาความมั่นคงปลอดภัย การพิจารณาว่าการใช้งานตามที่ระบบนี้มุ่งหมาย
+  (งานให้รหัสภายในโรงพยาบาล) เข้าฐานทางกฎหมายใด เป็นการวินิจฉัยทางกฎหมายของ
+  ที่ปรึกษากฎหมายหรือเจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO) ของโรงพยาบาล
+  รายงานนี้ไม่ได้วินิจฉัยประเด็นดังกล่าว (หัวข้อ 5.5 ข้อ 2)
   — *Tilleke & Gibbins, "Thailand Issues Guidelines on PDPA Consent and
-  Notification Requirements"*, accessed 2026-09-20.
+  Notification Requirements"*, สืบค้นเมื่อ 2026-09-20.
   [https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/](https://www.tilleke.com/insights/thailand-issues-guidelines-on-pdpa-consent-and-notification-requirements/)
-- **Data subject rights**: access, rectification, erasure, and portability
-  must all be honored for a real patient's data. This system's current
-  "erasure" mechanism (§5.4) does not satisfy this — it restores a shared
-  demo baseline, it does not selectively delete one person's record.
+- **สิทธิของเจ้าของข้อมูลส่วนบุคคล**: สิทธิในการเข้าถึง การแก้ไขให้ถูกต้อง การลบ
+  และการโอนย้ายข้อมูล ต้องได้รับการปฏิบัติตามทั้งหมดสำหรับข้อมูลของผู้ป่วยจริง
+  กลไก "การลบ" ของระบบนี้ในปัจจุบัน (หัวข้อ 5.4) ไม่เป็นไปตามข้อกำหนดนี้ เนื่องจากเป็นการ
+  คืนค่าข้อมูลสาธิตกลับสู่สถานะตั้งต้น (baseline) ที่ใช้ร่วมกัน มิได้ลบข้อมูลของบุคคลใดบุคคลหนึ่งแบบเจาะจง
   — *Tilleke & Gibbins, "Thailand's Public Consultation on Proposed PDPA
-  Guidelines: Key Updates"*, accessed 2026-09-20.
+  Guidelines: Key Updates"*, สืบค้นเมื่อ 2026-09-20.
   [https://www.tilleke.com/insights/thailands-public-consultation-on-proposed-pdpa-guidelines-key-updates/45/](https://www.tilleke.com/insights/thailands-public-consultation-on-proposed-pdpa-guidelines-key-updates/45/)
-- **Data minimization.** The current design already leans this direction by
-  accident of the hospital's own extract (no patient name, no national ID
-  are ever sent — §5.1) — but this needs to be a deliberate, reviewed
-  policy for production, not an artifact of what the hospital's OPD extract
-  happens to omit today.
-- **Retention limits.** No retention period has been defined anywhere in
-  this project. The team's own production checklist already states this
-  plainly: *"How long we keep the record of approvals... We store this, but
-  no rule says how long to keep it. Your medical records policy decides. We
-  follow it"* (`medcode-api/docs/DEPLOYMENT-PREP.md`, §2). This is an open
-  item, not a solved one.
-- **Cross-border transfer restrictions.** Personal data may only be sent
-  outside Thailand to jurisdictions with adequate protection, or under
-  specific safeguards/consent. This directly shaped the local-RAG
-  architecture decision in Chapter 2, §2.3, and the team's own deployment
-  notes cite Thailand's data regulator (PDPC) as having published a draft
-  healthcare-specific guidance document and flagged this exact issue for
-  hospitals evaluating cloud AI compute located outside the country
-  (`medcode-api/docs/DEPLOYMENT-PREP.md`, "Sources checked," citing a PDPC
-  consultation on healthcare data-protection guidance).
+- **การเก็บรวบรวมข้อมูลเท่าที่จำเป็น** การออกแบบในปัจจุบันเป็นไปในทิศทางนี้อยู่แล้วโดยบังเอิญ
+  จากลักษณะข้อมูลส่งออกของโรงพยาบาลเอง (ไม่มีการส่งชื่อผู้ป่วยหรือเลขประจำตัวประชาชนเลย
+  — หัวข้อ 5.1) แต่สำหรับสภาพแวดล้อมใช้งานจริง ประเด็นนี้ต้องเป็นนโยบายที่กำหนดขึ้นโดยเจตนา
+  และผ่านการทบทวนแล้ว มิใช่ผลพลอยได้จากสิ่งที่ข้อมูลส่งออกผู้ป่วยนอกของโรงพยาบาล
+  บังเอิญไม่ได้ส่งมาในปัจจุบัน
+- **ข้อจำกัดด้านระยะเวลาการเก็บรักษา** โครงการนี้ยังไม่ได้กำหนดระยะเวลาการเก็บรักษาข้อมูล
+  ไว้ในส่วนใดเลย รายการตรวจสอบสำหรับการนำไปใช้งานจริงของคณะผู้จัดทำเองระบุไว้
+  อย่างตรงไปตรงมาแล้วว่า *"ระยะเวลาที่เราเก็บบันทึกการอนุมัติ... เราจัดเก็บข้อมูลนี้
+  แต่ไม่มีกฎใดระบุว่าต้องเก็บไว้นานเท่าใด นโยบายเวชระเบียนของท่านเป็นผู้กำหนด และเราจะปฏิบัติตาม"*
+  (`medcode-api/docs/DEPLOYMENT-PREP.md` หัวข้อ 2) ประเด็นนี้ยังเปิดอยู่
+  ยังไม่ได้รับการแก้ไข
+- **ข้อจำกัดการส่งหรือโอนข้อมูลไปยังต่างประเทศ** ข้อมูลส่วนบุคคลจะส่งออกนอกประเทศไทยได้
+  เฉพาะไปยังประเทศหรือเขตอำนาจที่มีมาตรฐานการคุ้มครองข้อมูลส่วนบุคคลที่เพียงพอ
+  หรือภายใต้มาตรการคุ้มครองหรือความยินยอมเฉพาะเท่านั้น ข้อนี้ส่งผลโดยตรงต่อการตัดสินใจ
+  เลือกสถาปัตยกรรม RAG แบบภายในเครื่องในบทที่ 2 หัวข้อ 2.3 และบันทึกการนำไปใช้งานจริง
+  ของคณะผู้จัดทำอ้างถึงว่าหน่วยงานกำกับดูแลด้านข้อมูลส่วนบุคคลของไทย (PDPC)
+  ได้เผยแพร่ร่างแนวปฏิบัติเฉพาะด้านสุขภาพ และได้ชี้ประเด็นนี้โดยตรงสำหรับโรงพยาบาล
+  ที่กำลังพิจารณาใช้ทรัพยากรประมวลผล AI บนคลาวด์ที่ตั้งอยู่นอกประเทศ
+  (`medcode-api/docs/DEPLOYMENT-PREP.md` ส่วน "Sources checked" ซึ่งอ้างถึง
+  การรับฟังความคิดเห็นของ PDPC ต่อแนวปฏิบัติการคุ้มครองข้อมูลส่วนบุคคลด้านสุขภาพ)
   — *HLC / Chambers, "Thailand PDPC Consults on First Healthcare-Specific
-  Data Protection Guideline"*, accessed via `DEPLOYMENT-PREP.md` sources,
+  Data Protection Guideline"*, สืบค้นผ่านแหล่งอ้างอิงใน `DEPLOYMENT-PREP.md`,
   2026.
   [https://www.hlc.com/en/publications/thailand-pdpc-consults-on-first-healthcarespecific-data-protection-guideline](https://www.hlc.com/en/publications/thailand-pdpc-consults-on-first-healthcarespecific-data-protection-guideline)
-- **Breach notification and enforcement posture.** Current guidance
-  describes a short notification window to the regulator following
-  awareness of a personal-data breach, and administrative fines that can
-  reach into the millions of Thai baht for serious violations. Guidance
-  published in 2026 also names **healthcare** explicitly as one of the
-  PDPC's priority sectors for investigation this year.
+- **การแจ้งเหตุการละเมิดข้อมูลและแนวทางการบังคับใช้กฎหมาย** แนวปฏิบัติในปัจจุบันระบุ
+  กรอบเวลาอันสั้นในการแจ้งหน่วยงานกำกับดูแลภายหลังทราบเหตุการละเมิดข้อมูลส่วนบุคคล
+  และโทษปรับทางปกครองที่อาจสูงถึงหลักล้านบาทสำหรับการฝ่าฝืนร้ายแรง แนวปฏิบัติ
+  ที่เผยแพร่ในปี 2026 ยังระบุ **ภาคบริการสุขภาพ** อย่างชัดเจนว่าเป็นหนึ่งในภาคส่วน
+  ที่ PDPC ให้ความสำคัญเป็นลำดับต้นในการตรวจสอบในปีนี้
   — *pacmap.dev, "Thailand Personal Data Protection Act (PDPA) — Enhanced
-  Enforcement Phase"*, accessed 2026-09-18.
+  Enforcement Phase"*, สืบค้นเมื่อ 2026-09-18.
   [https://pacmap.dev/regulation/th-pdpa-enforcement-2026](https://pacmap.dev/regulation/th-pdpa-enforcement-2026)
   ; *Chambers and Partners, "Data Protection & Privacy 2026 - Thailand"*,
-  accessed 2026-09-18.
+  สืบค้นเมื่อ 2026-09-18.
   [https://practiceguides.chambers.com/practice-guides/data-protection-privacy-2026/thailand/trends-and-developments](https://practiceguides.chambers.com/practice-guides/data-protection-privacy-2026/thailand/trends-and-developments)
-  These are secondary sources, so this report deliberately quotes no
-  specific notification deadline or fine amount; the statute itself and the
-  hospital's legal counsel are the authority for those figures.
-- **DPO appointment.** Organizations processing personal data at scale,
-  especially sensitive categories like health data, typically need a
-  designated Data Protection Officer under PDPA.
+  แหล่งข้อมูลเหล่านี้เป็นแหล่งข้อมูลทุติยภูมิ รายงานนี้จึงจงใจไม่ระบุกำหนดเวลาการแจ้งเหตุ
+  หรือจำนวนค่าปรับที่เฉพาะเจาะจง ตัวบทกฎหมายและที่ปรึกษากฎหมายของโรงพยาบาล
+  เป็นผู้มีอำนาจชี้ขาดตัวเลขเหล่านั้น
+- **การแต่งตั้งเจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO)** ตาม PDPA องค์กรที่ประมวลผล
+  ข้อมูลส่วนบุคคลในปริมาณมาก โดยเฉพาะข้อมูลประเภทที่มีความอ่อนไหว เช่น ข้อมูลสุขภาพ
+  โดยทั่วไปจำเป็นต้องแต่งตั้งเจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคลโดยเฉพาะ
   — *Tilleke & Gibbins, "Thailand's New Draft Guidance on Data Protection
-  Officers"*, accessed 2026-09-20.
+  Officers"*, สืบค้นเมื่อ 2026-09-20.
   [https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/](https://www.tilleke.com/insights/thailands-new-draft-guidance-on-data-protection-officers/)
-  Whether the partner hospital already has a DPO who would cover this
-  system's data flows is a hospital governance question the engineering
-  team cannot answer; it is listed as open in §5.5.
+  การที่โรงพยาบาลพันธมิตรมี DPO ที่จะครอบคลุมการไหลของข้อมูลของระบบนี้อยู่แล้วหรือไม่
+  เป็นคำถามด้านธรรมาภิบาลของโรงพยาบาลที่ทีมพัฒนาระบบไม่สามารถตอบได้
+  จึงระบุไว้เป็นประเด็นเปิดในหัวข้อ 5.5
 
-## 5.3 How data is stored today, and what was verified (not assumed)
+## 5.3 วิธีการจัดเก็บข้อมูลในปัจจุบัน และสิ่งที่ได้รับการตรวจสอบแล้ว (มิใช่การสันนิษฐาน)
 
-The claim that no patient-chart data leaves the hospital's own
-infrastructure in the current design was **checked against the code**,
-not simply asserted from the README:
+ข้อกล่าวอ้างว่าในการออกแบบปัจจุบันไม่มีข้อมูลเวชระเบียนผู้ป่วยออกนอกโครงสร้างพื้นฐาน
+ของโรงพยาบาลเอง ได้รับการ **ตรวจสอบกับโค้ด** มิใช่เพียงยืนยันตามที่เขียนไว้ใน README:
 
-- **Databases.** One `postgres:18` container holds both application
-  databases (`medcode`, `imed`), matching the intended production shape —
-  "one Postgres server holds both databases... matching the GCP deploy
-  plan" (`medcode-stack/README.md`, "The database").
-- **The RAG vector index and generation model run locally.** The vector
-  store (Chroma) is a persistent on-disk store inside the `rag` service's
-  own data volume (`RAG/app/config.py`, `ragdata` volume in
-  `medcode-stack/README.md`). Generation is either fully in-process
-  (`transformers`, CPU) or via **Ollama running on the host machine itself**
-  — explicitly chosen over an in-container/cloud setup for latency and GPU
-  reasons (Chapter 4, §4.2.4), not for privacy — but the privacy property
-  falls out of the same decision: nothing about generation crosses the
-  hospital's own network boundary.
-- **A direct code search for external cloud AI API calls (OpenAI,
-  Anthropic, Google, AWS Bedrock, Azure OpenAI) across `RAG/app`,
-  `medcode-api/src/main`, and `audit-chart-frontend/src` found none.** The
-  only "OpenAI" references in the codebase are two doc-comments noting that
-  the chat message role convention (`role: "user"/"assistant"`) follows the
-  same shape OpenAI's API popularized — not an actual call to any OpenAI
-  service (`RAG/app/models/schemas.py:70`,
-  `audit-chart-frontend/src/features/agent/types/agent.types.ts:71`).
+- **ฐานข้อมูล** คอนเทนเนอร์ `postgres:18` หนึ่งตัวเก็บฐานข้อมูลของแอปพลิเคชันทั้งสอง
+  (`medcode`, `imed`) ซึ่งตรงกับรูปแบบที่ตั้งใจไว้สำหรับสภาพแวดล้อมใช้งานจริง ดังที่ระบุว่า
+  "เซิร์ฟเวอร์ Postgres เครื่องเดียวเก็บฐานข้อมูลทั้งสอง... ตรงกับแผนการนำไปใช้งานบน GCP"
+  (`medcode-stack/README.md` ส่วน "The database")
+- **ดัชนีเวกเตอร์ของ RAG และโมเดลสร้างข้อความทำงานภายในเครื่อง** ฐานข้อมูลเวกเตอร์
+  (Chroma) เป็นที่เก็บข้อมูลถาวรบนดิสก์ภายใน data volume ของบริการ `rag` เอง
+  (`RAG/app/config.py` และ volume `ragdata` ใน `medcode-stack/README.md`)
+  การสร้างข้อความ (generation) ทำงานได้ทั้งแบบภายในโพรเซสทั้งหมด (`transformers` บน CPU)
+  หรือผ่าน **Ollama ที่รันบนเครื่องโฮสต์เอง** ซึ่งเลือกใช้แทนการตั้งค่าภายในคอนเทนเนอร์
+  หรือบนคลาวด์ด้วยเหตุผลด้านความหน่วง (latency) และ GPU (บทที่ 4 หัวข้อ 4.2.4)
+  มิใช่ด้วยเหตุผลด้านความเป็นส่วนตัว แต่คุณสมบัติด้านความเป็นส่วนตัวก็เป็นผลที่ตามมา
+  จากการตัดสินใจเดียวกันนี้ กล่าวคือ ไม่มีส่วนใดของการสร้างข้อความที่ข้ามขอบเขตเครือข่าย
+  ของโรงพยาบาลออกไป
+- **การค้นหาโดยตรงในโค้ดเพื่อหาการเรียก API ของบริการ AI บนคลาวด์ภายนอก (OpenAI,
+  Anthropic, Google, AWS Bedrock, Azure OpenAI) ใน `RAG/app`,
+  `medcode-api/src/main` และ `audit-chart-frontend/src` ไม่พบการเรียกใช้ใดเลย**
+  การอ้างถึง "OpenAI" ที่มีอยู่ในโค้ดมีเพียง doc-comment สองแห่งซึ่งระบุว่ารูปแบบบทบาท
+  ของข้อความแชท (`role: "user"/"assistant"`) มีโครงสร้างเดียวกับที่ API ของ OpenAI
+  ทำให้แพร่หลาย มิใช่การเรียกใช้บริการใดของ OpenAI จริง (`RAG/app/models/schemas.py:70`,
+  `audit-chart-frontend/src/features/agent/types/agent.types.ts:71`)
 
-What the AI service actually receives was checked the same way, in
-`medcode-api`'s `CaseSuggestService` and `AgentController`:
+ข้อมูลที่บริการ AI ได้รับจริงได้รับการตรวจสอบด้วยวิธีเดียวกัน ใน `CaseSuggestService`
+และ `AgentController` ของ `medcode-api`:
 
-| Call | Sent to the AI service | Not sent |
+| การเรียกใช้ | ส่งไปยังบริการ AI | ไม่ได้ส่ง |
 |---|---|---|
-| Code suggestions | the chart's report-section text, complaint and present illness first, capped at 3,500 characters | visit number, hospital number, case id, account |
-| Agent chat | the coder's question and prior turns | case id, patient identifiers, account token |
-| Taught rules | the rule text, plus the teaching coder's name and account id (for authorship checks) | patient data |
+| คำแนะนำรหัส | ข้อความในส่วนรายงานของเวชระเบียน โดยเรียงอาการสำคัญและประวัติการเจ็บป่วยปัจจุบันไว้ก่อน จำกัดไม่เกิน 3,500 ตัวอักษร | หมายเลขการมารับบริการ, เลขประจำตัวผู้ป่วยของโรงพยาบาล, รหัสเคส, บัญชีผู้ใช้ |
+| แชทกับ AI ผู้ช่วย | คำถามของผู้ให้รหัสและบทสนทนาก่อนหน้า | รหัสเคส, ตัวระบุผู้ป่วย, โทเค็นบัญชีผู้ใช้ |
+| กฎการให้รหัสที่สอน | ข้อความของกฎ พร้อมชื่อและรหัสบัญชีของผู้ให้รหัสที่สอน (เพื่อตรวจสอบผู้สร้างกฎ) | ข้อมูลผู้ป่วย |
 
-One honest caveat: chart text is sent as written. If a clinician typed an
-identifier into a note, it reaches the AI service unscrubbed — still on the
-local machine, but not filtered.
+ข้อสงวนประการหนึ่งที่ต้องระบุอย่างตรงไปตรงมา คือ ข้อความในเวชระเบียนถูกส่งไปตามที่บันทึกไว้
+หากบุคลากรทางคลินิกพิมพ์ตัวระบุตัวบุคคลไว้ในบันทึก ข้อมูลนั้นจะไปถึงบริการ AI โดยไม่ถูกลบออก
+แม้จะยังอยู่บนเครื่องภายใน แต่ก็ไม่ได้ผ่านการกรอง
 
-**What this verification does *not* cover**: network egress at the
-infrastructure/firewall level (this was a source-code check, not a running
-network trace), and any future production configuration that might
-introduce a cloud dependency the current demo build does not have. A real
-deployment's PDPA review (§5.5) should re-verify this claim against the
-actual production infrastructure, not just this report's source read.
+**สิ่งที่การตรวจสอบนี้ *ไม่ได้* ครอบคลุม**: การรับส่งข้อมูลขาออกจากเครือข่าย (network egress)
+ในระดับโครงสร้างพื้นฐาน/ไฟร์วอลล์ (การตรวจสอบนี้เป็นการตรวจซอร์สโค้ด มิใช่การติดตาม
+การรับส่งข้อมูลบนเครือข่ายขณะระบบทำงาน) และการตั้งค่าสภาพแวดล้อมใช้งานจริงในอนาคต
+ที่อาจเพิ่มการพึ่งพาบริการคลาวด์ซึ่งระบบสาธิตปัจจุบันไม่มี การทบทวนด้าน PDPA
+สำหรับการนำไปใช้งานจริง (หัวข้อ 5.5) ควรตรวจสอบข้อกล่าวอ้างนี้ซ้ำกับโครงสร้างพื้นฐาน
+ของสภาพแวดล้อมใช้งานจริง มิใช่อาศัยเพียงการอ่านซอร์สโค้ดในรายงานนี้
 
-## 5.4 How data is disposed of today — and why that is not the same as PDPA "erasure"
+## 5.4 วิธีการกำจัดข้อมูลในปัจจุบัน — และเหตุใดจึงไม่เทียบเท่ากับ "การลบ" ตาม PDPA
 
-The only "delete" mechanism that exists today is **`POST /api/demo/reset`**:
-it restores both the `medcode` and `imed` databases to a previously
-snapshotted baseline, truncating and refilling every baselined table
-(`medcode-api/docs/api-contract.md`, `POST /api/demo/reset`). This is
-reached from the coder UI via **Settings → Reset demo**
-(`imed-mock-api/DEMO-SETUP.md`, step 6). It is gated off by default outside
-local development (`DEMO_TOOLS_ENABLED`, forced `false` in the container
-build), because it is a destructive bulk write requiring authentication
-even when enabled.
+กลไก "การลบ" เพียงอย่างเดียวที่มีอยู่ในปัจจุบันคือ **`POST /api/demo/reset`**
+ซึ่งคืนค่าฐานข้อมูลทั้ง `medcode` และ `imed` กลับสู่สถานะตั้งต้นที่บันทึกสแนปช็อต (snapshot)
+ไว้ก่อนหน้า โดยล้างข้อมูลและเติมข้อมูลกลับในทุกตารางที่อยู่ในสถานะตั้งต้น
+(`medcode-api/docs/api-contract.md`, `POST /api/demo/reset`) ผู้ใช้เข้าถึงกลไกนี้
+จากหน้าจอของผู้ให้รหัสผ่าน **การตั้งค่า → รีเซ็ตเดโม**
+(`imed-mock-api/DEMO-SETUP.md` ขั้นตอนที่ 6) กลไกนี้ถูกปิดไว้โดยค่าเริ่มต้นนอกสภาพแวดล้อม
+การพัฒนาภายในเครื่อง (`DEMO_TOOLS_ENABLED` ถูกบังคับเป็น `false` ในการ build
+คอนเทนเนอร์) เนื่องจากเป็นการเขียนข้อมูลจำนวนมากที่ทำลายข้อมูลเดิม ซึ่งต้องยืนยันตัวตน
+แม้เมื่อเปิดใช้งานแล้ว
 
-**This is a demo convenience, not a PDPA-compliant erasure mechanism**, and
-this report states that gap explicitly rather than implying reset "handles"
-data disposal:
+**กลไกนี้เป็นเพียงเครื่องมืออำนวยความสะดวกสำหรับการสาธิต มิใช่กลไกการลบข้อมูลที่เป็นไปตาม PDPA**
+และรายงานนี้ระบุช่องว่างดังกล่าวอย่างชัดแจ้ง แทนที่จะสื่อเป็นนัยว่าการรีเซ็ต "จัดการ"
+การกำจัดข้อมูลได้แล้ว:
 
-- It restores **everything** to a shared baseline — there is no way to
-  erase one specific patient's record while leaving the rest of the
-  database intact, which is what a real data-subject erasure request would
-  require.
-- It is a *reset to a snapshot*, not a *deletion* — a snapshot itself
-  persists the data it was taken from; "erasing" via reset does not reduce
-  what has been retained anywhere upstream (backups, the snapshot schema
-  itself, journaled audit history).
-- No retention-period logic exists anywhere in the schema (§5.2) — nothing
-  currently deletes a case automatically after N days/years.
+- กลไกนี้คืนค่า **ทุกอย่าง** กลับสู่สถานะตั้งต้นที่ใช้ร่วมกัน ไม่มีวิธีลบข้อมูลของผู้ป่วย
+  รายใดรายหนึ่งโดยเฉพาะโดยคงข้อมูลส่วนอื่นของฐานข้อมูลไว้ ซึ่งเป็นสิ่งที่คำขอลบข้อมูล
+  จากเจ้าของข้อมูลส่วนบุคคลจริงต้องการ
+- กลไกนี้เป็น *การรีเซ็ตกลับสู่สแนปช็อต* มิใช่ *การลบ* ตัวสแนปช็อตเองยังคงเก็บข้อมูล
+  ที่ใช้สร้างสแนปช็อตนั้นไว้ "การลบ" ด้วยการรีเซ็ตจึงไม่ได้ลดข้อมูลที่ถูกเก็บรักษาไว้
+  ในแหล่งต้นทางใด ๆ (ข้อมูลสำรอง ตัว schema ของสแนปช็อตเอง และประวัติการตรวจสอบ
+  ที่บันทึกไว้ในบันทึกประวัติ)
+- ไม่มีตรรกะเกี่ยวกับระยะเวลาการเก็บรักษาอยู่ในส่วนใดของ schema (หัวข้อ 5.2)
+  ปัจจุบันไม่มีสิ่งใดลบเคสโดยอัตโนมัติเมื่อครบ N วัน/ปี
 
-## 5.5 Explicit gap: no PDPA compliance review has been done
+## 5.5 ช่องว่างที่ระบุไว้อย่างชัดแจ้ง: ยังไม่มีการทบทวนการปฏิบัติตาม PDPA
 
-**This is stated plainly because it is a real, current gap, not a
-formality:** no production PDPA compliance review, Data Protection Impact
-Assessment (DPIA), or legal sign-off has been performed for this system.
-The team's own production-readiness checklist already reaches the same
-conclusion independently: *"Data protection paperwork — a processing
-agreement, a record of what data we handle, and an impact check for the AI
-part. Thailand's data regulator published a draft guide for hospitals this
-year. It does not add new rules, but it shows how hospitals will be
-checked. Doing it now is cheaper than fixing it later"*
-(`medcode-api/docs/DEPLOYMENT-PREP.md`, §2, tagged `🟡 [say]` — a decision
-the hospital, not the engineering team, must drive).
+**ประเด็นนี้ระบุไว้อย่างตรงไปตรงมาเพราะเป็นช่องว่างที่มีอยู่จริงในปัจจุบัน มิใช่เพียงพิธีการ:**
+ระบบนี้ยังไม่ได้ผ่านการทบทวนการปฏิบัติตาม PDPA สำหรับการใช้งานจริง การประเมินผลกระทบ
+ด้านการคุ้มครองข้อมูลส่วนบุคคล (Data Protection Impact Assessment: DPIA)
+หรือการรับรองทางกฎหมายใด ๆ รายการตรวจสอบความพร้อมสำหรับการใช้งานจริงของคณะผู้จัดทำเอง
+ก็ได้ข้อสรุปเดียวกันนี้โดยอิสระ: *"เอกสารด้านการคุ้มครองข้อมูล ได้แก่ ข้อตกลงการประมวลผลข้อมูล
+บันทึกรายการข้อมูลที่เราจัดการ และการประเมินผลกระทบสำหรับส่วนที่เป็น AI
+หน่วยงานกำกับดูแลด้านข้อมูลส่วนบุคคลของไทยได้เผยแพร่ร่างแนวปฏิบัติสำหรับโรงพยาบาลในปีนี้
+ร่างนี้ไม่ได้เพิ่มกฎใหม่ แต่แสดงให้เห็นว่าโรงพยาบาลจะถูกตรวจสอบอย่างไร
+การดำเนินการตั้งแต่ตอนนี้มีต้นทุนต่ำกว่าการแก้ไขภายหลัง"*
+(`medcode-api/docs/DEPLOYMENT-PREP.md` หัวข้อ 2 ติดป้าย `🟡 [say]` ซึ่งหมายถึงการตัดสินใจ
+ที่โรงพยาบาลต้องเป็นผู้ขับเคลื่อน มิใช่ทีมพัฒนาระบบ)
 
-Concretely, before any real patient data is processed by this system, the
-following must happen and currently have not (carried forward into Chapter
-8's deployment gap list, not duplicated here in full):
+กล่าวโดยเจาะจง ก่อนที่ระบบนี้จะประมวลผลข้อมูลผู้ป่วยจริงใด ๆ จะต้องดำเนินการต่อไปนี้
+ซึ่งปัจจุบันยังไม่ได้ดำเนินการ (ยกไปรวมไว้ในรายการช่องว่างก่อนการนำไปใช้งานจริงในบทที่ 8
+โดยไม่ได้ทำซ้ำไว้ที่นี่ทั้งหมด):
 
-1. A Data Protection Impact Assessment covering the AI-suggestion pathway
-   specifically (since it involves automated processing of sensitive health
-   data, even with a human-approval gate).
-2. A determined, documented lawful basis for processing (consent vs. one of
-   the medical-purpose exceptions — §5.2).
-3. A data processing agreement between the hospital (as data controller)
-   and whoever operates/hosts this system (as processor, if these are
-   different legal entities).
-4. A defined, PDPA-compliant retention and erasure policy, replacing the
-   demo-reset mechanism (§5.4) with real per-record capabilities.
-5. Confirmation of the hospital's own DPO's sign-off, and — because this
-   system stores an audit trail of *who* coded *what* and stamps individual
-   coder accounts — a review of whether the coder-attribution data itself
-   (Chapter 4, §4.3) needs its own retention/access policy as employee data,
-   separate from the patient data it is attached to.
+1. การประเมินผลกระทบด้านการคุ้มครองข้อมูลส่วนบุคคลที่ครอบคลุมเส้นทางการแนะนำรหัสโดย AI
+   โดยเฉพาะ (เนื่องจากเกี่ยวข้องกับการประมวลผลข้อมูลสุขภาพซึ่งเป็นข้อมูลส่วนบุคคลที่มีความอ่อนไหว
+   โดยอัตโนมัติ แม้จะมีขั้นตอนการอนุมัติโดยมนุษย์กำกับอยู่ก็ตาม)
+2. การกำหนดฐานทางกฎหมายในการประมวลผลให้ชัดเจนและจัดทำเป็นเอกสาร (ความยินยอม
+   หรือข้อยกเว้นข้อใดข้อหนึ่งเพื่อวัตถุประสงค์ทางการแพทย์ — หัวข้อ 5.2)
+3. ข้อตกลงการประมวลผลข้อมูลส่วนบุคคลระหว่างโรงพยาบาล (ในฐานะผู้ควบคุมข้อมูลส่วนบุคคล)
+   กับผู้ดำเนินการหรือผู้ให้บริการโฮสต์ระบบนี้ (ในฐานะผู้ประมวลผลข้อมูลส่วนบุคคล
+   หากเป็นนิติบุคคลต่างกัน)
+4. นโยบายการเก็บรักษาและการลบข้อมูลที่กำหนดไว้ชัดเจนและเป็นไปตาม PDPA เพื่อแทนที่
+   กลไกการรีเซ็ตสำหรับการสาธิต (หัวข้อ 5.4) ด้วยความสามารถในการจัดการข้อมูลรายระเบียนที่ใช้งานได้จริง
+5. การยืนยันการรับรองจาก DPO ของโรงพยาบาลเอง และเนื่องจากระบบนี้จัดเก็บร่องรอยการตรวจสอบ
+   (audit trail) ว่า *ใคร* ให้รหัส *อะไร* และประทับบัญชีของผู้ให้รหัสแต่ละคนไว้
+   จึงต้องทบทวนด้วยว่าข้อมูลการระบุผู้ให้รหัสนี้เอง (บทที่ 4 หัวข้อ 4.3) จำเป็นต้องมี
+   นโยบายการเก็บรักษา/การเข้าถึงของตนเองในฐานะข้อมูลของพนักงาน แยกจากข้อมูลผู้ป่วย
+   ที่ข้อมูลนี้ผูกอยู่หรือไม่
 
-**No number, deadline, or compliance status is claimed in this report** for
-any of the five items above — they are open, and are re-listed as such in
-Chapter 8.
+**รายงานนี้ไม่ได้กล่าวอ้างตัวเลข กำหนดเวลา หรือสถานะการปฏิบัติตามกฎหมายใด ๆ**
+สำหรับรายการทั้งห้าข้างต้น ทุกรายการยังเปิดอยู่ และได้ระบุซ้ำในสถานะดังกล่าวไว้ในบทที่ 8

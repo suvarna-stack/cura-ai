@@ -1,178 +1,70 @@
-# Chapter 1 — Problem
+# บทที่ 1 บทนำ
 
-This report describes **CURA AI**, built by team Suvarna Stack. The product
-was developed under the working name *MedCode AI*, which its repositories,
-services and databases still use (`medcode-api`, `medcode-stack`, the
-`medcode` database), as do some project documents quoted in this report.
+รายงานฉบับนี้นำเสนอระบบ **CURA AI** ซึ่งพัฒนาโดยทีม Suvarna Stack ผลิตภัณฑ์นี้พัฒนาขึ้นภายใต้ชื่อชั่วคราว *MedCode AI* ซึ่งยังคงใช้อยู่ในชื่อคลังโค้ด (repository) บริการ และฐานข้อมูลของระบบ (`medcode-api`, `medcode-stack` และฐานข้อมูล `medcode`) รวมถึงในเอกสารโครงการบางฉบับที่อ้างถึงในรายงานนี้
 
-## 1.1 The setting: how a Thai hospital visit becomes a paid claim
+## 1.1 บริบท: การมารับบริการที่โรงพยาบาลในประเทศไทยกลายเป็นการเบิกจ่ายค่ารักษาได้อย่างไร
 
-Every patient visit at the partner hospital produces a chart: the doctor's notes
-(chief complaint, present illness, physical exam, assessment), lab results, drug
-orders, procedures, and vital signs. After the visit, a **medical coder** reads
-that chart and assigns standardized codes — ICD-10 for *what was wrong*
-(diagnoses) and ICD-9 / ICD-9-CM for *what was done* (procedures) — using
-Thailand's own national modification of the WHO standard, **ICD-10-TM**, which
-adds a fifth volume of coding rules and a block of Thailand-specific codes
-(U50–U77 for traditional medicine, among others) on top of the WHO tabular
-lists (medcode-api `docs/medical-glossary.md`, §4–5).
+การมารับบริการของผู้ป่วยแต่ละครั้งที่โรงพยาบาลพันธมิตรจะก่อให้เกิดเวชระเบียน ได้แก่ บันทึกของแพทย์ (อาการสำคัญ ประวัติการเจ็บป่วยปัจจุบัน การตรวจร่างกาย และการประเมิน) ผลการตรวจทางห้องปฏิบัติการ คำสั่งใช้ยา หัตถการ และสัญญาณชีพ หลังการมารับบริการ **เจ้าหน้าที่ให้รหัสโรค** (medical coder) จะอ่านเวชระเบียนนั้นและกำหนดรหัสมาตรฐาน ได้แก่ ICD-10 สำหรับ *สิ่งที่ผิดปกติ* (การวินิจฉัย) และ ICD-9 / ICD-9-CM สำหรับ *สิ่งที่ได้กระทำ* (หัตถการ) โดยใช้ **ICD-10-TM** ซึ่งเป็นฉบับดัดแปลงระดับชาติของประเทศไทยจากมาตรฐานของ WHO ฉบับนี้เพิ่มเล่มที่ 5 ว่าด้วยกฎการให้รหัส และกลุ่มรหัสเฉพาะของประเทศไทย (เช่น U50–U77 สำหรับการแพทย์แผนดั้งเดิม เป็นต้น) ต่อยอดจากบัญชีจำแนก (tabular list) ของ WHO (medcode-api `docs/medical-glossary.md` หัวข้อ 4–5)
 
-Those codes are not paperwork for its own sake. For inpatient (IPD) care, Thai
-hospitals are reimbursed by **DRG** (diagnosis-related group): the codes place
-the admission into a group, each group carries a relative weight, and payment
-is roughly *weight × rate*. Because the codes move money, Thailand's National
-Health Security Office (NHSO) audits medical records against submitted codes,
-watching for both under-coding (the hospital loses money it earned) and
-"DRG creep" / upcoding. A 2015 NHSO audit covered roughly 119,000 records,
-checking principal diagnoses in discharge summaries against the coded data
-(`docs/medical-glossary.md`, §1, citing the NHSO audit literature listed in
-that file's Sources section). Getting the code right is therefore both a
-clinical-documentation exercise and a compliance exercise, with real financial
-and audit consequences for the hospital.
+รหัสเหล่านี้ไม่ใช่งานเอกสารที่ทำเพียงเพื่อให้มีเอกสาร สำหรับการดูแลผู้ป่วยใน (IPD) โรงพยาบาลในประเทศไทยได้รับการเบิกจ่ายค่ารักษาตามระบบ **DRG** (กลุ่มวินิจฉัยโรคร่วม; diagnosis-related group) กล่าวคือ รหัสจะจัดการรับผู้ป่วยไว้รักษา (admission) แต่ละครั้งเข้าสู่กลุ่ม แต่ละกลุ่มมีน้ำหนักสัมพัทธ์ (relative weight) และค่าตอบแทนมีค่าประมาณ *น้ำหนัก × อัตราจ่าย* เนื่องจากรหัสมีผลต่อเงินที่โรงพยาบาลได้รับ สำนักงานหลักประกันสุขภาพแห่งชาติ (สปสช.) จึงตรวจสอบเวชระเบียนเทียบกับรหัสที่ส่งเบิก โดยเฝ้าระวังทั้งการให้รหัสต่ำกว่าความเป็นจริง (under-coding) ซึ่งทำให้โรงพยาบาลสูญเสียรายได้ที่ควรได้รับ และ "DRG creep" / การให้รหัสสูงกว่าความเป็นจริง (upcoding) การตรวจสอบของ สปสช. ในปี 2015 ครอบคลุมเวชระเบียนประมาณ 119,000 ฉบับ โดยตรวจการวินิจฉัยหลักในสรุปการจำหน่ายผู้ป่วย (discharge summary) เทียบกับข้อมูลรหัสที่บันทึกไว้ (`docs/medical-glossary.md` หัวข้อ 1 ซึ่งอ้างอิงเอกสารการตรวจสอบของ สปสช. ที่ระบุไว้ในส่วน Sources ของไฟล์ดังกล่าว) ดังนั้น การให้รหัสที่ถูกต้องจึงเป็นทั้งงานด้านการบันทึกเวชระเบียนทางคลินิกและงานด้านการปฏิบัติตามข้อกำหนด ซึ่งส่งผลจริงต่อการเงินและผลการตรวจสอบของโรงพยาบาล
 
-## 1.2 The manual process this system is built to support
+## 1.2 กระบวนการที่ทำด้วยมือซึ่งระบบนี้สร้างขึ้นเพื่อสนับสนุน
 
-Coding today is a manual, chart-by-chart human task, governed by a strict
-rulebook (ICD-10-TM Volume 5) that a naive tool would routinely get wrong.
-Some of the rules that make correct coding genuinely hard, not just tedious
-(`docs/medical-glossary.md`, §5):
+ปัจจุบัน การให้รหัสเป็นงานที่มนุษย์ทำด้วยมือทีละเวชระเบียน ภายใต้กฎเกณฑ์ที่เข้มงวด (ICD-10-TM เล่มที่ 5) ซึ่งเครื่องมือที่ออกแบบอย่างง่ายเกินไปมักทำผิดพลาดเป็นประจำ ตัวอย่างกฎที่ทำให้การให้รหัสอย่างถูกต้องเป็นงานที่ยากจริง ไม่ใช่เพียงน่าเบื่อ มีดังนี้ (`docs/medical-glossary.md` หัวข้อ 5)
 
-- Exactly **one** principal diagnosis per visit — the *final* diagnosis at
-  discharge, which may differ from the diagnosis on arrival, chosen by
-  severity and resource use when several conditions compete, and read
-  primarily from the discharge summary rather than the admission note.
-- Comorbidity vs. complication vs. "other diagnosis" are three different
-  things (arose before vs. after admission; enough severity to need extra
-  care or not) that the coder must distinguish from free-text doctor notes.
-- **A lab result is never a diagnosis** — an abnormal white-cell count cannot
-  be coded as "infection" unless the doctor's own note concluded that.
-- Catch-all / ambiguous codes are discouraged; combined codes should be used
-  where they exist; symptom codes are dropped once the underlying cause is
-  coded.
+- การมารับบริการแต่ละครั้งมีการวินิจฉัยหลักได้ **เพียงหนึ่งเดียว** ซึ่งคือการวินิจฉัย *สุดท้าย* ณ เวลาจำหน่ายผู้ป่วย และอาจแตกต่างจากการวินิจฉัยแรกรับ หากมีหลายภาวะที่อาจเป็นการวินิจฉัยหลักได้ ให้เลือกตามความรุนแรงและการใช้ทรัพยากร และให้อ่านจากสรุปการจำหน่ายผู้ป่วยเป็นหลักแทนบันทึกแรกรับ
+- โรคร่วม (comorbidity) ภาวะแทรกซ้อน (complication) และ "การวินิจฉัยอื่น" (other diagnosis) เป็นสามสิ่งที่แตกต่างกัน (เกิดขึ้นก่อนหรือหลังรับไว้รักษา และมีความรุนแรงถึงขั้นต้องได้รับการดูแลเพิ่มเติมหรือไม่) ซึ่งผู้ให้รหัสต้องแยกแยะจากบันทึกของแพทย์ที่เป็นข้อความอิสระ
+- **ผลการตรวจทางห้องปฏิบัติการไม่ถือเป็นการวินิจฉัยโดยเด็ดขาด** เช่น ค่าเม็ดเลือดขาวที่ผิดปกติไม่สามารถให้รหัสเป็น "การติดเชื้อ" ได้ เว้นแต่บันทึกของแพทย์เองได้สรุปเช่นนั้น
+- ไม่สนับสนุนให้ใช้รหัสแบบครอบคลุมกว้าง (catch-all) หรือรหัสที่กำกวม ควรใช้รหัสรวม (combined code) เมื่อมีรหัสดังกล่าว และให้ตัดรหัสอาการออกเมื่อได้ให้รหัสสาเหตุที่แท้จริงแล้ว
 
-A coder is, in effect, reading unstructured Thai/English clinical text —
-including heavy local shorthand (`HT`, `DM`, `s/p`, `r/o`, mixed Thai
-fragments — catalogued in `docs/medical-glossary.md` §10) — against a
-five-volume national rulebook, for every visit, all day. This is the
-process the AI-assisted workflow in this project is built to speed up, not
-replace: **"which code belongs on a chart is a certified human coder's call
-under [the ICD-10-TM] rules... this system stores, checks and forwards
-their decision"** (`docs/medical-glossary.md`, §1, opening scope note).
+กล่าวโดยสรุป ผู้ให้รหัสต้องอ่านข้อความทางคลินิกภาษาไทยและภาษาอังกฤษที่ไม่มีโครงสร้าง ซึ่งมีคำย่อเฉพาะท้องถิ่นจำนวนมาก (`HT`, `DM`, `s/p`, `r/o` และข้อความภาษาไทยที่ปะปนอยู่ ซึ่งรวบรวมไว้ใน `docs/medical-glossary.md` หัวข้อ 10) แล้วนำไปเทียบกับกฎเกณฑ์ระดับชาติจำนวน 5 เล่ม สำหรับการมารับบริการทุกครั้ง ตลอดทั้งวัน นี่คือกระบวนการที่ขั้นตอนการทำงานโดยมี AI ช่วยในโครงการนี้สร้างขึ้นเพื่อเร่งให้เร็วขึ้น ไม่ใช่เพื่อทดแทน: **"การตัดสินว่ารหัสใดควรอยู่ในเวชระเบียนเป็นอำนาจของผู้ให้รหัสที่เป็นมนุษย์และได้รับการรับรอง ภายใต้กฎ [ของ ICD-10-TM]... ระบบนี้ทำหน้าที่จัดเก็บ ตรวจสอบ และส่งต่อการตัดสินใจของผู้ให้รหัส"** (`docs/medical-glossary.md` หัวข้อ 1 หมายเหตุขอบเขตตอนต้น)
 
-## 1.3 Where the backlog actually is
+## 1.3 งานค้างที่แท้จริงอยู่ที่ใด
 
-The system's own dashboard vocabulary makes the scale of the problem
-concrete rather than abstract. A visit arrives from the hospital's iMed
-system carrying its clinical documentation, but often without a complete
-set of codes. In the seeded demo dataset, which is shaped after the
-hospital's real extract, a sync loads **140 outpatient visits, 60 of them
-"incomplete"** — missing an ICD-10 diagnosis, an ICD-9 procedure, or both —
-and 80 "complete" (counted on the running system, 23 September 2026). The
-project's glossary is explicit that "complete" here only means the
-hospital's own data already carried both code systems at sync time; it does
-**not** mean a human has reviewed the codes (`docs/medical-glossary.md`
-§11).
+คำศัพท์ที่ใช้บนแดชบอร์ดของระบบเองช่วยให้เห็นขนาดของปัญหาเป็นรูปธรรมแทนที่จะเป็นนามธรรม การมารับบริการแต่ละครั้งเข้ามาจากระบบ iMed ของโรงพยาบาลพร้อมเอกสารทางคลินิก แต่บ่อยครั้งไม่มีรหัสครบชุด ในชุดข้อมูลสาธิตที่เตรียมไว้ล่วงหน้า (seeded demo dataset) ซึ่งจัดรูปแบบตามข้อมูลที่ดึงออกมาจริงของโรงพยาบาล การซิงค์หนึ่งครั้งจะโหลด **การมารับบริการของผู้ป่วยนอก 140 รายการ ในจำนวนนี้ 60 รายการ "ไม่สมบูรณ์"** คือขาดรหัสการวินิจฉัย ICD-10 ขาดรหัสหัตถการ ICD-9 หรือขาดทั้งสองอย่าง และ 80 รายการ "สมบูรณ์" (นับจากระบบที่กำลังทำงานอยู่ เมื่อวันที่ 23 กันยายน 2026) อภิธานศัพท์ของโครงการระบุชัดเจนว่า "สมบูรณ์" ในที่นี้หมายความเพียงว่าข้อมูลของโรงพยาบาลเองมีรหัสทั้งสองระบบอยู่แล้ว ณ เวลาที่ซิงค์ และ **ไม่ได้** หมายความว่ามนุษย์ได้ตรวจทานรหัสแล้ว (`docs/medical-glossary.md` หัวข้อ 11)
 
-The incomplete backlog is further bucketed by what kind of work drove the
-visit — medicine, surgery, CT/X-ray, other — because a coder triaging a
-worklist needs to know which cases need which expertise
-(`medcode-api/docs/api-contract.md`, `incompleteGroups`). This bucketing
-exists precisely because, before this system, there was no single place a
-coder (or a coding supervisor) could see the whole uncoded queue, grouped
-by type of work, across the hospital's outpatient (OPD) visits.
+งานค้างที่ไม่สมบูรณ์ยังถูกแบ่งกลุ่มย่อยตามประเภทของงานที่เป็นเหตุของการมารับบริการ ได้แก่ อายุรกรรม ศัลยกรรม CT/X-ray และอื่น ๆ เนื่องจากผู้ให้รหัสที่คัดแยกลำดับความสำคัญของรายการงานจำเป็นต้องทราบว่าเคสใดต้องใช้ความเชี่ยวชาญด้านใด (`medcode-api/docs/api-contract.md`, `incompleteGroups`) การแบ่งกลุ่มนี้มีขึ้นก็เพราะก่อนมีระบบนี้ ไม่มีที่ใดที่ผู้ให้รหัส (หรือหัวหน้างานให้รหัส) จะมองเห็นคิวงานที่ยังไม่ได้ให้รหัสทั้งหมดได้ในที่เดียว โดยจัดกลุ่มตามประเภทงาน ครอบคลุมการมารับบริการของผู้ป่วยนอก (OPD) ทั้งโรงพยาบาล
 
-This report deliberately states **no real backlog size, turnaround time or
-coder headcount** for the partner hospital. None of these has been measured
-against real production data, only against the synthetic demo dataset, and
-inventing them would undermine every measured number in Chapters 6 and 7.
-Measuring them needs the hospital's own historically coded visits, which is
-the item "Proving the AI is accurate enough" in
-`medcode-api/docs/DEPLOYMENT-PREP.md` §2.
+รายงานฉบับนี้ตั้งใจ **ไม่ระบุขนาดงานค้างจริง ระยะเวลาดำเนินการ หรือจำนวนผู้ให้รหัส** ของโรงพยาบาลพันธมิตร เนื่องจากยังไม่มีค่าใดในจำนวนนี้ที่วัดจากข้อมูลจริงในสภาพแวดล้อมใช้งานจริง มีเพียงการวัดจากชุดข้อมูลสาธิตที่เป็นข้อมูลสมมุติ และการกุตัวเลขเหล่านี้ขึ้นเองจะบั่นทอนความน่าเชื่อถือของตัวเลขทุกตัวที่วัดได้ในบทที่ 6 และบทที่ 7 การวัดค่าเหล่านี้ต้องใช้ข้อมูลการมารับบริการที่โรงพยาบาลเคยให้รหัสไว้ในอดีต ซึ่งตรงกับรายการ "Proving the AI is accurate enough" (การพิสูจน์ว่า AI มีความแม่นยำเพียงพอ) ใน `medcode-api/docs/DEPLOYMENT-PREP.md` หัวข้อ 2
 
-## 1.4 Why decision support, and not automation
+## 1.4 เหตุใดจึงเป็นการสนับสนุนการตัดสินใจ ไม่ใช่การทำงานอัตโนมัติ
 
-The team's own production-readiness handout is explicit that the product's
-value proposition is **assistance, not replacement**: *"A person approves
-every code. The AI only suggests. It never writes into the hospital system
-by itself. ... The AI cannot make up a code. It does not write codes from
-imagination. It searches the coding manuals, takes the codes that actually
-appear in them, and shows the text it found them in."*
-(`medcode-api/docs/DEPLOYMENT-PREP.md`, "Safety" section). This is not
-incidental UI copy — it is enforced in the API contract itself:
-`POST /api/cases/{caseId}/suggest-codes` is documented as writing nothing at
-all (`medcode-api/docs/api-contract.md`), and the only path that touches the
-hospital's own database is a separate, explicit `POST /api/cases/approve`
-call made by a logged-in, audited human account.
+เอกสารประกอบเรื่องความพร้อมสำหรับการนำไปใช้งานจริงของคณะผู้จัดทำระบุชัดเจนว่า คุณค่าหลักของผลิตภัณฑ์คือ **การช่วยเหลือ ไม่ใช่การทดแทน**: *"มนุษย์เป็นผู้อนุมัติทุกรหัส AI ทำหน้าที่เพียงแนะนำ และไม่เคยเขียนข้อมูลลงระบบของโรงพยาบาลด้วยตนเอง ... AI ไม่สามารถกุรหัสขึ้นเองได้ AI ไม่เขียนรหัสจากจินตนาการ แต่ค้นหาในคู่มือการให้รหัส นำรหัสที่ปรากฏอยู่ในคู่มือจริงมาใช้ และแสดงข้อความที่พบรหัสเหล่านั้น"* (`medcode-api/docs/DEPLOYMENT-PREP.md` ส่วน "Safety") ข้อความนี้ไม่ใช่เพียงถ้อยคำบนหน้าจอโดยบังเอิญ แต่ถูกบังคับใช้ไว้ในสัญญาการเชื่อมต่อ API โดยตรง กล่าวคือ `POST /api/cases/{caseId}/suggest-codes` ระบุไว้ในเอกสารว่าไม่เขียนข้อมูลใด ๆ เลย (`medcode-api/docs/api-contract.md`) และช่องทางเดียวที่มีผลต่อฐานข้อมูลของโรงพยาบาลคือการเรียก `POST /api/cases/approve` ซึ่งแยกต่างหากและต้องเรียกอย่างชัดแจ้ง โดยบัญชีผู้ใช้ที่เป็นมนุษย์ซึ่งเข้าสู่ระบบแล้วและถูกบันทึกเพื่อการตรวจสอบ
 
-The reason this design choice matters for the *problem statement*, not
-just the implementation, is that ICD-10-TM coding carries the "never turn a
-lab result into a diagnosis" rule and several other judgment calls a
-model cannot verify against ground truth on its own (§1.2 above). A tool
-that silently auto-codes risks exactly the DRG-creep / under-coding
-failure modes the NHSO already audits for (§1.1). The problem this project
-solves is therefore narrower and more defensible than "automate medical
-coding": it is **"give the coder a faster, better-grounded starting point,
-and make the approve/reject decision fast, auditable, and reversible."**
+เหตุผลที่การเลือกออกแบบเช่นนี้มีความสำคัญต่อ *การนิยามปัญหา* ไม่ใช่เพียงต่อการนำไปปฏิบัติ คือ การให้รหัสตาม ICD-10-TM มีกฎ "ห้ามแปลงผลการตรวจทางห้องปฏิบัติการเป็นการวินิจฉัย" และการใช้วิจารณญาณอีกหลายประการที่โมเดลไม่สามารถตรวจสอบเทียบกับความจริง (ground truth) ได้ด้วยตนเอง (หัวข้อ 1.2 ข้างต้น) เครื่องมือที่ให้รหัสอัตโนมัติโดยไม่แจ้งให้ทราบย่อมเสี่ยงต่อความล้มเหลวในรูปแบบ DRG creep / การให้รหัสต่ำกว่าความเป็นจริง ซึ่ง สปสช. ตรวจสอบอยู่แล้ว (หัวข้อ 1.1) ดังนั้น ปัญหาที่โครงการนี้แก้ไขจึงแคบกว่าและมีเหตุผลรองรับได้ดีกว่า "การให้รหัสทางการแพทย์แบบอัตโนมัติ" กล่าวคือ **"มอบจุดเริ่มต้นที่เร็วกว่าและยึดโยงกับแหล่งที่มาได้ดีกว่าให้แก่ผู้ให้รหัส และทำให้การตัดสินใจอนุมัติหรือปฏิเสธเป็นไปอย่างรวดเร็ว ตรวจสอบได้ และย้อนกลับได้"**
 
-## 1.5 Scope of the current deliverable
+## 1.5 ขอบเขตของผลงานในปัจจุบัน
 
-Two honest scoping limits, stated because they shape everything that
-follows in this report:
+ข้อจำกัดด้านขอบเขต 2 ประการที่ต้องระบุอย่างตรงไปตรงมา เนื่องจากมีผลต่อเนื้อหาทั้งหมดที่ตามมาในรายงานนี้
 
-- **OPD only, today.** The coder dashboard (`GET /api/cases`) serves
-  outpatient visits exclusively (`encountertype = '0'`); the ten IPD
-  admissions in the demo dataset are deliberately absent from it
-  (`imed-mock-api/DEMO-SETUP.md`). DRG, which is the highest-stakes
-  reimbursement mechanism described in §1.1, applies to IPD admissions —
-  so the current dashboard's financial impact is narrower than the
-  DRG-audit framing above implies. This is a real scope boundary, not an
-  oversight to paper over.
-- **A hackathon-built system running on synthetic demo data.** Every case a
-  coder reviews in the current build was generated by
-  `imed-mock-api/scripts/generate_demo_data.py`, not pulled from the real
-  hospital's live iMed system (see Chapter 5 for the full data provenance
-  and honesty statement). The problem described above is real — it is
-  grounded in the hospital's actual coding rulebook, actual API contract,
-  and actual workflow vocabulary, as captured across this project's docs
-  — but the demonstration of the *solution* has not yet run against real
-  patient charts.
+- **ปัจจุบันรองรับเฉพาะ OPD** แดชบอร์ดของผู้ให้รหัส (`GET /api/cases`) แสดงเฉพาะการมารับบริการของผู้ป่วยนอกเท่านั้น (`encountertype = '0'`) ส่วนการรับไว้รักษาแบบ IPD จำนวน 10 รายการในชุดข้อมูลสาธิตถูกตั้งใจไม่นำมาแสดง (`imed-mock-api/DEMO-SETUP.md`) ทั้งนี้ DRG ซึ่งเป็นกลไกการเบิกจ่ายค่ารักษาที่มีผลกระทบสูงที่สุดตามที่อธิบายในหัวข้อ 1.1 ใช้กับการรับไว้รักษาแบบ IPD ดังนั้น ผลกระทบทางการเงินของแดชบอร์ดในปัจจุบันจึงแคบกว่าที่กรอบการตรวจสอบ DRG ข้างต้นสื่อให้เข้าใจ นี่คือขอบเขตที่มีอยู่จริง ไม่ใช่ความบกพร่องที่จะปกปิดไว้
+- **เป็นระบบที่สร้างขึ้นในงานแฮกกาธอน (hackathon) และทำงานบนข้อมูลสาธิตที่เป็นข้อมูลสมมุติ** ทุกเคสที่ผู้ให้รหัสตรวจทานในรุ่นปัจจุบันสร้างขึ้นโดย `imed-mock-api/scripts/generate_demo_data.py` ไม่ได้ดึงมาจากระบบ iMed ที่ใช้งานจริงของโรงพยาบาล (ดูบทที่ 5 สำหรับที่มาของข้อมูลโดยละเอียดและคำแถลงความโปร่งใส) ปัญหาที่อธิบายข้างต้นเป็นปัญหาจริง โดยอ้างอิงจากกฎเกณฑ์การให้รหัสจริง สัญญาการเชื่อมต่อ API จริง และคำศัพท์ในขั้นตอนการทำงานจริงของโรงพยาบาล ตามที่บันทึกไว้ในเอกสารต่าง ๆ ของโครงการ แต่การสาธิต *แนวทางแก้ไข* ยังไม่เคยดำเนินการกับเวชระเบียนผู้ป่วยจริง
 
-## 1.6 Objectives
+## 1.6 วัตถุประสงค์
 
-The deliverable set out to build, and to test as a whole, a system that:
+ผลงานนี้มีเป้าหมายเพื่อสร้างระบบ และทดสอบระบบในภาพรวม โดยระบบดังกล่าว
 
-1. **Brings the coding backlog into one worklist.** Pulls outpatient visits
-   from the hospital's iMed system and shows which of them still lack an
-   ICD-10 diagnosis or an ICD-9 procedure.
-2. **Suggests codes grounded in the coding manuals.** Proposes ICD-10 and
-   ICD-9 candidates from each chart, taken from the uploaded ICD references,
-   with the source shown.
-3. **Keeps the coder as the decision maker.** Nothing reaches the hospital
-   without an explicit, authenticated approval; every approval is attributed
-   and can be reversed.
-4. **Writes approved codes back into the hospital's own records** through
-   the hospital's API, not a side database.
-5. **Keeps patient data inside the hospital.** Retrieval and generation run
-   on local models, with no cloud AI service in the loop.
-6. **Reaches TRL 4.** The system is tested end to end, on realistic data,
-   with measured results.
+1. **รวบรวมงานค้างการให้รหัสไว้ในรายการงานเดียว** ดึงข้อมูลการมารับบริการของผู้ป่วยนอกจากระบบ iMed ของโรงพยาบาล และแสดงว่ารายการใดยังขาดรหัสการวินิจฉัย ICD-10 หรือรหัสหัตถการ ICD-9
+2. **แนะนำรหัสที่ยึดโยงกับคู่มือการให้รหัส** เสนอรหัส ICD-10 และ ICD-9 ที่เป็นตัวเลือกจากเวชระเบียนแต่ละฉบับ โดยนำมาจากเอกสารอ้างอิง ICD ที่อัปโหลดไว้ พร้อมแสดงแหล่งที่มา
+3. **ให้ผู้ให้รหัสเป็นผู้ตัดสินใจ** ไม่มีข้อมูลใดถูกส่งถึงโรงพยาบาลหากไม่มีการอนุมัติที่ชัดแจ้งและผ่านการยืนยันตัวตน การอนุมัติทุกครั้งระบุตัวผู้อนุมัติได้และสามารถย้อนกลับได้
+4. **บันทึกรหัสที่อนุมัติแล้วกลับลงในระเบียนของโรงพยาบาลเอง** ผ่าน API ของโรงพยาบาล ไม่ใช่ฐานข้อมูลแยกต่างหาก
+5. **เก็บข้อมูลผู้ป่วยไว้ภายในโรงพยาบาล** การค้นคืน (retrieval) และการสร้างข้อความ (generation) ทำงานบนโมเดลภายในเครื่อง โดยไม่มีบริการ AI บนคลาวด์เข้ามาเกี่ยวข้อง
+6. **บรรลุระดับ TRL 4** ระบบได้รับการทดสอบตั้งแต่ต้นจนจบ (end to end) บนข้อมูลที่ใกล้เคียงความเป็นจริง พร้อมผลการวัดที่เป็นตัวเลข
 
-Chapter 7 judges the results against these six objectives.
+บทที่ 7 ประเมินผลลัพธ์เทียบกับวัตถุประสงค์ทั้ง 6 ข้อนี้
 
-## 1.7 Method and timeline
+## 1.7 วิธีดำเนินงานและระยะเวลา
 
-The work ran from 21 July to 23 September 2026 across five repositories
-(283 commits in total, per `git log`). The dated milestones below come from
-the project's own progress log (`medcode-api/CLAUDE.md`) and commit history.
+การดำเนินงานเริ่มตั้งแต่วันที่ 21 กรกฎาคม ถึง 23 กันยายน 2026 ครอบคลุมคลังโค้ด 5 แห่ง (รวม 283 commit ตาม `git log`) หลักไมล์ที่ระบุวันที่ด้านล่างนำมาจากบันทึกความก้าวหน้าของโครงการ (`medcode-api/CLAUDE.md`) และประวัติ commit
 
-| Date (2026) | Milestone |
+| วันที่ (2026) | หลักไมล์ |
 |---|---|
-| 21–22 Jul | Backend rebuilt in Spring Boot; the API contract written down; the hospital side split into its own mock service and database |
-| 23–24 Jul | Sync from the hospital; staff login and accounts; write-back rebuilt on the hospital's real "iMed Diagnosis and Medical Discharge API" |
-| 26–27 Jul | AI (RAG) service started; the new coder web UI wired to the backend |
-| 28 Jul – 7 Aug | Catalog split, procedure time windows, hospital-style chart view, accessibility pass, selection-first code review, coding status on the hospital record |
-| 15–17 Aug | Streaming Agent chat with the grounding guard; all five services containerised in one compose stack |
-| 19–20 Aug | The read contract (R1–R6) written for the hospital and mocked; test suite re-based; Flyway made the single schema source |
-| 22–26 Aug | Coder-taught rules with ownership; shared case star; analytics filters |
-| 21 Sep | Evaluation run: test suites, load tests, AI accuracy, screenshots |
-| 23 Sep | Documentation and final report |
+| 21–22 ก.ค. | สร้างระบบส่วนหลัง (backend) ใหม่ด้วย Spring Boot จัดทำเอกสารสัญญาการเชื่อมต่อ API และแยกฝั่งโรงพยาบาลออกเป็นบริการจำลองและฐานข้อมูลของตนเอง |
+| 23–24 ก.ค. | การซิงค์จากโรงพยาบาล การเข้าสู่ระบบและบัญชีผู้ใช้ของเจ้าหน้าที่ และสร้างการบันทึกกลับใหม่บน "iMed Diagnosis and Medical Discharge API" ของจริงของโรงพยาบาล |
+| 26–27 ก.ค. | เริ่มพัฒนาบริการ AI (RAG) และเชื่อมต่อส่วนติดต่อผู้ใช้บนเว็บ (web UI) ใหม่สำหรับผู้ให้รหัสเข้ากับระบบส่วนหลัง |
+| 28 ก.ค. – 7 ส.ค. | แยกแคตตาล็อก ช่วงเวลาของหัตถการ มุมมองเวชระเบียนแบบโรงพยาบาล การปรับปรุงด้านการเข้าถึง (accessibility) การตรวจทานรหัสแบบเลือกก่อน (selection-first) และสถานะการให้รหัสบนระเบียนของโรงพยาบาล |
+| 15–17 ส.ค. | แชต Agent แบบสตรีม (streaming) พร้อมกลไกป้องกันด้านการยึดโยงกับแหล่งที่มา (grounding guard) และบรรจุบริการทั้ง 5 บริการลงในคอนเทนเนอร์ภายใน compose stack เดียว |
+| 19–20 ส.ค. | จัดทำสัญญาการอ่านข้อมูล (R1–R6) สำหรับโรงพยาบาลและสร้างระบบจำลองตามสัญญา ปรับฐานชุดทดสอบใหม่ และกำหนดให้ Flyway เป็นแหล่งเดียวของ schema |
+| 22–26 ส.ค. | กฎที่ผู้ให้รหัสสอนพร้อมการกำหนดความเป็นเจ้าของ การติดดาวเคสที่ใช้ร่วมกัน และตัวกรองในหน้าวิเคราะห์ข้อมูล |
+| 21 ก.ย. | รอบการประเมินผล: ชุดทดสอบ การทดสอบภาระงาน ความแม่นยำของ AI และภาพหน้าจอ |
+| 23 ก.ย. | จัดทำเอกสารและรายงานฉบับสมบูรณ์ |

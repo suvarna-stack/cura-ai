@@ -13,13 +13,18 @@ const sources = fs.readdirSync(dir).filter((f) => f.endsWith('.mmd')).sort();
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 2 });
   await page.setContent('<html><body style="margin:0;background:#fff"><div id="out" style="width:1500px;padding:16px"></div></body></html>');
+  // The labels are Thai: embed the report's Sarabun font and wait for it, so
+  // Mermaid measures the boxes with the same font it draws them in.
+  const sarabun = fs.readFileSync(path.join(dir, '..', 'fonts', 'Sarabun-Regular.ttf')).toString('base64');
+  await page.addStyleTag({ content: `@font-face { font-family: "Sarabun"; src: url(data:font/ttf;base64,${sarabun}); }` });
+  await page.evaluate(() => document.fonts.load('16px Sarabun', 'ก'));
   await page.addScriptTag({ path: mermaidJs });
   await page.evaluate(() => {
     window.mermaid.initialize({
       startOnLoad: false,
       theme: 'neutral',
-      fontFamily: 'Arial, Helvetica, sans-serif',
-      flowchart: { htmlLabels: true, curve: 'basis' },
+      fontFamily: 'Sarabun, Arial, Helvetica, sans-serif',
+      flowchart: { htmlLabels: true, curve: 'basis', wrappingWidth: 420 },
       sequence: { mirrorActors: false },
     });
   });

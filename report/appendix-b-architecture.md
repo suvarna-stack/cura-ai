@@ -1,39 +1,37 @@
-# Appendix B — Architecture & data-flow diagrams
+# ภาคผนวก ข แผนภาพสถาปัตยกรรมและการไหลของข้อมูล
 
-Full interactive diagrams (12 sections covering the system boundary, the
-case coding pipeline, sync/approve/reopen, auth, the RAG seam, and a full
-process-by-table CRUD matrix) live at `medcode-api/docs/dataflow.html` —
-open it in a browser for the interactive version; two of its figures are
-captured statically below for this appendix.
+แผนภาพแบบโต้ตอบฉบับเต็ม (12 ส่วน ครอบคลุมขอบเขตของระบบ ไปป์ไลน์การให้รหัสของเคส
+การซิงค์/การอนุมัติ/การเปิดใหม่ การยืนยันตัวตน รอยต่อ (seam) กับบริการ RAG และเมทริกซ์ CRUD
+ระหว่างกระบวนการกับตารางฉบับเต็ม) อยู่ที่ `medcode-api/docs/dataflow.html` —
+เปิดด้วยเว็บเบราว์เซอร์เพื่อดูฉบับโต้ตอบ ภาคผนวกนี้บันทึกภาพนิ่งของแผนภาพ 2 ภาพจากเอกสารดังกล่าวไว้ด้านล่าง
 
-## Figure B.1 — System boundary (Level 0 context)
+## ภาพที่ ข.1 — ขอบเขตของระบบ (แผนภาพบริบทระดับ 0)
 
-![System boundary diagram — Medical coder and Administrator browsers on
-top, CURA AI backend in the center, Hospital iMed API and MedCode RAG
-service below](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-context.png)
+![แผนภาพขอบเขตของระบบ — เบราว์เซอร์ของเจ้าหน้าที่ให้รหัสโรคและผู้ดูแลระบบอยู่ด้านบน
+ระบบหลังบ้าน (backend) ของ CURA AI อยู่ตรงกลาง API ของ iMed ของโรงพยาบาลและบริการ MedCode RAG
+อยู่ด้านล่าง](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-context.png)
 
-Four actors: the coder's browser, the admin console, the hospital's iMed
-API (read/write, one direction is irreversible — diagnosis POST/PUT/DELETE),
-and the RAG service (clinical text in, code candidates out). CURA AI's
-backend is the only component with write access to its own database and the
-only one that owns the API contract.
+ผู้มีส่วนเกี่ยวข้อง (actor) มี 4 ส่วน ได้แก่ เบราว์เซอร์ของผู้ให้รหัส คอนโซลของผู้ดูแลระบบ API ของ iMed
+ของโรงพยาบาล (อ่าน/เขียน โดยทิศทางหนึ่งย้อนกลับไม่ได้ — คือการ POST/PUT/DELETE ข้อมูลการวินิจฉัย)
+และบริการ RAG (รับข้อความทางคลินิกเข้า ส่งรหัสที่เป็นตัวเลือกออก) ระบบหลังบ้านของ CURA AI
+เป็นองค์ประกอบเดียวที่มีสิทธิ์เขียนฐานข้อมูลของตนเอง และเป็นองค์ประกอบเดียวที่เป็นเจ้าของสัญญาการเชื่อมต่อ API
 
-## Figure B.2 — The case coding pipeline
+## ภาพที่ ข.2 — ไปป์ไลน์การให้รหัสของเคส
 
-![Case coding pipeline diagram](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-pipeline.png)
+![แผนภาพไปป์ไลน์การให้รหัสของเคส](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-pipeline.png)
 
-*(See `dataflow.html` for the remaining 10 sections: processes-and-stores
-index, sync, approve two-phase/one-lock, reopen-as-journal-replay,
-authentication, the RAG seam's four flows, the single-writer/single-cache
-model, and the full process × table matrix — not reproduced here to avoid
-duplicating an already-maintained, versioned document.)*
+*(ดู `dataflow.html` สำหรับอีก 10 ส่วนที่เหลือ ได้แก่ ดัชนีกระบวนการและแหล่งเก็บข้อมูล
+การซิงค์ การอนุมัติแบบสองเฟสภายใต้ล็อกเดียว การเปิดใหม่ในรูปแบบการเล่นซ้ำบันทึกประวัติ
+การยืนยันตัวตน การไหลของข้อมูล 4 เส้นทางที่รอยต่อกับบริการ RAG แบบจำลองผู้เขียนรายเดียว/แคชเดียว
+และเมทริกซ์กระบวนการ × ตารางฉบับเต็ม — ไม่ได้นำมาแสดงซ้ำในที่นี้
+เพื่อหลีกเลี่ยงการทำซ้ำเอกสารที่มีการดูแลและควบคุมเวอร์ชันอยู่แล้ว)*
 
-## Deployment topology — what runs where
+## โครงสร้างการติดตั้งระบบ (deployment topology) — บริการใดทำงานอยู่ที่ใด
 
-One `docker compose` file runs all five services (`medcode-stack/`
-orchestrates; each service builds its own image from its own repo):
+ไฟล์ `docker compose` ไฟล์เดียวเรียกใช้บริการทั้ง 5 บริการ (`medcode-stack/`
+ทำหน้าที่ประสานการทำงาน ส่วนแต่ละบริการสร้างอิมเมจ (image) ของตนเองจาก repository ของตนเอง):
 
-| Service | Host port | Inside the network |
+| บริการ | พอร์ตบนเครื่องโฮสต์ | ภายในเครือข่าย |
 |---|---|---|
 | `web` (nginx + SPA) | `localhost:8080` | `web:8080` |
 | `medcode-api` | `localhost:8001` | `medcode-api:8001` |
@@ -41,7 +39,7 @@ orchestrates; each service builds its own image from its own repo):
 | `rag` | `localhost:8000` | `rag:8000` |
 | `db` (Postgres 18) | `localhost:5433` | `db:5432` |
 
-The browser only ever talks to port 8080; every other service is reached
-through it. Ports are overridable in `.env`; two (8080, 5433) are
-intentionally offset from the native four-terminal dev setup so both can run
-side by side. Full detail: `medcode-stack/README.md`.
+เบราว์เซอร์ติดต่อกับพอร์ต 8080 เพียงพอร์ตเดียว และเข้าถึงบริการอื่นทั้งหมดผ่านพอร์ตนี้
+หมายเลขพอร์ตเปลี่ยนได้ในไฟล์ `.env` โดยพอร์ต 2 พอร์ต (8080, 5433)
+ถูกตั้งให้ต่างจากการตั้งค่าสภาพแวดล้อมพัฒนาแบบรันตรงบนเครื่องที่ใช้ 4 เทอร์มินัลโดยเจตนา เพื่อให้ทั้งสองแบบทำงานควบคู่กันได้
+รายละเอียดทั้งหมด: `medcode-stack/README.md`

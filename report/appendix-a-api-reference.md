@@ -1,47 +1,47 @@
-# Appendix A — API reference
+# ภาคผนวก ก เอกสารอ้างอิง API
 
-The authoritative API contract lives in the codebase, not duplicated here —
-`medcode-api/docs/api-contract.md` (1,018 lines) is hand-maintained and
-described by its own header as "the source of truth," checked against
-`CasesApiIntegrationTest` in the same commit whenever a response shape
-changes. Reproducing it in this appendix would mean two copies drifting
-apart, so this appendix indexes it instead.
+สัญญาการเชื่อมต่อ API ฉบับที่ใช้เป็นหลักอ้างอิงจัดเก็บอยู่ในชุดซอร์สโค้ด และไม่ได้คัดลอกซ้ำไว้ในที่นี้ —
+ไฟล์ `medcode-api/docs/api-contract.md` (1,018 บรรทัด) ได้รับการดูแลปรับปรุงด้วยมือ และส่วนหัวของไฟล์ระบุว่าเป็น
+"แหล่งข้อมูลอ้างอิงหลัก" โดยจะตรวจสอบให้สอดคล้องกับ
+`CasesApiIntegrationTest` ใน commit เดียวกันทุกครั้งที่รูปแบบของผลตอบกลับ (response)
+เปลี่ยนแปลง การคัดลอกสัญญาดังกล่าวมาไว้ในภาคผนวกนี้จะทำให้มีเอกสาร 2 ชุดที่ค่อย ๆ ไม่ตรงกัน
+ภาคผนวกนี้จึงทำหน้าที่เป็นดัชนีของเอกสารดังกล่าวแทน
 
-## Endpoint index (33 endpoints)
+## ดัชนี endpoint (33 endpoint)
 
-| Endpoint | Purpose |
+| Endpoint | หน้าที่ |
 |---|---|
-| `GET /api/health`, `GET /api/healthz` | Liveness probes |
-| `GET /api/cases` | Dashboard payload (four buckets: complete/incomplete/reopened/finished) |
-| `GET /api/cases/{caseId}` | Case detail (chart + codes) |
-| `PUT /api/cases/{caseId}/codes` | Save the coder's working code list |
-| `POST /api/cases/approve` | Approve codes, write back to iMed |
-| `POST /api/cases/{caseId}/reopen` | Reopen a finished case |
-| `POST /api/cases/{caseId}/lock`, `DELETE .../lock` | One-coder-per-case lock |
-| `POST /api/cases/{caseId}/star`, `DELETE .../star` | Mark a case important |
-| `POST /api/demo/snapshot`, `POST /api/demo/reset` | Demo baseline snapshot/restore |
-| `POST /api/sync` | Pull case data from the hospital (windowed) |
-| `POST /api/cases/{caseId}/sync` | Sync one case |
-| `POST /api/cases/{caseId}/suggest-codes` | RAG code suggestions |
-| `GET /api/icd-codes` | ICD catalog typeahead |
-| `GET /api/case-field-settings`, `PUT /api/admin/case-field-settings` | Which identifier fields the case list shows |
-| `GET /api/analytics` | Analytics page payload |
-| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Auth |
-| `GET/POST/PUT/DELETE /api/admin/accounts...` | Account management (admin) |
-| `GET /api/admin/dashboard` | Admin dashboard cards |
-| `/api/admin/knowledge/**` | AI Training / RAG proxy (admin) |
-| `/api/agent/chat`, `/api/agent/chat/stream` | Coder AI Agent chat (+ streaming) |
-| `/api/agent/learn/**` | Suggest & Learn (coder-taught rules) |
+| `GET /api/health`, `GET /api/healthz` | ตรวจสอบว่าบริการยังทำงานอยู่ (liveness probe) |
+| `GET /api/cases` | ข้อมูลสำหรับหน้าแดชบอร์ด (4 กลุ่ม: สมบูรณ์/ไม่สมบูรณ์/เปิดใหม่/เสร็จสิ้น) |
+| `GET /api/cases/{caseId}` | รายละเอียดเคส (เวชระเบียนและรหัส) |
+| `PUT /api/cases/{caseId}/codes` | บันทึกรายการรหัสที่เจ้าหน้าที่ให้รหัสโรคกำลังดำเนินการอยู่ |
+| `POST /api/cases/approve` | อนุมัติรหัส และบันทึกกลับลง iMed |
+| `POST /api/cases/{caseId}/reopen` | เปิดเคสที่เสร็จสิ้นแล้วใหม่ |
+| `POST /api/cases/{caseId}/lock`, `DELETE .../lock` | การล็อกเคสให้ผู้ให้รหัสทำงานได้ครั้งละ 1 คนต่อเคส |
+| `POST /api/cases/{caseId}/star`, `DELETE .../star` | ติดดาวเพื่อทำเครื่องหมายว่าเคสสำคัญ |
+| `POST /api/demo/snapshot`, `POST /api/demo/reset` | บันทึกสถานะตั้งต้นของชุดสาธิต (snapshot)/คืนค่ากลับสู่สถานะตั้งต้น |
+| `POST /api/sync` | ดึงข้อมูลเคสจากโรงพยาบาล (ตามช่วงเวลาที่กำหนด) |
+| `POST /api/cases/{caseId}/sync` | ซิงค์เคสเดียว |
+| `POST /api/cases/{caseId}/suggest-codes` | คำแนะนำรหัสด้วย RAG |
+| `GET /api/icd-codes` | ค้นหาจากแคตตาล็อกรหัส ICD ขณะพิมพ์ (typeahead) |
+| `GET /api/case-field-settings`, `PUT /api/admin/case-field-settings` | กำหนดว่ารายการเคสแสดงฟิลด์ตัวระบุ (identifier) ใดบ้าง |
+| `GET /api/analytics` | ข้อมูลสำหรับหน้าวิเคราะห์ข้อมูล |
+| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | การยืนยันตัวตน |
+| `GET/POST/PUT/DELETE /api/admin/accounts...` | การจัดการบัญชีผู้ใช้ (ผู้ดูแลระบบ) |
+| `GET /api/admin/dashboard` | การ์ดข้อมูลบนหน้า Dashboard ของผู้ดูแลระบบ |
+| `/api/admin/knowledge/**` | หน้า AI Training / พร็อกซีไปยังบริการ RAG (ผู้ดูแลระบบ) |
+| `/api/agent/chat`, `/api/agent/chat/stream` | แชทกับ AI ผู้ช่วยของผู้ให้รหัส (Coder AI Agent) (+ แบบสตรีม) |
+| `/api/agent/learn/**` | Suggest & Learn (กฎการให้รหัสที่ผู้ให้รหัสสอน) |
 
-Full request/response shapes, error codes, and the auth model are in
-`medcode-api/docs/api-contract.md`.
+รูปแบบคำขอ/ผลตอบกลับฉบับเต็ม รหัสข้อผิดพลาด และแบบจำลองการยืนยันตัวตน อยู่ใน
+`medcode-api/docs/api-contract.md`
 
-## Supporting documents (all in `medcode-api/docs/`)
+## เอกสารประกอบ (ทั้งหมดอยู่ใน `medcode-api/docs/`)
 
-| File | What it is |
+| ไฟล์ | รายละเอียด |
 |---|---|
-| `api-contract.md` | Full contract — endpoints, shapes, errors, auth (source of truth) |
-| `types.ts` | TypeScript mirror of every response shape, for exact typing |
-| `MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | The contract our team wrote and sent *to* the hospital for the R1–R6 read side |
-| `imed-integration.md` | Integration design + 17 open questions still owed to the hospital |
-| `imed-writeback-as-built.md` | Real request/response bodies, byte-for-byte, with "as-built vs. spec" discrepancies called out |
+| `api-contract.md` | สัญญาการเชื่อมต่อฉบับเต็ม — endpoint รูปแบบข้อมูล ข้อผิดพลาด และการยืนยันตัวตน (แหล่งข้อมูลอ้างอิงหลัก) |
+| `types.ts` | ชนิดข้อมูล TypeScript ที่สะท้อนรูปแบบผลตอบกลับทุกแบบ เพื่อให้กำหนดชนิดข้อมูลได้ตรงกันทุกประการ |
+| `MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | สัญญาการเชื่อมต่อที่คณะผู้จัดทำเขียนและส่ง*ถึง*โรงพยาบาล สำหรับฝั่งการอ่านข้อมูล R1–R6 |
+| `imed-integration.md` | การออกแบบการเชื่อมต่อ และคำถาม 17 ข้อที่ยังค้างอยู่กับโรงพยาบาล |
+| `imed-writeback-as-built.md` | เนื้อหาคำขอ/ผลตอบกลับจริงแบบตรงกันทุกไบต์ พร้อมระบุความคลาดเคลื่อนระหว่าง "สิ่งที่สร้างจริงกับข้อกำหนด" ไว้อย่างชัดเจน |
