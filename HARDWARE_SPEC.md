@@ -1,10 +1,28 @@
 # HARDWARE_SPEC.md — MediHack Extension infrastructure
 
-*Prepared 2026-09-21, from the repos as they exist today (MedCode AI: `medcode-api`,
+*Prepared 2026-09-21 (sections 0, the resource profile, VAT totals, 6.1 and 6.2 added 2026-09-23), from the repos as they exist today (MedCode AI: `medcode-api`,
 `imed-mock-api`, `audit-chart-frontend`, `RAG`, `medcode-stack`) plus
 `medcode-api/docs/DEPLOYMENT-PREP.md` (the team's own production checklist, 24 Aug
 2026). Where the prompt's template asked for something not in any repo or doc, it is
 listed under **Open Questions** instead of guessed.*
+
+## 0. Read this first
+
+- **Every price is indicative.** Figures are rough ranges from public listings
+  (checked 21 Sep 2026, converted at ~33 THB/USD, before VAT and reseller
+  markup), not quotes. Thai government e-bidding requires a formal price
+  survey (สืบราคา) from at least three vendors before any line becomes a TOR.
+  Treat the totals as an envelope to seek approval for.
+- **Specifications are vendor-neutral**, written as minimum capabilities.
+  Where a product is named (e.g. "NVIDIA L4") it is a sizing reference only;
+  the TOR wording should be "or equivalent meeting the stated capabilities".
+- **The GPU stays inside the hospital.** That is a PDPA consequence, not a cost
+  optimisation: Bangkok has no cloud GPUs, and the nearest region
+  (Singapore) would send patient text across a border Thai law controls
+  (§4). It is the single fact that drives the AI-compute line.
+- **The AI is optional by design.** With no GPU at all, coders can still sync,
+  code, approve and write back; only suggestions, the chat and AI Training
+  stop. A late GPU never delays go-live.
 
 ## 1. Project (as given, gaps marked)
 
@@ -32,6 +50,22 @@ audit dashboard.
 
 If the hackathon program includes two more prototypes from other teams, this document
 does not cover them — nothing about them exists in this codebase (Q1).
+
+### Resource profile the sizing is based on
+
+| Workload | Figure | Source |
+|---|---|---|
+| Generation model: Llama-3.1-EIRAI-8B, 4-bit (Q4_K_M), via Ollama | ~4–6 GB VRAM, plus ~25% while working | `DEPLOYMENT-PREP.md` §3 |
+| Embedding model: `BAAI/bge-m3` | ~2.3 GB on disk; runs on CPU inside the `rag` container | `docker-compose.yml`, `.env.example` |
+| Whole stack on one machine (2 JVMs, PyTorch, nginx, Postgres) | ≥4 GB RAM for Docker; 6 GB if the 8B model runs on the same machine | `medcode-stack/README.md` |
+| App server | 4 cores, 8 GB RAM; **one instance only** (in-memory write lock and cache) | `DEPLOYMENT-PREP.md` §3 |
+| Program + AI model files | ~10 GB, fixed; the database grows with visit volume | `DEPLOYMENT-PREP.md` §3 |
+| Load tested (read path, one machine) | 50 concurrent clients, 2,000 requests, 0 failures, p95 19 ms | `eval-results/perf/` |
+| Not measured | AI suggestion latency; several coders writing at once | report Ch.6 §6.4 |
+
+**What the numbers mean for buying:** the model fits a 16 GB card with room
+to spare; 24 GB buys headroom for several coders at once, not a minimum. The
+app server is a scale-up box, never a cluster.
 
 ## 3. Team & environment
 
@@ -109,8 +143,39 @@ Management Act B.E. 2560 (2017).
 | Minimum (reuse spare hospital servers, 16 GB GPU, small NAS, no new dev laptops) | ~120,000–140,000 |
 | Recommended (new pilot servers, 24 GB GPU, redundant NAS; developer laptop count still open) | ~360,000–440,000 + (developer laptops × Q5) |
 
+| **Minimum incl. VAT 7%** | ~128,400–149,800 |
+| **Recommended incl. VAT 7%** | ~385,200–470,800 + (developer laptops × Q5) |
+
 Both totals exclude every item marked **[OPEN]** below, since pricing those would be
 guessing, not estimating.
+
+**Recurring costs** are power, backup storage and staff time for updates. The
+software has no per-code, per-user or cloud fee: the models are open and run
+on the hospital's own card, so the running cost does not grow with coding
+volume (`DEPLOYMENT-PREP.md`, "What it costs"). Power is not priced here
+because the GPU's duty cycle is unmeasured.
+
+### 6.1 What separates Minimum from Recommended
+
+| | Minimum buys | Recommended adds |
+|---|---|---|
+| **AI compute** | One 16 GB GPU: the model fits with headroom | A 24 GB GPU: several coders at once, or a larger Thai model if accuracy needs it |
+| **Hosting** | Reuse spare hospital server capacity | Dedicated app and database servers (ECC, redundant power), so a database failure cannot take the app down with it |
+| **Backup** | A small NAS | A redundant NAS, able to go offsite |
+| **Staging** | A VM on the pilot hardware | A dedicated small host, so updates are rehearsed before they reach coders |
+
+**If only one upgrade above Minimum is affordable, choose the dedicated
+staging environment.** The team's own checklist makes "three copies, not one"
+(build, test, real) a precondition for touching real patient records.
+
+### 6.2 Explicitly excluded
+
+Named so nobody assumes they are covered: software development and hospital
+integration work; single sign-on setup with the hospital's identity provider;
+network cabling, firewall rules and TLS certificates; coder workstations
+(the product runs in their existing browser, Q7); staff training; extended
+warranty beyond the vendor's standard term; and PDPA compliance work (DPIA,
+data processing agreement), which is procedural, not hardware.
 
 ## 7. Open questions
 
