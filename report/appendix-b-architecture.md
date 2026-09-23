@@ -7,9 +7,7 @@
 
 ## ภาพที่ ข.1 — ขอบเขตของระบบ (แผนภาพบริบทระดับ 0)
 
-![แผนภาพขอบเขตของระบบ — เบราว์เซอร์ของเจ้าหน้าที่ให้รหัสโรคและผู้ดูแลระบบอยู่ด้านบน
-ระบบหลังบ้าน (backend) ของ CURA AI อยู่ตรงกลาง API ของ iMed ของโรงพยาบาลและบริการ MedCode RAG
-อยู่ด้านล่าง](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-context.png)
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/dataflow-diagram-context.png" alt="แผนภาพขอบเขตของระบบ — เบราว์เซอร์ของเจ้าหน้าที่ให้รหัสโรคและผู้ดูแลระบบอยู่ด้านบน ระบบหลังบ้าน (backend) ของ CURA AI อยู่ตรงกลาง API ของ iMed ของโรงพยาบาลและบริการ MedCode RAG อยู่ด้านล่าง"></p>
 
 ผู้มีส่วนเกี่ยวข้อง (actor) มี 4 ส่วน ได้แก่ เบราว์เซอร์ของผู้ให้รหัส คอนโซลของผู้ดูแลระบบ API ของ iMed
 ของโรงพยาบาล (อ่าน/เขียน โดยทิศทางหนึ่งย้อนกลับไม่ได้ — คือการ POST/PUT/DELETE ข้อมูลการวินิจฉัย)
@@ -18,7 +16,7 @@
 
 ## ภาพที่ ข.2 — ไปป์ไลน์การให้รหัสของเคส
 
-![แผนภาพไปป์ไลน์การให้รหัสของเคส](../../audit-chart-frontend/docs/screenshots/dataflow-diagram-pipeline.png)
+<p align="center"><img src="../../audit-chart-frontend/docs/screenshots/dataflow-diagram-pipeline.png" alt="แผนภาพไปป์ไลน์การให้รหัสของเคส"></p>
 
 *(ดู `dataflow.html` สำหรับอีก 10 ส่วนที่เหลือ ได้แก่ ดัชนีกระบวนการและแหล่งเก็บข้อมูล
 การซิงค์ การอนุมัติแบบสองเฟสภายใต้ล็อกเดียว การเปิดใหม่ในรูปแบบการเล่นซ้ำบันทึกประวัติ
