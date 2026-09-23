@@ -53,7 +53,7 @@ supposed to, structurally. It is not the same evidence as:
 - **AI output accuracy** (ICD-10 top-1/top-8 against `/suggest`) —
   Ch.6/Ch.7, `eval-results/rag-accuracy-SUMMARY.md` +
   `rag-accuracy-raw.json`.
-- **Staff feedback** — Appendix E (questionnaire; not yet administered).
+- **Staff feedback** — cut from this submission; see `appendices-outline.md`.
 
 Conflating "tests pass" with "the AI is accurate" or "coders like it" is
 exactly the mistake Ch.6 is written to avoid — see its own framing.

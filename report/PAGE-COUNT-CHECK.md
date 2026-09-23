@@ -1,25 +1,29 @@
-# Page count check — 2026-09-21, updated after standard formatting pass
+# Page count check — 2026-09-23, updated after cutting 3 sections for deadline
 
 *Method note, not part of the submitted report. Target: 25–40 pages
 (deliverable spec, item 4).*
 
-## Authoritative number: 86 pages (`report/MedCode-AI-Report.pdf`)
+## Authoritative number: 76 pages (`report/MedCode-AI-Report.pdf`)
 
-Went through two rendering passes:
+Went through three rendering passes:
 
 1. **First real build**: 75 pages (plain CSS print via Chromium — no page
    numbers, no running header, TOC was just a linked list with no page
    references).
-2. **Standard-formatting pass** (this update): switched to
-   [paged.js](https://pagedjs.org/) — a CSS Paged Media polyfill — to add
-   the formatting elements a real report is expected to have: a running
-   header (report title), bottom-center page numbers, and a proper table of
-   contents with dot leaders and *correct, per-entry page numbers*
-   (`target-counter()`), instead of a bare link list. **86 pages** with all
-   of that in place — the ~11-page increase from 75 is legitimate: a
-   1-page-longer TOC (dot-leader rows take marginally more vertical space)
-   plus the page-number/header margin boxes nudging some pages' content
-   just past their own boundary. 86 is the number to trust.
+2. **Standard-formatting pass**: switched to [paged.js](https://pagedjs.org/)
+   — a CSS Paged Media polyfill — to add the formatting elements a real
+   report is expected to have: a running header (report title),
+   bottom-center page numbers, and a proper table of contents with dot
+   leaders and *correct, per-entry page numbers* (`target-counter()`),
+   instead of a bare link list. 86 pages with all of that in place.
+3. **Scope-cut pass (this update, 2026-09-23)**: on deadline day, cut 3
+   incomplete sections that had no real data/results to report rather than
+   ship them half-finished — staff feedback (Appendix E questionnaire,
+   never administered), the manual-vs-AI/hospital-process comparison
+   (Ch.6 old §6.4/§6.4.1, Ch.7 old §7.3), and detailed `/chat` scoring
+   discussion. Each is still noted as an explicit, reasoned scope cut (not
+   silently dropped) in `06-testing-evaluation.md` §6.4 and
+   `appendices-outline.md`. Result: **76 pages**, down from 86.
 
 See `report/build-report.sh` for the build (needs `pandoc`, Node with
 `playwright` + `pagedjs` installed — script header has the exact commands).
@@ -46,6 +50,11 @@ paginated PDF (A4, 2.5cm margins, 12pt serif, pandoc → HTML → Chromium
 print) to get an actual count instead of guessing from word count.
 
 ## Result
+
+*(Tables below are the pre-cut, 2026-09-21 per-file breakdown, kept for
+history. As of 2026-09-23, Appendix E is excluded from the build and Ch.6/7
+are each ~1 subsection shorter — see the scope-cut pass above. Trust the
+top-line 76 for the current total, not the sum of these old rows.)*
 
 | Chapter | Pages (own page break) |
 |---|---|

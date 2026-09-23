@@ -34,7 +34,6 @@ FILES=(
   appendix-b-architecture.md
   appendix-c-database-schema.md
   appendix-d-test-evidence.md
-  appendix-e-questionnaire.md
   appendix-f-screenshots.md
   appendix-g-production-readiness.md
   appendix-h-data-provenance.md

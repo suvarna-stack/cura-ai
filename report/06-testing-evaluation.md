@@ -81,92 +81,34 @@ possible in either direction); it tests `/suggest` (retrieval-only), not the
 full `/chat` LLM-reasoning path a coder sees in the app today; it is not a
 substitute for scoring against real historical hospital coding.
 
-## 6.4 Manual vs. AI-assisted coding time
+## 6.4 What was not tested
 
-The team timed itself completing a small number of cases (1–5) both without
-and with AI assistance, using this system's own demo (source: `Cura AI.pdf`
-pitch deck, "Is It Actually Worth It?"):
-
-| | Manual | AI-assisted (Cura AI) |
-|---|---|---|
-| Time per case | ~8 minutes | ~1.36 minutes |
-| Ratio | — | **~5.9× faster** |
-
-**Read this as a small-sample, single-tester directional result, not a
-validated throughput study.** The deck also states "260 → 1,500 cases/day"
-and "+1,240 cases/day at ฿340/case = ฿421,600/day" — these are **not**
-separately measured; they are the same ~5.9× ratio applied to an assumed
-daily case volume and per-coder workload (260 × 5.9 ≈ 1,529 ≈ the deck's
-1,500), i.e. an extrapolation from the timing ratio, not an independent
-hospital-capacity measurement. Presented in Ch.7 with that caveat attached;
-a real pilot would need to time considerably more cases, more testers, and
-ideally an actual hospital coder rather than a team member.
-
-### 6.4.1 External benchmark context (not hospital-specific)
-
-Neither figure above is hospital-specific — no partner-hospital timing or
-coding-volume data exists to compare against (§6.5). Published literature
-offers a rough sanity check on the two numbers separately, with the
-mismatches stated plainly rather than glossed over:
-
-- **The manual-coding baseline (~8 min/OPD case).** AHIMA's ICD-10-CM/PCS
-  coding productivity studies found US **inpatient** coding averaged
-  **37–44 minutes per record** shortly after ICD-10 go-live, settling around
-  37 minutes by mid-2016, against a ~20-minute ICD-9 baseline
-  ([AHIMA ICD-10 Coding Productivity Study](https://journal.ahima.org/Portals/0/archives/AHIMA%20files/ICD-10%20Coding%20Productivity%20Study%20Highlights%20Emerging%20Standards.pdf)).
-  Not a like-for-like comparison — that figure is **inpatient** (DRG-relevant,
-  longer charts, US ICD-10-CM/PCS), while this project's scope is **OPD**
-  (Ch.1 §1.5) under Thailand's ICD-10-TM. The team's 8-minute **outpatient**
-  figure sitting well under the US **inpatient** figure is directionally
-  sensible (OPD charts are shorter, fewer codes), not evidence the number
-  is accurate — it just isn't implausible on its face.
-- **The AI speed-up (~5.9×).** Published studies of AI assistance in
-  adjacent clinical workflows — AI scribes reducing physician documentation
-  time — report far more modest gains: roughly **9–10% time reduction**,
-  on the order of 12–20 minutes saved per **day** (not per case), across
-  large multi-site studies
-  ([STAT: large AI scribe study finds modest, inconsistent time savings](https://www.statnews.com/2026/04/01/ai-ambient-scribes-modest-time-savings-clinical-documentation/),
-  [Medical Economics: AI scribes cut documentation time](https://www.medicaleconomics.com/view/ai-scribes-cut-documentation-time-by-69-in-simulated-primary-care-visits-study-finds)).
-  Those studies measure a different task (physicians dictating/reviewing
-  notes) with a different AI role (transcription/drafting, not code
-  suggestion), so they aren't a direct substitute either. But the gap
-  between "~9–10% in large published studies" and "~490% in this project's
-  1–5-case, single-tester demo" is wide enough that it should be read as
-  **a reason for caution, not confirmation** — the same caveat already
-  attached to the 5.9× figure above, now with an external reference point
-  for why that caution is warranted.
-
-This subsection is **context, not validation** — it does not replace the
-missing hospital-specific comparison (§6.5), and no hospital-specific
-number is claimed or implied by citing it.
-
-## 6.5 What was not tested
-
+- Manual vs. AI-assisted coding time comparison, and comparison against the
+  hospital's own historically-coded visits — **out of scope for this
+  submission.** No partner-hospital timing or coding-volume data was
+  available in time, and the team judged extrapolating from a 1–5-case
+  internal timing sample (source: `Cura AI.pdf`) as more likely to mislead
+  than inform under this deadline, so it was cut rather than presented as
+  evidence. See Ch.2's Klang et al. citation for the methodology a real
+  comparison would need.
 - Concurrent multi-coder write contention (simultaneous approve/edit).
 - RAG suggestion latency under load.
-- Comparison against the hospital's own historically-coded visits (the
-  methodology Ch.2's Klang et al. citation uses) — no access to real hospital
-  coding data.
-- Structured staff/coder feedback — the instrument exists
-  (Appendix E) but has not been administered to a real coder; no responses
-  to report yet.
+- Structured staff/coder feedback — **out of scope for this submission.**
+  No real coder was available to pilot a feedback instrument before the
+  deadline.
 - UI usability walkthrough with a non-team user (screenshots exist —
   Appendix F — but no outside user has been observed using the system).
 - **`/chat` (the full LLM-reasoning path a coder sees in the AI Agent) was
   not separately scored** — only `/suggest` (retrieval-only) was evaluated
-  (§6.3). This is a deliberate scoping call, not an oversight: `/chat`'s
-  generation step runs on the same retrieval layer already tested in §6.3,
-  which is where the identified accuracy gap (narrative→code retrieval)
-  lives, so scoring `/chat` separately would most likely surface the same
-  root cause rather than new information. The generation model
+  (§6.3). Out of scope for this submission: the generation model
   (`Llama-3.1-EIRAI-8B` via Ollama) could not be pulled during this
-  evaluation pass — Ollama's client rejected a cross-host redirect from
-  Hugging Face's CDN on every retry — so this is also a real, unresolved
-  environment blocker, not purely a scoping choice; a team continuing this
-  work should fix that download path before claiming `/chat` accuracy
-  either way.
+  evaluation pass (Ollama's client rejected a cross-host redirect from
+  Hugging Face's CDN on every retry), and `/chat` shares the same retrieval
+  layer already tested in §6.3, so the team judged fixing that download path
+  under deadline pressure not worth the time versus the marginal new
+  information it would likely produce.
 
-## 6.6 Test case summary
+## 6.5 Test case summary
 
 | # | Test case | Result |
 |---|---|---|
@@ -178,4 +120,3 @@ number is claimed or implied by citing it.
 | 6 | `medcode-api` stress: cases endpoint, 2,000 req @ c=50 | 0 failures |
 | 7 | AI accuracy: 42 scenarios, ICD-10 top-1 | 0/42 — root cause identified (6.3) |
 | 8 | AI accuracy: 42 scenarios, ICD-10 top-8 | 3/42 |
-| 9 | Manual vs. AI-assisted timing, small sample | ~5.9× faster (6.4) |

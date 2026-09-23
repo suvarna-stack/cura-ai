@@ -14,16 +14,28 @@ attached in full instead; each appendix says which file that would be.*
 | B — Architecture & data-flow | `appendix-b-architecture.md` | Assembled: 2 diagram figures embedded + port table |
 | C — Database schema | `appendix-c-database-schema.md` | Assembled: full migration list (both DBs) + glossary pointer |
 | D — Test cases / evidence | `appendix-d-test-evidence.md` | Assembled: suite results table + RAG test breakdown |
-| E — Questionnaires | `appendix-e-questionnaire.md` | Assembled (instrument). **`[TODO — remaining]`**: not yet administered — no real responses exist |
+| E — Questionnaires | *Cut from this submission (2026-09-23)* | Instrument (`appendix-e-questionnaire.md`) exists in the repo but is **not included in the submitted report** — never administered to a real coder, so there's no data to present; kept out to finish on deadline rather than ship an empty/incomplete section |
 | F — Screenshots | `appendix-f-screenshots.md` | Assembled: 24-image index (21 Thai/coder + 1 admin + 2 architecture figures) |
 | G — Production-readiness checklist | `appendix-g-production-readiness.md` | Assembled: TLDR + section index of `DEPLOYMENT-PREP.md` |
 | H — Data provenance | `appendix-h-data-provenance.md` | Assembled: generator sourcing table + demo lifecycle |
 
 ## Still open
 
-- **Appendix E has no real responses yet** — the instrument is ready
-  (bilingual, PDPA-compliant), but needs an actual pilot coder to fill it
-  out before Ch.6/Ch.7 can cite staff feedback as evidence.
 - **Page budget**: confirm with whoever set the requirement whether
   appendices count toward the 25–40 page target (not stated in the
   deliverable spec) — see `PAGE-COUNT-CHECK.md`.
+
+## Cut from this submission (2026-09-23, deadline pressure)
+
+Three items were deliberately dropped rather than left half-finished, since
+none could be completed with real evidence before the deadline:
+- Staff/coder feedback (Appendix E questionnaire — instrument exists,
+  never administered)
+- Manual-vs-AI and hospital-process comparison (Ch.6 §6.4 in earlier
+  drafts — team-timed sample + external literature, cut rather than
+  presented as validation)
+- Separate `/chat` (LLM-in-the-loop) accuracy scoring — blocked on a broken
+  Ollama model download, not fixed under time pressure
+
+All three are noted as explicit, reasoned scope cuts in `06-testing-evaluation.md`
+§6.4 ("What was not tested"), not silently dropped.
