@@ -730,6 +730,32 @@ class CasesApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error")
                         .value("from must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]"));
+        // an open start would mean one hospital call per day back to forever
+        mvc.perform(post("/api/sync").header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"to\":\"2026-07-24\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("from is required when to is given"));
+    }
+
+    @Test
+    void unwindowedSyncRefreshesKnownOpenCasesAndImportsNothing() throws Exception {
+        // the hospital has no list-every-visit route, so "no window" means
+        // re-read the open cases we already hold, by their saved visit ids
+        List<String> open = jdbc.queryForList(
+                "SELECT case_id FROM cases WHERE case_status::text = 'open'", String.class);
+        assertFalse(open.isEmpty(), "the seeded dataset has open cases");
+
+        JsonNode all = postSync("{}");
+        assertTrue(all.get("ok").asBoolean());
+        assertTrue(all.get("imported").isEmpty(), "nothing new can arrive without a window");
+        assertTrue(all.get("skippedApproved").isEmpty(), "finalized cases are not even fetched");
+        assertTrue(all.get("failed").isEmpty());
+        assertEquals(open.size(), all.get("refreshed").size(), "every open case is re-read");
+        assertTrue(all.get("window") == null, "no window key on an unwindowed sync");
+        // the hospital's "F"/"M" are stored in our one vocabulary
+        assertTrue(jdbc.queryForList("SELECT DISTINCT sex FROM cases WHERE sex IS NOT NULL",
+                String.class).stream().allMatch(x -> x.equals("female") || x.equals("male")));
     }
 
     private JsonNode postSync(String body) throws Exception {

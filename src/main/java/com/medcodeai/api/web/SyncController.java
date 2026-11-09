@@ -50,23 +50,31 @@ public class SyncController {
             Pattern.compile("^\\d{4}-\\d{2}-\\d{2}([ T]\\d{2}:\\d{2}(:\\d{2})?)?$");
 
     @PostMapping("/api/sync")
-    @Operation(summary = "Sync all cases from the hospital (optionally windowed)",
-            description = "Fetches every case the hospital exposes and loads it into medcode. "
-                    + "An optional JSON body `{\"from\": \"YYYY-MM-DD\", \"to\": \"YYYY-MM-DD\"}` "
-                    + "(datetimes accepted, bounds inclusive, either side optional) narrows the "
-                    + "pull to cases whose VISIT datetime falls in the window — the hospital "
-                    + "filters server-side. "
+    @Operation(summary = "Sync cases from the hospital (by visit-date window, or refresh)",
+            description = "With a JSON body `{\"from\": \"YYYY-MM-DD\", \"to\": \"YYYY-MM-DD\"}` "
+                    + "(datetimes accepted but only the day counts, bounds inclusive, `to` "
+                    + "defaults to today, `from` is required) it pulls every case whose VISIT "
+                    + "date falls in the window, one hospital call per day — this is how NEW "
+                    + "cases arrive. With no window it re-reads the OPEN cases medcode already "
+                    + "holds, by their saved visit ids, and imports nothing new (the hospital "
+                    + "has no list-every-visit route). "
                     + "Per case: **new** → full import; **open** → hospital-sourced data refreshed "
                     + "(coder edits/drafts/approvals kept); **already finalized** → skipped, left "
                     + "intact. Idempotent — safe to re-run. Reads the hospital only (no write-back). "
                     + "Runs under the single-writer lock, so it briefly blocks approve/reopen.")
     @ApiResponse(responseCode = "200", content = @Content(mediaType = "application/json",
             examples = @ExampleObject(value = SYNC_EXAMPLE)))
-    @ApiResponse(responseCode = "400", description = "Malformed from/to",
+    @ApiResponse(responseCode = "400", description = "Malformed from/to, or to without from",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"error\": \"from must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]\"}")))
     public Map<String, Object> syncAll(@RequestBody(required = false) Map<String, Object> body) {
-        return sync.syncAll(windowBound(body, "from"), windowBound(body, "to"));
+        String from = windowBound(body, "from");
+        String to = windowBound(body, "to");
+        if (from == null && to != null) {
+            // an open start would mean one hospital call per day back to whenever
+            throw new BadRequestException("from is required when to is given");
+        }
+        return sync.syncAll(from, to);
     }
 
     /** Null when absent/blank; 400 on anything that isn't a date or datetime. */

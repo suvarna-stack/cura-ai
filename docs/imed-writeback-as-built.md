@@ -284,8 +284,12 @@ DELETE /api/v1/diagnosis/{visit_id}/icd10/{object_id}
 DELETE /api/v1/diagnosis/{visit_id}/icd9/{object_id}
 ```
 
-Base URL is one configuration value (`IMED_API_BASE`); the token is
-`IMED_API_TOKEN`, sent as `Authorization: Bearer <token>` on every call.
+Base URL is one configuration value (`IMED_API_BASE`, the host — no
+`/api/v1`). Since 2026-11-09 there is no fixed token: `IMED_CLIENT_ID` /
+`IMED_CLIENT_SECRET` are traded for a short-lived token at
+`POST {IMED_API_BASE}/auth/token` (Basic auth, `grant_type=client_credentials`),
+sent as `Authorization: Bearer <token>` on every call, renewed before it
+expires and retried once on a `401`.
 
 **Date/time as actually sent** — we store the window as
 `"YYYY-MM-DD HH:MM:SS"` and split it on the first space:

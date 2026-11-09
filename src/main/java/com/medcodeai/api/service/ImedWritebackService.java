@@ -83,9 +83,10 @@ public class ImedWritebackService {
      * discharge object below still goes out (the POST contract requires one),
      * but it no longer projects onto the visit row.
      *
-     * Our extension, not in the hospital's PDF: the real iMed needs to add the
-     * field (open question 17 in docs/imed-integration.md). Sending it to an
-     * API that ignores unknown fields is harmless.
+     * Proposed by us and ACCEPTED: the hospital's Medihack API guide (4 Nov
+     * 2026) lists coding_status ("approved" / "open") as an optional field on
+     * POST and PUT, and a status-only PUT as a supported request. Its read side
+     * still serves visit.coding_status as null (no confirmed mapping yet).
      */
     private static final String CODING_APPROVED = "approved";
     /** The reserved word that clears it again on reopen. */
@@ -326,7 +327,12 @@ public class ImedWritebackService {
             if ("icd10".equals(kind)) {
                 r.put("icd10_code", t.code());
                 putName(r, "icd10_description", "beginning_diagnosis", t.name());
-                r.put("fix_diagnosis_type_id", t.diagnosisType());
+                // the hospital serves diagnosis_type as null when it can't map
+                // it, and a PUT field is either a real value or left out — a
+                // null would be a 400, and leaving it out keeps the stored type
+                if (t.diagnosisType() != null && !t.diagnosisType().isBlank()) {
+                    r.put("fix_diagnosis_type_id", t.diagnosisType());
+                }
             } else {
                 r.put("icd9_code", t.code());
                 putName(r, "icd9_description", "beginning_operation", t.name());

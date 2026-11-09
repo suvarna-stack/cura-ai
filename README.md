@@ -78,7 +78,8 @@ Good to know:
 | `DATABASE_URL` | libpq-form DSN (`postgresql://user:pass@host:port/db`); translated to JDBC automatically. Unset = `localhost:5432/medcode`. |
 | `JDBC_DATABASE_URL` | Already-JDBC URL; wins over `DATABASE_URL`. |
 | `IMED_API_BASE` | Base URL of the hospital iMed API — `../imed-mock-api` locally, the hospital's real API in production. Default `http://localhost:8003`. |
-| `IMED_API_TOKEN` | Bearer token for the hospital's `/api/v1` write endpoints. Default `imed-mock-token` (the mock's default); the real token comes from the hospital. |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | Client credentials for the hospital API. Traded for a short-lived Bearer token at `IMED_API_BASE/auth/token` (Basic auth, `grant_type=client_credentials`), renewed automatically. Defaults `medcode-mock-client` / `medcode-mock-secret` (the mock's); the real pair comes from the hospital's admin. Keep the secret out of Git. |
+| `IMED_READ_TIMEOUT_SECONDS` | Read timeout for hospital calls. Default `60`. |
 | `ALLOWED_ORIGINS` | CORS origins, `*` (default) or comma list. |
 | `PORT` | HTTP port (default 8001). |
 | `SWAGGER_ENABLED` | Swagger UI + `/v3/api-docs`. Default `true` when running locally, forced `false` in the Docker image (so every container, incl. GCP, ships without it). |

@@ -30,6 +30,17 @@ public class SyncRepository {
         return r.isEmpty() ? null : r.get(0);
     }
 
+    /**
+     * The visit ids of every case still open for coding — what an unwindowed
+     * sync re-reads from the hospital. Same "open" test the per-case sync rule
+     * uses, so nothing is fetched only to be skipped.
+     */
+    public List<String> openCaseIds() {
+        return jdbc.queryForList(
+                "SELECT case_id FROM cases WHERE case_status::text = 'open' ORDER BY case_id",
+                String.class);
+    }
+
     // sync.py:182 — new case row (case_status seeded 'open')
     public void insertCase(String caseId, String patientRef, String encountertype, String sex,
                            String birthdate, String ageyear, String admissiondatetime,

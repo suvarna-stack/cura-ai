@@ -841,6 +841,56 @@ Milestones (git log --oneline reads as this sequence):
   `useMenuDismiss`). Same pass enlarged the bar per the same request: 12px →
   13px labels, taller hit targets, 14px icons, wider panels, bigger tick boxes.
 
+- ✅ **Tuned to the hospital's own API guide (2026-11-09):** the hospital sent
+  "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026, HTML at
+  `../MedCode-API-Connection-Guide.html`, plus the central
+  `../third-party-integration-manual.html`). The user's call: **the guide
+  wins wherever it differs from the contract we proposed.** What moved:
+  - **Auth is client credentials, not a fixed token.** `ImedApiClient` trades
+    `IMED_CLIENT_ID`/`IMED_CLIENT_SECRET` for a Bearer token at
+    `POST {IMED_API_BASE}/auth/token` (Basic auth, form
+    `grant_type=client_credentials`), caches it, renews it 30 s before
+    `expires_in` (a tenth early for short tokens) and retries a call ONCE on a
+    `401`. The timing logic is the pure `client/ImedTokenProvider`
+    (`ImedTokenProviderTest`). `IMED_API_TOKEN` is gone everywhere.
+    `IMED_API_BASE` is the HOST (no `/api/v1`) because `/auth/token` sits at
+    the root. Read timeout 10 s → `IMED_READ_TIMEOUT_SECONDS` (60).
+  - **R1 `/cases/check` was never built** (parked by the hospital). Decided
+    with the user: an UNWINDOWED `POST /api/sync` now re-reads the OPEN cases
+    we already hold via `/cases/sync` (`SyncRepository.openCaseIds`), and
+    imports nothing new; new cases only arrive through a date window. The
+    frontend's "All time"/"Everything" choice became "Update cases already
+    here", and the empty-dashboard Sync button opens the date picker without
+    it. A `to` without a `from` is now `400` (an open start would mean one
+    hospital call per day back to 2000).
+  - **Windowed sync is one hospital call per DAY** (the guide's
+    recommendation; 31 days is only the hard cap), bounds sent with the
+    hospital's offset (`…T00:00:00+07:00`).
+  - **Wire values:** datetimes carry `+07:00` — `SyncRules.parseDt` drops the
+    hospital's own offset and CONVERTS any other one to Bangkok time;
+    `sex` arrives `F`/`M` and `SyncRules.sexWord` stores `female`/`male`
+    (mixing both would split analytics); catalogue rows lost `edition`.
+  - **Writes:** the hospital's side is a mock for now (`mock: true`, nothing
+    saved in HIS) — logged once as a WARN. Our bodies already met every 400
+    rule in the guide; only fix: a PUT no longer sends
+    `fix_diagnosis_type_id: null` (the hospital serves unmappable types as
+    null). `coding_status` is IN the guide now (accepted).
+  - `../imed-mock-api` was reworked to the guide in the same change (token
+    endpoint, R1 removed, `+07:00`/`F`/`M` on the wire, the guide's 400
+    rules on writes) but **its writes still persist** — the user's choice, so
+    approve/reopen stays testable end to end.
+  Verified: mock suite 24/24; this suite green except
+  `approveThenReopenRoundTripsAndInvalidatesCache`, which was ALREADY failing
+  before this change — it expects 2 hospital writes, but since 2026-08-25
+  (`confirmImportedCodes`) a list-approve confirms all hospital codes, so the
+  ICD-9 cancel it counts no longer happens (1 write). Live check in the
+  browser: header Sync → "Update cases already here" → confirm → refresh ran
+  against the token-gated mock with no errors.
+  Still open with the hospital (in `docs/imed-integration.md`): which field
+  `sync-by-period` filters on, whether `visit_id` keeps the transaction-number
+  shape (`SyncRules.visitDateFromCaseId` reads the visit date from it), the
+  max cases per period answer, rate limits.
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing

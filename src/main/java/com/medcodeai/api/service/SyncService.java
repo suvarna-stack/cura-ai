@@ -40,15 +40,17 @@ import java.util.Set;
  * case doesn't roll back the batch, and the cases cache is invalidated once at
  * the end. Sync is READ-ONLY toward the hospital — no write-back calls.
  *
- * How the cases are FETCHED changed with the contract (2026-08-19). There is no
- * "download everything" endpoint by design — every read is bounded by a
- * timestamp, an id list, or a date window:
+ * How the cases are FETCHED follows the hospital's Medihack API guide (4 Nov
+ * 2026). There is no "download everything" endpoint — the R1 update check we
+ * proposed was parked — so every read is bounded by an id list or a window:
  *
- *   - windowed sync → R3 per <= 31-day chunk (long windows are split here)
- *   - unwindowed    → R1 from the epoch for the id list, then R2 in <= 20-id
- *                     batches; "everything" is just a very old timestamp
+ *   - windowed sync → /cases/sync-by-period, one call per DAY (the guide's
+ *                     recommendation), bounds carrying +07:00; the only way
+ *                     NEW cases arrive
+ *   - unwindowed    → the saved ids of every OPEN case through /cases/sync in
+ *                     <= 20-id batches; refreshes, never imports
  *
- * Every run is preceded by the R6 contract check, so a hospital-side field
+ * Every run is preceded by the contract check, so a hospital-side field
  * change stops the sync before any data is touched rather than half-importing.
  */
 @Service
@@ -98,24 +100,30 @@ public class SyncService {
             "vitals.measured_at", "vitals.temperature", "vitals.systolic", "vitals.diastolic",
             "vitals.heart_rate", "vitals.oxygen_saturation", "vitals.weight", "vitals.height");
 
-    /** R1's bound when the caller wants everything: older than any real visit. */
-    private static final String EPOCH = "1970-01-01T00:00:00";
-
-    /** Sync every case the hospital currently exposes. */
+    /** Re-read every open case we already hold (no window). */
     public Map<String, Object> syncAll() {
         return syncAll(null, null);
     }
 
     /**
-     * Sync only the cases whose VISIT datetime falls in [from, to] — the
-     * hospital resolves a visit's datetime (admission_datetime, else the
-     * datetime encoded in the visit id) and filters server-side; a null bound
-     * leaves that side open. Same non-destructive per-case rules either way.
+     * Two modes, following the hospital's guide ("นำเข้าทีละช่วง → เก็บ
+     * visit_id ดึงซ้ำด้วย sync"):
+     *
+     * - WINDOWED — cases whose VISIT datetime falls in [from, to] are pulled
+     *   by period: this is how NEW cases arrive. {@code to} defaults to today;
+     *   {@code from} is required whenever a window is given (the controller
+     *   400s a lone {@code to}).
+     * - NO WINDOW — re-read the OPEN cases we already hold, by their saved
+     *   visit ids. Nothing new is imported this way: the hospital has no "list
+     *   every visit" route (the R1 update check we proposed was parked), so
+     *   "everything" can only mean "everything we know about".
+     *
+     * Same non-destructive per-case rules either way.
      */
     public Map<String, Object> syncAll(String from, String to) {
         preflight();
         Map<String, Object> out = run(from == null && to == null
-                ? fetchAll()
+                ? fetchKnownOpen()
                 : fetchWindow(from, to));
         if (from != null || to != null) {
             Map<String, Object> window = new LinkedHashMap<>();
@@ -155,21 +163,15 @@ public class SyncService {
     }
 
     /**
-     * R1 → R2: ask which visits exist/changed since the epoch, then pull them
-     * in batches. The contract has no unlimited read, so "everything" is
-     * expressed as a timestamp older than any visit.
+     * The saved visit ids of every OPEN case, re-read through /cases/sync in
+     * batches. Finalized cases are left out up front — the per-case rule would
+     * skip them anyway, so fetching them would only spend hospital calls.
+     * Ids the hospital no longer knows come back in not_found and are left
+     * alone here (logged, not deleted: a vanished visit is the hospital's
+     * question to answer, not ours to act on).
      */
-    private List<Map<String, Object>> fetchAll() {
-        Object ids = imed.checkChanges(EPOCH).get("visit_ids");
-        List<String> visitIds = new ArrayList<>();
-        if (ids instanceof List<?> l) {
-            for (Object id : l) {
-                if (id != null) {
-                    visitIds.add(id.toString());
-                }
-            }
-        }
-        return casesByIds(visitIds);
+    private List<Map<String, Object>> fetchKnownOpen() {
+        return casesByIds(sync.openCaseIds());
     }
 
     /** R2 in batches of at most {@link ImedApiClient#MAX_SYNC_BATCH} ids. */
@@ -179,34 +181,37 @@ public class SyncService {
         for (int i = 0; i < visitIds.size(); i += ImedApiClient.MAX_SYNC_BATCH) {
             List<String> batch =
                     visitIds.subList(i, Math.min(i + ImedApiClient.MAX_SYNC_BATCH, visitIds.size()));
-            Object cases = imed.syncCases(batch).get("cases");
-            if (cases instanceof List<?> l) {
+            Map<String, Object> answer = imed.syncCases(batch);
+            if (answer.get("cases") instanceof List<?> l) {
                 out.addAll((List<Map<String, Object>>) l);
+            }
+            if (answer.get("not_found") instanceof List<?> nf && !nf.isEmpty()) {
+                log.info("hospital does not know {} visit id(s): {}", nf.size(), nf);
             }
         }
         return out;
     }
 
     /**
-     * R3, split into chunks the hospital will accept. An open bound is closed
-     * against the visit-id date encoding's own range rather than left unbounded,
-     * because R3 requires both ends.
+     * /cases/sync-by-period, ONE DAY per call — the guide's recommendation
+     * ("แนะนำ…แบ่งเรียกทีละวัน"); the hard cap is 31 days, but a day of full
+     * case objects is already the biggest answer we want to wait for. Each
+     * bound carries the hospital's offset, as the guide also recommends, so
+     * "the 4th" means the 4th in Bangkok whatever zone this server runs in.
+     * {@code to} defaults to today (hospital time). Days are whole days: a
+     * time part on either bound is ignored.
      */
     private List<Map<String, Object>> fetchWindow(String from, String to) {
-        LocalDate start = date(from, LocalDate.of(2000, 1, 1));
-        LocalDate end = date(to, LocalDate.now());
+        LocalDate today = LocalDate.now(SyncRules.HOSPITAL_ZONE);
+        LocalDate start = date(from, today);
+        LocalDate end = date(to, today);
         if (end.isBefore(start)) {
             return List.of();
         }
         List<Map<String, Object>> out = new ArrayList<>();
-        for (LocalDate cursor = start; !cursor.isAfter(end); ) {
-            // inclusive bounds, so a 31-day window spans cursor .. cursor+30
-            LocalDate chunkEnd = cursor.plusDays(ImedApiClient.MAX_PERIOD_DAYS - 1L);
-            if (chunkEnd.isAfter(end)) {
-                chunkEnd = end;
-            }
-            out.addAll(imed.syncByPeriod(cursor + "T00:00:00", chunkEnd + "T23:59:59"));
-            cursor = chunkEnd.plusDays(1);
+        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+            String offset = day.atStartOfDay(SyncRules.HOSPITAL_ZONE).getOffset().getId();
+            out.addAll(imed.syncByPeriod(day + "T00:00:00" + offset, day + "T23:59:59" + offset));
         }
         return out;
     }
@@ -361,12 +366,12 @@ public class SyncService {
         String department = trimOrNull(str(visit.get("department")));
 
         if (isNew) {
-            sync.insertCase(tn, patientRef, enc, str(visit.get("sex")), birthdate, ageYear,
+            sync.insertCase(tn, patientRef, enc, SyncRules.sexWord(str(visit.get("sex"))), birthdate, ageYear,
                     admission, discharge, str(visit.get("discharge_type")),
                     str(visit.get("discharge_status")), str(visit.get("is_pregnant")),
                     ward, department, coverage, completeness, missingDetail, group, severity, now);
         } else {
-            sync.updateCaseClinical(tn, patientRef, enc, str(visit.get("sex")), birthdate, ageYear,
+            sync.updateCaseClinical(tn, patientRef, enc, SyncRules.sexWord(str(visit.get("sex"))), birthdate, ageYear,
                     admission, discharge, str(visit.get("discharge_type")),
                     str(visit.get("discharge_status")), str(visit.get("is_pregnant")),
                     ward, department, coverage, completeness, missingDetail, group, severity, now);

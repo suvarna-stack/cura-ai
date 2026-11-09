@@ -29,6 +29,31 @@ class SyncRulesTest {
     }
 
     @Test
+    void parseDtStoresHospitalLocalTimeWhateverTheOffset() {
+        // the hospital API's own form: its +07:00 is simply dropped
+        assertEquals("2026-08-09 08:00:00", SyncRules.parseDt("2026-08-09T08:00:00+07:00"));
+        assertEquals("2026-08-09 08:00:00", SyncRules.parseDt("2026-08-09T08:00:00.250+0700"));
+        // any other offset is converted first, or the clock reading would be 7h off
+        assertEquals("2026-08-09 08:00:00", SyncRules.parseDt("2026-08-09T01:00:00Z"));
+        assertEquals("2026-08-10 00:30:00", SyncRules.parseDt("2026-08-09T17:30:00+00:00"));
+        // a bare date stays midnight; no offset means already local
+        assertEquals("2026-08-09 00:00:00", SyncRules.parseDt("2026-08-09"));
+        assertEquals("2026-08-09 08:00:00", SyncRules.parseDt("2026-08-09T08:00:00"));
+    }
+
+    @Test
+    void sexWordSpellsOutTheGuidesLetterCodes() {
+        assertEquals("female", SyncRules.sexWord("F"));
+        assertEquals("male", SyncRules.sexWord("m"));
+        // the extract's (and every older sync's) words are already ours
+        assertEquals("female", SyncRules.sexWord("female"));
+        assertEquals("male", SyncRules.sexWord(" Male "));
+        assertEquals("unknown", SyncRules.sexWord("unknown"));
+        assertNull(SyncRules.sexWord(""));
+        assertNull(SyncRules.sexWord(null));
+    }
+
+    @Test
     void coverageFamilyAndPayer() {
         assertEquals("UCS", SyncRules.coverageFamily("UCS_89_I"));
         assertEquals("OFC", SyncRules.coverageFamily("OFC_O3"));

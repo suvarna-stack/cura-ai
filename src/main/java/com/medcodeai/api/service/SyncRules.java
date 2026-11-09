@@ -1,5 +1,10 @@
 package com.medcodeai.api.service;
 
+import java.time.DateTimeException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -57,12 +62,36 @@ public final class SyncRules {
     private static final Pattern DT_RE =
             Pattern.compile("(\\d{4}-\\d{2}-\\d{2})[\\sT]*(\\d{2}:\\d{2}(:\\d{2})?)?");
 
-    /** sync.py:38 parse_dt() — normalize a hospital datetime to "YYYY-MM-DD HH:MM:SS", or null. */
+    /**
+     * The hospital's time zone. Every datetime we store is hospital local time
+     * without a zone (the extract's own form), and the hospital API serves
+     * "+07:00" on everything it sends; Bangkok has no daylight saving, so this
+     * is a fixed +07:00.
+     */
+    public static final ZoneId HOSPITAL_ZONE = ZoneId.of("Asia/Bangkok");
+
+    private static final ZoneOffset HOSPITAL_OFFSET = ZoneOffset.ofHours(7);
+
+    /** What may follow the matched HH:MM[:SS]: a fraction, then an offset. */
+    private static final Pattern OFFSET_TAIL =
+            Pattern.compile("^(?:\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})$");
+
+    private static final DateTimeFormatter STORED =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * sync.py:38 parse_dt() — normalize a hospital datetime to "YYYY-MM-DD
+     * HH:MM:SS" hospital local time, or null. The hospital API sends ISO 8601
+     * with an offset ("2026-08-09T08:00:00+07:00"): the hospital's own offset is
+     * simply dropped, any OTHER offset (say "Z") is converted to hospital time
+     * first — storing a UTC clock reading as local would shift it by 7 hours.
+     */
     public static String parseDt(String raw) {
         if (raw == null || raw.isEmpty()) {
             return null;
         }
-        Matcher m = DT_RE.matcher(raw.strip());
+        String s = raw.strip();
+        Matcher m = DT_RE.matcher(s);
         if (!m.lookingAt()) { // Python re.match anchors at start only
             return null;
         }
@@ -71,7 +100,41 @@ public final class SyncRules {
         if (t.length() == 5) { // HH:MM → HH:MM:00
             t += ":00";
         }
+        if (m.group(2) != null) {
+            Matcher tail = OFFSET_TAIL.matcher(s.substring(m.end()));
+            if (tail.matches()) {
+                String o = tail.group(1);
+                try {
+                    ZoneOffset offset = "Z".equals(o) ? ZoneOffset.UTC
+                            : ZoneOffset.of(o.length() == 5 ? o.substring(0, 3) + ":" + o.substring(3) : o);
+                    if (!offset.equals(HOSPITAL_OFFSET)) {
+                        return LocalDateTime.parse(d + "T" + t).atOffset(offset)
+                                .atZoneSameInstant(HOSPITAL_ZONE).toLocalDateTime().format(STORED);
+                    }
+                } catch (DateTimeException e) {
+                    // not a real date/offset: keep the old lenient behaviour (text as matched)
+                }
+            }
+        }
         return d + " " + t;
+    }
+
+    /**
+     * Patient sex in our one vocabulary. The hospital API sends "F" / "M"; the
+     * extract (and every case synced before 2026-11-09) says "female" / "male".
+     * Storing both would split every sex breakdown in analytics in two, so the
+     * letter codes are spelled out. Anything else is kept as sent; blank → null.
+     */
+    public static String sexWord(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String s = raw.strip();
+        return switch (s.toLowerCase()) {
+            case "f", "female" -> "female";
+            case "m", "male" -> "male";
+            default -> s;
+        };
     }
 
     /** sync.py:47 chunk() — split section text into fixed-size pieces (F11); [] when empty. */

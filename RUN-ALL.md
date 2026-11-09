@@ -333,7 +333,8 @@ LLM_DEVICE=cpu
 |---|---|---|
 | `DATABASE_URL` | `postgresql://…localhost:5432/medcode` | DSN แบบ libpq แปลงเป็น JDBC ให้เอง |
 | `IMED_API_BASE` | `http://localhost:8003` | โรงพยาบาล (เปลี่ยนเป็นของจริงตอน production) |
-| `IMED_API_TOKEN` | `imed-mock-token` | Bearer token ของ API เขียนฝั่งโรงพยาบาล |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | `medcode-mock-client` / `medcode-mock-secret` | ใช้ขอ token ที่ `/auth/token` ของโรงพยาบาล (ระบบต่ออายุ token ให้เอง) |
+| `IMED_READ_TIMEOUT_SECONDS` | `60` | เวลารอคำตอบจาก API โรงพยาบาล (วินาที) |
 | `RAG_API_BASE` | `http://localhost:8000` | บริการ RAG |
 | `PORT` | `8001` | |
 | `SWAGGER_ENABLED` | `true` (ใน Docker บังคับ `false`) | |
@@ -347,7 +348,8 @@ LLM_DEVICE=cpu
 |---|---|
 | `DATABASE_URL` | `postgresql://…localhost:5432/imed` |
 | `PORT` | `8003` |
-| `IMED_API_TOKEN` | `imed-mock-token` (ต้องตรงกับฝั่ง medcode-api) |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | `medcode-mock-client` / `medcode-mock-secret` (ต้องตรงกับฝั่ง medcode-api) |
+| `IMED_TOKEN_TTL_SECONDS` | `300` (อายุ token) |
 
 **RAG** — ดู `.env.example`: `PORT`, `LLM_BACKEND`, `OLLAMA_MODEL`, `EMBED_DEVICE`,
 `TOP_K`, `CHUNK_SIZE`, `MAX_NEW_TOKENS`

@@ -388,23 +388,29 @@ production ships with them off.
 
 ### POST /api/sync — pull case data from the hospital
 
-Request body optional. With no body (or an empty object) fetches every case
-the hospital's iMed API exposes; with a window it pulls only the cases whose
-**visit datetime** falls inside it:
+Request body optional. Two modes (since 2026-11-09, following the hospital's
+Medihack API guide of 4 Nov 2026):
+
+- **With a window** it pulls every case whose **visit date** falls inside it.
+  This is the only way NEW cases arrive.
+- **With no body (or an empty object)** it re-reads the **open cases medcode
+  already holds**, by their saved visit ids. It imports nothing new: the
+  hospital has no "list every visit" route (the update check we proposed, R1,
+  was parked).
 
 ```jsonc
-{ "from": "2026-07-22",            // optional; YYYY-MM-DD or "YYYY-MM-DD HH:MM[:SS]"
-  "to":   "2026-07-25" }           // optional; either side may be omitted
+{ "from": "2026-07-22",            // required when "to" is given; YYYY-MM-DD or "YYYY-MM-DD HH:MM[:SS]"
+  "to":   "2026-07-25" }           // optional; defaults to today (hospital time)
 ```
 
-Bounds are inclusive and filtered by the hospital server-side; a date-only
-bound covers the whole day (`from` → 00:00:00, `to` → 23:59:59). The visit
-datetime is the hospital's rule: `admissiondatetime` when the extract filled
-it, else the datetime encoded in the transaction number. A malformed bound is
-`400 {"error": "<field> must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]"}`. Note
-the window selects by when the patient VISITED, not by when hospital data last
-changed — the hospital list also supports `changed_since` (its `updated_at`
-stamps) but medcode does not expose that yet.
+Bounds are inclusive whole days (a time part is accepted but ignored) and are
+filtered by the hospital server-side, one hospital call per day. The visit
+date is the hospital's rule (`admission_datetime` when filled; the mock falls
+back to the datetime encoded in the transaction number). A malformed bound is
+`400 {"error": "<field> must be YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS]"}`; a `to`
+without a `from` is `400 {"error": "from is required when to is given"}`.
+Note the window selects by when the patient VISITED, not by when hospital data
+last changed.
 
 Loads the fetched cases into medcode. **Non-destructive** (safe to re-run) —
 per case:
@@ -430,7 +436,7 @@ it briefly blocks approve/reopen. Response:
   "stats": { "cases": 0, "sections": 0, "codes": 0, "orders": 0,
              "chunks": 0, "vitals": 0, "coverageTypes": 0, "catalogCodes": 0 },
   "window": { "from": "2026-07-22", "to": "2026-07-25" } }
-  // "window" echoes the request bounds (null for an omitted side) and is
+  // "window" echoes the request bounds (null for an omitted "to") and is
   // ABSENT entirely on an unwindowed sync — the old shape is unchanged.
 ```
 
@@ -440,13 +446,15 @@ into this database's `icd_10`/`icd_9` tables — insert new codes, fill blank
 descriptions, never overwrite an existing description. `stats.catalogCodes`
 counts the rows that changed.
 
-How the cases are fetched (unchanged on the wire, but worth knowing): the iMed
-contract has no "download everything" endpoint, so a **windowed** sync calls
-R3 (`/api/v1/cases/sync-by-period`) once per ≤31-day chunk, and an
-**unwindowed** one calls R1 (`/api/v1/cases/check`) from the epoch for the id
-list and pulls it through R2 (`/api/v1/cases/sync`) in ≤20-id batches. Both
-are preceded by the R6 contract check, which fails the run with a `500` naming
-any field the hospital has stopped serving — before anything is written.
+How the cases are fetched: a **windowed** sync calls
+`/api/v1/cases/sync-by-period` once per DAY (the guide's recommendation; the
+hard cap is 31 days), each bound carrying `+07:00`. An **unwindowed** one
+sends the saved ids of every open case to `/api/v1/cases/sync` in ≤20-id
+batches; ids the hospital no longer knows come back in `not_found` and are
+only logged. Both are preceded by the contract check
+(`/api/v1/contract/check`), which fails the run with a `500` naming any field
+the hospital has stopped serving — before anything is written. Every hospital
+call carries a Bearer token from `/auth/token` (see *Downstream* below).
 `document_chunks` is populated for future retrieval but has no reader today.
 
 ### POST /api/cases/{caseId}/sync — sync one case from the hospital
@@ -997,10 +1005,13 @@ Effects once a rule is stored:
 ## Downstream: the hospital iMed API
 
 On approve/reopen this backend calls the hospital's REAL write contract —
-"iMed Diagnosis and Medical Discharge API" plus our proposed coding-status
-extension (`IMED_API_BASE` + `IMED_API_TOKEN`; locally the sibling repo
-`../imed-mock-api`, which mocks it field-for-field). Frontends never call it
-directly.
+as documented in its Medihack API guide for MedCode (4 Nov 2026), including
+the optional `coding_status` field we proposed (`IMED_API_BASE` +
+`IMED_CLIENT_ID` + `IMED_CLIENT_SECRET`; the client trades the credentials for
+a short-lived Bearer token at `/auth/token`; locally the sibling repo
+`../imed-mock-api` mocks it field-for-field). Frontends never call it
+directly. While the hospital's write side is itself a mock it answers
+`mock: true` and saves nothing in HIS — logged once as a warning.
 
 Since 2026-07-24 the write-back is a **diff**: the finalized code set is
 compared against the hospital's live rows, then removed codes are cancelled

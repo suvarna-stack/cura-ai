@@ -4,7 +4,35 @@ How medcode-api's approve/reopen flow maps onto the hospital's real write API
 ("iMed Diagnosis and Medical Discharge API", rev 1, 24 Jul 2026), which
 supersedes the invented `coding-result` contract. The sibling repo
 `../imed-mock-api` mocks this contract field-for-field under `/api/v1` —
-production is an `IMED_API_BASE` + `IMED_API_TOKEN` swap.
+production is an `IMED_API_BASE` + `IMED_CLIENT_ID` + `IMED_CLIENT_SECRET` swap.
+
+> **2026-11-09 — the hospital's own guide now wins.** The hospital sent
+> "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026), its documentation of
+> what it actually built. Where it differs from what we proposed, we follow
+> it. What changed for us:
+>
+> - **Auth:** client credentials at `POST /auth/token` (Basic auth, form
+>   `grant_type=client_credentials`) → a Bearer token that expires
+>   (`expires_in`, 300 s in the example). `ImedApiClient` caches and renews it
+>   and retries once on a `401`. The fixed `IMED_API_TOKEN` is gone.
+> - **R1 `/cases/check` was not built.** An unwindowed sync now re-reads the
+>   open cases we hold through `/cases/sync`; new cases only arrive through a
+>   date window, fetched one day per call with `+07:00` bounds.
+> - **Read values:** datetimes carry `+07:00` (stored as Bangkok local time;
+>   any other offset is converted), `sex` is `F`/`M` (stored as
+>   `female`/`male`), catalogue rows have no `edition`. Still `null` on the
+>   hospital side for now: `discharge_type`, `discharge_status`,
+>   `health_coverage`, `coding_status`, `operation_type`.
+> - **Writes are a mock on their side** — `mock: true`, nothing saved in HIS,
+>   no 403 visit lock or 409 duplicate yet. `coding_status` (question 17) is
+>   in the guide, so it is accepted. The guide's 400 rules (request_id
+>   `MCAI-<visit_id>-<UUID v4>`, one code kind per POST, PUT sends only the
+>   changed array, description pairs, no fields outside its set) match what
+>   `ImedWritebackService` already sent; `imed-mock-api` now enforces them.
+> - **Still open with the hospital:** which field `sync-by-period` filters
+>   on; whether the internal `visit_id` keeps the transaction-number shape
+>   (our visit-date fallback reads the date from it); the max number of cases
+>   per `sync-by-period` answer; rate limits.
 
 Decisions taken 2026-07-24 (with the team):
 
