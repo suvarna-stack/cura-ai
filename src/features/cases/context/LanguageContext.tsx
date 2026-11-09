@@ -37,7 +37,7 @@ export const dict: Record<string, { en: string; th: string }> = {
   "empty.finished.title":   { en: "No finished cases yet", th: "ยังไม่มีเคสเสร็จสิ้น" },
   "empty.finished.sub":     { en: "Cases you approve move here, and their codes are sent back to the hospital.", th: "เคสที่อนุมัติแล้วจะย้ายมาที่นี่ และรหัสจะถูกส่งกลับไปยังโรงพยาบาล" },
   "empty.noData.title":     { en: "No cases yet", th: "ยังไม่มีเคส" },
-  "empty.noData.sub":       { en: "Case data comes from the hospital's iMed system. Run a sync to pull it in.", th: "ข้อมูลเคสมาจากระบบ iMed ของโรงพยาบาล กดซิงค์เพื่อดึงข้อมูล" },
+  "empty.noData.sub":       { en: "Case data comes from the hospital's iMed system. Sync and pick the visit dates to pull it in.", th: "ข้อมูลเคสมาจากระบบ iMed ของโรงพยาบาล กดซิงค์แล้วเลือกช่วงวันที่เพื่อดึงข้อมูล" },
   "empty.noData.action":    { en: "Sync from hospital", th: "ซิงค์จากโรงพยาบาล" },
   "empty.action.viewComplete":   { en: "View complete cases ({n})", th: "ดูเคสสมบูรณ์ ({n})" },
   "empty.action.viewIncomplete": { en: "View incomplete cases ({n})", th: "ดูเคสไม่สมบูรณ์ ({n})" },
@@ -126,6 +126,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   // sync moved out of the page and into the header (2026-08-25)
   "sync.period":      { en: "Sync period", th: "ช่วงเวลาซิงค์" },
   "sync.button":      { en: "Sync", th: "ซิงค์" },
+  // no window = re-read the open cases already here; new visits need dates
+  "sync.refreshKnown": { en: "Update cases already here", th: "อัปเดตเคสที่มีอยู่แล้ว" },
   "sort.title":   { en: "Sort by",      th: "เรียงตาม" },
   "sort.newest":  { en: "Newest first", th: "ใหม่ที่สุดก่อน" },
   "sort.oldest":  { en: "Oldest first", th: "เก่าที่สุดก่อน" },
@@ -431,8 +433,8 @@ export const dict: Record<string, { en: string; th: string }> = {
   // iMed sync — pulls fresh hospital data over the current dashboard
   "confirm.sync.title": { en: "Sync from iMed?", th: "ซิงค์ข้อมูลจาก iMed?" },
   "confirm.sync.bodyAll": {
-    en: "This pulls every available visit from the hospital system and refreshes the dashboard. Cases you have not approved yet are reloaded from iMed.",
-    th: "ระบบจะดึงข้อมูลการเข้ารับบริการทั้งหมดจากระบบโรงพยาบาล และรีเฟรชแดชบอร์ด เคสที่ยังไม่ได้อนุมัติจะถูกโหลดใหม่จาก iMed",
+    en: "This reloads the cases already on the dashboard that you have not approved yet, with the latest data from iMed. No new visits come in this way — pick dates to pull those.",
+    th: "ระบบจะโหลดข้อมูลล่าสุดจาก iMed ให้กับเคสบนแดชบอร์ดที่ยังไม่ได้อนุมัติ วิธีนี้จะไม่ดึงการเข้ารับบริการใหม่ ต้องเลือกช่วงวันที่เพื่อดึงเคสใหม่",
   },
   "confirm.sync.bodyWindow": {
     en: "This pulls visits for {window} from the hospital system and refreshes the dashboard. Cases you have not approved yet are reloaded from iMed.",

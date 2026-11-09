@@ -260,7 +260,7 @@ export function CasesPage({
   setTab: (t: CaseTab) => void;
 }) {
   const { gl } = useTheme();
-  const { syncing, syncVersion, requestSync } = useSync();
+  const { syncing, syncVersion, openSyncPicker } = useSync();
   const { t } = useLang();
   useDocumentTitle(t("nav.dashboard"));
   // ---- real approval workflow (SRS F14): approved cases MOVE to Finished ----
@@ -746,7 +746,7 @@ export function CasesPage({
                   {unfilteredComplete === 0 && (noData ? (
                     <EmptyState icon={CheckCircle2}
                       title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
-                      actionLabel={t("empty.noData.action")} onAction={() => requestSync()} />
+                      actionLabel={t("empty.noData.action")} onAction={() => openSyncPicker({ allowRefresh: false })} />
                   ) : (
                     <EmptyState icon={CheckCircle2}
                       title={t("empty.complete.title")} subtext={t("empty.complete.sub")}
@@ -848,7 +848,7 @@ export function CasesPage({
                   {unfilteredIncomplete === 0 && (noData ? (
                     <EmptyState icon={AlertCircle}
                       title={t("empty.noData.title")} subtext={t("empty.noData.sub")}
-                      actionLabel={t("empty.noData.action")} onAction={() => requestSync()} />
+                      actionLabel={t("empty.noData.action")} onAction={() => openSyncPicker({ allowRefresh: false })} />
                   ) : (
                     <EmptyState icon={AlertCircle}
                       title={t("empty.incomplete.title")} subtext={t("empty.incomplete.sub")}

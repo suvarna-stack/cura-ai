@@ -11,8 +11,6 @@ import {
 import { ConfirmDialog } from './global/ConfirmDialog'
 import { CuraLockup } from '../../../components/brand/CuraMark'
 import { CuraSpinner } from '../../../components/brand/CuraSpinner'
-import { DateRangeDialog } from './global/DateRangeDialog'
-import type { DateRange } from '../utils/dateRange'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
 import { useSync } from '../context/SyncContext'
@@ -31,12 +29,10 @@ function CoderShell() {
   const { t } = useLang()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { syncing, requestSync } = useSync()
+  const { syncing, openSyncPicker } = useSync()
   // Sync moved up here from the Dashboard's date bar (2026-08-25) so it sits
   // beside the account chip and is reachable from every page, not just the
-  // list. Picking the period is the first step; SyncProvider still asks for
-  // confirmation after, because a sync re-pulls hospital records.
-  const [syncPickerOpen, setSyncPickerOpen] = useState(false)
+  // list. SyncProvider owns both steps: pick the period, then confirm.
   const location = useLocation()
   const { pathname } = location
   // The agent page is a chat: lock the shell to the viewport so only its
@@ -138,7 +134,7 @@ function CoderShell() {
           {/* the one action in the header, so it carries the accent */}
           <button
             type="button"
-            onClick={() => setSyncPickerOpen(true)}
+            onClick={() => openSyncPicker()}
             disabled={syncing}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold transition hover:brightness-110 disabled:opacity-60"
             style={{
@@ -184,19 +180,6 @@ function CoderShell() {
           </button>
         </div>
       </header>
-
-      {syncPickerOpen && (
-        <DateRangeDialog
-          value={null}
-          title={t('sync.period')}
-          confirmLabel={t('sync.button')}
-          allLabel="Everything"
-          onApply={(r: DateRange | null) =>
-            requestSync(r ? { from: r.from, to: r.to } : undefined)
-          }
-          onClose={() => setSyncPickerOpen(false)}
-        />
-      )}
 
       {confirmingLogout && (
         <ConfirmDialog
