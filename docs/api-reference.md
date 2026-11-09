@@ -293,50 +293,68 @@ fact.
 
 ## The hospital contract (iMed)
 
-What `medcode-api` calls. Frontends never do. Locally `imed-mock-api` answers
-field for field, and cutover is `IMED_API_BASE` + `IMED_API_TOKEN`.
+What `medcode-api` calls. Frontends never do. The source of truth is the
+hospital's own guide, "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026).
+Locally `imed-mock-api` answers field for field, and cutover is
+`IMED_API_BASE` + `IMED_CLIENT_ID` + `IMED_CLIENT_SECRET`.
 
-Every call is `Authorization: Bearer <IMED_API_TOKEN>` (mock default
-`imed-mock-token`).
+Auth: `POST /auth/token` with `Authorization: Basic base64(client_id:client_secret)`
+and form body `grant_type=client_credentials` →
+`{access_token, token_type: "Bearer", expires_in}`. Every other call sends
+`Authorization: Bearer <access_token>`. medcode-api renews the token before it
+expires and retries once on a `401`. Mock defaults: `medcode-mock-client` /
+`medcode-mock-secret`, 300-second tokens.
 
-### Read: R1–R6, the case-data contract we asked the hospital to build
+### Read: the five routes the hospital built
+
+R1 (`POST /api/v1/cases/check`, "what changed since T?") was proposed but
+parked by the hospital. A sync with no window re-reads saved visit ids via R2
+instead.
 
 | # | Call | Answer |
 |---|---|---|
-| R1 | `POST /api/v1/cases/check {changed_since}` | `{has_changes, visit_ids}`. No clinical data |
 | R2 | `POST /api/v1/cases/sync {visit_ids}` | `{cases, not_found}`. **Max 20 ids**, else `422 too_many_visit_ids` |
 | R3 | `POST /api/v1/cases/sync-by-period {from, to}` | `{cases}`. **Max 31 days**, else `422 period_too_long` |
-| R4 | `GET /api/v1/catalog/icd10` | `[{code, description, edition}]` |
+| R4 | `GET /api/v1/catalog/icd10` | `[{code, description}]` (no `edition` yet) |
 | R5 | `GET /api/v1/catalog/icd9` | same shape |
 | R6 | `POST /api/v1/contract/check {required_fields}` | `{valid}` or `{valid: false, missing: [...]}` |
 
 A case is a `visit` block plus nine data blocks (`documents`,
 `record_results`, `diagnoses`, `procedures`, `drug_orders`, `lab_results`,
 `vitals`, `ward_movements`, `billing_items`). An empty block is `[]`, never
-absent. Datetimes are ISO 8601, missing values are `null` (never `""`), and
-cancelled code rows never appear. **Every sync runs R6 first**. If the hospital
-has stopped serving a field we depend on, the sync fails with a `500` naming
-it, before anything is written.
+absent. Datetimes are ISO 8601 with `+07:00`, `sex` is `F`/`M`, missing values
+are `null` (never `""`), and cancelled code rows never appear. **Every sync
+runs R6 first**. If the hospital has stopped serving a field we depend on, the
+sync fails with a `500` naming it, before anything is written. Bad bodies are
+`400`; an empty `visit_ids`/`required_fields` list or a backwards window is a
+`400` too.
 
-### Write: W1–W4, the hospital's own "iMed Diagnosis and Medical Discharge API"
+### Write: W1–W4
+
+The hospital's write side is still a **mock** on its end: every success
+carries `mock: true` and nothing reaches HIS (medcode-api logs this once).
+`imed-mock-api` checks the same rules but really saves, so approve/reopen can
+be tested end to end.
 
 | # | Call | What |
 |---|---|---|
-| W1 | `POST /api/v1/diagnosis` | Create ICD-10 diagnoses + ICD-9 procedures + the discharge object in **one** transaction. New ids come back in `result` |
-| W2 | `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by `object_id`. Only the fields sent change |
+| W1 | `POST /api/v1/diagnosis` | Create ICD-10 diagnoses **or** ICD-9 procedures (the other array is `[]`) + the discharge object. New ids come back in `result` |
+| W2 | `PUT /api/v1/diagnosis/{visit_id}` | Edit rows by `object_id` (only the array being changed is sent), or only `coding_status`. Only the fields sent change |
 | W3 | `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis: flagged, never deleted, gone from reads. Idempotent |
 | W4 | `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |
 
 Bodies are snake_case in a `{request_id, status, result}` envelope.
-**`request_id` deduplicates**: replaying a request returns the stored answer
-instead of running it again. Errors follow the hospital's PDF: `400
-STATUS_BUSINESS_ERROR / invalid_request`, `401 unauthorized`, and `409
-DIAGNOSIS_CODE_ALREADY_EXIST` on a duplicate live ICD-10 code for the visit.
+`request_id` is `MCAI-<visit_id>-<UUID v4>`. Any field outside the guide's set
+is a `400`; a description goes as a matching pair
+(`icd10_description` + `beginning_diagnosis`). Errors: `400
+STATUS_BUSINESS_ERROR / invalid_request` and `401 unauthorized` (no `status`
+key). The real HIS will also send `409 DIAGNOSIS_CODE_ALREADY_EXIST` and a
+visit-lock `403`; the hospital's mock does neither yet, and `imed-mock-api`
+does the `409` plus `request_id` replay.
 
-W1 and W2 carry one field that is **ours, not the hospital's**: optional
-`coding_status`. `"approved"` marks the visit as coded, and `"open"` clears it
-on reopen. It is proposed to the hospital as an extension (open question 17 in
-`medcode-api/docs/imed-integration.md`).
+Optional `coding_status` on W1/W2: `"approved"` marks the visit as coded, and
+`"open"` clears it on reopen. We proposed it; the hospital's guide now lists it
+(its read side still serves `visit.coding_status` as `null`).
 
 Master-data IDs are placeholders until the hospital sends its lists: visit
 type `OPD`/`IPD`; diagnosis type `PRIMARY_DIAGNOSIS`, `COMORBIDITY`, `OTHERS`,

@@ -67,7 +67,7 @@ exists so you can change ports and secrets without touching the compose file.
 | `WEB_PORT` · `API_PORT` · `IMED_PORT` · `RAG_PORT` · `DB_PORT` | 8080 · 8001 · 8003 · 8000 · 5433 | a port is already taken |
 | `ADMIN_BOOTSTRAP_EMAIL` / `_PASSWORD` | `admin@medcodeai.demo` / `admin1234` | **before anything reachable from another machine** |
 | `POSTGRES_PASSWORD` | `postgres` | same |
-| `IMED_API_TOKEN` | `imed-mock-token` | pointing at the real hospital API (it issues the real token) |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | `medcode-mock-client` / `medcode-mock-secret` | pointing at the real hospital API (its admin issues the real pair; medcode-api trades it for a short-lived token at `/auth/token`) |
 | `LLM_BACKEND` · `OLLAMA_BASE` · `OLLAMA_MODEL` | `ollama` · `http://host.docker.internal:11434` · EIRAI-8B | see step 4 |
 
 `.env` is gitignored. `.env.example` is the only tracked copy, and it holds

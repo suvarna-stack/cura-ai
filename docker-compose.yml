@@ -55,7 +55,9 @@ services:
       context: ../imed-mock-api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/imed
-      IMED_API_TOKEN: ${IMED_API_TOKEN:-imed-mock-token}
+      # the client credentials the mock's POST /auth/token accepts (hospital guide, 2026-11-04)
+      IMED_CLIENT_ID: ${IMED_CLIENT_ID:-medcode-mock-client}
+      IMED_CLIENT_SECRET: ${IMED_CLIENT_SECRET:-medcode-mock-secret}
       PORT: 8003
     ports:
       - "${IMED_PORT:-8003}:8003"
@@ -106,7 +108,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/medcode
       IMED_API_BASE: http://imed-mock-api:8003
-      IMED_API_TOKEN: ${IMED_API_TOKEN:-imed-mock-token}
+      # traded for a short-lived Bearer token at IMED_API_BASE/auth/token
+      IMED_CLIENT_ID: ${IMED_CLIENT_ID:-medcode-mock-client}
+      IMED_CLIENT_SECRET: ${IMED_CLIENT_SECRET:-medcode-mock-secret}
       RAG_API_BASE: http://rag:8000
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@medcodeai.demo}

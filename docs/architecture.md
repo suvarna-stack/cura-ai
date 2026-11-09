@@ -29,13 +29,13 @@ flowchart LR
   end
 
   ollama["Ollama on the host<br/>Llama-3.1-EIRAI-8B Q4_K_M<br/>:11434"]
-  real["Real hospital iMed API<br/>(future: same contract)"]
+  real["Hospital Medihack API<br/>(per its 2026-11-04 guide)"]
 
   browser -->|"HTTP, same origin"| web
   web -->|"/api proxy"| api
   api -->|"JDBC · plain SQL<br/>db: medcode"| db
   imed -->|"db: imed"| db
-  api -->|"R1–R6 read · W1–W4 write<br/>Bearer IMED_API_TOKEN"| imed
+  api -->|"/auth/token → Bearer token<br/>5 read · 4 write routes"| imed
   api -.->|"swap IMED_API_BASE"| real
   api -->|"/suggest · /chat · /learn · /documents"| rag
   rag -.->|"generation only<br/>(chat, rule extraction)"| ollama
@@ -51,10 +51,14 @@ the only one that calls the hospital or the AI service. The AI service has no
 authentication of its own and is meant to be reachable only from the backend
 (see [Known gaps](#9-known-gaps)).
 
-**The hospital is behind one setting.** `imed-mock-api` implements the
-hospital's contract field for field, including its refusals (20 visits per
-request, 31 days per window). Moving to the real hospital means changing
-`IMED_API_BASE` and `IMED_API_TOKEN`, with no code change.
+**The hospital is behind one setting.** `imed-mock-api` follows the
+hospital's own API guide for MedCode (4 Nov 2026) field for field, including
+its refusals (20 visits per request, 31 days per window, its 400 rules on
+writes). The one deliberate difference: the mock's writes are saved, so
+approve and reopen can be tested end to end, while the hospital's write side
+is still a mock that answers `mock: true` and saves nothing. Moving to the real
+hospital means changing `IMED_API_BASE`, `IMED_CLIENT_ID` and
+`IMED_CLIENT_SECRET`, with no code change.
 
 **Generation runs outside the containers.** Docker on macOS has no GPU
 passthrough, so the chat model runs in Ollama on the host. Code suggestions
@@ -270,12 +274,14 @@ to the graph. It does not change model weights.
 
 ## 6. Sync: reading the hospital
 
-The hospital's read contract (R1–R6) was written by this team and handed to
-the hospital. The mock implements it so development does not wait for them.
+This team first proposed the read contract (R1–R6) to the hospital. The
+hospital built five of the six and documented them in its own guide
+(4 Nov 2026). R1, the "what changed since T?" poll, was parked. Every call
+carries a Bearer token from `POST /auth/token` (Basic client credentials,
+300-second tokens, renewed automatically).
 
 | # | Call | Used for |
 |---|---|---|
-| R1 | `POST /api/v1/cases/check {changed_since}` | Which visit ids changed. The cheap poll; no clinical data |
 | R2 | `POST /api/v1/cases/sync {visit_ids ≤20}` | Full case objects for those ids |
 | R3 | `POST /api/v1/cases/sync-by-period {from, to ≤31 days}` | Full case objects for a visit-date window |
 | R4 / R5 | `GET /api/v1/catalog/icd10` · `/icd9` | The hospital's code masters, mirrored into our catalogs |
@@ -283,9 +289,10 @@ the hospital. The mock implements it so development does not wait for them.
 
 A case object is one `visit` block plus nine data blocks: `documents`,
 `record_results`, `diagnoses`, `procedures`, `drug_orders`, `lab_results`,
-`vitals`, `ward_movements` and `billing_items`. A windowed sync calls R3 once
-per ≤31-day chunk. An unwindowed one walks R1's id list through R2 in batches
-of 20.
+`vitals`, `ward_movements` and `billing_items`. Datetimes carry the
+hospital's `+07:00`. A windowed sync calls R3 **once per day**, as the guide
+recommends; it is the only way new cases arrive. An unwindowed sync re-reads
+the open cases medcode already holds through R2, 20 ids per call.
 
 ---
 
