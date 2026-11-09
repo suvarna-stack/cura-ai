@@ -10,10 +10,18 @@ extract data. Two audiences:
    Diagnosis and Medical Discharge API" PDF (rev 1, 24 Jul 2026). (The
    invented coding-status extension was withdrawn 2026-08-02 — the mock now
    mirrors the PDF exactly.)
-2. **medcode-api** — calls the `/api/v1` write endpoints on approve/reopen,
-   exactly as it will call the hospital's real API later. Swapping this mock
-   for the real thing is a base-URL + token change (`IMED_API_BASE` /
-   `IMED_API_TOKEN` in medcode-api).
+2. **medcode-api** — calls these endpoints exactly as it will call the
+   hospital's real API later. Swapping this mock for the real thing is a
+   base-URL + credentials change (`IMED_API_BASE`, `IMED_CLIENT_ID`,
+   `IMED_CLIENT_SECRET` in medcode-api).
+
+> **Since 2026-11-09 the spec this mock follows is the hospital's own guide**,
+> "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026,
+> `../MedCode-API-Connection-Guide.html`). It wins wherever it differs from
+> the contract MedCode AI first proposed. One deliberate difference remains:
+> the hospital's write routes are a mock that answers `mock: true` and saves
+> nothing, while **this mock's writes really persist**, so approve/reopen can
+> be tested end to end.
 
 Spring Boot 4.1 / Java 21, Maven (`./mvnw`), plain SQL — no JPA, no Python.
 Owns the `imed` PostgreSQL database exclusively; no other app touches it.
@@ -37,22 +45,31 @@ their contract field-for-field.
 
 ## The API
 
-### READ — `/api/v1`, the MedCode AI Case Data API contract (R1–R6)
+### AUTH — `POST /auth/token`
 
-The read surface MedCode AI **asked the hospital to build** — see
-`../medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. It is
-mocked here first so development doesn't wait for the hospital's
-implementation; when the real API lands, medcode-api swaps `IMED_API_BASE`
-and nothing else changes.
+Client credentials, as the guide shows: `Authorization: Basic
+base64(client_id:client_secret)`, form body `grant_type=client_credentials` →
+`{"access_token", "token_type": "Bearer", "expires_in": 300}`. Every
+`/api/v1` route needs `Authorization: Bearer <access_token>`; an expired or
+unknown token is `401 {"message":"unauthorized","message_th":"ไม่มีสิทธิเข้าถึง"}`
+(no `status` key). Wrong client credentials → the same `401`; a
+`grant_type` other than `client_credentials` → `400`. Tokens are random
+strings held in memory (the real API issues JWTs; a client never looks
+inside), so a restart forgets them — a client just asks again. The console
+page at `/` has a **Get token** button.
 
-Bearer-authenticated like the write side (same `IMED_API_TOKEN`).
+### READ — `/api/v1`, the five routes the hospital built
+
+MedCode AI first proposed six read routes (R1–R6,
+`../medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`). The
+hospital built five; **R1 `/cases/check` was parked**, so the mock no longer
+serves it (`404`).
 
 | # | Endpoint | Purpose |
 |---|---|---|
-| R1 | `POST /api/v1/cases/check` | Did anything change after `changed_since`? → `{has_changes, visit_ids}`. The cheap poll; no clinical data |
 | R2 | `POST /api/v1/cases/sync` | Full case data for up to **20** `visit_ids` → `{cases, not_found}` |
 | R3 | `POST /api/v1/cases/sync-by-period` | Same data for a visit-date window (`from`/`to`, both ends included, max **31 days**) → `{cases}` |
-| R4 | `GET /api/v1/catalog/icd10` | ICD-10 code master → `[{code, description, edition}]` |
+| R4 | `GET /api/v1/catalog/icd10` | ICD-10 code master → `[{code, description}]` (no `edition`, as in the guide) |
 | R5 | `GET /api/v1/catalog/icd9` | ICD-9 code master, same shape |
 | R6 | `POST /api/v1/contract/check` | Schema gate: send `required_fields` as `block.field` names → `{valid}` or `{valid:false, missing:[…]}` |
 
@@ -64,9 +81,11 @@ plus nine data blocks (`documents`, `record_results`, `diagnoses`,
 Three transport rules are enforced here because on the real API they are the
 hospital's job:
 
-- **Date-times are ISO 8601** (`2026-04-01T06:45:00`). The extract stores
-  `2026-04-01 06:45:00`, so every datetime is normalized on the way out;
-  `birth_date` is served as a plain date.
+- **Date-times are ISO 8601 with the hospital's offset**
+  (`2026-04-01T06:45:00+07:00`). The extract stores `2026-04-01 06:45:00`
+  (Bangkok local time), so every datetime is normalized on the way out;
+  `birth_date` is served as a plain date. `sex` is the guide's `F`/`M` (the
+  extract says `female`/`male`).
 - **Missing values are `null`** — never `""`, never an absent key. The
   extract uses both `NULL` and `''` for "nothing", so blanks collapse.
 - **Cancelled code rows never appear**, same rule as the older reads.
@@ -78,8 +97,11 @@ the change-timestamp mechanism to the hospital, so no column was added.
 
 The limits are real, not decorative: 21 ids → `422 too_many_visit_ids`, a
 32-day window → `422 period_too_long`, both in the hospital's
-`STATUS_BUSINESS_ERROR` envelope. A convenient shortcut here would only
-surface on cutover day.
+`STATUS_BUSINESS_ERROR` envelope; an empty id or field list, or a window
+whose `from` is after its `to`, is a `400`. Period bounds may carry an offset
+(`+07:00`, `Z`) and are converted to hospital time; a bound without one is
+already hospital time. A convenient shortcut here would only surface on
+cutover day.
 
 ### Demo tooling (mock-only)
 
@@ -93,20 +115,37 @@ so never ask the hospital for it.
 
 ### WRITE — `/api/v1`, the hospital's real contract (mocked)
 
-Mirrors the "iMed Diagnosis and Medical Discharge API" PDF field-for-field:
-`Authorization: Bearer <token>` (mock: `IMED_API_TOKEN`, default
-`imed-mock-token`), snake_case bodies, `{request_id, status, result}`
-envelopes, and `request_id` dedup — replaying a request returns the stored
-response instead of re-executing.
+Validated to the guide's rules, on top of the field names from the earlier
+"iMed Diagnosis and Medical Discharge API" PDF: Bearer token from
+`/auth/token`, snake_case bodies, `{request_id, status, result}` envelopes.
+What the guide requires and the mock enforces (each break is a `400`):
+
+- `request_id` is `MCAI-<visit_id>-<UUID v4>` naming the body's visit.
+- Only the guide's fields — anything else (the PDF's `doctor_eid`,
+  `comments`, IPD clinical texts, …) is refused.
+- POST: `diagnosis_icd10` and `diagnosis_icd9` both present, exactly one with
+  rows; ICD-10 rows need `fix_dx_source: "MED_DC"` and `coder_eid`; ICD-9
+  rows need `is_from: "MED_DC"` and one of the four operation types; a time
+  needs its date.
+- PUT: only the array being changed (never `[]` for the other), each row
+  `object_id` + at least one change, no discharge object, no
+  `fix_operation_type_id`; a body without rows must carry `coding_status`.
+  `time_in`/`time_out` may come without the date (it lands on the stored
+  date) or as `null`.
+- Descriptions go as a matching pair (`icd10_description` +
+  `beginning_diagnosis`); never an empty string instead of leaving a key out.
+
+Kept from the PDF because the real HIS will do them (the hospital's mock
+does not yet): `request_id` replay returns the stored response, and a
+duplicate live ICD-10 code is `409`.
 
 | Endpoint | What |
 |---|---|
-| `POST /api/v1/diagnosis` | Create ICD-10 dx + ICD-9 procedures + medical discharge in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
-| `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`; only provided fields change |
+| `POST /api/v1/diagnosis` | Create ICD-10 dx **or** ICD-9 procedures + the discharge object in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
+| `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`, or only the coding status; only provided fields change |
 
-POST and PUT carry one field that is NOT in the hospital's PDF: the optional
-`coding_status` (medcode's proposed extension — open question 17 in
-medcode-api's `docs/imed-integration.md`). `"approved"` marks the visit's own
+POST and PUT carry the optional `coding_status` — medcode's proposal, now in
+the hospital's guide. `"approved"` marks the visit's own
 `medhack_patient.coding_status`, the reserved word `"open"` clears it again on
 reopen, and absent/blank changes nothing — so a caller speaking the exact
 hospital contract is unaffected. It sets the visit in the SAME transaction as
@@ -147,10 +186,9 @@ readiness group includes the `db` check, so an unreachable Postgres reports
 DOWN rather than merely failing every request). The Dockerfile HEALTHCHECK
 uses readiness.
 
-**Auth:** the `/api/v1` write surface requires `Authorization: Bearer
-<IMED_API_TOKEN>` (default `imed-mock-token`), mimicking the real contract;
-token issuance for production is the hospital's side. The extract READ
-endpoints are open in this mock — production read auth still TBD.
+**Auth:** every `/api/v1` route requires a Bearer token from
+`POST /auth/token` (see *AUTH* above). Health, actuator, Swagger and the demo
+tooling stay open.
 
 ## Local dev — first-time setup included
 
@@ -241,7 +279,7 @@ already had these applied by the old startup runner takes them as no-ops.
 |---|---|
 | `V1` | `is_cancelled`, `imed_request_log`, `doctor_discharge_opd` / `_ipd` |
 | `V2` | `icd_10` / `icd_9` catalog tables |
-| `V3` | `updated_at`, backing the `changed_since` filter |
+| `V3` | `updated_at` on the code rows, behind `visit.last_changed_at` (it once also backed R1's `changed_since`, parked by the hospital) |
 | `V4` | the five pre-coded demo visits |
 | `V5` | `coding_status` on the visit row |
 | `V6` | the ~1000 ICD catalog rows |
@@ -402,7 +440,8 @@ after a Sync).
 | `DATABASE_URL` | libpq-form DSN (`postgresql://user:pass@host:port/db`). Unset = `localhost:5432/imed`. |
 | `JDBC_DATABASE_URL` | Already-JDBC URL; wins over `DATABASE_URL`. |
 | `PORT` | HTTP port (default 8003). |
-| `IMED_API_TOKEN` | Bearer token the `/api/v1` write endpoints require (default `imed-mock-token`). |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | The client credentials `/auth/token` accepts (default `medcode-mock-client` / `medcode-mock-secret`). |
+| `IMED_TOKEN_TTL_SECONDS` | Token lifetime, reported as `expires_in` (default `300`). |
 
 ## Testing
 

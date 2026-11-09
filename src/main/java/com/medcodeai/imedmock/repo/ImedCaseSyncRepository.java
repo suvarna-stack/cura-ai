@@ -10,11 +10,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
- * Read side of the "MedCode AI Case Data API" contract (R1-R6) — the shape
- * MedCode AI asked the hospital to build, mocked here first so development
- * doesn't wait for the hospital's implementation.
+ * Read side of the hospital's Medihack API (guide of 4 Nov 2026) — the case
+ * data shape MedCode AI first proposed and the hospital built, mocked here so
+ * development doesn't depend on the hospital's server.
  *
  * The medhack_* extract tables are re-shaped into the contract's nested CASE
  * OBJECT: one visit block plus nine data blocks, every key renamed to the
@@ -26,8 +27,12 @@ import java.util.Map;
  * Three transport rules from the contract are enforced HERE rather than left
  * to the caller, because on the real API they are the hospital's job:
  *
- * - Date-times are ISO 8601 ("2026-04-01T06:45:00"). The extract stores
- *   "2026-04-01 06:45:00", so every datetime is normalized on the way out.
+ * - Date-times are ISO 8601 with the hospital's offset
+ *   ("2026-04-01T06:45:00+07:00"), as the Medihack API guide serves them. The
+ *   extract stores "2026-04-01 06:45:00" (Bangkok local time, no zone), so
+ *   every datetime is normalized on the way out.
+ * - sex is the guide's one-letter code ("F" / "M"); the extract stores
+ *   "female" / "male".
  * - Missing values are null — never an empty string, never an absent key.
  *   The extract uses both NULL and '' for "nothing", so blanks collapse.
  * - Cancelled diagnosis/procedure rows must never appear (a code a coder
@@ -83,20 +88,7 @@ public class ImedCaseSyncRepository {
                 "SELECT 1 FROM imed.medhack_patient WHERE transactionnumber = ? LIMIT 1", tn).isEmpty();
     }
 
-    // ---- R1 / R3: which visits ---------------------------------------------
-
-    /**
-     * R1 — visits whose data changed at or after the bound. "Changed" is the
-     * visit's own datetime (so a new visit counts) or any later write to its
-     * code rows; see {@link #LAST_CHANGED}.
-     */
-    public List<String> changedVisitIds(String changedSince) {
-        return jdbc.queryForList("""
-                SELECT p.transactionnumber FROM imed.medhack_patient p
-                 WHERE """ + " " + LAST_CHANGED + """
-                 >= ?::timestamp
-                 ORDER BY p.transactionnumber""", String.class, changedSince);
-    }
+    // ---- R3: which visits ---------------------------------------------
 
     /** R3 — visits whose VISIT datetime falls inside the window (both ends included). */
     public List<String> visitIdsInPeriod(String from, String to) {
@@ -270,7 +262,7 @@ public class ImedCaseSyncRepository {
                        p.dischargestatus, p.healthcoverage, p.coding_status,
                        b.department, b.ward,
                        to_char(""" + " " + LAST_CHANGED + """
-                       , 'YYYY-MM-DD"T"HH24:MI:SS') AS last_changed_at
+                       , 'YYYY-MM-DD"T"HH24:MI:SS"+07:00"') AS last_changed_at
                   FROM imed.medhack_patient p
                   LEFT JOIN LATERAL (
                        SELECT m.department, m.ward FROM imed.medhack_bedmanagement m
@@ -283,7 +275,7 @@ public class ImedCaseSyncRepository {
             v.put("visit_id", text(rs, "transactionnumber"));
             v.put("admission_number", admissionNumber);
             v.put("encounter_type", admissionNumber == null ? "OPD" : "IPD");
-            v.put("sex", text(rs, "sex"));
+            v.put("sex", sexCode(text(rs, "sex")));
             v.put("birth_date", dateOnly(text(rs, "birthdate")));
             v.put("age_year", ageYears(text(rs, "ageyear")));
             v.put("is_pregnant", flag(text(rs, "ispregnant")));
@@ -303,9 +295,9 @@ public class ImedCaseSyncRepository {
     // ---- R4 / R5: the code catalogues --------------------------------------
 
     /**
-     * The hospital's own ICD master list. {@code edition} is in the contract as
-     * "if available" and the extract has no such column, so it is served as
-     * null rather than omitted (missing values are null, not absent keys).
+     * The hospital's own ICD master list: code + description only. The guide
+     * leaves {@code edition} out until the hospital has a confirmed source for
+     * it, so the mock does too (it used to serve it as null).
      */
     public List<Map<String, Object>> catalog(String table) {
         return jdbc.query("SELECT code, description FROM imed." + table + " ORDER BY code",
@@ -313,7 +305,6 @@ public class ImedCaseSyncRepository {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("code", text(rs, "code"));
                     m.put("description", text(rs, "description"));
-                    m.put("edition", null);
                     return m;
                 });
     }
@@ -383,18 +374,43 @@ public class ImedCaseSyncRepository {
         return (v == null || v.isBlank()) ? null : v;
     }
 
+    /** The hospital's UTC offset — every extract datetime is Bangkok local time. */
+    private static final String HOSPITAL_OFFSET = "+07:00";
+
+    /** A date-time that already says which zone it is in. */
+    private static final Pattern HAS_OFFSET =
+            Pattern.compile(".*T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:?\\d{2})$");
+
     /**
-     * ISO 8601 for the wire. The extract stores "2026-04-01 06:45:00"; anything
-     * that doesn't look like a date is passed through untouched rather than
-     * dropped — losing an unexpected value would be worse than serving it.
+     * ISO 8601 with the hospital's offset for the wire, as the guide serves it.
+     * The extract stores "2026-04-01 06:45:00" (local, zoneless) → served as
+     * "2026-04-01T06:45:00+07:00". A bare date stays a bare date; anything that
+     * doesn't look like a date is passed through untouched rather than dropped —
+     * losing an unexpected value would be worse than serving it.
      */
     private static String iso(String v) {
         if (v == null) {
             return null;
         }
-        return v.length() >= 11 && v.charAt(4) == '-' && v.charAt(10) == ' '
-                ? v.substring(0, 10) + "T" + v.substring(11)
-                : v;
+        boolean dateTime = v.length() >= 16 && v.charAt(4) == '-' && v.charAt(7) == '-'
+                && (v.charAt(10) == ' ' || v.charAt(10) == 'T') && v.charAt(13) == ':';
+        if (!dateTime) {
+            return v;
+        }
+        String s = v.substring(0, 10) + "T" + v.substring(11);
+        return HAS_OFFSET.matcher(s).matches() ? s : s + HOSPITAL_OFFSET;
+    }
+
+    /** The guide's sex code: "F" / "M". Anything else is served as recorded. */
+    private static String sexCode(String v) {
+        if (v == null) {
+            return null;
+        }
+        return switch (v.strip().toLowerCase()) {
+            case "female", "f" -> "F";
+            case "male", "m" -> "M";
+            default -> v;
+        };
     }
 
     /**

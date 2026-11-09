@@ -8,24 +8,27 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Bearer-token gate on the /api/v1/** write surface, mimicking the real iMed
- * API ("Authorization: Bearer &lt;access-token&gt;"). The mock accepts ONE
- * static token from IMED_API_TOKEN (default "imed-mock-token" so local dev
- * just works); the real API's token issuance is the hospital's business —
- * medcode-api only needs the header plumbing to be exercised.
+ * Bearer-token gate on every /api/v1/** route, mimicking the hospital's
+ * Medihack API ("Authorization: Bearer {ACCESS_TOKEN}"). Only tokens issued
+ * by {@code POST /auth/token} and not yet expired get through — see
+ * {@link TokenStore}. The old single static token (IMED_API_TOKEN) is gone:
+ * the real API has no such thing, and a mock that accepted one would let a
+ * client that never fetches or refreshes its token pass every test.
  *
- * The 401 body is the real API's exact shape ({"message", "message_th"} — no
- * "status" key, unlike the 400/409 business errors). The extract READ
- * endpoints stay open: production read auth is still TBD with the hospital.
+ * The 401 body is the guide's exact shape ({"message", "message_th"} — no
+ * "status" key, unlike the 400/422 business errors).
  */
 @Component
 public class ApiV1AuthInterceptor implements HandlerInterceptor {
 
-    private final String token;
+    /** The guide's 401 body, shared with the token endpoint's refusal. */
+    public static final String UNAUTHORIZED_BODY =
+            "{\"message\":\"unauthorized\",\"message_th\":\"ไม่มีสิทธิเข้าถึง\"}";
 
-    public ApiV1AuthInterceptor() {
-        String t = System.getenv("IMED_API_TOKEN");
-        this.token = (t == null || t.isEmpty()) ? "imed-mock-token" : t;
+    private final TokenStore tokens;
+
+    public ApiV1AuthInterceptor(TokenStore tokens) {
+        this.tokens = tokens;
     }
 
     @Override
@@ -35,13 +38,13 @@ public class ApiV1AuthInterceptor implements HandlerInterceptor {
             return true; // CORS preflight carries no Authorization header
         }
         String auth = req.getHeader("Authorization");
-        if (auth != null && auth.equals("Bearer " + token)) {
+        if (auth != null && auth.startsWith("Bearer ") && tokens.isValid(auth.substring(7).trim())) {
             return true;
         }
         res.setStatus(401);
         res.setContentType("application/json");
         res.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        res.getWriter().write("{\"message\":\"unauthorized\",\"message_th\":\"ไม่มีสิทธิเข้าถึง\"}");
+        res.getWriter().write(UNAUTHORIZED_BODY);
         return false;
     }
 }

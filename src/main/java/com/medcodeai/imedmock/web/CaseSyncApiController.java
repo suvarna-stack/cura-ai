@@ -10,7 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,25 +25,30 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * READ side of the "MedCode AI Case Data API" contract — R1-R6, the endpoints
- * MedCode AI asked the hospital to build. Mocked here so development runs at
- * full speed while the hospital implements its side; when the real API lands,
- * medcode-api swaps IMED_API_BASE and nothing else.
+ * READ side, mocked to the hospital's Medihack API guide for MedCode (4 Nov
+ * 2026) — the five read routes the hospital actually built (R2-R6 of the
+ * contract MedCode AI first proposed). R1 ({@code POST /cases/check}, "what
+ * changed since T?") was proposed but the hospital parked it: a client
+ * re-reads the visit ids it already holds through /cases/sync instead, so
+ * the mock no longer serves it either.
  *
- * Faithfulness is the whole point of this class, so the contract's limits are
- * enforced rather than waved through: R2 refuses more than 20 visit ids, R3
- * refuses a window longer than 31 days, and both answer in the hospital's
+ * Faithfulness is the whole point of this class, so the guide's limits are
+ * enforced rather than waved through: /cases/sync refuses more than 20 visit
+ * ids and an empty list, /cases/sync-by-period refuses a window longer than
+ * 31 days or running backwards, and the answers use the hospital's
  * STATUS_BUSINESS_ERROR envelope. A shortcut here ("the cap doesn't matter
  * locally") would only surface on cutover day.
  *
- * These sit on /api/v1 alongside the write endpoints, so the existing Bearer
- * gate (ApiV1AuthInterceptor) covers them — unlike the older extract reads on
- * /api/cases/**, which stay open and are superseded by this surface.
+ * Date-time bounds may carry an offset ("+07:00", "Z" — the guide recommends
+ * sending one); a bound without one is read as hospital local time
+ * (Asia/Bangkok), which is also how the extract stores every datetime.
+ *
+ * These sit on /api/v1, so the Bearer gate (ApiV1AuthInterceptor) covers them.
  */
 @RestController
-@Tag(name = "Read (contract R1-R6) — case data for MedCode AI",
-        description = "The nested case-object API: poll for changes, sync by ids or period, "
-                + "code catalogues, and the pre-sync schema check")
+@Tag(name = "Read — case data for MedCode AI",
+        description = "The nested case-object API: sync by ids or period, code catalogues, "
+                + "and the pre-sync schema check")
 @SecurityRequirement(name = "bearerAuth")
 public class CaseSyncApiController {
 
@@ -47,9 +56,15 @@ public class CaseSyncApiController {
     static final int MAX_VISIT_IDS = 20;
     static final int MAX_PERIOD_DAYS = 31;
 
-    /** ISO 8601 date, or date-time with optional seconds. */
-    private static final Pattern ISO_DT =
-            Pattern.compile("^\\d{4}-\\d{2}-\\d{2}([ T]\\d{2}:\\d{2}(:\\d{2})?)?$");
+    /** ISO 8601 date, or date-time with optional seconds, fraction and offset. */
+    private static final Pattern ISO_DT = Pattern.compile(
+            "^\\d{4}-\\d{2}-\\d{2}([ T]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:?\\d{2})?)?$");
+
+    /** Hospital local time — the zone every extract datetime is stored in. */
+    static final ZoneId HOSPITAL_ZONE = ZoneId.of("Asia/Bangkok");
+
+    private static final DateTimeFormatter LOCAL_ISO =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     /**
      * Every field this API serves, as the contract's block.field names — the
@@ -95,24 +110,6 @@ public class CaseSyncApiController {
         this.repo = repo;
     }
 
-    // ---- R1 ----------------------------------------------------------------
-
-    @PostMapping("/api/v1/cases/check")
-    @Operation(summary = "R1 — update check",
-            description = "Did anything change after `changed_since`? Answers with the ids of "
-                    + "changed and new visits. No clinical data: this is the cheap poll "
-                    + "MedCode AI runs every few minutes.")
-    @ApiResponse(responseCode = "200", description = "has_changes + visit_ids (empty array if none)")
-    @ApiResponse(responseCode = "400", description = "invalid_request — missing or unparseable changed_since")
-    public Map<String, Object> check(@RequestBody(required = false) Map<String, Object> body) {
-        String changedSince = requiredDateTime(body, "changed_since");
-        List<String> ids = repo.changedVisitIds(changedSince);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("has_changes", !ids.isEmpty());
-        out.put("visit_ids", ids);
-        return out;
-    }
-
     // ---- R2 ----------------------------------------------------------------
 
     @PostMapping("/api/v1/cases/sync")
@@ -121,7 +118,8 @@ public class CaseSyncApiController {
                     + "hospital does not know come back in `not_found`; the known ones are "
                     + "still served, which is not an error for the whole request.")
     @ApiResponse(responseCode = "200", description = "cases[] + not_found[]")
-    @ApiResponse(responseCode = "400", description = "invalid_request — visit_ids missing or not a list")
+    @ApiResponse(responseCode = "400", description = "invalid_request — visit_ids missing, empty, "
+            + "or holding something other than non-blank strings")
     @ApiResponse(responseCode = "422", description = "too_many_visit_ids — more than the batch cap")
     public Map<String, Object> sync(@RequestBody(required = false) Map<String, Object> body) {
         List<String> requested = requiredIdList(body);
@@ -154,21 +152,27 @@ public class CaseSyncApiController {
     @PostMapping("/api/v1/cases/sync-by-period")
     @Operation(summary = "R3 — sync cases by visit-date period",
             description = "Same response as R2, selected by a visit-date window instead of ids. "
-                    + "Both ends included. The visit date is admission_datetime when filled, "
-                    + "else the datetime encoded in the transaction number. Window length is "
-                    + "capped at " + MAX_PERIOD_DAYS + " days.")
+                    + "Both ends included; `from` must not be after `to`. Send an offset "
+                    + "(+07:00) — a bound without one is read as hospital local time. The visit "
+                    + "date is admission_datetime when filled, else the datetime encoded in the "
+                    + "transaction number. Window length is capped at " + MAX_PERIOD_DAYS
+                    + " days; the guide recommends one day per call.")
     @ApiResponse(responseCode = "200", description = "cases[] — same structure as R2")
-    @ApiResponse(responseCode = "400", description = "invalid_request — from/to missing or unparseable")
+    @ApiResponse(responseCode = "400", description = "invalid_request — from/to missing, "
+            + "unparseable, or from after to")
     @ApiResponse(responseCode = "422", description = "period_too_long — window longer than the cap")
     public Map<String, Object> syncByPeriod(@RequestBody(required = false) Map<String, Object> body) {
-        String from = requiredDateTime(body, "from");
-        String to = requiredDateTime(body, "to");
-        if (parse(from).plusDays(MAX_PERIOD_DAYS).isBefore(parse(to))) {
+        LocalDateTime from = requiredDateTime(body, "from");
+        LocalDateTime to = requiredDateTime(body, "to");
+        if (from.isAfter(to)) {
+            throw new ApiExceptionHandler.ImedBusinessException("from must not be after to");
+        }
+        if (from.plusDays(MAX_PERIOD_DAYS).isBefore(to)) {
             throw new ApiExceptionHandler.ImedUnprocessableException(
                     "period_too_long", "ช่วงวันที่ยาวเกินเพดานที่กำหนด");
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("cases", repo.cases(repo.visitIdsInPeriod(from, to)));
+        out.put("cases", repo.cases(repo.visitIdsInPeriod(from.format(LOCAL_ISO), to.format(LOCAL_ISO))));
         return out;
     }
 
@@ -199,16 +203,13 @@ public class CaseSyncApiController {
                     + "whether all of them are served right now. A missing field stops the sync "
                     + "cleanly before any data is touched, instead of half-importing a case.")
     @ApiResponse(responseCode = "200", description = "valid — plus `missing` when valid is false")
-    @ApiResponse(responseCode = "400", description = "invalid_request — required_fields missing or not a list")
+    @ApiResponse(responseCode = "400", description = "invalid_request — required_fields missing, "
+            + "empty, or holding something other than non-blank strings")
     public Map<String, Object> contractCheck(@RequestBody(required = false) Map<String, Object> body) {
-        Object raw = body == null ? null : body.get("required_fields");
-        if (!(raw instanceof List<?> list)) {
-            throw new ApiExceptionHandler.ImedBusinessException("required_fields must be an array of strings");
-        }
+        List<String> requested = requiredStringList(body, "required_fields");
         List<String> missing = new ArrayList<>();
-        for (Object o : list) {
-            String field = o == null ? null : o.toString();
-            if (field != null && !SUPPORTED_FIELDS.contains(field) && !missing.contains(field)) {
+        for (String field : requested) {
+            if (!SUPPORTED_FIELDS.contains(field) && !missing.contains(field)) {
                 missing.add(field);
             }
         }
@@ -223,11 +224,12 @@ public class CaseSyncApiController {
     // ---- request validation -------------------------------------------------
 
     /**
-     * A required ISO 8601 bound. A bare date is widened to the start of that
-     * day — the contract's own samples send both forms, and a caller asking for
-     * "2026-08-09" means the whole day, not midnight exactly.
+     * A required ISO 8601 bound, as hospital local time. A bare date is the
+     * start of that day; a bound with an offset is converted to Asia/Bangkok
+     * (so "2026-08-09T17:00:00Z" means 00:00 on the 10th); one without an
+     * offset is already local. Unparseable, or not a real date → 400.
      */
-    private static String requiredDateTime(Map<String, Object> body, String key) {
+    static LocalDateTime requiredDateTime(Map<String, Object> body, String key) {
         Object v = body == null ? null : body.get(key);
         String s = v == null ? null : v.toString().trim();
         if (s == null || s.isEmpty()) {
@@ -235,31 +237,52 @@ public class CaseSyncApiController {
         }
         if (!ISO_DT.matcher(s).matches()) {
             throw new ApiExceptionHandler.ImedBusinessException(
-                    key + " must be ISO 8601 (2026-08-10T14:30:00)");
+                    key + " must be ISO 8601 (2026-11-04T00:00:00+07:00)");
         }
-        return s.length() == 10 ? s + "T00:00:00" : s;
+        try {
+            return toHospitalLocal(s);
+        } catch (DateTimeParseException e) { // well-formed but not a real date (2026-02-30)
+            throw new ApiExceptionHandler.ImedBusinessException(key + " is not a real date-time");
+        }
     }
 
-    private static LocalDateTime parse(String iso) {
-        try {
-            return LocalDateTime.parse(iso.replace(' ', 'T'));
-        } catch (DateTimeParseException e) {
-            // ISO_DT already matched, so this is the seconds-less form
-            return LocalDateTime.parse(iso.replace(' ', 'T') + ":00");
+    private static LocalDateTime toHospitalLocal(String s) {
+        if (s.length() == 10) {
+            return LocalDate.parse(s).atStartOfDay();
         }
+        String t = s.replace(' ', 'T');
+        if (t.length() == 16) {
+            t = t + ":00"; // HH:mm → HH:mm:ss
+        } else if (t.length() > 16 && t.charAt(16) != ':') {
+            t = t.substring(0, 16) + ":00" + t.substring(16); // HH:mm+07:00 → HH:mm:00+07:00
+        }
+        if (t.endsWith("Z") || t.matches(".*T.*[+-]\\d{2}:?\\d{2}$")) {
+            // "+0700" is ISO 8601 too, but java.time wants the colon form
+            t = t.replaceFirst("([+-]\\d{2})(\\d{2})$", "$1:$2");
+            return OffsetDateTime.parse(t).atZoneSameInstant(HOSPITAL_ZONE).toLocalDateTime();
+        }
+        return LocalDateTime.parse(t);
     }
 
     private static List<String> requiredIdList(Map<String, Object> body) {
-        Object raw = body == null ? null : body.get("visit_ids");
-        if (!(raw instanceof List<?> list)) {
-            throw new ApiExceptionHandler.ImedBusinessException("visit_ids must be an array of strings");
+        return requiredStringList(body, "visit_ids");
+    }
+
+    /** A required, non-empty array of non-blank strings — the guide's rule for both lists. */
+    private static List<String> requiredStringList(Map<String, Object> body, String key) {
+        Object raw = body == null ? null : body.get(key);
+        if (!(raw instanceof List<?> list) || list.isEmpty()) {
+            throw new ApiExceptionHandler.ImedBusinessException(
+                    key + " must be a non-empty array of strings");
         }
-        List<String> ids = new ArrayList<>();
+        List<String> out = new ArrayList<>();
         for (Object o : list) {
-            if (o != null && !o.toString().isBlank()) {
-                ids.add(o.toString());
+            if (!(o instanceof String str) || str.isBlank()) {
+                throw new ApiExceptionHandler.ImedBusinessException(
+                        key + " must hold non-blank strings only");
             }
+            out.add(str);
         }
-        return ids;
+        return out;
     }
 }

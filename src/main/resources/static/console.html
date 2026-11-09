@@ -112,6 +112,15 @@
     min-width: 0;
   }
   .tokenbox label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .tokenbtn {
+    padding: 5px 10px;
+    font-size: 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
   .tokenbox input {
     width: min(260px, 30vw);
     padding: 5px 9px;
@@ -371,8 +380,10 @@
     <div class="baseurl mono" id="baseurl"></div>
     <div class="tokenbox">
       <label for="token">Bearer token</label>
-      <input id="token" type="text" placeholder="imed-mock-token" spellcheck="false"
+      <input id="token" type="text" placeholder="click Get token" spellcheck="false"
              autocomplete="off">
+      <button id="get-token" type="button" class="tokenbtn"
+              title="POST /auth/token with client credentials (tokens expire — click again)">Get token</button>
     </div>
   </header>
 
@@ -537,6 +548,33 @@ function applySample(o) {
 const tokenInput = document.getElementById('token');
 tokenInput.value = localStorage.getItem('imed-console-token') || '';
 tokenInput.addEventListener('input', () => localStorage.setItem('imed-console-token', tokenInput.value));
+
+/* Trade client credentials for a token, the way the hospital's guide does it:
+   POST /auth/token, Basic client_id:client_secret, grant_type=client_credentials.
+   The defaults are the mock's own (IMED_CLIENT_ID / IMED_CLIENT_SECRET unset). */
+document.getElementById('get-token').addEventListener('click', async () => {
+  const id = prompt('client_id', 'medcode-mock-client');
+  if (id === null) return;
+  const secret = prompt('client_secret', 'medcode-mock-secret');
+  if (secret === null) return;
+  try {
+    const res = await fetch('/auth/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + btoa(id + ':' + secret),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(res.status + ' ' + (body.message || ''));
+    tokenInput.value = body.access_token;
+    localStorage.setItem('imed-console-token', body.access_token);
+    tokenInput.title = 'expires in ' + body.expires_in + 's';
+  } catch (e) {
+    alert('Token request failed: ' + e.message);
+  }
+});
 
 document.getElementById('baseurl').textContent = location.origin;
 

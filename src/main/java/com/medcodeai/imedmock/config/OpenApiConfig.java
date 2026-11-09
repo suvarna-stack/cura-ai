@@ -11,31 +11,33 @@ import org.springframework.context.annotation.Configuration;
  *
  * The point of this app is to BE the integration spec, so the spec should be
  * generated from the running code rather than maintained by hand — the README
- * table can drift, /v3/api-docs.yaml cannot. Hand that YAML to the hospital's
- * integrators; it is the contract their production API must satisfy (for the
- * /api/v1 write surface it mirrors THEIR own PDF back at them exactly —
- * the invented coding-status extension was withdrawn 2026-08-02).
+ * table can drift, /v3/api-docs.yaml cannot. Since 2026-11-09 the spec it
+ * mirrors is the hospital's own "MedCode กับ Medihack API" guide (4 Nov 2026).
  */
 @Configuration
+@SecurityScheme(name = "basicAuth", type = SecuritySchemeType.HTTP, scheme = "basic",
+        description = "client_id:client_secret — only for POST /auth/token. Mock defaults: "
+                + "IMED_CLIENT_ID / IMED_CLIENT_SECRET (medcode-mock-client / medcode-mock-secret).")
 @SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer",
-        description = "Static mock token from IMED_API_TOKEN (default \"imed-mock-token\"). "
-                + "The real API's token issuance is the hospital's — TBD.")
-@OpenAPIDefinition(info = @Info(title = "iMed hospital API (mock)", version = "0.0.2", description = """
-        The HTTP surface between MedCode AI and the hospital, implemented as \
-        a live example over real sample extract data.
+        description = "The access_token from POST /auth/token. Expires after expires_in seconds "
+                + "(IMED_TOKEN_TTL_SECONDS, default 300).")
+@OpenAPIDefinition(info = @Info(title = "iMed hospital API (mock)", version = "0.0.3", description = """
+        The HTTP surface between MedCode AI and the hospital, mocked to the \
+        hospital's Medihack API guide for MedCode (4 Nov 2026).
 
-        READ endpoints serve case data one endpoint per extract table — \
-        rows verbatim: exact extract column names, all values as stored \
-        (TEXT; the extracts' datetime formats are non-uniform, so parsing \
-        is the consumer's job). Cancelled diagnosis/procedure rows are \
-        excluded. No auth on reads in this mock (production read auth TBD).
+        AUTH: POST /auth/token with Basic client credentials and \
+        grant_type=client_credentials returns a short-lived Bearer token; \
+        every /api/v1 route requires it.
 
-        WRITE endpoints under /api/v1 mock the hospital's REAL contract — \
-        "iMed Diagnosis and Medical Discharge API" (rev 1, 24 Jul 2026): \
-        POST creates ICD-10/ICD-9 rows + medical discharge in one \
-        transaction (ids generated and returned), PUT edits by object_id, \
-        DELETE cancels a single row via the cancel flow. Bearer auth, \
-        request_id dedup, {request_id, status, result} envelopes, \
-        409 DIAGNOSIS_CODE_ALREADY_EXIST."""))
+        READ: /cases/sync (by visit ids, at most 20), /cases/sync-by-period \
+        (at most 31 days), the ICD-10/ICD-9 catalogues and /contract/check. \
+        Date-times are ISO 8601 with the +07:00 offset; cancelled \
+        diagnosis/procedure rows never appear.
+
+        WRITE: POST /diagnosis, PUT /diagnosis/{visit_id}, DELETE one ICD-10 \
+        or ICD-9 row — validated to the guide's rules. Unlike the hospital's \
+        own mock (which answers mock: true and stores nothing), these writes \
+        are REAL: they persist and show up in the reads, so approve/reopen \
+        round trips can be tested end to end."""))
 public class OpenApiConfig {
 }

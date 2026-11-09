@@ -1,5 +1,7 @@
 package com.medcodeai.imedmock;
 
+import com.medcodeai.imedmock.config.TokenStore;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -9,6 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Base64;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,11 +42,18 @@ class ImedMockApiIntegrationTest {
     // C1-pneumonia-cxr from demo-data/generate_demo_cases.py (has diagnoses,
     // labs, vitals — the richest case in the curated 21-case demo dataset)
     private static final String KNOWN_TN = "87026072413210500101";
-    /** ApiV1AuthInterceptor's default when IMED_API_TOKEN is unset. */
-    private static final String AUTH = "Bearer imed-mock-token";
+    /** TokenStore's defaults when IMED_CLIENT_ID / IMED_CLIENT_SECRET are unset. */
+    private static final String BASIC = "Basic " + Base64.getEncoder().encodeToString(
+            "medcode-mock-client:medcode-mock-secret".getBytes(StandardCharsets.UTF_8));
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private TokenStore tokens;
+
+    /** "Bearer <token>" — fetched through POST /auth/token before every test, as a client would. */
+    private String auth;
 
     /** Only for parking the demo baseline around the snapshot/reset test. */
     @Autowired
@@ -49,8 +61,23 @@ class ImedMockApiIntegrationTest {
 
     private final JsonMapper json = new JsonMapper();
 
+    /** A fresh request_id in the guide's MCAI-<visit_id>-<UUID v4> form, for KNOWN_TN. */
     private static String rid() {
-        return "TEST-" + UUID.randomUUID();
+        return rid(KNOWN_TN);
+    }
+
+    private static String rid(String visitId) {
+        return "MCAI-" + visitId + "-" + UUID.randomUUID();
+    }
+
+    @BeforeEach
+    void fetchToken() throws Exception {
+        String body = mvc.perform(post("/auth/token").header("Authorization", BASIC)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("grant_type=client_credentials"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        auth = "Bearer " + json.readTree(body).get("access_token").asString();
     }
 
     // ---- extract reads ------------------------------------------------------
@@ -65,39 +92,23 @@ class ImedMockApiIntegrationTest {
     }
 
     @Test
-    void updateCheckSeesApiWrites() throws Exception {
-        assertEquals(0, changedSince("2100-01-01").size(), "nothing changed after the far future");
-
-        // a write through /api/v1 stamps the visit → it surfaces for a
-        // changed_since long after its own visit date (2026-07-24)
+    void lastChangedAtMovesWithApiWrites() throws Exception {
+        // a write through /api/v1 stamps the visit → last_changed_at jumps to
+        // today, long after its own visit date (2026-07-24). This replaced the
+        // R1 /cases/check test when the hospital parked that route.
         String today = java.time.LocalDate.now().toString();
-        JsonNode created = postDiagnosis(rid(), "Z01.8", "Other specified special examinations",
-                null, null);
+        JsonNode created = postDiagnosis(rid(), "Z01.8", "Other specified special examinations");
         String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         try {
-            assertTrue(contains(changedSince(today), KNOWN_TN),
-                    "a written visit must be reported as changed");
+            String stamp = patient(KNOWN_TN).get("last_changed_at").asString();
+            assertEquals(today, stamp.substring(0, 10), "a written visit reports the write time");
+            assertTrue(stamp.endsWith("+07:00"), "last_changed_at carries the offset: " + stamp);
         } finally {
             mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
-                    .header("Authorization", AUTH)).andExpect(status().isOk());
+                    .header("Authorization", auth)).andExpect(status().isOk());
         }
-        // a cancel is a change too — the visit still matches after cleanup
-        assertTrue(contains(changedSince(today), KNOWN_TN));
-    }
-
-    /** R1's visit_ids for a bound. */
-    private JsonNode changedSince(String bound) throws Exception {
-        return postV1Json("/api/v1/cases/check", "{\"changed_since\":\"" + bound + "\"}")
-                .get("visit_ids");
-    }
-
-    private static boolean contains(JsonNode ids, String tn) {
-        for (JsonNode id : ids) {
-            if (tn.equals(id.asString())) {
-                return true;
-            }
-        }
-        return false;
+        // a cancel is a change too
+        assertEquals(today, patient(KNOWN_TN).get("last_changed_at").asString().substring(0, 10));
     }
 
     // ---- demo baseline (mock-only tooling) ----------------------------------
@@ -123,8 +134,7 @@ class ImedMockApiIntegrationTest {
             int diagsBefore = caseObject(KNOWN_TN).get("diagnoses").size();
 
             // a write-back lands...
-            postDiagnosis(rid(), "Z00.0", "General medical examination", "89.7",
-                    "General physical examination");
+            postDiagnosis(rid(), "Z00.0", "General medical examination");
             assertEquals(diagsBefore + 1, caseObject(KNOWN_TN).get("diagnoses").size());
 
             // ...and reset restores the snapshotted hospital state
@@ -160,11 +170,60 @@ class ImedMockApiIntegrationTest {
     void apiV1RequiresBearerToken() throws Exception {
         mvc.perform(post("/api/v1/diagnosis").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("unauthorized"));
+                .andExpect(jsonPath("$.message").value("unauthorized"))
+                .andExpect(jsonPath("$.status").doesNotExist());
         mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN)
                 .header("Authorization", "Bearer wrong-token")
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
+        // the retired static token is just another wrong token now
+        mvc.perform(get("/api/v1/catalog/icd9").header("Authorization", "Bearer imed-mock-token"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenEndpointIssuesShortLivedBearerTokens() throws Exception {
+        mvc.perform(post("/auth/token").header("Authorization", BASIC)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("grant_type=client_credentials"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token_type").value("Bearer"))
+                .andExpect(jsonPath("$.expires_in").value(300))
+                .andExpect(jsonPath("$.access_token").isString())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("Cache-Control", "no-store"));
+        // the token fetched in @BeforeEach opens /api/v1
+        mvc.perform(get("/api/v1/catalog/icd9").header("Authorization", auth))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void tokenEndpointRefusesBadCredentialsAndGrants() throws Exception {
+        String wrongSecret = "Basic " + Base64.getEncoder().encodeToString(
+                "medcode-mock-client:nope".getBytes(StandardCharsets.UTF_8));
+        mvc.perform(post("/auth/token").header("Authorization", wrongSecret)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("grant_type=client_credentials"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("unauthorized"));
+        // credentials only count in the Basic header, never in the body
+        mvc.perform(post("/auth/token").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("grant_type=client_credentials&client_id=medcode-mock-client"
+                                + "&client_secret=medcode-mock-secret"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/auth/token").header("Authorization", BASIC)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("grant_type=password"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+    }
+
+    @Test
+    void expiredTokenIsRefused() throws Exception {
+        String expired = tokens.issue(Duration.ofSeconds(-1));
+        mvc.perform(get("/api/v1/catalog/icd10").header("Authorization", "Bearer " + expired))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("unauthorized"));
     }
 
     // ---- /api/v1/diagnosis validation ---------------------------------------
@@ -172,19 +231,20 @@ class ImedMockApiIntegrationTest {
     @Test
     void postRejectsUnknownVisitAndBadShapes() throws Exception {
         // unknown visit
-        mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
+        mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"request_id":"%s","object_id":"no-such-visit","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1","doctor_discharge_ipd":{
-                           "fix_ipd_discharge_status_id":"S1","fix_ipd_discharge_type_id":"T1"}}"""
-                        .formatted(rid())))
+                         "doctor_discharge":"1","diagnosis_icd10":[],"diagnosis_icd9":[],
+                         "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"S1",
+                           "fix_ipd_discharge_type_id":"T1","is_from":"MED_DC"}}"""
+                        .formatted(rid("no-such-visit"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("invalid_request"));
 
         // POST rows must not carry object_id
-        mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
+        mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
@@ -197,7 +257,7 @@ class ImedMockApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         // discharge object matching the visit type is required
-        mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
+        mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
@@ -214,137 +274,237 @@ class ImedMockApiIntegrationTest {
         // the doctor's clinical discharge outcome — no /api/v1 write may touch it
         String dischargeBefore = String.valueOf(patient(KNOWN_TN).get("discharge_status"));
 
-        // POST: one diagnosis + one procedure + IPD discharge, ids generated
-        JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "93.90", "CPAP therapy",
-                "approved");
+        // POST one diagnosis (one kind per POST, per the guide), ids generated
+        JsonNode created = postDiagnosis(rid(), "U07.1", "COVID-19", "approved");
         assertEquals("STATUS_SUCCESS", created.get("status").asString());
         String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
-        String pxId = created.get("result").get("diagnosis_icd9").get(0).get("object_id").asString();
         String dcId = created.get("result").get("doctor_discharge_ipd").get("object_id").asString();
-        assertTrue(dxId.startsWith("DX10-") && pxId.startsWith("DX9-") && dcId.startsWith("DCI-"));
+        assertTrue(dxId.startsWith("DX10-") && dcId.startsWith("DCI-"));
+        assertEquals(0, created.get("result").get("diagnosis_icd9").size(), "the other kind is []");
+        assertTrue(created.get("mock") == null, "this mock's writes are real — never mock: true");
+
+        // …and one procedure, with an operation window
+        JsonNode proc = postProcedure(rid(), "93.90", "CPAP therapy", "2026-07-24", "08:00:00");
+        String pxId = proc.get("result").get("diagnosis_icd9").get(0).get("object_id").asString();
+        assertTrue(pxId.startsWith("DX9-"));
 
         // …the coding status the POST carried marks the visit's own extract row
         assertEquals("approved", patient(KNOWN_TN).get("coding_status").asString());
         assertEquals("approved", created.get("result").get("coding_status").asString());
-        // …and the doctor's discharge column is untouched (it lives in
-        // doctor_discharge_ipd now, not on the patient row)
+        // …and the doctor's discharge column is untouched
         assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("discharge_status")));
 
-        // created rows are visible through the extract reads
+        // created rows are visible through the reads
         assertEquals(diagsBefore + 1, caseObject(KNOWN_TN).get("diagnoses").size());
         assertEquals(procsBefore + 1, caseObject(KNOWN_TN).get("procedures").size());
         JsonNode row = findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), dxId);
-        assertNotNull(row, "created diagnosis is served by the contract read");
+        assertNotNull(row, "created diagnosis is served by the read");
         assertEquals("U07.1", row.get("icd10_code").asString());
         assertEquals("PRIMARY_DIAGNOSIS", row.get("diagnosis_type").asString());
+        assertEquals("2026-07-24T08:00:00+07:00", findByObjectId(
+                caseObject(KNOWN_TN).get("procedures"), pxId).get("operation_start").asString());
 
-        // PUT: edit the diagnosis by its object_id (code + type change)
-        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+        // PUT: edit the diagnosis by its object_id (code + type change); only
+        // the array sent comes back in the result
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1",
-                         "diagnosis_icd10":[{"object_id":"%s","icd10_code":"U07.2",
-                           "fix_diagnosis_type_id":"COMORBIDITY"}]}"""
-                        .formatted(rid(), KNOWN_TN, dxId)))
+                .content(putBody(rid(), """
+                        "diagnosis_icd10":[{"object_id":"%s","icd10_code":"U07.2",
+                          "fix_diagnosis_type_id":"COMORBIDITY"}]""".formatted(dxId))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("STATUS_SUCCESS"))
-                .andExpect(jsonPath("$.result.diagnosis_icd10[0].object_id").value(dxId));
+                .andExpect(jsonPath("$.result.diagnosis_icd10[0].object_id").value(dxId))
+                .andExpect(jsonPath("$.result.diagnosis_icd10[0].icd10_code").value("U07.2"))
+                .andExpect(jsonPath("$.result.diagnosis_icd9").doesNotExist());
         row = findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), dxId);
         assertEquals("U07.2", row.get("icd10_code").asString());
         assertEquals("COMORBIDITY", row.get("diagnosis_type").asString());
 
-        // PUT of the discharge object edits the discharge row only — the visit
-        // row's clinical column still isn't ours to write
-        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+        // PUT a time WITHOUT its date: lands on the stored date (the guide allows it)
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1",
-                         "doctor_discharge_ipd":{"object_id":"%s",
-                           "fix_ipd_discharge_status_id":"IPD_STATUS_2"}}"""
-                        .formatted(rid(), KNOWN_TN, dcId)))
-                .andExpect(status().isOk());
-        assertEquals(dischargeBefore, String.valueOf(patient(KNOWN_TN).get("discharge_status")));
+                .content(putBody(rid(), """
+                        "diagnosis_icd9":[{"object_id":"%s","time_in":"08:30:00"}]""".formatted(pxId))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.diagnosis_icd9[0].object_id").value(pxId))
+                .andExpect(jsonPath("$.result.diagnosis_icd9[0].icd9_code").doesNotExist());
+        assertEquals("2026-07-24T08:30:00+07:00", findByObjectId(
+                caseObject(KNOWN_TN).get("procedures"), pxId).get("operation_start").asString());
 
-        // a body carrying nothing but coding_status clears the mark (reopen)
-        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
+        // a body carrying nothing but coding_status clears the mark (reopen),
+        // and echoes "open" with no arrays
+        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1","coding_status":"open"}"""
-                        .formatted(rid(), KNOWN_TN)))
-                .andExpect(status().isOk());
+                .content(putBody(rid(), "\"coding_status\":\"open\"")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.coding_status").value("open"))
+                .andExpect(jsonPath("$.result.diagnosis_icd10").doesNotExist());
         assertTrue(patient(KNOWN_TN).get("coding_status").isNull(), "reopen clears coding_status");
-
-        // an unknown word is a business error, not a silently stored string
-        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1","coding_status":"halfway"}"""
-                        .formatted(rid(), KNOWN_TN)))
-                .andExpect(status().isBadRequest());
-
-        // PUT with a row missing object_id is rejected (mock-only strictness)
-        mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", AUTH)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                         "doctor_discharge":"1",
-                         "diagnosis_icd10":[{"icd10_code":"A00"}]}""".formatted(rid(), KNOWN_TN)))
-                .andExpect(status().isBadRequest());
 
         // DELETE: cancel both rows — flagged, not deleted, gone from reads
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
-                .header("Authorization", AUTH))
+                .header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.cancelled").value(true))
-                .andExpect(jsonPath("$.result.object_id").value(dxId));
+                .andExpect(jsonPath("$.result.object_id").value(dxId))
+                .andExpect(jsonPath("$.request_id").doesNotExist());
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd9/{id}", KNOWN_TN, pxId)
-                .header("Authorization", AUTH))
+                .header("Authorization", auth))
                 .andExpect(status().isOk());
         assertEquals(diagsBefore, caseObject(KNOWN_TN).get("diagnoses").size());
         assertEquals(procsBefore, caseObject(KNOWN_TN).get("procedures").size());
 
         // cancel is idempotent
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
-                .header("Authorization", AUTH))
+                .header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.cancelled").value(true));
     }
 
+    /** The guide's 400 rules for POST — each one refused on its own. */
+    @Test
+    void postEnforcesTheGuidesRules() throws Exception {
+        String goodRow = """
+                {"icd10_code":"A09","icd10_description":"Diarrhoea","beginning_diagnosis":"Diarrhoea",
+                 "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS","fix_dx_source":"MED_DC",
+                 "coder_eid":"coder@example.org"}""";
+        String goodProc = """
+                {"icd9_code":"89.7","fix_operation_type_id":"GENERAL_OPERATION","is_from":"MED_DC"}""";
+        // a field outside the guide's set (the PDF's doctor_eid)
+        expect400(postBody(rid(), "[" + goodRow.replace("\"coder_eid\"",
+                "\"doctor_eid\":\"EMP1\",\"coder_eid\"") + "]", "[]"), "doctor_eid");
+        // both kinds in one POST
+        expect400(postBody(rid(), "[" + goodRow + "]", "[" + goodProc + "]"), "exactly one");
+        // neither kind
+        expect400(postBody(rid(), "[]", "[]"), "exactly one");
+        // the other array omitted instead of []
+        expect400(postBody(rid(), "[" + goodRow + "]", null), "both required");
+        // fix_dx_source must be MED_DC, coder_eid required
+        expect400(postBody(rid(), "[" + goodRow.replace("\"MED_DC\"", "\"OPD\"") + "]", "[]"),
+                "fix_dx_source");
+        expect400(postBody(rid(), """
+                [{"icd10_code":"A09","fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS",
+                  "fix_dx_source":"MED_DC"}]""", "[]"), "coder_eid");
+        // description pair must match
+        expect400(postBody(rid(), "[" + goodRow.replace("\"beginning_diagnosis\":\"Diarrhoea\"",
+                "\"beginning_diagnosis\":\"Gastroenteritis\"") + "]", "[]"), "same text");
+        // an empty string is not an omission
+        expect400(postBody(rid(), "[" + goodRow.replace("\"icd10_description\":\"Diarrhoea\"",
+                "\"icd10_description\":\"\"") + "]", "[]"), "non-blank");
+        // ICD-9: operation type from the guide's four, a time needs its date, real dates only
+        expect400(postBody(rid(), "[]", "[" + goodProc.replace("GENERAL_OPERATION", "SURGERY") + "]"),
+                "fix_operation_type_id");
+        expect400(postBody(rid(), "[]", "[" + goodProc.replace("}", ",\"time_in\":\"08:00:00\"}") + "]"),
+                "time_in needs date_in");
+        expect400(postBody(rid(), "[]", "[" + goodProc.replace("}", ",\"date_in\":\"2026-02-30\"}") + "]"),
+                "real YYYY-MM-DD");
+        // request_id must be MCAI-<this visit>-<UUID v4>
+        expect400(postBody("TEST-" + UUID.randomUUID(), "[" + goodRow + "]", "[]"), "request_id");
+        expect400(postBody(rid("87000000000000000000"), "[" + goodRow + "]", "[]"), "request_id");
+        // broken JSON is a 400 in the guide's envelope too
+        mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"request_id\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+    }
+
+    /** The guide's 400 rules for PUT. */
+    @Test
+    void putEnforcesTheGuidesRules() throws Exception {
+        // the other kind sent as [] (that's POST's convention, not PUT's)
+        expect400Put(putBody(rid(), "\"diagnosis_icd10\":[]"), "at least one row");
+        // a row with nothing to change
+        expect400Put(putBody(rid(), "\"diagnosis_icd10\":[{\"object_id\":\"DX10-X\"}]"),
+                "nothing to change");
+        // envelope only — no rows and no status
+        expect400Put(putBody(rid(), null), "nothing to update");
+        // the create-only operation type
+        expect400Put(putBody(rid(), """
+                "diagnosis_icd9":[{"object_id":"DX9-X","fix_operation_type_id":"OTH"}]"""),
+                "not accepted");
+        // discharge objects belong to POST
+        expect400Put(putBody(rid(), """
+                "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"S2"}"""), "discharge");
+        // an unknown coding status word
+        expect400Put(putBody(rid(), "\"coding_status\":\"halfway\""), "coding_status");
+        // a row missing object_id
+        expect400Put(putBody(rid(), "\"diagnosis_icd10\":[{\"icd10_code\":\"A00\"}]"),
+                "object_id");
+    }
+
+    private void expect400(String body, String detailContains) throws Exception {
+        String resp = mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("invalid_request"))
+                .andReturn().getResponse().getContentAsString();
+        if (detailContains != null) {
+            String detail = json.readTree(resp).get("detail").asString();
+            assertTrue(detail.contains(detailContains), "expected '" + detailContains + "' in: " + detail);
+        }
+    }
+
+    private void expect400Put(String body, String detailContains) throws Exception {
+        String resp = mvc.perform(put("/api/v1/diagnosis/{v}", KNOWN_TN).header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"))
+                .andReturn().getResponse().getContentAsString();
+        String detail = json.readTree(resp).get("detail").asString();
+        assertTrue(detail.contains(detailContains), "expected '" + detailContains + "' in: " + detail);
+    }
+
+    /** An IPD POST envelope for KNOWN_TN; a null icd9 array leaves the key out. */
+    private static String postBody(String requestId, String icd10Rows, String icd9Rows) {
+        return """
+                {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                 "doctor_discharge":"1","diagnosis_icd10":%s,%s
+                 "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
+                   "fix_ipd_discharge_type_id":"IPD_TYPE_1","is_from":"MED_DC"}}"""
+                .formatted(requestId, KNOWN_TN, icd10Rows,
+                        icd9Rows == null ? "" : "\"diagnosis_icd9\":" + icd9Rows + ",");
+    }
+
+    /** A PUT envelope for KNOWN_TN plus the given JSON members (null = envelope only). */
+    private static String putBody(String requestId, String members) {
+        return """
+                {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                 "doctor_discharge":"1"%s}"""
+                .formatted(requestId, KNOWN_TN, members == null ? "" : "," + members);
+    }
+
     @Test
     void duplicateIcd10CodeIs409() throws Exception {
-        JsonNode created = postDiagnosis(rid(), "J96.0", "Acute respiratory failure", null, null);
+        JsonNode created = postDiagnosis(rid(), "J96.0", "Acute respiratory failure");
         String dxId = created.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         try {
-            mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
+            mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(icd10Body(rid(), "J96.0", "dup")))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value("DIAGNOSIS_CODE_ALREADY_EXIST"));
         } finally { // cancel so re-runs and other tests see a clean read state
             mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
-                    .header("Authorization", AUTH)).andExpect(status().isOk());
+                    .header("Authorization", auth)).andExpect(status().isOk());
         }
     }
 
     @Test
     void replayedRequestIdReturnsStoredResponseWithoutReExecuting() throws Exception {
         String requestId = rid();
-        JsonNode first = postDiagnosis(requestId, "B34.9", "Viral infection", null, null);
+        JsonNode first = postDiagnosis(requestId, "B34.9", "Viral infection");
         String dxId = first.get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
         try {
             int after = caseObject(KNOWN_TN).get("diagnoses").size();
             // same request_id replayed: same body back, nothing inserted twice
-            JsonNode second = postDiagnosis(requestId, "B34.9", "Viral infection", null, null);
+            JsonNode second = postDiagnosis(requestId, "B34.9", "Viral infection");
             assertEquals(first, second, "replay must return the stored response verbatim");
             assertEquals(after, caseObject(KNOWN_TN).get("diagnoses").size(),
                     "replay must not re-execute the insert");
         } finally {
             mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, dxId)
-                    .header("Authorization", AUTH)).andExpect(status().isOk());
+                    .header("Authorization", auth)).andExpect(status().isOk());
         }
     }
 
@@ -356,7 +516,7 @@ class ImedMockApiIntegrationTest {
         JsonNode doc = getJson("/v3/api-docs");
         JsonNode paths = doc.get("paths");
         for (String p : new String[]{
-                "/api/v1/cases/check", "/api/v1/cases/sync", "/api/v1/cases/sync-by-period",
+                "/auth/token", "/api/v1/cases/sync", "/api/v1/cases/sync-by-period",
                 "/api/v1/catalog/icd10", "/api/v1/catalog/icd9", "/api/v1/contract/check",
                 "/api/demo/snapshot", "/api/demo/reset",
                 "/api/v1/diagnosis", "/api/v1/diagnosis/{visit_id}",
@@ -371,6 +531,8 @@ class ImedMockApiIntegrationTest {
                 "/api/icd10-codes", "/api/icd9-codes"}) {
             assertTrue(paths.get(gone) == null, "removed legacy read endpoint is still published: " + gone);
         }
+        assertTrue(paths.get("/api/v1/cases/check") == null,
+                "the parked update-check route must not be published");
         assertTrue(paths.get("/api/cases/{tn}/coding-result") == null,
                 "superseded coding-result endpoint must not be published");
         assertTrue(paths.get("/api/v1/coding-status/{visit_id}") == null,
@@ -412,69 +574,68 @@ class ImedMockApiIntegrationTest {
 
     // ---- helpers ------------------------------------------------------------
 
-    /** POST one ICD-10 (+ optional ICD-9) with IPD discharge; returns the envelope. */
-    private JsonNode postDiagnosis(String requestId, String icd10, String dxName,
-            String icd9, String opName) throws Exception {
-        return postDiagnosis(requestId, icd10, dxName, icd9, opName, null);
+    /** POST one ICD-10 row with IPD discharge; returns the envelope. */
+    private JsonNode postDiagnosis(String requestId, String icd10, String dxName) throws Exception {
+        return postDiagnosis(requestId, icd10, dxName, null);
     }
 
     /**
-     * …optionally carrying the coding_status extension. Tests that don't assert
-     * on it pass null DELIBERATELY: this suite writes to the live demo `imed`
-     * database, and a marked visit reads as an approved case in the hospital DB
-     * that medcode knows nothing about. Only the round-trip test sets it, and
-     * that test clears it again before finishing.
+     * …optionally carrying coding_status. Tests that don't assert on it pass
+     * null DELIBERATELY: this suite writes to the live demo `imed` database,
+     * and a marked visit reads as an approved case in the hospital DB that
+     * medcode knows nothing about. Only the round-trip test sets it, and that
+     * test clears it again before finishing.
      */
     private JsonNode postDiagnosis(String requestId, String icd10, String dxName,
-            String icd9, String opName, String codingStatus) throws Exception {
+            String codingStatus) throws Exception {
         String statusPart = codingStatus == null
                 ? ""
                 : "\"coding_status\":\"%s\",".formatted(codingStatus);
-        String icd9Part = icd9 == null
-                ? "[]"
-                : """
-                        [{"icd9_code":"%s","beginning_operation":"%s",
-                          "fix_operation_type_id":"GENERAL_OPERATION","is_from":"MED_DC"}]"""
-                        .formatted(icd9, opName);
         String body = """
                 {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
                  "doctor_discharge":"1",%s
-                 "diagnosis_icd10":[{"icd10_code":"%s","beginning_diagnosis":"%s",
-                   "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS","fix_dx_source":"MED_DC",
-                   "coder_eid":"web.coder"}],
-                 "diagnosis_icd9":%s,
+                 "diagnosis_icd10":[{"icd10_code":"%s","icd10_description":"%s",
+                   "beginning_diagnosis":"%s","fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS",
+                   "fix_dx_source":"MED_DC","coder_eid":"web.coder"}],
+                 "diagnosis_icd9":[],
                  "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
                    "fix_ipd_discharge_type_id":"IPD_TYPE_1","is_from":"MED_DC"}}"""
-                .formatted(requestId, KNOWN_TN, statusPart, icd10, dxName, icd9Part);
-        String resp = mvc.perform(post("/api/v1/diagnosis").header("Authorization", AUTH)
+                .formatted(requestId, KNOWN_TN, statusPart, icd10, dxName, dxName);
+        return postOk(body);
+    }
+
+    /** POST one ICD-9 row (with a start date/time) and IPD discharge. */
+    private JsonNode postProcedure(String requestId, String icd9, String opName, String dateIn,
+            String timeIn) throws Exception {
+        String body = """
+                {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
+                 "doctor_discharge":"1","diagnosis_icd10":[],
+                 "diagnosis_icd9":[{"icd9_code":"%s","icd9_description":"%s",
+                   "beginning_operation":"%s","fix_operation_type_id":"GENERAL_OPERATION",
+                   "is_from":"MED_DC","date_in":"%s","time_in":"%s"}],
+                 "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
+                   "fix_ipd_discharge_type_id":"IPD_TYPE_1","is_from":"MED_DC"}}"""
+                .formatted(requestId, KNOWN_TN, icd9, opName, opName, dateIn, timeIn);
+        return postOk(body);
+    }
+
+    private JsonNode postOk(String body) throws Exception {
+        String resp = mvc.perform(post("/api/v1/diagnosis").header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(resp);
     }
 
-    // ---- contract reads (R1-R6) ---------------------------------------------
+    // ---- contract reads (R2-R6) ---------------------------------------------
 
     @Test
-    void updateCheckReportsChangedVisits() throws Exception {
-        JsonNode all = postV1Json("/api/v1/cases/check", "{\"changed_since\":\"2000-01-01T00:00:00\"}");
-        assertTrue(all.get("has_changes").asBoolean(), "every seeded visit changed after 2000");
-        assertTrue(all.get("visit_ids").size() > 0);
-
-        JsonNode none = postV1Json("/api/v1/cases/check", "{\"changed_since\":\"2999-01-01T00:00:00\"}");
-        assertEquals(false, none.get("has_changes").asBoolean());
-        assertEquals(0, none.get("visit_ids").size(), "empty array, not a missing key");
-
-        // a bare date is widened to the start of that day rather than rejected
-        mvc.perform(post("/api/v1/cases/check").header("Authorization", AUTH)
+    void updateCheckRouteIsGone() throws Exception {
+        // the hospital parked POST /cases/check; clients re-read saved ids via /cases/sync
+        mvc.perform(post("/api/v1/cases/check").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"changed_since\":\"2000-01-01\"}"))
-                .andExpect(status().isOk());
-        mvc.perform(post("/api/v1/cases/check").header("Authorization", AUTH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"changed_since\":\"yesterday\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+                        .content("{\"changed_since\":\"2000-01-01T00:00:00\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -499,9 +660,15 @@ class ImedMockApiIntegrationTest {
                 "the two requested additions are served (null is fine, absent is not)");
         assertEquals(10, visit.get("birth_date").asString().length(), "birth_date is a plain date");
 
-        // ISO 8601 on the wire; the extract stores "YYYY-MM-DD HH:MM:SS"
+        // ISO 8601 with the hospital's offset on the wire, as the guide serves it;
+        // the extract stores "YYYY-MM-DD HH:MM:SS" (local, zoneless)
         String recordedAt = c.get("documents").get(0).get("recorded_at").asString();
         assertEquals('T', recordedAt.charAt(10), "date-times are ISO 8601: " + recordedAt);
+        assertTrue(recordedAt.endsWith("+07:00"), "date-times carry +07:00: " + recordedAt);
+        assertTrue(visit.get("last_changed_at").asString().endsWith("+07:00"));
+        // sex is the guide's one-letter code; the extract says female/male
+        String sex = visit.get("sex").asString();
+        assertTrue(sex.equals("F") || sex.equals("M"), "sex is F or M, got " + sex);
         assertTrue(c.get("lab_results").get(0).has("panel_name"), "lab rows keep the panel fields");
     }
 
@@ -511,11 +678,19 @@ class ImedMockApiIntegrationTest {
         for (int i = 0; i <= 20; i++) { // one over the cap
             ids.append(i == 0 ? "" : ",").append("\"V").append(i).append("\"");
         }
-        mvc.perform(post("/api/v1/cases/sync").header("Authorization", AUTH)
+        mvc.perform(post("/api/v1/cases/sync").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"visit_ids\":[" + ids + "]}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.message").value("too_many_visit_ids"));
+        // at least one id, and every id a non-blank string
+        for (String bad : new String[]{"[]", "[\"\"]", "[1]"}) {
+            mvc.perform(post("/api/v1/cases/sync").header("Authorization", auth)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"visit_ids\":" + bad + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+        }
     }
 
     @Test
@@ -530,7 +705,23 @@ class ImedMockApiIntegrationTest {
         // R3 answers with cases only — not_found belongs to the id-based R2
         assertTrue(day.get("not_found") == null);
 
-        mvc.perform(post("/api/v1/cases/sync-by-period").header("Authorization", AUTH)
+        // the same day, asked with offsets: +07:00 explicitly, and in UTC
+        JsonNode bkk = postV1Json("/api/v1/cases/sync-by-period",
+                "{\"from\":\"2026-07-24T00:00:00+07:00\",\"to\":\"2026-07-24T23:59:59+07:00\"}");
+        JsonNode utc = postV1Json("/api/v1/cases/sync-by-period",
+                "{\"from\":\"2026-07-23T17:00:00Z\",\"to\":\"2026-07-24T16:59:59Z\"}");
+        assertEquals(day.get("cases").size(), bkk.get("cases").size());
+        assertEquals(day.get("cases").size(), utc.get("cases").size(),
+                "a UTC bound is converted to hospital time before filtering");
+
+        // a window that runs backwards is a 400, not an empty answer
+        mvc.perform(post("/api/v1/cases/sync-by-period").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from\":\"2026-07-25T00:00:00+07:00\",\"to\":\"2026-07-24T00:00:00+07:00\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("STATUS_BUSINESS_ERROR"));
+
+        mvc.perform(post("/api/v1/cases/sync-by-period").header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"from\":\"2026-07-01T00:00:00\",\"to\":\"2026-08-02T00:00:01\"}"))
                 .andExpect(status().isUnprocessableContent())
@@ -550,24 +741,28 @@ class ImedMockApiIntegrationTest {
                 "{\"required_fields\":[\"visit.visit_id\",\"lab_results.reference_range\"]}");
         assertEquals(false, gap.get("valid").asBoolean());
         assertEquals("lab_results.reference_range", gap.get("missing").get(0).asString());
+
+        // required_fields: a non-empty array of non-blank strings
+        mvc.perform(post("/api/v1/contract/check").header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"required_fields\":[]}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void contractCatalogsCarryTheEditionKey() throws Exception {
+    void catalogRowsAreCodeAndDescriptionOnly() throws Exception {
         JsonNode ten = getV1Json("/api/v1/catalog/icd10");
         JsonNode nine = getV1Json("/api/v1/catalog/icd9");
-        assertTrue(ten.size() > 0 && nine.size() > 0);
-        for (String field : new String[]{"code", "description", "edition"}) {
-            assertTrue(ten.get(0).has(field), "R4 row is missing " + field);
+        assertTrue(ten.size() > 0 && nine.size() > 0, "a bare array, no data/cases wrapper");
+        for (JsonNode row : new JsonNode[]{ten.get(0), nine.get(0)}) {
+            assertTrue(row.has("code") && row.has("description"));
+            assertEquals(2, row.size(), "the guide serves no edition key: " + row);
         }
-        assertTrue(ten.get(0).get("edition").isNull(),
-                "edition is null until the hospital's catalogue carries one");
     }
 
     @Test
     void contractReadsRequireBearerToken() throws Exception {
-        mvc.perform(post("/api/v1/cases/check").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"changed_since\":\"2000-01-01\"}"))
+        mvc.perform(post("/api/v1/cases/sync").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"visit_ids\":[\"" + KNOWN_TN + "\"]}"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/catalog/icd10")).andExpect(status().isUnauthorized());
     }
@@ -575,28 +770,24 @@ class ImedMockApiIntegrationTest {
     @Test
     void cancelledCodeRowsNeverComeBackThroughTheContractRead() throws Exception {
         String rid = rid();
-        String created = postDiagnosis(rid, "J18.9", "Pneumonia probe", null, null)
+        String created = postDiagnosis(rid, "J18.9", "Pneumonia probe")
                 .get("result").get("diagnosis_icd10").get(0).get("object_id").asString();
 
         assertNotNull(findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), created),
                 "a created row is visible to R2");
 
         mvc.perform(delete("/api/v1/diagnosis/{v}/icd10/{id}", KNOWN_TN, created)
-                .header("Authorization", AUTH)).andExpect(status().isOk());
+                .header("Authorization", auth)).andExpect(status().isOk());
 
         assertTrue(findByObjectId(caseObject(KNOWN_TN).get("diagnoses"), created) == null,
                 "a cancelled row must never reappear — it would resurrect a code the coder removed");
     }
 
     private String icd10Body(String requestId, String icd10, String dxName) {
-        return """
-                {"request_id":"%s","object_id":"%s","fix_visit_type_id":"IPD",
-                 "doctor_discharge":"1",
-                 "diagnosis_icd10":[{"icd10_code":"%s","beginning_diagnosis":"%s",
-                   "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS"}],
-                 "doctor_discharge_ipd":{"fix_ipd_discharge_status_id":"IPD_STATUS_1",
-                   "fix_ipd_discharge_type_id":"IPD_TYPE_1"}}"""
-                .formatted(requestId, KNOWN_TN, icd10, dxName);
+        return postBody(requestId, """
+                [{"icd10_code":"%s","icd10_description":"%s","beginning_diagnosis":"%s",
+                  "fix_diagnosis_type_id":"PRIMARY_DIAGNOSIS","fix_dx_source":"MED_DC",
+                  "coder_eid":"web.coder"}]""".formatted(icd10, dxName, dxName), "[]");
     }
 
     /** The visit block of the contract read, for the write tests' assertions. */
@@ -620,14 +811,14 @@ class ImedMockApiIntegrationTest {
     }
 
     private JsonNode postV1Json(String url, String body) throws Exception {
-        return json.readTree(mvc.perform(post(url).header("Authorization", AUTH)
+        return json.readTree(mvc.perform(post(url).header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
     }
 
     private JsonNode getV1Json(String url) throws Exception {
-        return json.readTree(mvc.perform(get(url).header("Authorization", AUTH))
+        return json.readTree(mvc.perform(get(url).header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
     }

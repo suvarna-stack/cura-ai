@@ -14,10 +14,10 @@ import java.util.List;
  * real hospital works, where the extract is a projection of the tables this
  * API writes.
  *
- * Fields the API accepts but the extract does not carry (doctor_eid,
- * comments, dates, …) are not stored in the code tables — the full request
- * JSON lands in imed_request_log, so nothing is lost and the extract shape
- * stays what the hospital documented. Cancel = is_cancelled '1', never DELETE
+ * Fields the API accepts but the extract does not carry (coder_eid,
+ * fix_dx_source, is_from) are not stored in the code tables — the response
+ * lands in imed_request_log under its request_id, and the extract shape stays
+ * what the hospital documented. Cancel = is_cancelled '1', never DELETE
  * (the real iMed cancel flow keeps the row for the audit trail).
  */
 @Repository
@@ -111,6 +111,20 @@ public class ImedApiV1Repository {
                 name, icd, startdatetime, enddatetime, operationtype, now(), tn, objectId);
     }
 
+    /**
+     * A live procedure row's stored start/end ("YYYY-MM-DD HH:MM:SS", or a bare
+     * date, or null), or null when the row is unknown or cancelled. A PUT may
+     * send time_in/time_out without the date (the guide allows it), so the
+     * controller rebuilds the full value on the stored date.
+     */
+    public String[] procedureWindow(String tn, String objectId) {
+        List<String[]> r = jdbc.query("""
+                SELECT startdatetime, enddatetime FROM imed.medhack_procedure_icd9
+                WHERE transactionnumber = ? AND id = ? AND is_cancelled IS DISTINCT FROM '1'""",
+                (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, tn, objectId);
+        return r.isEmpty() ? null : r.get(0);
+    }
+
     public int cancelIcd9(String tn, String objectId) {
         return jdbc.update("""
                 UPDATE imed.medhack_procedure_icd9 SET is_cancelled = '1', updated_at = ?
@@ -129,16 +143,6 @@ public class ImedApiV1Repository {
                 VALUES (?,?,?,?,?)""", objectId, tn, statusId, typeId, note);
     }
 
-    public int updateDischargeOpd(String tn, String objectId, String statusId, String typeId, String note) {
-        return jdbc.update("""
-                UPDATE imed.doctor_discharge_opd
-                SET fix_opd_discharge_status_id = COALESCE(?, fix_opd_discharge_status_id),
-                    base_doctor_discharge_type_id = COALESCE(?, base_doctor_discharge_type_id),
-                    note = COALESCE(?, note)
-                WHERE transactionnumber = ? AND object_id = ?""",
-                statusId, typeId, note, tn, objectId);
-    }
-
     public void upsertDischargeIpd(String objectId, String tn, DiagnosisIpdFields f) {
         jdbc.update("DELETE FROM imed.doctor_discharge_ipd WHERE transactionnumber = ?", tn);
         jdbc.update("""
@@ -152,30 +156,6 @@ public class ImedApiV1Repository {
                 f.reasonAdmission(), f.physicalExamination(), f.diagnostic(), f.investigation(),
                 f.hospitalCourse(), f.treatment(), f.planOrAdvice(), f.dischargeInstruction(),
                 f.isFollowUp(), f.isFrom());
-    }
-
-    public int updateDischargeIpd(String tn, String objectId, DiagnosisIpdFields f) {
-        return jdbc.update("""
-                UPDATE imed.doctor_discharge_ipd
-                SET discharge_doctor_eid = COALESCE(?, discharge_doctor_eid),
-                    fix_ipd_discharge_status_id = COALESCE(?, fix_ipd_discharge_status_id),
-                    fix_ipd_discharge_type_id = COALESCE(?, fix_ipd_discharge_type_id),
-                    note = COALESCE(?, note),
-                    reason_admission = COALESCE(?, reason_admission),
-                    physical_examination = COALESCE(?, physical_examination),
-                    diagnostic = COALESCE(?, diagnostic),
-                    investigation = COALESCE(?, investigation),
-                    hospital_course = COALESCE(?, hospital_course),
-                    treatment = COALESCE(?, treatment),
-                    plan_or_advice = COALESCE(?, plan_or_advice),
-                    discharge_instruction = COALESCE(?, discharge_instruction),
-                    is_follow_up = COALESCE(?, is_follow_up),
-                    is_from = COALESCE(?, is_from)
-                WHERE transactionnumber = ? AND object_id = ?""",
-                f.dischargeDoctorEid(), f.statusId(), f.typeId(), f.note(), f.reasonAdmission(),
-                f.physicalExamination(), f.diagnostic(), f.investigation(), f.hospitalCourse(),
-                f.treatment(), f.planOrAdvice(), f.dischargeInstruction(), f.isFollowUp(), f.isFrom(),
-                tn, objectId);
     }
 
     // ---- coding status (medcode extension) ----------------------------------

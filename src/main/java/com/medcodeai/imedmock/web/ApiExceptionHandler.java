@@ -17,14 +17,14 @@ import java.util.stream.Collectors;
 /**
  * Two error conventions live side by side, deliberately:
  *
- * - The extract READ endpoints keep {"error": "..."} with 404/400 — same
+ * - The mock-only demo tooling (/api/demo/**) keeps {"error": "..."} — same
  *   shape as medcode-api, one convention across both services.
- * - The real-shaped /api/v1 write endpoints answer in the hospital's own
- *   envelope from the "iMed Diagnosis and Medical Discharge API" PDF:
- *   {"status": "STATUS_BUSINESS_ERROR", "message", "message_th"} for 400/409
- *   (401 is emitted by ApiV1AuthInterceptor with its slightly different
- *   no-status shape). The mock adds a "detail" key on 400s as a debugging
- *   aid — documented as mock-only, the real API sends none.
+ * - The guide's routes (/auth/token, /api/v1/**) answer in the hospital's own
+ *   envelope: {"status": "STATUS_BUSINESS_ERROR", "message", "message_th"}
+ *   for 400/409/422 (401 has the slightly different no-status shape, emitted
+ *   by ApiV1AuthInterceptor and AuthTokenController). The mock adds a
+ *   "detail" key on 400s as a debugging aid — mock-only, the real API sends
+ *   none.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -130,10 +130,14 @@ public class ApiExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, message.isEmpty() ? "invalid request body" : message);
     }
 
-    /** Unparseable JSON, or a value of the wrong shape (object where text is expected). */
+    /**
+     * Unparseable JSON, or a body of the wrong shape (an array where an object
+     * belongs). Every route that takes a body is a guide route now, so this
+     * answers in the guide's 400 envelope ("JSON เสีย" is listed as a 400).
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> unreadableBody() {
-        return body(HttpStatus.BAD_REQUEST, "malformed request body");
+        return imedBusinessError(new ImedBusinessException("malformed request body"));
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error) {
