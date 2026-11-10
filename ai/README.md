@@ -1,0 +1,203 @@
+# MedCode RAG
+
+A small, fully-local **Retrieval-Augmented Generation** API built with FastAPI.
+
+| Piece | Choice |
+|-------|--------|
+| Web framework | FastAPI + Uvicorn |
+| Embeddings | `BAAI/bge-m3` (multilingual, 1024-dim) via `sentence-transformers` |
+| Vector store | Chroma (persistent, on-disk) |
+| Generation | `Qwen/Qwen2.5-0.5B-Instruct` (tiny local LLM) via `transformers` |
+
+Everything runs **offline on CPU**. Models are downloaded from Hugging Face on
+first use (~3 GB total) and cached; the API process itself starts instantly
+because models load lazily on the first request that needs them.
+
+---
+
+## Project layout
+
+```
+RAG/
+├── app/
+│   ├── main.py            # FastAPI app + router wiring
+│   ├── config.py          # settings (env / .env)
+│   ├── models/schemas.py  # pydantic request/response models
+│   ├── core/
+│   │   ├── chunking.py     # recursive character splitter
+│   │   ├── embeddings.py   # bge-m3 wrapper (lazy)
+│   │   ├── vectorstore.py  # Chroma wrapper
+│   │   ├── llm.py          # Qwen wrapper (lazy)
+│   │   ├── learn.py        # Suggest & Learn: coder-taught rules
+│   │   └── rag.py          # ingest + retrieve + generate orchestration
+│   └── routers/
+│       ├── health.py       # GET /health
+│       ├── documents.py    # POST /documents/text, /documents/upload, DELETE
+│       ├── learn.py        # POST /learn/extract, /learn/notes, /learn/match
+│       └── chat.py         # POST /chat
+├── scripts/ingest.py       # CLI bulk ingestion
+├── data/                   # chroma db, uploads, sample corpus (gitignored)
+├── tests/                  # chunker unit tests + API smoke tests
+├── run.py                  # python run.py -> starts uvicorn
+└── requirements.txt
+```
+
+## Setup
+
+> **Prefer Docker?** The sibling repo
+> [`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this
+> service together with the rest of MedCode AI (five containers, one command) —
+> no Python install, no venv. Retrieval runs in the container; generation talks
+> to **Ollama on your host**, because Docker on macOS has no GPU passthrough.
+> The steps below are for running it natively instead.
+
+```bash
+# from the RAG/ folder
+python -m venv .venv
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# then:
+pip install -r requirements.txt
+```
+
+(Optional) copy the env file and tweak settings:
+
+```bash
+cp .env.example .env
+```
+
+## Run the API
+
+```bash
+python run.py
+# or:
+uvicorn app.main:app --reload
+```
+
+Open the interactive docs at **http://localhost:8000/docs**.
+
+## Ingest documents
+
+**Via CLI** (recommended for bulk / the included sample corpus):
+
+```bash
+python -m scripts.ingest data/corpus/
+```
+
+**Via API** (raw text):
+
+```bash
+curl -X POST http://localhost:8000/documents/text \
+  -H "Content-Type: application/json" \
+  -d '{"text":"E11.9 is Type 2 diabetes without complications.","source":"notes"}'
+```
+
+**Via API** (file upload — `.pdf`, `.csv`, `.txt`, `.md`):
+
+```bash
+curl -X POST http://localhost:8000/documents/upload \
+  -F "file=@data/corpus/sample_icd10.md"
+```
+
+## Ask a question
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What ICD-10 code is used for Type 2 diabetes with hyperglycemia?"}'
+```
+
+Response shape:
+
+```json
+{
+  "question": "...",
+  "answer": "...",
+  "contexts": [
+    {"text": "...", "source": "sample_icd10.md", "score": 0.71, "metadata": {...}}
+  ]
+}
+```
+
+## Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET  | `/health` | status + indexed document count |
+| POST | `/documents/text` | index a raw text string |
+| POST | `/documents/upload` | index an uploaded pdf/csv/txt/md file (CSV rows become "Header: value" lines) |
+| PATCH | `/documents/{source}` | rename the display filename (index untouched) |
+| DELETE | `/documents/{source}` | remove all chunks from one source |
+| POST | `/chat` | ask a question (RAG) |
+| POST | `/suggest` | ICD-9/10 suggestions for a case narrative |
+| POST | `/learn/classify` | is this message a coding rule or a question? |
+| POST | `/learn/extract` | plain-language rule → structured draft (stores nothing) |
+| POST | `/learn/notes` | save a confirmed draft + index it for retrieval |
+| GET | `/learn/notes` | list taught rules (incl. muted) |
+| GET | `/learn/notes/{id}` | one rule — who taught it, for the caller's auth check |
+| PATCH | `/learn/notes/{id}?active=` | mute / un-mute a rule |
+| DELETE | `/learn/notes/{id}` | forget a rule |
+| POST | `/learn/match` | which taught rules apply to this narrative? |
+
+## Suggest & Learn (coder-taught rules)
+
+A coder types a rule in the Agent chat, in Thai or English:
+
+> "Diabetic patient with acute kidney injury: code E11.22 as principal, add
+> N17.9, do not code N18.9."
+
+`/learn/extract` turns that into a structured note — scenario, codes with
+roles (`principal` / `secondary` / `exclude`), rule, reason — the coder
+confirms it on screen, and `/learn/notes` stores it in
+`data/learned_notes.json` **and** embeds it as a one-chunk document
+(`source: learned:{id}`, `metadata.kind: learned`) in the same Chroma
+collection as the reference PDFs.
+
+From then on the rule is pinned above the general references whenever its
+scenario comes back: `/chat` cites it as "Coder note — {author}" and returns
+it in `learned_notes`, and `/suggest` puts its codes at the top of a case's
+suggestions and **removes** any code it marked `exclude`.
+
+Every change to the taught rules also regenerates one CSV per code system —
+`Learned rules ICD-10.csv` / `Learned rules ICD-9.csv` in `data/uploads/` —
+registered in the document registry under the matching upload box, so the
+learned knowledge shows up on the admin AI Training page next to the uploaded
+references. The CSV is a generated view of `learned_notes.json` (safe to
+delete — it comes back on the next taught rule); being a real registered
+upload, "Train AI" re-ingests it and code sync reads taught codes from it.
+
+Two properties this deliberately keeps:
+
+- **Nothing is trained.** Learning is retrieval-time. Every rule is listed,
+  attributed, mutable and deletable — the audit trail a hospital needs.
+- **Attribution is recorded, not enforced here.** A note carries
+  `created_by` and `created_by_id`, both supplied by the caller; this service
+  holds no identity and refuses nothing. medcode-api — the only tier with a
+  token — reads `created_by_id` back (that is what `GET /learn/notes/{id}` is
+  for) and lets only the author, or an admin, edit, mute or delete a rule.
+  A rule's author never changes: an edit keeps the original.
+- **Nothing is invented.** Codes the model proposes are dropped unless the
+  coder typed them; prose that echoes the prompt or shares no words with the
+  coder's sentence is discarded; a reason is recorded only when the coder
+  actually gave one. With no LLM at all (or a 0.5B one), the deterministic
+  extractor alone still produces a usable draft.
+
+## Tests
+
+```bash
+pytest -q            # chunker unit tests + API smoke tests (no model download)
+```
+
+## Configuration knobs (`.env`)
+
+`EMBED_MODEL`, `LLM_MODEL`, `TOP_K`, `CHUNK_SIZE`, `CHUNK_OVERLAP`,
+`MAX_NEW_TOKENS`, `TEMPERATURE`, `EMBED_DEVICE`/`LLM_DEVICE` (`cpu`/`cuda`).
+
+## Notes & next steps
+- First `/chat` or ingest call downloads bge-m3 (~2 GB) and Qwen2.5-0.5B (~1 GB).
+- For a GPU, set `EMBED_DEVICE=cuda` / `LLM_DEVICE=cuda` and install a CUDA torch build.
+- To swap in a different tiny model, just change `LLM_MODEL` (any HF chat model
+  with a chat template works, e.g. `Qwen/Qwen2.5-1.5B-Instruct`).
+- Consider adding a reranker (bge-reranker) and hybrid (BM25 + dense) retrieval
+  for higher-precision medical coding lookups.
+```

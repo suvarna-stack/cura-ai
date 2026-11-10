@@ -1,0 +1,21 @@
+# --- Web framework ---
+fastapi>=0.115
+httpx>=0.27          # Ollama backend client
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+python-multipart>=0.0.12
+
+# --- Retrieval / embeddings ---
+sentence-transformers>=3.3          # provides BAAI/bge-m3
+chromadb>=0.5.20                    # persistent vector store
+networkx>=3.4                       # knowledge graph (Graph RAG)
+
+# --- Generation (tiny local LLM) ---
+transformers>=4.46
+torch>=2.5                          # CPU build is fine
+accelerate>=1.1
+
+# --- Document loading ---
+pypdf>=5.1
+pymupdf>=1.24                       # tolerant fallback when pypdf chokes on hospital PDFs

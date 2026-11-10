@@ -1,0 +1,23 @@
+# grag-ouz — Graph RAG teaching notebook
+# Everything below is already installed in your environment; this file exists so
+# the project can be recreated elsewhere.
+
+# --- Notebook ---
+jupyterlab>=4.3
+ipykernel>=6.29
+
+# --- Document loading ---
+pypdf>=5.1
+
+# --- Graph ---
+networkx>=3.4                 # the knowledge graph
+matplotlib>=3.8               # drawing subgraphs
+
+# --- Retrieval / embeddings ---
+sentence-transformers>=3.3    # provides BAAI/bge-m3
+chromadb>=0.5.20              # persistent vector store
+
+# --- Generation ---
+transformers>=4.46            # provides Qwen2.5-0.5B-Instruct
+torch>=2.5                    # CPU build is fine
+accelerate>=1.1

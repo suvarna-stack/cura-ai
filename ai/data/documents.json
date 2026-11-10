@@ -1,0 +1,42 @@
+{
+  "S0053": {
+    "source": "S0053",
+    "uploaded_at": "2026-07-27T17:54:29.185847+00:00",
+    "filename": "icd10.pdf",
+    "size_bytes": 1057470,
+    "pages": 248,
+    "chunks": 735,
+    "status": "indexed",
+    "progress": 100,
+    "error": null,
+    "doc_type": null,
+    "edition": null
+  },
+  "icd9": {
+    "source": "icd9",
+    "uploaded_at": "2026-07-27T20:45:43.221046+00:00",
+    "filename": "icd9.pdf",
+    "size_bytes": 6579598,
+    "pages": 464,
+    "chunks": 1517,
+    "status": "indexed",
+    "progress": 100,
+    "error": null,
+    "doc_type": null,
+    "edition": null
+  },
+  "ICD-10-TM-for-PCU": {
+    "source": "ICD-10-TM-for-PCU",
+    "uploaded_at": "2026-08-06T07:12:53.042632+00:00",
+    "filename": "ICD-10-TM-for-PCU.pdf",
+    "ext": ".pdf",
+    "size_bytes": 1522978,
+    "pages": 114,
+    "chunks": 565,
+    "status": "indexed",
+    "progress": 100,
+    "error": null,
+    "doc_type": null,
+    "edition": null
+  }
+}
