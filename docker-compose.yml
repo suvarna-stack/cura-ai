@@ -1,12 +1,14 @@
 # MedCode AI — the whole system as five containers.
 #
-# Each of the four repos builds its OWN image from its OWN Dockerfile; this file
-# only owns the seam between them: startup order, the env vars that point them
-# at each other, the shared Postgres, and the volumes. Build contexts are the
-# sibling repos, so this folder must sit beside them:
+# Each service builds its OWN image from its OWN Dockerfile; this file only owns
+# the seam between them: startup order, the env vars that point them at each
+# other, the shared Postgres, and the volumes. Build contexts are folders of
+# this repo:
 #
-#   development/
-#     medcode-api/  imed-mock-api/  audit-chart-frontend/  RAG/  medcode-stack/
+#   frontend/                 web UI          → ./frontend/Dockerfile
+#   backend/medcode-api/      our backend     → ./backend/medcode-api/Dockerfile
+#   backend/imed-mock-api/    fake hospital   → ./backend/imed-mock-api/Dockerfile
+#   ai/                       RAG service     → ./ai/Dockerfile
 #
 # Ports are all overridable in .env — the defaults avoid the two host ports that
 # are permanently busy on the dev Macs (5432 = Homebrew Postgres, 5173 = the
@@ -33,8 +35,8 @@ services:
       # can hardlink across versions, and refuses to start on the old layout.
       - pgdata:/var/lib/postgresql
       - ./db/initdb:/docker-entrypoint-initdb.d:ro
-      - ../medcode-api/db/seed.sql.gz:/seed/medcode.sql.gz:ro
-      - ../imed-mock-api/db/seed.sql.gz:/seed/imed.sql.gz:ro
+      - ./backend/medcode-api/db/seed.sql.gz:/seed/medcode.sql.gz:ro
+      - ./backend/imed-mock-api/db/seed.sql.gz:/seed/imed.sql.gz:ro
     ports:
       - "${DB_PORT:-5433}:5432"
     healthcheck:
@@ -57,7 +59,7 @@ services:
   # the real thing is an IMED_API_BASE change on medcode-api, nothing more.
   imed-mock-api:
     build:
-      context: ../imed-mock-api
+      context: ./backend/imed-mock-api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/imed
       # the client credentials the mock's POST /auth/token accepts (hospital guide, 2026-11-04)
@@ -76,7 +78,7 @@ services:
   # is down, everything else still works, which is why nothing depends_on it.
   rag:
     build:
-      context: ../RAG
+      context: ./ai
       args:
         # 0 keeps bge-m3 (~2.3GB) OUT of the image — it lands in the hfcache
         # volume on first use instead, which is the right trade on a dev laptop
@@ -109,7 +111,7 @@ services:
   # -------------------------------------------------------------- backend
   medcode-api:
     build:
-      context: ../medcode-api
+      context: ./backend/medcode-api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/medcode
       IMED_API_BASE: http://imed-mock-api:8003
@@ -145,7 +147,7 @@ services:
   # no CORS and no API hostname baked into the bundle.
   web:
     build:
-      context: ../audit-chart-frontend
+      context: ./frontend
       args:
         VITE_API_BASE_URL: /api
     ports:
