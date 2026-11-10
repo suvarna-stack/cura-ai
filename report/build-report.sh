@@ -68,7 +68,7 @@ perl -0pi -e 's{(<nav id="TOC".*?</nav>)}{ (my $t = $1) =~ s#</?(?:em|code|stron
 echo "Rendering to PDF via paged.js (needs Node + playwright + pagedjs)..."
 # paged.js fetches its stylesheet via XHR to parse @page rules; file:// URLs
 # are blocked by CORS for that fetch in Chromium, so serve this repo root
-# (medcode-stack/.. , covers the ../../audit-chart-frontend image paths too)
+# (the repo root, which covers the ../frontend image paths too)
 # over a throwaway local HTTP server instead of using file://.
 node - <<'NODE'
 const { chromium } = require('playwright');
@@ -88,8 +88,8 @@ function findPagedjs() {
 }
 const pagedjsPath = findPagedjs();
 
-const REPO_ROOT = path.resolve('..', '..'); // cura-ai/
-const REPORT_REL = path.relative(REPO_ROOT, process.cwd()); // medcode-stack/report
+const REPO_ROOT = path.resolve('..'); // repo root
+const REPORT_REL = path.relative(REPO_ROOT, process.cwd()); // report
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.png': 'image/png',
                '.ttf': 'font/ttf', '.js': 'text/javascript' };

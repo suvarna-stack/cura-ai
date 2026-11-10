@@ -378,7 +378,7 @@ on purpose and why filling them would break the dashboard.
 ## Regenerating the dump
 
 `db/seed.sql.gz` is the **only** source of hospital data Docker boots from
-(`medcode-stack/docker-compose.yml` bind-mounts it into the Postgres container's
+(the root `docker-compose.yml` bind-mounts it into the Postgres container's
 initdb), and `scripts/seed_local_imed_pg.sh` restores the same file locally. So
 when the demo data changes, it changes *here* — a database edited only in place
 reaches nobody else. That is exactly how the dump drifted a month behind the
@@ -477,14 +477,13 @@ of never (the default drags long `@Operation`/`@Schema` descriptions onto
 
 ## Docker
 
-**The whole system in one command** — the sibling repo
-[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this
+**The whole system in one command** — the root [`docker-compose.yml`](../../docker-compose.yml) runs this
 mock, medcode-api, the web UI, RAG and one Postgres (holding both the `imed` and
 `medcode` databases, each seeded from its repo's committed dump) as five
-containers. Clone the five repos as siblings, then:
+containers. From this folder:
 
 ```bash
-cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+cd ../.. && cp .env.example .env && docker compose up -d --build
 ```
 
 This service alone, against a database you already run:

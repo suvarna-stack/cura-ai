@@ -15,7 +15,7 @@ optional AI chat model runs in [Ollama](https://ollama.com) on the same machine.
 | **Docker** + Compose (Engine 20.10+) | Every service builds and runs in a container. Docker Desktop, Colima and OrbStack all work. |
 | **≥4 GB RAM given to Docker** | Two JVMs, a PyTorch process, nginx and Postgres. Give it **6 GB** if Ollama's 8B model also runs on the same machine. An 8 GB laptop cannot comfortably run both. |
 | **~5 GB free disk** | Images with the defaults. Add ~3 GB if you bake the embedding model into the image (`PREFETCH_EMBED_MODEL=1`). |
-| **Git** | To clone the five repositories. |
+| **Git** | To clone the repository. |
 | **[Ollama](https://ollama.com)**, *optional* | Only for the AI Agent chat. Code suggestions do **not** need it (see [step 4](#4--ai)). |
 | A modern browser | Chrome, Edge or Firefox. Nothing to install on the coder's side. |
 
@@ -27,35 +27,30 @@ Free host ports: **8080, 8001, 8003, 8000, 5433**. All five can be moved in
 
 ---
 
-## 1 · Clone the five repositories side by side
+## 1 · Clone the repository
 
 ```bash
-mkdir medcode && cd medcode
-for r in medcode-stack medcode-api imed-mock-api RAG audit-chart-frontend; do
-  git clone https://github.com/Occamy-medihack/$r.git
-done
+git clone https://github.com/Occamy-medihack/cura-ai.git
+cd cura-ai
 ```
 
 ```
-medcode/
-  medcode-stack/          ← compose file, DB init scripts, docs (you work from here)
-  medcode-api/            backend            (Spring Boot, Java 21)
-  imed-mock-api/          stand-in hospital  (Spring Boot, Java 21)
-  RAG/                    AI service         (FastAPI, Python)
-  audit-chart-frontend/   web UI             (React + Vite, served by nginx)
+cura-ai/                  ← compose file, DB init scripts, docs (you work from here)
+  frontend/               web UI             (React + Vite, served by nginx)
+  backend/medcode-api/    backend            (Spring Boot, Java 21)
+  backend/imed-mock-api/  stand-in hospital  (Spring Boot, Java 21)
+  ai/                     AI service         (FastAPI, Python)
 ```
 
-The five folders **must be siblings**. The compose file builds each image from
-`../<repo>`, and it mounts the two database seed files straight out of
-`../medcode-api/db/` and `../imed-mock-api/db/`. Nothing is copied between
-repositories.
+The compose file builds each image from its folder, and it mounts the two
+database seed files straight out of `backend/medcode-api/db/` and
+`backend/imed-mock-api/db/`.
 
 ---
 
 ## 2 · Configure
 
 ```bash
-cd medcode-stack
 cp .env.example .env
 ```
 
@@ -175,7 +170,7 @@ Python 3:
 
 ```bash
 # medcode-api — needs both databases AND the hospital mock reachable
-cd ../medcode-api
+cd backend/medcode-api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
 IMED_API_BASE=http://localhost:8003 ./mvnw test
 
@@ -184,7 +179,7 @@ cd ../imed-mock-api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/imed ./mvnw test
 
 # RAG — no model download needed
-cd ../RAG && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd ../../ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest -q
 ```
 
@@ -197,25 +192,24 @@ product defect. The load tests (Apache Bench) and their exact commands are in
 ### Demo data
 
 Everything needed to run end to end ships in the repositories, and all of it is
-**synthetic**. No real patient data exists anywhere in the five repositories.
+**synthetic**. No real patient data exists anywhere in the repository.
 
 | What | Where |
 |---|---|
-| 150 hospital visits: 140 OPD (shown on the dashboard) + 10 IPD | `imed-mock-api/db/seed.sql.gz`, built by the deterministic `scripts/generate_demo_data.py` |
-| ICD-10 / ICD-9 reference catalogs (650 / 332 rows) | `imed-mock-api` Flyway migration `V6`, mirrored into `medcode` on every sync |
-| Our empty starting database | `medcode-api/db/seed.sql.gz` |
-| AI reference index (3 ICD manuals) | `RAG/data/` (Chroma index, knowledge graph, PDFs) |
+| 150 hospital visits: 140 OPD (shown on the dashboard) + 10 IPD | `backend/imed-mock-api/db/seed.sql.gz`, built by the deterministic `scripts/generate_demo_data.py` |
+| ICD-10 / ICD-9 reference catalogs (650 / 332 rows) | `backend/imed-mock-api` Flyway migration `V6`, mirrored into `medcode` on every sync |
+| Our empty starting database | `backend/medcode-api/db/seed.sql.gz` |
+| AI reference index (3 ICD manuals) | `ai/data/` (Chroma index, knowledge graph, PDFs) |
 | Accounts | Only the bootstrap admin. Coders are created by the admin |
 
 ---
 
 ## Updating after `git pull`
 
-The seed dumps live in `medcode-api` and `imed-mock-api`, not here, and Postgres
-only reads them into an **empty** volume. So:
+Postgres only reads the seed dumps into an **empty** volume. So:
 
 ```bash
-for r in medcode-api imed-mock-api RAG audit-chart-frontend medcode-stack; do (cd ../$r && git pull); done
+git pull
 docker compose down -v       # the -v is what makes new demo data load
 docker compose up -d --build
 ```
@@ -247,7 +241,7 @@ made in this stack**. Both are rebuilt from the committed files.
 
 ## Without Docker
 
-`medcode-api/RUN-ALL.md` covers the manual four-terminal setup (native
+`backend/medcode-api/RUN-ALL.md` covers the manual four-terminal setup (native
 Postgres 18, Java 21, Python and Node) on macOS, Linux and Windows. It is
 written in Thai.
 
@@ -260,6 +254,6 @@ written in Thai.
 | [`architecture.md`](architecture.md) | Topology, the coding flow, the AI pipeline, the data model, known gaps |
 | [`api-reference.md`](api-reference.md) | Endpoints, auth, errors, the hospital contract |
 | [`../HARDWARE_SPEC.md`](../HARDWARE_SPEC.md) | What to buy for a pilot, with costs |
-| `audit-chart-frontend/docs/USER-GUIDE-TH.md` | คู่มือการใช้งาน, for coders and administrators |
-| `medcode-api/docs/api-contract.md` | Every field of every response, the contract of record |
-| `medcode-api/docs/DEPLOYMENT-PREP.md` | The 28-item checklist for running this in a real hospital |
+| `frontend/docs/USER-GUIDE-TH.md` | คู่มือการใช้งาน, for coders and administrators |
+| `backend/medcode-api/docs/api-contract.md` | Every field of every response, the contract of record |
+| `backend/medcode-api/docs/DEPLOYMENT-PREP.md` | The 28-item checklist for running this in a real hospital |

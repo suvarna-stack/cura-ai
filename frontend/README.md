@@ -8,13 +8,12 @@ analytics, agent chat, and the admin/training surface. It talks to
 
 ## Run it
 
-**With Docker, whole system, one command** — the sibling repo
-[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this UI
+**With Docker, whole system, one command** — the root [`docker-compose.yml`](../docker-compose.yml) runs this UI
 (built and served by nginx, with `/api` proxied to the backend) plus the two
-backends, RAG and Postgres. Clone the five repos as siblings, then:
+backends, RAG and Postgres. From this folder:
 
 ```bash
-cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+cd .. && cp .env.example .env && docker compose up -d --build
 ```
 
 The app comes up on <http://localhost:8080>.

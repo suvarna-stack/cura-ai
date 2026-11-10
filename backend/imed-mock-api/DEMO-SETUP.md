@@ -212,4 +212,4 @@ find the stale process, then `kill <pid>`.
   if the cases ever need changing. Each scenario in its `S` list hardcodes
   a real ground-truth ICD-10/ICD-9 code alongside the note text, which is
   useful as a gold set for scoring AI suggestion accuracy (see
-  `medcode-stack/eval-results/rag-accuracy-SUMMARY.md`).
+  `../../eval-results/rag-accuracy-SUMMARY.md`).

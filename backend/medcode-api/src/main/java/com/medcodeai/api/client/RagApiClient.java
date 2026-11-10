@@ -312,6 +312,6 @@ public class RagApiClient {
 
     private IllegalStateException unreachable(Exception e) {
         return new IllegalStateException("RAG API not reachable at " + base
-                + " — is the RAG service running? (cd ../RAG && python run.py)", e);
+                + " — is the RAG service running? (cd ../../ai && python run.py)", e);
     }
 }

@@ -196,12 +196,11 @@ response shape and behavior directly.
 
 ## Docker
 
-**The whole system in one command** — the sibling repo
-[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs all four
-repos plus Postgres as five containers. Clone the five repos as siblings, then:
+**The whole system in one command** — the root [`docker-compose.yml`](../../docker-compose.yml) runs all four
+services plus Postgres as five containers. From this folder:
 
 ```bash
-cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+cd ../.. && cp .env.example .env && docker compose up -d --build
 ```
 
 The app comes up on <http://localhost:8080> (nginx serves the SPA and proxies

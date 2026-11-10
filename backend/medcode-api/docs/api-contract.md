@@ -832,7 +832,7 @@ success `{"ok": true}`. `404` unknown id.
 ### /api/admin/knowledge/** — AI Training / RAG proxy (admin)
 
 The admin "AI Training" page. Every route is a thin authenticated proxy to the
-MedCode RAG service (the FastAPI app in the sibling `../RAG` repo,
+MedCode RAG service (the FastAPI app in the `../../ai` folder,
 `RAG_API_BASE`, default `http://localhost:8000`); the RAG service itself has no
 auth and must only be reachable from this backend. "Training" means indexing
 documents (chunk → embed → knowledge graph), **not** fine-tuning model weights.

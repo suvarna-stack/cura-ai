@@ -1,9 +1,37 @@
-# medcode-stack — the whole CURA AI system in containers
+# CURA AI
 
-One `docker compose` file that runs all four repos plus Postgres. It contains no
-application code: each repo builds its own image from its own `Dockerfile`, and
-this folder owns only what lives *between* them — startup order, the env vars
-that point the services at each other, the shared database, and the volumes.
+The whole CURA AI system in one repo. Each service lives in its own folder with
+its own `Dockerfile`; the root `docker-compose.yml` runs them all plus Postgres
+and owns only what lives *between* them — startup order, the env vars that point
+the services at each other, the shared database, and the volumes.
+
+## Layout
+
+```
+frontend/                  web UI          React + Vite, served by nginx
+backend/medcode-api/       our backend     Spring Boot, Java 21
+backend/imed-mock-api/     fake hospital   Spring Boot, Java 21 (stands in for iMed)
+ai/                        RAG service     FastAPI, Python
+db/initdb/                 Postgres first-boot scripts
+docs/  report/  eval-results/
+docker-compose.yml         runs everything
+```
+
+Each folder still has its own README, `Dockerfile` and `.dockerignore`, and can be
+built on its own: `docker build ./frontend`, `docker build ./ai`, and so on.
+
+### For hospital developers building the real iMed API
+
+`backend/imed-mock-api/` is a working mock of the API we need from the hospital —
+build yours to match it. Start with its README, then the contract it implements
+(`backend/medcode-api/docs/imed-integration.md` and
+`backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`).
+`backend/medcode-api/` is the client that calls it. Pointing our backend at your
+real API is one setting: `IMED_API_BASE`.
+
+These folders were five separate repos until 2026-11-10 (`audit-chart-frontend`,
+`medcode-api`, `imed-mock-api`, `RAG`, `medcode-stack`); their full git history
+is kept here.
 
 ## Documentation
 
@@ -14,22 +42,8 @@ that point the services at each other, the shared database, and the volumes.
 | [`docs/api-reference.md`](docs/api-reference.md) | Endpoints, auth, errors, streaming, the hospital contract |
 | [`HARDWARE_SPEC.md`](HARDWARE_SPEC.md) | What to buy for a pilot, with costs and open questions |
 | [`report/CURA-AI-Report.pdf`](report/CURA-AI-Report.pdf) | The final report, in Thai (build: `report/build-report.sh`) |
-| `audit-chart-frontend/docs/USER-GUIDE-TH.pdf` | คู่มือการใช้งาน — Thai user guide for coders and administrators |
+| `frontend/docs/USER-GUIDE-TH.pdf` | คู่มือการใช้งาน — Thai user guide for coders and administrators |
 | [`eval-results/`](eval-results/) | Raw test, load-test and AI-accuracy evidence |
-
-## Layout it expects
-
-```
-development/
-  medcode-api/            backend        → image built from its own Dockerfile
-  imed-mock-api/          fake hospital  → same
-  audit-chart-frontend/   web UI         → same (nginx + built SPA)
-  RAG/                    AI service     → same
-  medcode-stack/          ← you are here (compose only)
-```
-
-The compose file uses `../<repo>` as build contexts, so all five folders must be
-siblings. Nothing is copied between repos.
 
 ## Prerequisites
 
@@ -43,7 +57,7 @@ build happens inside the images. Windows and Linux work the same as macOS (on
 Windows use Docker Desktop with the WSL2 backend, and run the commands from
 PowerShell or a WSL shell).
 
-Don't want Docker? See `medcode-api/RUN-ALL.md` for the manual, four-terminal
+Don't want Docker? See `backend/medcode-api/RUN-ALL.md` for the manual, four-terminal
 path (no containers, Thai-language).
 
 ## Run it
@@ -92,7 +106,7 @@ Port 8001 is still published for Swagger and `curl`, but the app doesn't use it.
 
 One Postgres server holds **both** databases — `medcode` (ours) and `imed` (the
 hospital's) — matching the GCP deploy plan. Both are restored from the committed
-dumps in the two repos by the scripts in `db/initdb/`.
+dumps in the two backend folders by the scripts in `db/initdb/`.
 
 Those scripts run **only once**, when the `pgdata` volume is empty. To re-seed:
 
@@ -102,29 +116,23 @@ docker compose down -v && docker compose up -d
 
 ### Pulling updated demo data — read this before `git pull`
 
-The seed dumps do **not** live in this repo. Compose bind-mounts them from the
-sibling checkouts:
+Compose bind-mounts the seed dumps from the backend folders:
 
 | Dump | Lives in |
 |---|---|
-| `/seed/medcode.sql.gz` | `../medcode-api/db/seed.sql.gz` |
-| `/seed/imed.sql.gz` | `../imed-mock-api/db/seed.sql.gz` |
+| `/seed/medcode.sql.gz` | `backend/medcode-api/db/seed.sql.gz` |
+| `/seed/imed.sql.gz` | `backend/imed-mock-api/db/seed.sql.gz` |
 
-Two consequences that bite in exactly this order:
-
-1. **Pulling `medcode-stack` alone gets you no new data.** Pull all three —
-   `medcode-api`, `imed-mock-api` and this repo — or you will boot the stack
-   against last month's dumps while believing you are current.
-2. **`docker compose up -d` will silently ignore the new dumps.** The scripts in
-   `db/initdb/` are run by the postgres image only on an *empty* `pgdata`
-   volume. If you have ever started this stack, that volume is populated, the
-   new dumps are mounted at `/seed/` and never read, and nothing errors — you
-   just quietly keep the old data.
+One `git pull` gets you new dumps, but **`docker compose up -d` will silently
+ignore them.** The scripts in `db/initdb/` are run by the postgres image only on
+an *empty* `pgdata` volume. If you have ever started this stack, that volume is
+populated, the new dumps are mounted at `/seed/` and never read, and nothing
+errors — you just quietly keep the old data.
 
 So the whole update is:
 
 ```bash
-for r in medcode-api imed-mock-api medcode-stack; do (cd ../$r && git pull); done
+git pull
 docker compose down -v          # the -v is the load-bearing part
 docker compose up -d --build
 ```
@@ -188,7 +196,7 @@ The suites are not containerized — they run on the host against this stack:
 
 ```bash
 # medcode-api needs both databases and the hospital mock reachable
-cd ../medcode-api
+cd backend/medcode-api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
 IMED_API_BASE=http://localhost:8003 ./mvnw test
 ```
@@ -198,7 +206,7 @@ containers — the suite's hard-coded case IDs predate the current demo dataset.
 
 ## Production is not this file
 
-Compose is for local dev, demos and onboarding. For the M7 GCP cutover, each repo
+Compose is for local dev, demos and onboarding. For the M7 GCP cutover, each folder
 builds and pushes its **own** image and Cloud Run wires them with the same env
 vars used here. Three things to carry over:
 
