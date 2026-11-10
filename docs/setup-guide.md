@@ -31,7 +31,7 @@ Free host ports: **8080, 8001, 8000, 5433**. All four can be moved in
 ## 1 · Clone the repository
 
 ```bash
-git clone https://github.com/Occamy-medihack/cura-ai.git
+git clone https://github.com/phyowaiyanlinzaw/cura-ai.git
 cd cura-ai
 ```
 

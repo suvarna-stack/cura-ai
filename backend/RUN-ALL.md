@@ -85,7 +85,7 @@ pg_isready         # accepting connections
 ## 3. Clone repo
 
 ```bash
-git clone https://github.com/Occamy-medihack/cura-ai.git ~/cura-ai
+git clone https://github.com/phyowaiyanlinzaw/cura-ai.git ~/cura-ai
 ```
 
 ```
