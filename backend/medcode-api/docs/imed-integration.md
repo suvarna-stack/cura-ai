@@ -2,9 +2,10 @@
 
 How medcode-api's approve/reopen flow maps onto the hospital's real write API
 ("iMed Diagnosis and Medical Discharge API", rev 1, 24 Jul 2026), which
-supersedes the invented `coding-result` contract. The sibling repo
-`../imed-mock-api` mocks this contract field-for-field under `/api/v1` —
-production is an `IMED_API_BASE` + `IMED_CLIENT_ID` + `IMED_CLIENT_SECRET` swap.
+supersedes the invented `coding-result` contract. The hospital builds and
+runs this API; medcode-api finds it through `IMED_API_BASE` + `IMED_CLIENT_ID`
++ `IMED_CLIENT_SECRET`. (Mentions of `imed-mock-api` below are history: our
+stand-in for it was removed from the repo on 2026-11-10.)
 
 > **2026-11-09 — the hospital's own guide now wins.** The hospital sent
 > "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026), its documentation of

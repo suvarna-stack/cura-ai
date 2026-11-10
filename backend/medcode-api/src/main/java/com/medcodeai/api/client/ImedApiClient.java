@@ -272,6 +272,6 @@ public class ImedApiClient {
 
     private IllegalStateException unreachable(Exception e) {
         return new IllegalStateException("iMed API not reachable at " + base
-                + " — is imed-mock-api running? (cd ../imed-mock-api && ./mvnw spring-boot:run)", e);
+                + " — is the hospital's API running, and is IMED_API_BASE set to it?", e);
     }
 }

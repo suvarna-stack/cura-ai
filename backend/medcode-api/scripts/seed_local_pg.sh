@@ -2,8 +2,8 @@
 # Create + seed the local dev database from the committed dump.
 # db/seed.sql.gz is the frozen demo baseline (originally produced by the
 # audit_chart POC pipeline, dumped once) — plain psql, no Python. The dump
-# holds only OUR schema; the hospital data lives in the separate "imed"
-# database owned by ../imed-mock-api (see its scripts/seed_local_imed_pg.sh).
+# holds only OUR schema; the hospital data lives behind the hospital's own
+# iMed API, which is not part of this repo.
 set -euo pipefail
 
 PGBIN="${PGBIN:-/opt/homebrew/opt/postgresql@18/bin}"

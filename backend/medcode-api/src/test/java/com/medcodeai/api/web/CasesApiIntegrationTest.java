@@ -28,9 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Drives the real read/write/approve/reopen endpoints against the local
  * seeded "medcode" Postgres (no test containers, no mocks) — the project's
- * correctness gate. PREREQUISITE: imed-mock-api must be running on :8003
- * (or IMED_API_BASE) — approve/reopen send the hospital calls for real
- * (cd ../imed-mock-api && ./mvnw spring-boot:run).
+ * correctness gate. PREREQUISITE: the hospital's iMed API must be reachable
+ * at IMED_API_BASE (default :8003) — approve/reopen send the hospital calls
+ * for real.
  *
  * Validates this backend's own contract (docs/api-contract.md), not Flask
  * parity: confidence/patient/hn/dates/revenue_impact/coder come from real DB

@@ -1008,8 +1008,8 @@ On approve/reopen this backend calls the hospital's REAL write contract —
 as documented in its Medihack API guide for MedCode (4 Nov 2026), including
 the optional `coding_status` field we proposed (`IMED_API_BASE` +
 `IMED_CLIENT_ID` + `IMED_CLIENT_SECRET`; the client trades the credentials for
-a short-lived Bearer token at `/auth/token`; locally the sibling repo
-`../imed-mock-api` mocks it field-for-field). Frontends never call it
+a short-lived Bearer token at `/auth/token`; the hospital builds and runs
+this API). Frontends never call it
 directly. While the hospital's write side is itself a mock it answers
 `mock: true` and saves nothing in HIS — logged once as a warning.
 

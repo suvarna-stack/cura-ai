@@ -1,4 +1,4 @@
-# MedCode AI — the whole system as five containers.
+# MedCode AI — the whole system as four containers.
 #
 # Each service builds its OWN image from its OWN Dockerfile; this file only owns
 # the seam between them: startup order, the env vars that point them at each
@@ -7,8 +7,10 @@
 #
 #   frontend/                 web UI          → ./frontend/Dockerfile
 #   backend/medcode-api/      our backend     → ./backend/medcode-api/Dockerfile
-#   backend/imed-mock-api/    fake hospital   → ./backend/imed-mock-api/Dockerfile
 #   ai/                       RAG service     → ./ai/Dockerfile
+#
+# The hospital's iMed API is NOT part of this repo — the hospital builds and
+# runs it. medcode-api reaches it at IMED_API_BASE (set it in .env).
 #
 # Ports are all overridable in .env — the defaults avoid the two host ports that
 # are permanently busy on the dev Macs (5432 = Homebrew Postgres, 5173 = the
@@ -17,17 +19,15 @@ name: medcode
 
 services:
   # ---------------------------------------------------------------- Postgres
-  # ONE server, TWO databases: "medcode" (ours) and "imed" (the hospital's) —
-  # the same shape the GCP deploy plan calls for. Both are seeded from the
-  # committed dumps on FIRST boot only (see db/initdb); re-seeding means
-  # `docker compose down -v`.
+  # The "medcode" database, seeded from the committed dump on FIRST boot only
+  # (see db/initdb); re-seeding means `docker compose down -v`.
   db:
     image: postgres:18
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      # Left as the default admin db; the two real databases are created by
-      # db/initdb/00-create-databases.sh so both get identical treatment.
+      # Left as the default admin db; "medcode" is created by
+      # db/initdb/00-create-databases.sh.
       POSTGRES_DB: postgres
     volumes:
       # postgres:18+ wants the volume at /var/lib/postgresql, NOT .../data —
@@ -36,7 +36,6 @@ services:
       - pgdata:/var/lib/postgresql
       - ./db/initdb:/docker-entrypoint-initdb.d:ro
       - ./backend/medcode-api/db/seed.sql.gz:/seed/medcode.sql.gz:ro
-      - ./backend/imed-mock-api/db/seed.sql.gz:/seed/imed.sql.gz:ro
     ports:
       - "${DB_PORT:-5433}:5432"
     healthcheck:
@@ -51,26 +50,7 @@ services:
     # Must match the services that need it: depends_on only orders a
     # `compose up`, so after a Docker/Colima restart the daemon brings back
     # only containers with a restart policy. Without this, db stays down and
-    # imed-mock-api + medcode-api crash-loop on "UnknownHostException: db".
-    restart: unless-stopped
-
-  # ------------------------------------------------------- hospital (mock)
-  # Stands in for the real iMed API until the hospital provides one; swapping to
-  # the real thing is an IMED_API_BASE change on medcode-api, nothing more.
-  imed-mock-api:
-    build:
-      context: ./backend/imed-mock-api
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/imed
-      # the client credentials the mock's POST /auth/token accepts (hospital guide, 2026-11-04)
-      IMED_CLIENT_ID: ${IMED_CLIENT_ID:-medcode-mock-client}
-      IMED_CLIENT_SECRET: ${IMED_CLIENT_SECRET:-medcode-mock-secret}
-      PORT: 8003
-    ports:
-      - "${IMED_PORT:-8003}:8003"
-    depends_on:
-      db:
-        condition: service_healthy
+    # medcode-api crash-loops on "UnknownHostException: db".
     restart: unless-stopped
 
   # ------------------------------------------------------------------- RAG
@@ -114,10 +94,14 @@ services:
       context: ./backend/medcode-api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/medcode
-      IMED_API_BASE: http://imed-mock-api:8003
-      # traded for a short-lived Bearer token at IMED_API_BASE/auth/token
-      IMED_CLIENT_ID: ${IMED_CLIENT_ID:-medcode-mock-client}
-      IMED_CLIENT_SECRET: ${IMED_CLIENT_SECRET:-medcode-mock-secret}
+      # The hospital's iMed API (host only — no /api/v1, no trailing slash).
+      # The default reaches port 8003 on THIS machine, for a hospital developer
+      # running their API locally; otherwise set it in .env.
+      IMED_API_BASE: ${IMED_API_BASE:-http://host.docker.internal:8003}
+      # traded for a short-lived Bearer token at IMED_API_BASE/auth/token;
+      # the hospital's admin issues the real pair
+      IMED_CLIENT_ID: ${IMED_CLIENT_ID:-}
+      IMED_CLIENT_SECRET: ${IMED_CLIENT_SECRET:-}
       RAG_API_BASE: http://rag:8000
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@medcodeai.demo}
@@ -128,15 +112,16 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       DEMO_TOOLS_ENABLED: ${DEMO_TOOLS_ENABLED:-true}
       PORT: 8001
+    extra_hosts:
+      # makes host.docker.internal resolve on plain Docker Engine / Colima
+      - "host.docker.internal:host-gateway"
     ports:
       - "${API_PORT:-8001}:8001"
     depends_on:
       db:
         condition: service_healthy
-      # Not service_healthy: hospital calls only happen on approve/reopen, so
-      # the backend can boot before the mock finishes starting.
-      imed-mock-api:
-        condition: service_started
+      # Nothing waits for the hospital API: it is only called on sync,
+      # approve and reopen, so the backend boots without it.
     # In-process write lock + cases cache: NEVER scale this past one instance.
     deploy:
       replicas: 1

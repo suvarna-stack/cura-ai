@@ -7,9 +7,9 @@ dashboard). Originally a query-for-query clone of the Flask POC at
 `../audit_chart/audit-chart_doc/integration-poc/server/` — that POC (and the
 whole audit_chart repo) is now **historical reference only**, never edited,
 never needed at runtime or setup time. Owns the `medcode` Postgres database;
-sends approval results to the hospital's iMed API — locally the sibling repo
-`../imed-mock-api`, a fake hospital server owning the separate `imed`
-database. Build/run/test commands: see `README.md`.
+sends approval results to the hospital's iMed API, which the hospital builds
+and runs — it is NOT in this repo (the `imed-mock-api` stand-in was dropped on
+2026-11-10). Build/run/test commands: see `README.md`.
 
 **Domain vocabulary: `docs/medical-glossary.md`.** Plain-language meanings of
 every medical term this project touches — visit/OPD/IPD/HN, ICD-10 vs ICD-9 and
@@ -37,7 +37,8 @@ replacement — the sibling repo `../../frontend` — is built against
 - Every field serves a REAL DB value; where no real source exists the field
   is null (`confidence`, `patient`, `revenue_impact`) or a documented static
   placeholder (`drg: "—"`). Never reintroduce synthesized per-case fake data.
-- The correctness gate is `./mvnw test` (requires imed-mock-api on :8003).
+- The correctness gate is `./mvnw test` (requires a hospital iMed API at
+  `IMED_API_BASE`).
 - **Swagger is NOT a fourth mirror.** The `@Operation`/`@ExampleObject`
   annotations on the controllers feed a local-dev try-it-out console; they are
   descriptive, hand-trimmed, and nothing asserts them. The same-commit sync
@@ -891,24 +892,33 @@ Milestones (git log --oneline reads as this sequence):
   shape (`SyncRules.visitDateFromCaseId` reads the visit date from it), the
   max cases per period answer, rate limits.
 
+- ✅ **One monorepo, no mock hospital (2026-11-10):** the five repos were
+  merged into one (`frontend/`, `backend/`, `ai/`, compose + `db/initdb` at the
+  root). The same day the hospital said it will build the real iMed API itself
+  and needs no mock, so `imed-mock-api` was removed from the repo: no compose
+  service, no `imed` database, `scripts/dev.sh` no longer starts it.
+  `IMED_API_BASE` must point at a hospital server; without one the app boots
+  but sync/approve/reopen fail, and so do the write tests in
+  `CasesApiIntegrationTest`. Older entries above still name `../imed-mock-api`
+  — they are history. The mock's last version lives in its old repo.
+
 - ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
   containers) and rerun both repos' test suites there. The frontend half of
   this milestone is done (above); what remains is prod hosting plus pointing
   the frontend's `VITE_API_BASE_URL` at it. The old frontend/Flask pair just
   keeps running untouched until then.
 
-Deploy direction (decided 2026-07-21, updated 2026-07-22): **GCP, three
-containers** — medcode-api, imed-mock-api (until the hospital provides the
-real iMed API; swapping is an `IMED_API_BASE` change), and one stock
-`postgres:18` hosting both databases. Exact GCP service not chosen yet. Must
+Deploy direction (decided 2026-07-21, updated 2026-11-10): **GCP** —
+medcode-api, the web and RAG images, and one stock `postgres:18` for
+`medcode`. The hospital hosts the iMed API; we reach it via `IMED_API_BASE`. Exact GCP service not chosen yet. Must
 run a single medcode-api instance (`max-instances=1` on Cloud Run).
 
 **Update this section when a milestone or significant decision lands.**
 
 ## Gotchas still live
 
-- `./mvnw test` needs BOTH seeded databases AND imed-mock-api running on
-  :8003 (`IMED_API_BASE`) — approve/reopen make real hospital calls.
+- `./mvnw test` needs the seeded `medcode` database AND a hospital iMed API
+  at `IMED_API_BASE` — approve/reopen make real hospital calls.
 - Timestamps/JSONB always come back as raw strings: `::text` casts +
   `getString`; never let JDBC parse them into objects.
 - Never `ORDER BY` a PG ENUM column bare — the `CASE` expressions in the
@@ -928,8 +938,8 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
   rule is what let them drift a month behind the working local databases, so
   Docker booted 1150 stale April-2026 cases while the demo ran on 21 July-2026
   visits). `db/seed.sql.gz` is data, not build output, but it is also the only
-  hospital/medcode data Docker ever sees — the root `docker-compose.yml` bind-mounts both
-  dumps into Postgres initdb. Change the demo data, regenerate the dump.
+  medcode data Docker ever sees — the root `docker-compose.yml` bind-mounts it
+  into Postgres initdb. Change the demo data, regenerate the dump.
   Ours holds schema + `coverage_types` + the `icd_10`/`icd_9` catalogs, with
   every case table, `auth_sessions` AND `users` empty — that emptiness is what
   makes the dashboard start empty, and an empty `users` is deliberate: it lets
@@ -950,15 +960,7 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 
   Exclude `flyway_schema_history`, or `baseline-on-migrate` won't adopt the dump
   as version 0 and replay V1–V7. `-n public` also leaves the `demo_baseline`
-  snapshot schema out. The hospital side has the same rule and its own recipe
-  in `../imed-mock-api/README.md` § *Regenerating the dump*.
-- The sibling `imed` database keeps every table in a schema named **`imed`**,
-  not `public` (a leftover from the pre-split single-database era; the dump is
-  taken with `pg_dump -n imed`, so it carries the schema along). Doesn't affect
-  us — we only reach it over HTTP — but two things follow for M7: the
-  hospital-side SQL must stay schema-qualified, and provisioning needs
-  `GRANT USAGE ON SCHEMA imed` for any non-owner app role, or it fails with
-  "permission denied for schema imed". Details in `../imed-mock-api/README.md`.
+  snapshot schema out.
 - **Schema changes go in ONE place: a new `src/main/resources/db/migrations/
   V<n>__<name>.sql` file** (Flyway, since 2026-08-20). Never also write the DDL
   in Java — that duplication is exactly what drifted for a year. The seed dump is

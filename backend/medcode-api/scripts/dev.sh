@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # One-line local bring-up.
 #
-#   scripts/dev.sh          # seed anything missing, start the fake hospital
-#                           # (imed-mock-api :8003), then run this backend (:8001)
-#   scripts/dev.sh --seed   # force a FRESH re-seed of BOTH databases first
+#   scripts/dev.sh          # seed the database if missing, then run this
+#                           # backend (:8001)
+#   scripts/dev.sh --seed   # force a FRESH re-seed first
 #                           # (WIPES local approvals/edits back to the baseline)
+#
+# The hospital's iMed API is not started here — the hospital runs it. Point
+# IMED_API_BASE at it (default http://localhost:8003).
 #
 # Ctrl-C stops everything this script started. Login once it's up:
 #   admin@medcodeai.demo / admin1234
@@ -12,9 +15,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-IMED_DIR="${IMED_DIR:-$HERE/../imed-mock-api}"
 MEDCODE_PORT="${PORT:-8001}"
-IMED_PORT="8003"
 LOGDIR="${TMPDIR:-/tmp}/medcode-dev"; mkdir -p "$LOGDIR"
 FORCE_SEED=0; [ "${1:-}" = "--seed" ] && FORCE_SEED=1
 
@@ -36,21 +37,19 @@ if ! "$PGBIN/pg_isready" -q >/dev/null 2>&1; then
   "$PGBIN/pg_isready" -q >/dev/null 2>&1 || die "Postgres still not up"
 fi
 
-# --- seed each database only if it's missing (or if --seed) ----------------
+# --- seed the database only if it's missing (or if --seed) -----------------
 db_has() { # db_has <database> <schema.table>
   local out; out="$("$PGBIN/psql" -tAqX -d "$1" -c "SELECT to_regclass('$2')" 2>/dev/null || true)"
   [ -n "$out" ]
 }
 if [ "$FORCE_SEED" = 1 ]; then
-  log "--seed: re-seeding BOTH databases (wipes local approvals/edits)"
+  log "--seed: re-seeding 'medcode' (wipes local approvals/edits)"
   "$HERE/scripts/seed_local_pg.sh"
-  "$IMED_DIR/scripts/seed_local_imed_pg.sh"
 else
-  db_has medcode public.cases         || { log "Seeding 'medcode'…"; "$HERE/scripts/seed_local_pg.sh"; }
-  db_has imed    imed.medhack_patient || { log "Seeding 'imed'…";    "$IMED_DIR/scripts/seed_local_imed_pg.sh"; }
+  db_has medcode public.cases || { log "Seeding 'medcode'…"; "$HERE/scripts/seed_local_pg.sh"; }
 fi
 
-# --- helpers to start/stop the two Spring Boot apps ------------------------
+# --- helpers to start/stop the Spring Boot app ----------------------------
 health()  { curl -s -o /dev/null -w '%{http_code}' "http://localhost:$1/api/health" 2>/dev/null; }
 kill_port() { local p; p="$(lsof -tiTCP:"$1" -sTCP:LISTEN 2>/dev/null || true)"; [ -n "$p" ] && kill $p 2>/dev/null || true; }
 wait_up() { # wait_up <port> <name> <logfile>
@@ -61,26 +60,13 @@ wait_up() { # wait_up <port> <name> <logfile>
   echo; tail -40 "$3" 2>/dev/null; die "$2 did not come up on :$1 (see $3)"
 }
 
-STARTED_IMED=0
 cleanup() {
   [ -n "${CLEANED:-}" ] && return; CLEANED=1
   [ -n "${TAIL_PID:-}" ] && kill "$TAIL_PID" 2>/dev/null || true
   [ -n "${MEDCODE_PID:-}" ] && { kill "$MEDCODE_PID" 2>/dev/null || true; kill_port "$MEDCODE_PORT"; }
-  if [ "$STARTED_IMED" = 1 ]; then kill "${IMED_PID:-}" 2>/dev/null || true; kill_port "$IMED_PORT"; log "stopped imed-mock-api"; fi
 }
 trap 'exit 130' INT TERM
 trap cleanup EXIT
-
-# --- fake hospital (dependency of approve/reopen/sync) ---------------------
-if [ "$(health "$IMED_PORT")" = "200" ]; then
-  log "imed-mock-api already running on :$IMED_PORT — reusing it"
-else
-  [ -x "$IMED_DIR/mvnw" ] || die "imed-mock-api not found at $IMED_DIR (keep the repos as siblings, or set IMED_DIR)"
-  log "Starting imed-mock-api (fake hospital) on :$IMED_PORT — logs: $LOGDIR/imed.log"
-  ( cd "$IMED_DIR" && exec ./mvnw -q spring-boot:run ) > "$LOGDIR/imed.log" 2>&1 &
-  IMED_PID=$!; STARTED_IMED=1
-  wait_up "$IMED_PORT" "imed-mock-api" "$LOGDIR/imed.log"
-fi
 
 # --- this backend ----------------------------------------------------------
 [ "$(health "$MEDCODE_PORT")" = "200" ] && die "something already serves :$MEDCODE_PORT — is medcode-api already running?"
@@ -97,7 +83,7 @@ cat <<EOF
   Swagger UI      http://localhost:$MEDCODE_PORT/swagger-ui.html
   Health          http://localhost:$MEDCODE_PORT/api/healthz
   Admin login     ${ADMIN_BOOTSTRAP_EMAIL:-admin@medcodeai.demo} / ${ADMIN_BOOTSTRAP_PASSWORD:-admin1234}
-  Fake hospital   http://localhost:$IMED_PORT   (imed-mock-api)
+  Hospital API    ${IMED_API_BASE:-http://localhost:8003}   (IMED_API_BASE — run by the hospital)
 
   Following medcode-api logs — press Ctrl-C to stop everything this script started.
 

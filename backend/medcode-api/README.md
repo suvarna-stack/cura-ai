@@ -11,28 +11,24 @@ against [docs/api-contract.md](docs/api-contract.md) /
 - Spring Boot 4.1 / Java 21, Maven (`./mvnw`), plain SQL — no JPA, no Python.
 - Layers: `web/` (controllers) → `service/` (logic) → `repo/` (all SQL) +
   `client/` (outbound HTTP to the hospital's iMed API).
-- Owns the `medcode` PostgreSQL database. Hospital data lives in the separate
-  `imed` database owned by the sibling repo `../imed-mock-api` — this app
-  never touches it directly, it only calls the iMed API (approval results on
-  approve/reopen).
+- Owns the `medcode` PostgreSQL database. Hospital data lives behind the
+  hospital's iMed API, which the hospital builds and runs (it is not in this
+  repo). This app only calls that API: sync reads cases, approve/reopen write
+  codes back.
 
-> **รันทั้งระบบ (4 repo) ครั้งแรก?** → [RUN-ALL.md](RUN-ALL.md) — คู่มือภาษาไทย
-> ครอบคลุม imed-mock-api + medcode-api + RAG + audit-chart-frontend ตั้งแต่
-> เครื่องเปล่า เอกสารด้านล่างนี้เป็นของ repo นี้ repo เดียว
+> **รันทั้งระบบครั้งแรก?** → ใช้ Docker ตาม README ที่ root ของ repo
+> (`docker compose up`) เอกสารด้านล่างนี้เป็นของ backend นี้อย่างเดียว
 
 ## Local dev — first-time setup included
 
-**Just cloned this (or got it from a teammate)?** The databases are NOT
-shipped pre-built — you create them yourself from the seed file committed in
-each repo (`db/seed.sql.gz`). Keep the two repos as **sibling folders**
-(`medcode-api`, `imed-mock-api`), then:
+**Just cloned this?** The database is NOT shipped pre-built — you create it
+yourself from the committed seed file (`db/seed.sql.gz`), then point the app at
+the hospital's iMed API:
 
 ```bash
 brew install postgresql@18 && brew services start postgresql@18   # once per machine
-scripts/seed_local_pg.sh                               # builds db "medcode" (this repo)
-cd ../imed-mock-api && scripts/seed_local_imed_pg.sh   # builds db "imed" (sibling repo)
-./mvnw spring-boot:run                                 # :8003 fake hospital — keep it running
-cd ../medcode-api && ./mvnw spring-boot:run            # :8001 this backend
+scripts/seed_local_pg.sh                                  # builds db "medcode"
+IMED_API_BASE=https://<hospital-api-host> ./mvnw spring-boot:run   # :8001
 ```
 
 **Shortcut — one line to bring it all up** (macOS/Linux only; these scripts are
@@ -40,19 +36,19 @@ bash and shell out to `lsof`/`brew`. On Windows run the manual steps above in
 separate terminals — see `RUN-ALL.md` §5, the portable path — or use WSL/Git Bash):
 
 ```bash
-scripts/dev.sh          # seeds anything missing, starts the fake hospital (:8003),
-                        # then runs this backend (:8001). Ctrl-C stops both.
-scripts/dev.sh --seed   # force a fresh re-seed of BOTH databases first (wipes local data)
+scripts/dev.sh          # seeds the database if missing, then runs this
+                        # backend (:8001). Ctrl-C stops it.
+scripts/dev.sh --seed   # force a fresh re-seed first (wipes local data)
 ```
 
 It prints the Swagger URL and the admin login (`admin@medcodeai.demo` /
 `admin1234`) once ready. Postgres must be installed; it will `brew services
-start` it if it's not already running. Keep the two repos as sibling folders (or
-set `IMED_DIR`).
+start` it if it's not already running. It does not start the hospital API —
+set `IMED_API_BASE` to it (default `http://localhost:8003`).
 
-`dev.sh` covers the two backends only. The full product is four repos — add
-RAG (`:8000`) and the frontend (`:5173`) in their own terminals; the complete
-runbook for all four, on every OS, is `RUN-ALL.md`.
+`dev.sh` covers this backend only. Add RAG (`../../ai`, `:8000`) and the
+frontend (`../../frontend`, `:5173`) in their own terminals, or run everything
+with Docker from the repo root.
 
 Good to know:
 
@@ -77,7 +73,7 @@ Good to know:
 |---|---|
 | `DATABASE_URL` | libpq-form DSN (`postgresql://user:pass@host:port/db`); translated to JDBC automatically. Unset = `localhost:5432/medcode`. |
 | `JDBC_DATABASE_URL` | Already-JDBC URL; wins over `DATABASE_URL`. |
-| `IMED_API_BASE` | Base URL of the hospital iMed API — `../imed-mock-api` locally, the hospital's real API in production. Default `http://localhost:8003`. |
+| `IMED_API_BASE` | Base URL of the hospital's iMed API (host only, no `/api/v1`). The hospital runs it. Default `http://localhost:8003`. |
 | `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | Client credentials for the hospital API. Traded for a short-lived Bearer token at `IMED_API_BASE/auth/token` (Basic auth, `grant_type=client_credentials`), renewed automatically. Defaults `medcode-mock-client` / `medcode-mock-secret` (the mock's); the real pair comes from the hospital's admin. Keep the secret out of Git. |
 | `IMED_READ_TIMEOUT_SECONDS` | Read timeout for hospital calls. Default `60`. |
 | `ALLOWED_ORIGINS` | CORS origins, `*` (default) or comma list. |
@@ -187,24 +183,24 @@ above stays the source of truth. Off in containers — set
 ./mvnw test
 ```
 
-Prerequisites: Postgres running with **both** databases seeded (see Local
-dev) and **imed-mock-api running on :8003** — approve/reopen make the
-hospital calls for real. `CasesApiIntegrationTest` (`@SpringBootTest` +
+Prerequisites: Postgres running with the `medcode` database seeded (see
+Local dev) and **a hospital iMed API reachable at `IMED_API_BASE`** —
+sync, approve and reopen make the hospital calls for real. `CasesApiIntegrationTest` (`@SpringBootTest` +
 MockMvc, no test containers, no HTTP stubs) is the project's correctness
 gate: it drives the real read/write/approve/reopen/reset endpoints and checks
 response shape and behavior directly.
 
 ## Docker
 
-**The whole system in one command** — the root [`docker-compose.yml`](../../docker-compose.yml) runs all four
-services plus Postgres as five containers. From this folder:
+**The whole system in one command** — the root [`docker-compose.yml`](../../docker-compose.yml) runs the three
+services plus Postgres as four containers. From this folder:
 
 ```bash
 cd ../.. && cp .env.example .env && docker compose up -d --build
 ```
 
 The app comes up on <http://localhost:8080> (nginx serves the SPA and proxies
-`/api` here), with both databases seeded from the committed dumps. Docker is the
+`/api` here), with the `medcode` database seeded from the committed dump. Docker is the
 only prerequisite — no Java, Node, Python or PostgreSQL install needed. See that
 repo's README for ports, env vars and the RAM/disk notes.
 
@@ -219,17 +215,15 @@ docker run -p 8002:8002 -e PORT=8002 \
 
 ## Deploy (production direction: GCP, decided 2026-07-21)
 
-Target: **GCP with three containers** — this backend, `imed-mock-api`
-(stand-in until the hospital provides the real iMed API; then it's just an
-`IMED_API_BASE` change), and one stock `postgres:18` hosting the two
-databases (`medcode`, `imed`), each seeded from its repo's committed
-`db/seed.sql.gz`. Exact service (VM+compose vs Cloud Run vs GKE) not decided
-yet.
+Target: **GCP** — this backend and one stock `postgres:18` hosting
+`medcode`, seeded from the committed `db/seed.sql.gz`. The hospital hosts the
+iMed API; this backend reaches it through `IMED_API_BASE`. Exact service
+(VM+compose vs Cloud Run vs GKE) not decided yet.
 
-- Configuration is env-only: see the table above (plus imed-mock-api's own).
+- Configuration is env-only: see the table above.
 - **Single medcode-api instance only**: the in-process cases cache + write
   lock assume one process. On Cloud Run that means `max-instances=1`.
-- `/api/healthz` on both apps runs a real `SELECT COUNT(*)` — usable as the
+- `/api/healthz` runs a real `SELECT COUNT(*)` — usable as the
   container health/liveness checks.
 
 Migration plan + milestones: see `CLAUDE.md` (progress) and the full session

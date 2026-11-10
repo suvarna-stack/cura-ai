@@ -3,14 +3,16 @@
 The whole CURA AI system in one repo. Each service lives in its own folder with
 its own `Dockerfile`; the root `docker-compose.yml` runs them all plus Postgres
 and owns only what lives *between* them — startup order, the env vars that point
-the services at each other, the shared database, and the volumes.
+the services at each other, the database, and the volumes.
+
+The hospital's iMed API is **not** in this repo: the hospital builds and runs
+it, and our backend reaches it through `IMED_API_BASE`.
 
 ## Layout
 
 ```
 frontend/                  web UI          React + Vite, served by nginx
 backend/medcode-api/       our backend     Spring Boot, Java 21
-backend/imed-mock-api/     fake hospital   Spring Boot, Java 21 (stands in for iMed)
 ai/                        RAG service     FastAPI, Python
 db/initdb/                 Postgres first-boot scripts
 docs/  report/  eval-results/
@@ -20,18 +22,18 @@ docker-compose.yml         runs everything
 Each folder still has its own README, `Dockerfile` and `.dockerignore`, and can be
 built on its own: `docker build ./frontend`, `docker build ./ai`, and so on.
 
-### For hospital developers building the real iMed API
+### For hospital developers building the iMed API
 
-`backend/imed-mock-api/` is a working mock of the API we need from the hospital —
-build yours to match it. Start with its README, then the contract it implements
-(`backend/medcode-api/docs/imed-integration.md` and
-`backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`).
-`backend/medcode-api/` is the client that calls it. Pointing our backend at your
-real API is one setting: `IMED_API_BASE`.
+What our backend calls, and expects back, is written down in
+`backend/medcode-api/docs/imed-integration.md` and
+`backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. The
+code that calls it is `backend/medcode-api/` (start at
+`src/main/java/com/medcodeai/api/client/ImedApiClient.java`). Pointing our
+backend at your API is three settings in `.env`: `IMED_API_BASE`,
+`IMED_CLIENT_ID` and `IMED_CLIENT_SECRET`.
 
-These folders were five separate repos until 2026-11-10 (`audit-chart-frontend`,
-`medcode-api`, `imed-mock-api`, `RAG`, `medcode-stack`); their full git history
-is kept here.
+These folders were separate repos until 2026-11-10 (`audit-chart-frontend`,
+`medcode-api`, `RAG`, `medcode-stack`); their full git history is kept here.
 
 ## Documentation
 
@@ -50,31 +52,38 @@ is kept here.
 - Docker (Docker Desktop, Colima, OrbStack — any Docker Engine 20.10+), given
   **at least 4GB of RAM** in its settings
 - Ollama running on the **host**, if you want AI generation (see below)
-- No native Postgres on port 5433 and nothing on 8080/8001/8003/8000
+- No native Postgres on port 5433 and nothing on 8080/8001/8000
+- The hospital's iMed API, reachable from this machine, for Sync, Approve and
+  Reopen (see below)
 
 Nothing else: no Java, Node, Python or PostgreSQL install is needed — every
 build happens inside the images. Windows and Linux work the same as macOS (on
 Windows use Docker Desktop with the WSL2 backend, and run the commands from
 PowerShell or a WSL shell).
 
-Don't want Docker? See `backend/medcode-api/RUN-ALL.md` for the manual, four-terminal
-path (no containers, Thai-language).
+Don't want Docker? See `backend/medcode-api/RUN-ALL.md` for the manual,
+three-terminal path (no containers, Thai-language).
 
 ## Run it
 
 ```bash
-cp .env.example .env      # edit ports/passwords if you like
+cp .env.example .env      # set IMED_API_BASE + client id/secret; edit ports/passwords if you like
 docker compose up -d --build
 ```
 
 Then open **http://localhost:8080** and log in with the bootstrap admin from
 `.env` (`admin@medcodeai.demo` / `admin1234` by default).
 
-First run takes a while: two Maven builds, an npm build, and a PyTorch install.
+The dashboard starts empty: every case arrives by **Sync** from the hospital's
+iMed API. Without that API the app still starts and you can log in, but Sync,
+Approve and Reopen fail. If `IMED_API_BASE` is left blank, the backend looks for
+it on port 8003 of this machine.
+
+First run takes a while: a Maven build, an npm build, and a PyTorch install.
 Later runs are cached.
 
 ```bash
-docker compose ps                 # health of all five services
+docker compose ps                 # health of all four services
 docker compose logs -f medcode-api
 docker compose down               # stop, keep data
 docker compose down -v            # stop and WIPE the databases + RAG index
@@ -86,11 +95,10 @@ docker compose down -v            # stop and WIPE the databases + RAG index
 |---|---|---|
 `web` (nginx + SPA) | http://localhost:8080 | `web:8080` |
 `medcode-api` | http://localhost:8001 | `medcode-api:8001` |
-`imed-mock-api` | http://localhost:8003 | `imed-mock-api:8003` |
 `rag` | http://localhost:8000 | `rag:8000` |
 `db` (Postgres 18) | `localhost:5433` | `db:5432` |
 
-Two host ports differ from the native four-terminal setup on purpose, so this
+Two host ports differ from the native setup on purpose, so this
 stack can run **alongside** it: the web UI is on **8080** (5173 belongs to the
 vite dev server) and Postgres on **5433** (5432 belongs to Homebrew Postgres).
 All ports are overridable in `.env`.
@@ -104,9 +112,9 @@ Port 8001 is still published for Swagger and `curl`, but the app doesn't use it.
 
 ## The database
 
-One Postgres server holds **both** databases — `medcode` (ours) and `imed` (the
-hospital's) — matching the GCP deploy plan. Both are restored from the committed
-dumps in the two backend folders by the scripts in `db/initdb/`.
+Postgres holds one database, `medcode`, restored from the committed dump in
+`backend/medcode-api/db/` by the scripts in `db/initdb/`. The hospital's data
+stays in the hospital: we only reach it over its API.
 
 Those scripts run **only once**, when the `pgdata` volume is empty. To re-seed:
 
@@ -116,17 +124,13 @@ docker compose down -v && docker compose up -d
 
 ### Pulling updated demo data — read this before `git pull`
 
-Compose bind-mounts the seed dumps from the backend folders:
+Compose bind-mounts the seed dump `backend/medcode-api/db/seed.sql.gz` at
+`/seed/medcode.sql.gz`.
 
-| Dump | Lives in |
-|---|---|
-| `/seed/medcode.sql.gz` | `backend/medcode-api/db/seed.sql.gz` |
-| `/seed/imed.sql.gz` | `backend/imed-mock-api/db/seed.sql.gz` |
-
-One `git pull` gets you new dumps, but **`docker compose up -d` will silently
+One `git pull` gets you a new dump, but **`docker compose up -d` will silently
 ignore them.** The scripts in `db/initdb/` are run by the postgres image only on
 an *empty* `pgdata` volume. If you have ever started this stack, that volume is
-populated, the new dumps are mounted at `/seed/` and never read, and nothing
+populated, the new dump is mounted at `/seed/` and never read, and nothing
 errors — you just quietly keep the old data.
 
 So the whole update is:
@@ -137,9 +141,10 @@ docker compose down -v          # the -v is the load-bearing part
 docker compose up -d --build
 ```
 
-`down -v` destroys the databases and the RAG index. That is fine here — both are
-rebuilt from the committed dumps — but it also destroys **any approvals made in
-this stack**, since they live only in the `pgdata` volume.
+`down -v` destroys the database and the RAG index. That is fine here — both are
+rebuilt from committed files — but it also destroys **any approvals made in
+this stack**, since they live only in the `pgdata` volume. (Codes already written
+back to the hospital stay there.)
 
 Not in the dumps, and restored a different way: the auth columns, the bootstrap
 admin and the `icd_10`/`icd_9` catalog split are applied by `medcode-api`'s
@@ -152,9 +157,6 @@ Reach it from the host with:
 ```bash
 psql -h localhost -p 5433 -U postgres -d medcode
 ```
-
-Remember the hospital database keeps its tables in a schema named `imed`, not
-`public`:  `psql … -d imed -c 'select count(*) from imed.medhack_patient'`.
 
 ## AI (the RAG service)
 
@@ -180,11 +182,11 @@ downloaded embedding model, so it survives rebuilds).
 
 ## Memory and disk
 
-The full stack is two JVMs, a PyTorch process, nginx and Postgres. Give Docker
+The full stack is a JVM, a PyTorch process, nginx and Postgres. Give Docker
 **at least 4GB** of RAM, 6GB if you also run Ollama's 8B model on the same
 machine — an 8GB laptop cannot comfortably do both at once. If Ollama is
 squeezed, run the stack with `LLM_BACKEND=transformers`, or run RAG natively and
-`docker compose up db imed-mock-api medcode-api web`.
+`docker compose up db medcode-api web`.
 
 Disk: roughly 4–5GB of images with the defaults. `PREFETCH_EMBED_MODEL=1` adds
 about 3GB more but makes the RAG image self-contained and offline-capable, which
@@ -195,14 +197,15 @@ is what you want for a CI-built image or a hospital demo on a strange network.
 The suites are not containerized — they run on the host against this stack:
 
 ```bash
-# medcode-api needs both databases and the hospital mock reachable
+# medcode-api needs the database and a hospital iMed API reachable
 cd backend/medcode-api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
-IMED_API_BASE=http://localhost:8003 ./mvnw test
+IMED_API_BASE=https://<hospital-test-server> ./mvnw test
 ```
 
-Note that 13 `CasesApiIntegrationTest` failures are pre-existing and unrelated to
-containers — the suite's hard-coded case IDs predate the current demo dataset.
+`CasesApiIntegrationTest` approves and reopens for real, so it **writes to the
+hospital API**. Run it only against a hospital test server. Its fixed case IDs
+come from the old mock's demo data, so expect failures against other data.
 
 ## Production is not this file
 

@@ -13,16 +13,17 @@ optional AI chat model runs in [Ollama](https://ollama.com) on the same machine.
 | | Why |
 |---|---|
 | **Docker** + Compose (Engine 20.10+) | Every service builds and runs in a container. Docker Desktop, Colima and OrbStack all work. |
-| **≥4 GB RAM given to Docker** | Two JVMs, a PyTorch process, nginx and Postgres. Give it **6 GB** if Ollama's 8B model also runs on the same machine. An 8 GB laptop cannot comfortably run both. |
+| **≥4 GB RAM given to Docker** | A JVM, a PyTorch process, nginx and Postgres. Give it **6 GB** if Ollama's 8B model also runs on the same machine. An 8 GB laptop cannot comfortably run both. |
 | **~5 GB free disk** | Images with the defaults. Add ~3 GB if you bake the embedding model into the image (`PREFETCH_EMBED_MODEL=1`). |
 | **Git** | To clone the repository. |
+| **The hospital's iMed API** | Every case comes from it by Sync, and approved codes go back to it. The hospital builds and runs it; it is not in this repo. Without it the app starts, but has no cases. |
 | **[Ollama](https://ollama.com)**, *optional* | Only for the AI Agent chat. Code suggestions do **not** need it (see [step 4](#4--ai)). |
 | A modern browser | Chrome, Edge or Firefox. Nothing to install on the coder's side. |
 
 No Java, Node, Python or PostgreSQL install is needed to *run* the system.
 Those are only needed to run the test suites on the host ([step 5](#5--verify)).
 
-Free host ports: **8080, 8001, 8003, 8000, 5433**. All five can be moved in
+Free host ports: **8080, 8001, 8000, 5433**. All four can be moved in
 `.env`.
 
 ---
@@ -38,13 +39,11 @@ cd cura-ai
 cura-ai/                  ← compose file, DB init scripts, docs (you work from here)
   frontend/               web UI             (React + Vite, served by nginx)
   backend/medcode-api/    backend            (Spring Boot, Java 21)
-  backend/imed-mock-api/  stand-in hospital  (Spring Boot, Java 21)
   ai/                     AI service         (FastAPI, Python)
 ```
 
-The compose file builds each image from its folder, and it mounts the two
-database seed files straight out of `backend/medcode-api/db/` and
-`backend/imed-mock-api/db/`.
+The compose file builds each image from its folder, and it mounts the
+database seed file straight out of `backend/medcode-api/db/`.
 
 ---
 
@@ -54,15 +53,17 @@ database seed files straight out of `backend/medcode-api/db/` and
 cp .env.example .env
 ```
 
-Every value already has a working default, so a demo needs no edits. The file
-exists so you can change ports and secrets without touching the compose file.
+Set the three `IMED_*` values to the hospital's API. Everything else has a
+working default. The file exists so you can change ports and secrets without
+touching the compose file.
 
 | Setting | Default | Change it when |
 |---|---|---|
-| `WEB_PORT` · `API_PORT` · `IMED_PORT` · `RAG_PORT` · `DB_PORT` | 8080 · 8001 · 8003 · 8000 · 5433 | a port is already taken |
+| `IMED_API_BASE` | blank = port 8003 on this machine | **always**: the hospital's iMed API, host only (no `/api/v1`, no trailing slash) |
+| `WEB_PORT` · `API_PORT` · `RAG_PORT` · `DB_PORT` | 8080 · 8001 · 8000 · 5433 | a port is already taken |
 | `ADMIN_BOOTSTRAP_EMAIL` / `_PASSWORD` | `admin@medcodeai.demo` / `admin1234` | **before anything reachable from another machine** |
 | `POSTGRES_PASSWORD` | `postgres` | same |
-| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | `medcode-mock-client` / `medcode-mock-secret` | pointing at the real hospital API (its admin issues the real pair; medcode-api trades it for a short-lived token at `/auth/token`) |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | blank | **always**: the hospital's admin issues the pair; medcode-api trades it for a short-lived token at `/auth/token` |
 | `LLM_BACKEND` · `OLLAMA_BASE` · `OLLAMA_MODEL` | `ollama` · `http://host.docker.internal:11434` · EIRAI-8B | see step 4 |
 
 `.env` is gitignored. `.env.example` is the only tracked copy, and it holds
@@ -74,28 +75,26 @@ demo defaults only.
 
 ```bash
 docker compose up -d --build
-docker compose ps          # wait until all five say "healthy"
+docker compose ps          # wait until all four are up
 ```
 
-The first run is slow: two Maven builds, an npm build and a PyTorch install.
+The first run is slow: a Maven build, an npm build and a PyTorch install.
 Later runs reuse the build cache.
 
 | Service | Open | What it is |
 |---|---|---|
 | `web` | **http://localhost:8080** | The app. nginx serves the built UI and proxies `/api` to the backend |
 | `medcode-api` | http://localhost:8001/swagger-ui.html | Backend. Swagger is on in this demo stack only |
-| `imed-mock-api` | http://localhost:8003/console.html | Stand-in hospital system (iMed) |
 | `rag` | http://localhost:8000/docs | AI service |
-| `db` | `psql -h localhost -p 5433 -U postgres` | Postgres 18, holding both databases |
+| `db` | `psql -h localhost -p 5433 -U postgres` | Postgres 18, holding the `medcode` database |
 
 **The browser only ever talks to port 8080.** The UI is built with
 `VITE_API_BASE_URL=/api`, so every call is same-origin and CORS never comes up.
 Port 8001 is published for Swagger and `curl` only.
 
-On first boot, Postgres creates two databases and restores them from the
-committed dumps. `medcode` holds our data and starts **empty**: no cases and no
-users. `imed` holds the hospital's data. Then `medcode-api`'s Flyway migrations
-run and the bootstrap admin is created.
+On first boot, Postgres creates the `medcode` database and restores it from
+the committed dump. It starts **empty**: no cases and no users. Then
+`medcode-api`'s Flyway migrations run and the bootstrap admin is created.
 
 ---
 
@@ -112,7 +111,7 @@ embedding model (`BAAI/bge-m3`, ~2.3 GB) downloads into the `hfcache` volume
 the first time a case asks for suggestions. **That first request takes about a
 minute and looks like a hang.** After that it is cached and survives rebuilds.
 The reference index (three ICD manuals, already chunked and embedded) ships
-committed in `RAG/data/` and is copied into the `ragdata` volume on first run.
+committed in `ai/data/` and is copied into the `ragdata` volume on first run.
 
 ### 4b · Agent chat: needs Ollama on the host
 
@@ -145,7 +144,6 @@ Three things that will bite you:
 ```bash
 # 1. every service answers
 curl -s localhost:8001/api/healthz     # {"ok":true,"cases":0,"db":"pg"}  (real COUNT(*))
-curl -s localhost:8003/api/healthz
 curl -s localhost:8000/health
 ```
 
@@ -156,12 +154,13 @@ Then walk the app:
 2. **The admin account cannot open the coding screens.** Coding is a coder-role
    page, and an admin is redirected to the admin console. Go to **Accounts**,
    create a coder account, sign out, and sign back in as that coder.
-3. The dashboard is empty. That is correct. Press **Sync** (ซิงค์), choose
-   **Everything**, and confirm with **Sync now** (ซิงค์เลย). The hospital's 140 outpatient visits load: 80 arrive already coded
-   with both code systems (*Complete*) and 60 are missing one (*Incomplete*).
+3. The dashboard is empty. That is correct. Press **Sync** (ซิงค์), pick a
+   date range, and confirm with **Sync now** (ซิงค์เลย). The hospital's visits
+   for those days load. A visit that arrives with both code systems is
+   *Complete*; one missing either is *Incomplete*.
 4. Open a case. AI suggestions appear in the ICD-10 and ICD-9 columns (the
    first time, after the ~1 minute model download). Tick codes and **Approve**.
-   The codes are written back to the hospital database within seconds.
+   The codes are written back to the hospital through its API within seconds.
 
 ### Run the test suites
 
@@ -169,36 +168,32 @@ These run on the host against the running stack, so they need Java 21 and
 Python 3:
 
 ```bash
-# medcode-api — needs both databases AND the hospital mock reachable
+# medcode-api — needs the database AND a hospital iMed API reachable.
+# It approves and reopens for real, so use a hospital TEST server.
 cd backend/medcode-api
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
-IMED_API_BASE=http://localhost:8003 ./mvnw test
-
-# imed-mock-api
-cd ../imed-mock-api
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/imed ./mvnw test
+IMED_API_BASE=https://<hospital-test-server> ./mvnw test
 
 # RAG — no model download needed
 cd ../../ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest -q
 ```
 
-Results recorded for the report (`eval-results/`): medcode-api 90/91,
-imed-mock-api 19/19, RAG 82/82. The one medcode-api failure is a test-isolation
-gap. The mock hospital's writes are not rolled back between runs. It is not a
-product defect. The load tests (Apache Bench) and their exact commands are in
+Results recorded for the report (`eval-results/`), run against our old mock
+hospital before it was removed: medcode-api 90/91, RAG 82/82. The one
+medcode-api failure is a test-isolation gap: the hospital's writes are not
+rolled back between runs. It is not a product defect. The load tests (Apache Bench) and their exact commands are in
 `eval-results/perf/`.
 
 ### Demo data
 
-Everything needed to run end to end ships in the repositories, and all of it is
-**synthetic**. No real patient data exists anywhere in the repository.
+No patient data exists anywhere in this repository. Cases live in the
+hospital and arrive through its API on Sync.
 
 | What | Where |
 |---|---|
-| 150 hospital visits: 140 OPD (shown on the dashboard) + 10 IPD | `backend/imed-mock-api/db/seed.sql.gz`, built by the deterministic `scripts/generate_demo_data.py` |
-| ICD-10 / ICD-9 reference catalogs (650 / 332 rows) | `backend/imed-mock-api` Flyway migration `V6`, mirrored into `medcode` on every sync |
-| Our empty starting database | `backend/medcode-api/db/seed.sql.gz` |
+| Hospital visits | Not in this repo. Pulled from the hospital's iMed API on Sync |
+| Our empty starting database, with the ICD-10 / ICD-9 catalogs | `backend/medcode-api/db/seed.sql.gz`; the catalogs are refreshed from the hospital's on every sync |
 | AI reference index (3 ICD manuals) | `ai/data/` (Chroma index, knowledge graph, PDFs) |
 | Accounts | Only the bootstrap admin. Coders are created by the admin |
 
@@ -214,8 +209,9 @@ docker compose down -v       # the -v is what makes new demo data load
 docker compose up -d --build
 ```
 
-`down -v` deletes both databases and the AI index, **including any approvals
-made in this stack**. Both are rebuilt from the committed files.
+`down -v` deletes the database and the AI index, **including any approvals
+made in this stack** (codes already written back stay at the hospital). Both are
+rebuilt from the committed files.
 
 ---
 
@@ -224,7 +220,9 @@ made in this stack**. Both are rebuilt from the committed files.
 | Symptom | Cause and fix |
 |---|---|
 | `Cannot connect to the Docker daemon` (Colima) | Colima's socket is not the default. Run `colima start`, then `export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"`. |
-| `port is already allocated` | Something else holds 8080/8001/8003/8000/5433. Change that port in `.env`. |
+| `port is already allocated` | Something else holds 8080/8001/8000/5433. Change that port in `.env`. |
+| Sync, Approve or Reopen fails with "iMed API not reachable" | The hospital's API is down or `IMED_API_BASE` is wrong. Check `.env`, then `docker compose up -d medcode-api`. |
+| Sync fails with `401` | `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` are wrong. Ask the hospital's admin for the pair. |
 | After a pull the demo data looks old | Postgres ignored the new dumps because the volume already existed. `docker compose down -v`, then up again. |
 | "password_hash does not exist", or no admin can sign in | The database was restored but the app has not booted yet. Start `medcode-api`. Flyway adds the columns and the bootstrap admin at startup. Never edit a dump to fix this. |
 | Admin signs in but never sees cases | Working as designed. Cases are a coder-role screen. Create a coder under **Accounts**. |
@@ -233,7 +231,7 @@ made in this stack**. Both are rebuilt from the committed files.
 | Agent chat errors or never answers | Ollama is not running or the model is not pulled. Check `curl localhost:11434/api/tags` on the host. See step 4b. |
 | `ollama pull` fails: *blocked redirect to a different host* | Known and unsolved. See step 4b. |
 | A training upload is refused | Over 50 MB (nginx limit), or a scanned PDF with no text layer (the AI service needs extractable text). |
-| `medcode-api` tests fail with "iMed API not reachable" | The mock hospital must be running and reachable through `IMED_API_BASE`. |
+| `medcode-api` tests fail with "iMed API not reachable" | A hospital test server must be reachable through `IMED_API_BASE`. |
 | Swagger or **Reset demo** answers 404 | Both are forced off inside the images and turned back on only by this compose file (`SWAGGER_ENABLED`, `DEMO_TOOLS_ENABLED`). Check `.env`. |
 | "This case is being worked on by …" | One coder per case. The lock expires 90 seconds after the other coder leaves the page. |
 
@@ -241,7 +239,7 @@ made in this stack**. Both are rebuilt from the committed files.
 
 ## Without Docker
 
-`backend/medcode-api/RUN-ALL.md` covers the manual four-terminal setup (native
+`backend/medcode-api/RUN-ALL.md` covers the manual three-terminal setup (native
 Postgres 18, Java 21, Python and Node) on macOS, Linux and Windows. It is
 written in Thai.
 

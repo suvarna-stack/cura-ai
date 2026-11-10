@@ -20,23 +20,20 @@ flowchart LR
     browser["Browser"]
   end
 
-  subgraph stack["medcode-stack (docker compose)"]
+  subgraph stack["this repo (docker compose)"]
     web["web<br/>nginx + React SPA<br/>:8080"]
     api["medcode-api<br/>Spring Boot 4.1 · Java 21<br/>:8001 · ONE instance"]
     rag["rag<br/>FastAPI · bge-m3 · Chroma<br/>:8000"]
-    db[("db · Postgres 18<br/>medcode + imed<br/>:5433")]
-    imed["imed-mock-api<br/>stand-in hospital (iMed)<br/>:8003"]
+    db[("db · Postgres 18<br/>medcode<br/>:5433")]
   end
 
   ollama["Ollama on the host<br/>Llama-3.1-EIRAI-8B Q4_K_M<br/>:11434"]
-  real["Hospital Medihack API<br/>(per its 2026-11-04 guide)"]
+  real["Hospital iMed API<br/>built and run by the hospital<br/>(per its 2026-11-04 guide)"]
 
   browser -->|"HTTP, same origin"| web
   web -->|"/api proxy"| api
   api -->|"JDBC · plain SQL<br/>db: medcode"| db
-  imed -->|"db: imed"| db
-  api -->|"/auth/token → Bearer token<br/>5 read · 4 write routes"| imed
-  api -.->|"swap IMED_API_BASE"| real
+  api -->|"IMED_API_BASE<br/>/auth/token → Bearer token<br/>5 read · 4 write routes"| real
   api -->|"/suggest · /chat · /learn · /documents"| rag
   rag -.->|"generation only<br/>(chat, rule extraction)"| ollama
 ```
@@ -51,28 +48,26 @@ the only one that calls the hospital or the AI service. The AI service has no
 authentication of its own and is meant to be reachable only from the backend
 (see [Known gaps](#9-known-gaps)).
 
-**The hospital is behind one setting.** `imed-mock-api` follows the
-hospital's own API guide for MedCode (4 Nov 2026) field for field, including
-its refusals (20 visits per request, 31 days per window, its 400 rules on
-writes). The one deliberate difference: the mock's writes are saved, so
-approve and reopen can be tested end to end, while the hospital's write side
-is still a mock that answers `mock: true` and saves nothing. Moving to the real
-hospital means changing `IMED_API_BASE`, `IMED_CLIENT_ID` and
-`IMED_CLIENT_SECRET`, with no code change.
+**The hospital is behind one setting.** The iMed API is built and run by the
+hospital, not by this repo. `medcode-api` calls it as described in the
+hospital's own API guide for MedCode (4 Nov 2026), including its refusals (20
+visits per request, 31 days per window, its 400 rules on writes). Pointing at
+a hospital server means setting `IMED_API_BASE`, `IMED_CLIENT_ID` and
+`IMED_CLIENT_SECRET`, with no code change. Without it, the app still starts,
+but sync, approve and reopen fail.
 
 **Generation runs outside the containers.** Docker on macOS has no GPU
 passthrough, so the chat model runs in Ollama on the host. Code suggestions
 never touch it (§5).
 
-### The five services
+### The four services
 
-| Service | Repo | Stack | Owns |
+| Service | Folder | Stack | Owns |
 |---|---|---|---|
-| `web` | `audit-chart-frontend` | React 19, Vite 8, TypeScript 6, Tailwind 4, axios; served by nginx | Nothing persistent. The token lives in the browser's `localStorage` |
-| `medcode-api` | `medcode-api` | Spring Boot 4.1, Java 21, plain SQL (no JPA), Flyway | The `medcode` database, the API contract, the write lock to the hospital |
-| `imed-mock-api` | `imed-mock-api` | Spring Boot 4.1, Java 21, plain SQL, Flyway | The `imed` database (schema `imed`). Mock only; replaced by the real hospital |
-| `rag` | `RAG` | FastAPI, sentence-transformers (`BAAI/bge-m3`), Chroma, a knowledge graph (GraphML) | The vector index, the graph, uploaded manuals, coder-taught rules |
-| `db` | — | stock `postgres:18` | Both databases on one server, seeded once from committed dumps |
+| `web` | `frontend/` | React 19, Vite 8, TypeScript 6, Tailwind 4, axios; served by nginx | Nothing persistent. The token lives in the browser's `localStorage` |
+| `medcode-api` | `backend/medcode-api/` | Spring Boot 4.1, Java 21, plain SQL (no JPA), Flyway | The `medcode` database, the API contract, the write lock to the hospital |
+| `rag` | `ai/` | FastAPI, sentence-transformers (`BAAI/bge-m3`), Chroma, a knowledge graph (GraphML) | The vector index, the graph, uploaded manuals, coder-taught rules |
+| `db` | — | stock `postgres:18` | The `medcode` database, seeded once from a committed dump |
 
 ### Ports
 
@@ -80,7 +75,6 @@ never touch it (§5).
 |---|---|---|---|
 | Web UI | **8080** | `web:8080` | 5173 (vite dev server) |
 | Backend | 8001 | `medcode-api:8001` | 8001 |
-| Hospital mock | 8003 | `imed-mock-api:8003` | 8003 |
 | AI service | 8000 | `rag:8000` | 8000 |
 | Postgres | **5433** | `db:5432` | 5432 |
 
@@ -342,25 +336,13 @@ Every case-keyed table has a foreign key to `cases`. Two were missing, because
 hand-written Java DDL had created them without one; migration V6 added them.
 Since then Flyway files are the only place schema is defined.
 
-### `imed`: the stand-in hospital (15 tables, schema `imed`)
-
-The hospital's extract tables, as exported: `medhack_patient` (the visit),
-`medhack_diagnosis_icd10`, `medhack_procedure_icd9`, `medhack_medicalrecord`,
-`medhack_medicalrecord_result`, `medhack_orderdrug`, `medhack_orderlab`,
-`medhack_vitalsign`, `medhack_bedmanagement` and `medhack_billingitem`. On top
-of those sit the write-side tables the hospital's API implies: `icd_10`,
-`icd_9`, `imed_request_log` (the `request_id` replay store) and
-`doctor_discharge_opd` / `_ipd`. Cancelled code rows are flagged, never
-deleted, and never returned by a read.
-
 ### Identity
 
 A case is keyed by the hospital's **visit (transaction) number**. The hospital
 extract carries **no patient names**, so `patient` is `null` everywhere; the
 admin's "show patient name" switch exists for the day iMed sends one. When
 iMed sends no visit datetime, the visit date is decoded from positions 4–15 of
-the transaction number, the same rule the mock uses, so both systems date a
-visit identically.
+the transaction number.
 
 ---
 
@@ -369,7 +351,7 @@ visit identically.
 | Variable | Default in image | In this compose stack | Why |
 |---|---|---|---|
 | `SWAGGER_ENABLED` | **off** | on | A try-it-out console; never in production |
-| `DEMO_TOOLS_ENABLED` | **off** | on | `POST /api/demo/reset` rewrites both databases |
+| `DEMO_TOOLS_ENABLED` | **off** | on | `POST /api/demo/reset` rewrites `medcode` and asks the hospital API to restore its side (only the retired mock did) |
 | `ADMIN_BOOTSTRAP_*` | `admin@medcodeai.demo` / `admin1234` | same | Logs a WARN when the default password is used |
 | `ALLOWED_ORIGINS` | `*` | `*` | Harmless behind the same-origin proxy; narrow it anywhere shared |
 | `LLM_BACKEND` | `transformers` | `ollama` | Chat only. Suggestions do not use it |
@@ -393,6 +375,6 @@ An honest list, for anyone planning a real deployment.
 | **Reopen cannot restore original hospital ids** | iMed has no un-cancel, so a re-created row gets a new id |
 | **Email + password logins** | Stored safely (BCrypt, lockout, server-side sessions), but a hospital should use its own SSO (SAML or OIDC). See `medcode-api/docs/DEPLOYMENT-PREP.md` |
 | **No retention, erasure or consent handling** | Nothing expires data, and there is no data-subject request flow. Needed before any real patient record (report Ch.5) |
-| **Tests write through to the mock hospital** | medcode-api's suite approves and reopens against the live `imed` database, so a long-lived mock drifts. This causes the one standing test failure (90/91) |
+| **Tests write through to the hospital API** | medcode-api's suite approves and reopens for real at `IMED_API_BASE`, so it needs a hospital test server, and repeated runs drift that server's data. Against the old mock this caused the one standing failure (90/91) |
 | **`document_chunks` has no reader** | Filled at every sync, used by nothing yet |
 | **Per-case sync has no UI** | `POST /api/cases/{id}/sync` works, but only bulk sync is wired to a button |

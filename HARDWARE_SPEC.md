@@ -46,7 +46,7 @@ audit dashboard.
 | AI use | **Inference only**, no training. Generation model: `Llama-3.1-EIRAI-8B-i1-GGUF:Q4_K_M` (8B params, 4-bit quantized) via Ollama. Embedding/retrieval model: bge-m3 (HuggingFace `transformers`), CPU-only in the container. |
 | Users | Hospital medical coders (roles: coder, admin). Headcount: **[OPEN — see Q4]** |
 | Peak concurrent | Load-tested at **50 simultaneous clients, zero failed requests** (`report/06-testing-evaluation.md`). Real hospital concurrency is explicitly flagged as **unverified** by the team's own report (`08-conclusion.md`, item 7) |
-| Integration | Hospital HIS/EMR via the "iMed" API — currently a same-contract mock (`imed-mock-api`); swapping to the real hospital API is a one-setting change once the hospital provides it |
+| Integration | Hospital HIS/EMR via the "iMed" API — built and run by the hospital (our same-contract mock was retired 2026-11-10); connecting to it is a one-setting change (`IMED_API_BASE`) |
 
 If the hackathon program includes two more prototypes from other teams, this document
 does not cover them — nothing about them exists in this codebase (Q1).

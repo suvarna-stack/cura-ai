@@ -8,10 +8,10 @@ Exhaustive companions sit beside it:
 
 | Document | Audience |
 |---|---|
-| `medcode-api/docs/api-contract.md` | frontend developers. Every field of every response, and which DB column it comes from. **The contract of record**: when this page and it disagree, it wins |
-| `medcode-api/docs/types.ts` | the same contract as TypeScript types |
-| `medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | hospital IT. The read contract (R1–R6) we asked the hospital to build |
-| `http://localhost:8003/v3/api-docs.yaml` | hospital integrators. OpenAPI 3.1, generated from the running mock, so it cannot drift |
+| `backend/medcode-api/docs/api-contract.md` | frontend developers. Every field of every response, and which DB column it comes from. **The contract of record**: when this page and it disagree, it wins |
+| `backend/medcode-api/docs/types.ts` | the same contract as TypeScript types |
+| `backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | hospital IT. The read contract (R1–R6) we asked the hospital to build |
+| `backend/medcode-api/docs/imed-integration.md` | hospital developers. How `medcode-api` calls the iMed API: every route, field and error it relies on |
 
 A live console is at `http://localhost:8001/swagger-ui.html` while the demo
 stack runs. It is forced **off** in the container images and turned back on
@@ -31,7 +31,7 @@ in code but not in the documented list, or the reverse.
 |---|---|---|
 | Web UI + API | `http://localhost:8080/api` | **What the browser uses.** nginx proxies `/api` to the backend: same origin, no CORS |
 | Backend, direct | `http://localhost:8001/api` | Swagger and `curl` |
-| Hospital (mock) | `http://localhost:8003/api/v1` | Stand-in for iMed. Called by the backend only |
+| Hospital (iMed) | `IMED_API_BASE` + `/api/v1` | Run by the hospital, not this repo. Called by the backend only |
 | AI service | `http://localhost:8000` | Internal. Called by the backend only |
 
 ---
@@ -295,15 +295,15 @@ fact.
 
 What `medcode-api` calls. Frontends never do. The source of truth is the
 hospital's own guide, "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026).
-Locally `imed-mock-api` answers field for field, and cutover is
+The hospital builds and runs this API; `medcode-api` finds it through
 `IMED_API_BASE` + `IMED_CLIENT_ID` + `IMED_CLIENT_SECRET`.
 
 Auth: `POST /auth/token` with `Authorization: Basic base64(client_id:client_secret)`
 and form body `grant_type=client_credentials` →
 `{access_token, token_type: "Bearer", expires_in}`. Every other call sends
 `Authorization: Bearer <access_token>`. medcode-api renews the token before it
-expires and retries once on a `401`. Mock defaults: `medcode-mock-client` /
-`medcode-mock-secret`, 300-second tokens.
+expires and retries once on a `401`. The guide's tokens last 300 seconds; the
+hospital's admin issues the client id and secret.
 
 ### Read: the five routes the hospital built
 
@@ -333,8 +333,6 @@ sync fails with a `500` naming it, before anything is written. Bad bodies are
 
 The hospital's write side is still a **mock** on its end: every success
 carries `mock: true` and nothing reaches HIS (medcode-api logs this once).
-`imed-mock-api` checks the same rules but really saves, so approve/reopen can
-be tested end to end.
 
 | # | Call | What |
 |---|---|---|
@@ -349,8 +347,7 @@ is a `400`; a description goes as a matching pair
 (`icd10_description` + `beginning_diagnosis`). Errors: `400
 STATUS_BUSINESS_ERROR / invalid_request` and `401 unauthorized` (no `status`
 key). The real HIS will also send `409 DIAGNOSIS_CODE_ALREADY_EXIST` and a
-visit-lock `403`; the hospital's mock does neither yet, and `imed-mock-api`
-does the `409` plus `request_id` replay.
+visit-lock `403`; the hospital's current write mock does neither yet.
 
 Optional `coding_status` on W1/W2: `"approved"` marks the visit as coded, and
 `"open"` clears it on reopen. We proposed it; the hospital's guide now lists it
