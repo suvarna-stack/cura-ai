@@ -46,6 +46,11 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+    # Must match the services that need it: depends_on only orders a
+    # `compose up`, so after a Docker/Colima restart the daemon brings back
+    # only containers with a restart policy. Without this, db stays down and
+    # imed-mock-api + medcode-api crash-loop on "UnknownHostException: db".
+    restart: unless-stopped
 
   # ------------------------------------------------------- hospital (mock)
   # Stands in for the real iMed API until the hospital provides one; swapping to
