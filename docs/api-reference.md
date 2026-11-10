@@ -8,10 +8,10 @@ Exhaustive companions sit beside it:
 
 | Document | Audience |
 |---|---|
-| `backend/medcode-api/docs/api-contract.md` | frontend developers. Every field of every response, and which DB column it comes from. **The contract of record**: when this page and it disagree, it wins |
-| `backend/medcode-api/docs/types.ts` | the same contract as TypeScript types |
-| `backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | hospital IT. The read contract (R1–R6) we asked the hospital to build |
-| `backend/medcode-api/docs/imed-integration.md` | hospital developers. How `medcode-api` calls the iMed API: every route, field and error it relies on |
+| `backend/docs/api-contract.md` | frontend developers. Every field of every response, and which DB column it comes from. **The contract of record**: when this page and it disagree, it wins |
+| `backend/docs/types.ts` | the same contract as TypeScript types |
+| `backend/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf` | hospital IT. The read contract (R1–R6) we asked the hospital to build |
+| `backend/docs/imed-integration.md` | hospital developers. How `medcode-api` calls the iMed API: every route, field and error it relies on |
 
 A live console is at `http://localhost:8001/swagger-ui.html` while the demo
 stack runs. It is forced **off** in the container images and turned back on

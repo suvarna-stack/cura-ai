@@ -46,8 +46,8 @@ It prints the Swagger URL and the admin login (`admin@medcodeai.demo` /
 start` it if it's not already running. It does not start the hospital API —
 set `IMED_API_BASE` to it (default `http://localhost:8003`).
 
-`dev.sh` covers this backend only. Add RAG (`../../ai`, `:8000`) and the
-frontend (`../../frontend`, `:5173`) in their own terminals, or run everything
+`dev.sh` covers this backend only. Add RAG (`../ai`, `:8000`) and the
+frontend (`../frontend`, `:5173`) in their own terminals, or run everything
 with Docker from the repo root.
 
 Good to know:
@@ -192,11 +192,11 @@ response shape and behavior directly.
 
 ## Docker
 
-**The whole system in one command** — the root [`docker-compose.yml`](../../docker-compose.yml) runs the three
+**The whole system in one command** — the root [`docker-compose.yml`](../docker-compose.yml) runs the three
 services plus Postgres as four containers. From this folder:
 
 ```bash
-cd ../.. && cp .env.example .env && docker compose up -d --build
+cd .. && cp .env.example .env && docker compose up -d --build
 ```
 
 The app comes up on <http://localhost:8080> (nginx serves the SPA and proxies

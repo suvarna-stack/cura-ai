@@ -6,7 +6,7 @@
 # this repo:
 #
 #   frontend/                 web UI          → ./frontend/Dockerfile
-#   backend/medcode-api/      our backend     → ./backend/medcode-api/Dockerfile
+#   backend/                  our backend     → ./backend/Dockerfile
 #   ai/                       RAG service     → ./ai/Dockerfile
 #
 # The hospital's iMed API is NOT part of this repo — the hospital builds and
@@ -35,7 +35,7 @@ services:
       # can hardlink across versions, and refuses to start on the old layout.
       - pgdata:/var/lib/postgresql
       - ./db/initdb:/docker-entrypoint-initdb.d:ro
-      - ./backend/medcode-api/db/seed.sql.gz:/seed/medcode.sql.gz:ro
+      - ./backend/db/seed.sql.gz:/seed/medcode.sql.gz:ro
     ports:
       - "${DB_PORT:-5433}:5432"
     healthcheck:
@@ -91,7 +91,7 @@ services:
   # -------------------------------------------------------------- backend
   medcode-api:
     build:
-      context: ./backend/medcode-api
+      context: ./backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/medcode
       # The hospital's iMed API (host only — no /api/v1, no trailing slash).

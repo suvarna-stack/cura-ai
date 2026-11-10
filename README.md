@@ -12,7 +12,7 @@ it, and our backend reaches it through `IMED_API_BASE`.
 
 ```
 frontend/                  web UI          React + Vite, served by nginx
-backend/medcode-api/       our backend     Spring Boot, Java 21
+backend/                   our backend     Spring Boot, Java 21
 ai/                        RAG service     FastAPI, Python
 db/initdb/                 Postgres first-boot scripts
 docs/  report/  eval-results/
@@ -25,9 +25,9 @@ built on its own: `docker build ./frontend`, `docker build ./ai`, and so on.
 ### For hospital developers building the iMed API
 
 What our backend calls, and expects back, is written down in
-`backend/medcode-api/docs/imed-integration.md` and
-`backend/medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. The
-code that calls it is `backend/medcode-api/` (start at
+`backend/docs/imed-integration.md` and
+`backend/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. The
+code that calls it is `backend/` (start at
 `src/main/java/com/medcodeai/api/client/ImedApiClient.java`). Pointing our
 backend at your API is three settings in `.env`: `IMED_API_BASE`,
 `IMED_CLIENT_ID` and `IMED_CLIENT_SECRET`.
@@ -61,7 +61,7 @@ build happens inside the images. Windows and Linux work the same as macOS (on
 Windows use Docker Desktop with the WSL2 backend, and run the commands from
 PowerShell or a WSL shell).
 
-Don't want Docker? See `backend/medcode-api/RUN-ALL.md` for the manual,
+Don't want Docker? See `backend/RUN-ALL.md` for the manual,
 three-terminal path (no containers, Thai-language).
 
 ## Run it
@@ -113,7 +113,7 @@ Port 8001 is still published for Swagger and `curl`, but the app doesn't use it.
 ## The database
 
 Postgres holds one database, `medcode`, restored from the committed dump in
-`backend/medcode-api/db/` by the scripts in `db/initdb/`. The hospital's data
+`backend/db/` by the scripts in `db/initdb/`. The hospital's data
 stays in the hospital: we only reach it over its API.
 
 Those scripts run **only once**, when the `pgdata` volume is empty. To re-seed:
@@ -124,7 +124,7 @@ docker compose down -v && docker compose up -d
 
 ### Pulling updated demo data — read this before `git pull`
 
-Compose bind-mounts the seed dump `backend/medcode-api/db/seed.sql.gz` at
+Compose bind-mounts the seed dump `backend/db/seed.sql.gz` at
 `/seed/medcode.sql.gz`.
 
 One `git pull` gets you a new dump, but **`docker compose up -d` will silently
@@ -198,7 +198,7 @@ The suites are not containerized — they run on the host against this stack:
 
 ```bash
 # medcode-api needs the database and a hospital iMed API reachable
-cd backend/medcode-api
+cd backend
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
 IMED_API_BASE=https://<hospital-test-server> ./mvnw test
 ```

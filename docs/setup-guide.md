@@ -38,12 +38,12 @@ cd cura-ai
 ```
 cura-ai/                  ← compose file, DB init scripts, docs (you work from here)
   frontend/               web UI             (React + Vite, served by nginx)
-  backend/medcode-api/    backend            (Spring Boot, Java 21)
+  backend/                backend            (Spring Boot, Java 21)
   ai/                     AI service         (FastAPI, Python)
 ```
 
 The compose file builds each image from its folder, and it mounts the
-database seed file straight out of `backend/medcode-api/db/`.
+database seed file straight out of `backend/db/`.
 
 ---
 
@@ -170,12 +170,12 @@ Python 3:
 ```bash
 # medcode-api — needs the database AND a hospital iMed API reachable.
 # It approves and reopens for real, so use a hospital TEST server.
-cd backend/medcode-api
+cd backend
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/medcode \
 IMED_API_BASE=https://<hospital-test-server> ./mvnw test
 
 # RAG — no model download needed
-cd ../../ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd ../ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest -q
 ```
 
@@ -193,7 +193,7 @@ hospital and arrive through its API on Sync.
 | What | Where |
 |---|---|
 | Hospital visits | Not in this repo. Pulled from the hospital's iMed API on Sync |
-| Our empty starting database, with the ICD-10 / ICD-9 catalogs | `backend/medcode-api/db/seed.sql.gz`; the catalogs are refreshed from the hospital's on every sync |
+| Our empty starting database, with the ICD-10 / ICD-9 catalogs | `backend/db/seed.sql.gz`; the catalogs are refreshed from the hospital's on every sync |
 | AI reference index (3 ICD manuals) | `ai/data/` (Chroma index, knowledge graph, PDFs) |
 | Accounts | Only the bootstrap admin. Coders are created by the admin |
 
@@ -239,7 +239,7 @@ rebuilt from the committed files.
 
 ## Without Docker
 
-`backend/medcode-api/RUN-ALL.md` covers the manual three-terminal setup (native
+`backend/RUN-ALL.md` covers the manual three-terminal setup (native
 Postgres 18, Java 21, Python and Node) on macOS, Linux and Windows. It is
 written in Thai.
 
@@ -253,5 +253,5 @@ written in Thai.
 | [`api-reference.md`](api-reference.md) | Endpoints, auth, errors, the hospital contract |
 | [`../HARDWARE_SPEC.md`](../HARDWARE_SPEC.md) | What to buy for a pilot, with costs |
 | `frontend/docs/USER-GUIDE-TH.md` | คู่มือการใช้งาน, for coders and administrators |
-| `backend/medcode-api/docs/api-contract.md` | Every field of every response, the contract of record |
-| `backend/medcode-api/docs/DEPLOYMENT-PREP.md` | The 28-item checklist for running this in a real hospital |
+| `backend/docs/api-contract.md` | Every field of every response, the contract of record |
+| `backend/docs/DEPLOYMENT-PREP.md` | The 28-item checklist for running this in a real hospital |

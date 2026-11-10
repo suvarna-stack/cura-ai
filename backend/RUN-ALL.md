@@ -7,7 +7,7 @@
 > ที่ root ของ repo (เว็บอยู่พอร์ต 8080, Postgres อยู่ 5433)
 >
 > เอกสารนี้เป็น "วิธีรัน" อย่างเดียว — สัญญา API อยู่ที่ `docs/api-contract.md`
-> + `docs/types.ts` ของ `backend/medcode-api`
+> + `docs/types.ts` ของ `backend`
 
 ---
 
@@ -15,7 +15,7 @@
 
 | ส่วน | โฟลเดอร์ | Port | ฐานข้อมูล | หน้าที่ |
 |---|---|---|---|---|
-| Backend หลัก | `backend/medcode-api/` | **8001** | `medcode` (schema `public`) | เจ้าของ API contract, auth, sync, approve/reopen, proxy ไป RAG |
+| Backend หลัก | `backend/` | **8001** | `medcode` (schema `public`) | เจ้าของ API contract, auth, sync, approve/reopen, proxy ไป RAG |
 | AI / Graph RAG | `ai/` | **8000** | ไม่มี (Chroma + graph บนดิสก์) | แนะนำรหัส ICD, AI Agent chat, คลังความรู้ (คู่มือ coding) |
 | เว็บของ coder | `frontend/` | **5173** | — | UI ทั้งหมด (React + Vite) |
 | ฐานข้อมูล | — | 5432 | `medcode` | PostgreSQL **18** |
@@ -90,7 +90,7 @@ git clone https://github.com/Occamy-medihack/cura-ai.git ~/cura-ai
 
 ```
 ~/cura-ai/
-├── backend/medcode-api/  :8001  backend หลัก  ← เอกสารนี้อยู่ที่นี่
+├── backend/              :8001  backend หลัก  ← เอกสารนี้อยู่ที่นี่
 ├── ai/                   :8000  AI
 └── frontend/             :5173  เว็บ coder
 ```
@@ -100,7 +100,7 @@ git clone https://github.com/Occamy-medihack/cura-ai.git ~/cura-ai
 ## 4. เตรียมฐานข้อมูล (ทำครั้งเดียว)
 
 ```bash
-cd ~/cura-ai/backend/medcode-api && scripts/seed_local_pg.sh   # สร้าง db medcode
+cd ~/cura-ai/backend && scripts/seed_local_pg.sh   # สร้าง db medcode
 ```
 
 ได้ database `medcode` ที่มี schema + catalog ICD แต่ **ยังไม่มีเคสและไม่มี user**
@@ -150,7 +150,7 @@ python run.py                        # หรือ: uvicorn app.main:app --relo
 client id/secret ที่แอดมินของโรงพยาบาลออกให้:
 
 ```bash
-cd ~/cura-ai/backend/medcode-api
+cd ~/cura-ai/backend
 export IMED_API_BASE=https://<โฮสต์-api-โรงพยาบาล>
 export IMED_CLIENT_ID=<client-id>
 export IMED_CLIENT_SECRET=<client-secret>
@@ -281,7 +281,7 @@ $env:IMED_API_BASE = 'https://<โฮสต์-api-โรงพยาบาล>'
 ## 10. รันเทสต์
 
 ```bash
-cd ~/cura-ai/backend/medcode-api && ./mvnw test   # ต้องมี db medcode + API โรงพยาบาลที่ IMED_API_BASE
+cd ~/cura-ai/backend && ./mvnw test   # ต้องมี db medcode + API โรงพยาบาลที่ IMED_API_BASE
 cd ~/cura-ai/ai                  && pytest -q     # ไม่ต้องโหลดโมเดล
 cd ~/cura-ai/frontend            && npm run lint
 ```
@@ -296,7 +296,7 @@ approve/reopen/reset โดยไม่ mock — เทสต์ฝั่งเ�
 
 | เรื่อง | ไฟล์ |
 |---|---|
-| สัญญา API ทุก endpoint | `backend/medcode-api/docs/api-contract.md` + `docs/types.ts` |
-| ศัพท์การแพทย์ที่ใช้ในโปรเจกต์ | `backend/medcode-api/docs/medical-glossary.md` |
-| การเชื่อมต่อกับ iMed + คำถามค้างกับโรงพยาบาล | `backend/medcode-api/docs/imed-integration.md` |
-| บริบทสำหรับ AI assistant | `backend/medcode-api/CLAUDE.md` |
+| สัญญา API ทุก endpoint | `backend/docs/api-contract.md` + `docs/types.ts` |
+| ศัพท์การแพทย์ที่ใช้ในโปรเจกต์ | `backend/docs/medical-glossary.md` |
+| การเชื่อมต่อกับ iMed + คำถามค้างกับโรงพยาบาล | `backend/docs/imed-integration.md` |
+| บริบทสำหรับ AI assistant | `backend/CLAUDE.md` |

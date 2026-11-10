@@ -65,7 +65,7 @@ never touch it (§5).
 | Service | Folder | Stack | Owns |
 |---|---|---|---|
 | `web` | `frontend/` | React 19, Vite 8, TypeScript 6, Tailwind 4, axios; served by nginx | Nothing persistent. The token lives in the browser's `localStorage` |
-| `medcode-api` | `backend/medcode-api/` | Spring Boot 4.1, Java 21, plain SQL (no JPA), Flyway | The `medcode` database, the API contract, the write lock to the hospital |
+| `medcode-api` | `backend/` | Spring Boot 4.1, Java 21, plain SQL (no JPA), Flyway | The `medcode` database, the API contract, the write lock to the hospital |
 | `rag` | `ai/` | FastAPI, sentence-transformers (`BAAI/bge-m3`), Chroma, a knowledge graph (GraphML) | The vector index, the graph, uploaded manuals, coder-taught rules |
 | `db` | — | stock `postgres:18` | The `medcode` database, seeded once from a committed dump |
 
@@ -373,7 +373,7 @@ An honest list, for anyone planning a real deployment.
 | **Hospital master-data IDs are placeholders** | Operation type (`GENERAL_OPERATION`) and discharge status (`Coding Approved`) wait for the hospital's real ID lists. The biggest unknown: how a coding write fits the discharge record the hospital requires on every write |
 | **A crash between a hospital create and its journal entry** | Leaves hospital rows that reopen cannot attribute. Re-approving heals the codes, but those rows stay unjournaled |
 | **Reopen cannot restore original hospital ids** | iMed has no un-cancel, so a re-created row gets a new id |
-| **Email + password logins** | Stored safely (BCrypt, lockout, server-side sessions), but a hospital should use its own SSO (SAML or OIDC). See `medcode-api/docs/DEPLOYMENT-PREP.md` |
+| **Email + password logins** | Stored safely (BCrypt, lockout, server-side sessions), but a hospital should use its own SSO (SAML or OIDC). See `backend/docs/DEPLOYMENT-PREP.md` |
 | **No retention, erasure or consent handling** | Nothing expires data, and there is no data-subject request flow. Needed before any real patient record (report Ch.5) |
 | **Tests write through to the hospital API** | medcode-api's suite approves and reopens for real at `IMED_API_BASE`, so it needs a hospital test server, and repeated runs drift that server's data. Against the old mock this caused the one standing failure (90/91) |
 | **`document_chunks` has no reader** | Filled at every sync, used by nothing yet |

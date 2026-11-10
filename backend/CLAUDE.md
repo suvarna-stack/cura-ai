@@ -26,7 +26,7 @@ about the domain; extend it when new terms appear in the data.
 ## The golden rule (rewritten 2026-07-22 — the Flask-clone era is over)
 
 **This backend owns the API contract.** The old React frontend is retired; its
-replacement — the sibling repo `../../frontend` — is built against
+replacement — the sibling repo `../frontend` — is built against
 `docs/api-contract.md` + `docs/types.ts` and is now LIVE against this backend
 (see the 2026-07-27 entry in Progress). Consequences:
 
@@ -178,7 +178,7 @@ Milestones (git log --oneline reads as this sequence):
   history-guard test now creates a real coder account since body-coder
   auto-creation is gone).
 - ✅ **New frontend wired to this backend (2026-07-27):** the replacement UI
-  lives in the sibling repo `../../frontend` (React + Vite + axios,
+  lives in the sibling repo `../frontend` (React + Vite + axios,
   `VITE_API_BASE_URL=http://localhost:8001/api` — the base URL already
   includes `/api`). It calls nearly the whole surface for real: auth
   (login/logout/me), both case reads, all four case writes (approve, reopen,
@@ -254,7 +254,7 @@ Milestones (git log --oneline reads as this sequence):
   `YYYY-MM-DDTHH:MM` accepted, garbage → null), and the write-back diff sends
   them split into the four iMed fields — same never-blank rule as names, window
   change = PUT, reopen restores from the journal before-image. Frontend
-  (`../../frontend`): Add-code ICD-9 box + both Edit modals get
+  (`../frontend`): Add-code ICD-9 box + both Edit modals get
   datetime-local inputs **pre-filled with "now"** (decision: a procedure must
   have times; default-now + coder edits, not a hard 400 — hospital rows with
   blank times stay valid), cards show a Clock line, detail seeding keeps the
@@ -288,7 +288,7 @@ Milestones (git log --oneline reads as this sequence):
   already served `GET /api/cases/{tn}/vital-signs`; nothing on our side read it.
   Now: `case_vitals` table (hospital-sourced, refresh = delete+reinsert, blanks
   → null), synced per case, served as detail `vitals[]` (chronological), sync
-  stats gains `vitals`. Frontend (`../../frontend`): ICD-9 cards show
+  stats gains `vitals`. Frontend (`../frontend`): ICD-9 cards show
   an operation-type chip, Add-code ICD-9 box + both Edit modals get a Type
   dropdown (`OPERATION_TYPES` in `utils/operationTime.ts`, default "OR
   Procedure", unknown hospital values still render + round-trip), and a
@@ -325,7 +325,7 @@ Milestones (git log --oneline reads as this sequence):
   with a persisted toggle back to the chronological document view (which
   keeps day-by-day order; unmapped fieldnames land in a "Progress / other
   notes" panel so nothing is dropped). Frontend: `global/HospitalPanels.tsx`
-  + wiring in all three detail pages (`../../frontend`). Backend
+  + wiring in all three detail pages (`../frontend`). Backend
   enabler — and a latent-bug fix: detail `orders[]` never served the stored
   `order_detail` JSONB, though the frontend's lab table and order chips had
   read `o.detail.*` all along (they silently degraded to name-only rows with
@@ -341,7 +341,7 @@ Milestones (git log --oneline reads as this sequence):
   data, unchanged: lab normal ranges (no abnormal-value highlighting, Q14)
   and doctor/recorder names (MD field shows "—", Q11).
 - ✅ **Frontend WCAG 2.2 AA pass (2026-07-31):** three commits in
-  `../../frontend` (67ab714 / ac8e9da / fb4b76d+69a496d) after a full
+  `../frontend` (67ab714 / ac8e9da / fb4b76d+69a496d) after a full
   audit found ~20+ AA failures. Phase 1: shared `useModalA11y` (Escape, focus
   trap, focus restore) + `ModalShell` behind all 8 hand-rolled overlays, label
   wiring via a `Field` render-prop in the three code modals, aria-labels on
@@ -450,7 +450,7 @@ Milestones (git log --oneline reads as this sequence):
   back to re-confirming the imported principal, the same path as "no saved
   edits", because that shape means nobody reviewed the case (the UI saves RAG
   suggestions as soon as a case is opened, and the list page can bulk-approve).
-  Frontend (`../../frontend`): checkbox per code card (the diagnosis
+  Frontend (`../frontend`): checkbox per code card (the diagnosis
   title is its label, so the whole title is a target), ticked = accent fill +
   ring / unticked recedes at 0.78 opacity, per-column tri-state "Select all"
   + Clear (indeterminate = "mixed", same control the case list already uses),
@@ -509,7 +509,7 @@ Milestones (git log --oneline reads as this sequence):
   ZERO backend code: `PUT /codes` reparses and re-serializes the whole body
   into JSONB with no field whitelist, so unknown keys round-trip verbatim
   (same free ride as `note`) — only `docs/api-contract.md` + `docs/types.ts`
-  were touched here. Frontend (`../../frontend`): new
+  were touched here. Frontend (`../frontend`): new
   `utils/codeOrigin.ts` owns the vocabulary, the order and `originOf()`,
   whose **legacy fallback** reads pre-2026-08-07 payloads (no `origin`
   anywhere) as manual-flag → manual, `confidence === 100` → hospital, else
@@ -529,7 +529,7 @@ Milestones (git log --oneline reads as this sequence):
   (`meta` with contexts first, `delta` pieces, terminal `done`/`error`;
   mid-stream failures are events because headers are already out).
   `RagApiClient.streamChat` pipes bytes with per-chunk flush over a shared JDK
-  HttpClient (HTTP/1.1 — same uvicorn h2c gotcha). RAG side (`../../ai`) also
+  HttpClient (HTTP/1.1 — same uvicorn h2c gotcha). RAG side (`../ai`) also
   gained: exact-substring code lookup (codes named in the question fetch their
   literal chunks via Chroma `$contains`, ranked ahead of semantic hits, capped
   union of 8), `unverified_codes` on /chat responses (codes the answer cites
@@ -545,12 +545,12 @@ Milestones (git log --oneline reads as this sequence):
   system now runs as five containers. Shape decided deliberately: **four
   separate images, each built from its own repo's own Dockerfile**, plus ONE
   compose file that owns only the seam between them — it lives in a new fifth
-  repo root `../../` (compose + Postgres init scripts +
+  repo root `../` (compose + Postgres init scripts +
   `.env.example` + README, no application code), so no repo becomes the hidden
   owner of the other three. One image per service, never a bundle: three
   runtimes, RAG must stay independently killable (it is optional-by-design), and
   Cloud Run wants one image per service anyway. New files: `Dockerfile` +
-  `nginx.conf` in `../../frontend`, `Dockerfile` in `../../ai`, a
+  `nginx.conf` in `../frontend`, `Dockerfile` in `../ai`, a
   `.dockerignore` in all four repos (RAG's `.venv` alone is 1.3GB of build
   context). Key decisions and the traps they avoid:
   - **The frontend is nginx + the built SPA with `/api` proxied to
@@ -592,7 +592,7 @@ Milestones (git log --oneline reads as this sequence):
   from imed-mock over the compose network, and an approve writing 5 diff rows
   with `coding_status='approved'` on the hospital visit row (`dischargestatus`
   correctly untouched). Found in passing, NOT ours: `npm ci` fails in
-  `../../frontend` on a pre-existing peer conflict
+  `../frontend` on a pre-existing peer conflict
   (`eslint-plugin-jsx-a11y@6.10.2` wants eslint ≤9, devDeps pin eslint 10) —
   its Dockerfile uses `--legacy-peer-deps` and the repo is untouched.
   This does NOT replace the native dev loop, and `RUN-ALL.md`'s manual path
@@ -661,7 +661,7 @@ Milestones (git log --oneline reads as this sequence):
   - **`order_detail` JSONB now holds the contract's key names** (`panel_name`,
     `item_name`, `value`, `unit`) because it stores the hospital row verbatim.
     The frontend's lab table and order chips read those keys, so
-    `../../frontend` (`LabResults.tsx`, `ReportOrders.tsx`) now reads
+    `../frontend` (`LabResults.tsx`, `ReportOrders.tsx`) now reads
     **new-or-old** — rows synced before today keep the old names until
     re-synced. `HospitalPanels.tsx` needed nothing (`name`/`value`/`quantity`
     survived the rename). Contract doc + `docs/types.ts` say so.
@@ -776,7 +776,7 @@ Milestones (git log --oneline reads as this sequence):
     so an admin fixing someone's rule doesn't quietly become its owner. An
     unknown note id passes through unchecked, so this can't become a probe for
     which rule ids exist.
-  Frontend (`../../frontend`): the rules panel draws mute/delete only
+  Frontend (`../frontend`): the rules panel draws mute/delete only
   on rules the signed-in coder may act on and a lock with a tooltip on the
   rest (`utils/noteOwner.ts` mirrors the server rule, it does not replace it);
   a refused change now says so in the chat instead of `console.warn`. The
@@ -798,7 +798,7 @@ Milestones (git log --oneline reads as this sequence):
   does. Deliberately **not** gated by the working lock or `WriteGate`: a star
   annotates a case, it does not edit it, and the coder most likely to want to
   flag one is the one locked out of it. Nothing reaches the hospital.
-  Frontend (`../../frontend`): a star button on every row of all four
+  Frontend (`../frontend`): a star button on every row of all four
   tabs, optimistic with rollback (`hooks/useCaseStars.ts`), starred rows
   pinned to the top of their tab — keyed on the SERVER's flag, not the
   optimistic one, so clicking a star never makes the row jump out from under
@@ -985,7 +985,7 @@ run a single medcode-api instance (`max-instances=1` on Cloud Run).
 
 ## Open tasks
 
-- **Frontend** (`../../frontend`) — built and live against this
+- **Frontend** (`../frontend`) — built and live against this
   backend; the repo itself stays out of scope here. One loose end on OUR side
   of the seam, re-checked 2026-08-07: `POST /api/cases/{id}/sync` (per-case)
   still has no caller — bulk `/api/sync` and the whole Training/knowledge
