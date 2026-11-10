@@ -1,0 +1,250 @@
+package com.medcodeai.api.service;
+
+import java.time.DateTimeException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Pure derivation/normalization helpers for the iMed → MedCode AI sync, ported
+ * from the retired Python POC sync/sync.py. Everything here is a naive [POC]
+ * placeholder rule (in a real system these are AI / configurable) — kept
+ * faithful to the source so the ported pipeline reproduces the same values.
+ * No DB, no I/O: unit-testable in isolation (see SyncRulesTest).
+ */
+public final class SyncRules {
+
+    private SyncRules() {
+    }
+
+    // sync.py:23 ICD10_GROUP — first letter of ICD-10 → disease-pattern group (F04)
+    private static final Map<Character, String> ICD10_GROUP = Map.ofEntries(
+            Map.entry('A', "Infectious"), Map.entry('B', "Infectious"),
+            Map.entry('C', "Oncology"), Map.entry('D', "Oncology/Blood"),
+            Map.entry('E', "Endocrinology"), Map.entry('F', "Psychiatry"),
+            Map.entry('G', "Neurological"), Map.entry('H', "Eye/ENT"),
+            Map.entry('I', "Cardiovascular"), Map.entry('J', "Respiratory"),
+            Map.entry('K', "Gastro"), Map.entry('L', "Skin"),
+            Map.entry('M', "Orthopedic"), Map.entry('N', "Genitourinary"),
+            Map.entry('O', "Obstetrics"), Map.entry('P', "Perinatal"),
+            Map.entry('Q', "Congenital"), Map.entry('R', "Symptoms/Signs"),
+            Map.entry('S', "Injury"), Map.entry('T', "Injury"),
+            Map.entry('V', "External"), Map.entry('W', "External"),
+            Map.entry('X', "External"), Map.entry('Y', "External"),
+            Map.entry('Z', "Factors"));
+
+    // sync.py:86 DIAG_ROLE — hospital diagnosistype → our code_role (Q3 mapping)
+    public static final Map<String, String> DIAG_ROLE = Map.of(
+            "PRIMARY_DIAGNOSIS", "principal_diagnosis",
+            "COMORBIDITY", "secondary_diagnosis",
+            "OTHERS", "other",
+            "EXTERNAL_CAUSE_OF_INJURY", "external_cause");
+
+    // sync.py:97 coverage family: opaque hospital codes, only the scheme family
+    // is derivable from the code itself (labels stay null until the hospital
+    // provides its official list).
+    private static final Map<String, String> COVERAGE_FAMILY_SPECIAL = Map.of(
+            "Cashonly", "SELF_PAY", "foreign", "FOREIGN");
+    private static final Map<String, String> FAMILY_PAYER = Map.of(
+            "OFC", "CGD", "VOF", "CGD",
+            "UCS", "NHSO", "WEL", "NHSO", "LGO", "NHSO", "VLG", "NHSO", "DIS", "NHSO",
+            "SELF_PAY", "SELF");
+
+    // sync.py:36 DT_RE — tolerates the Q5 missing-separator case "2026-04-0106:45:00".
+    // The [\sT]* separator also covers the R1-R6 contract's ISO 8601 form
+    // ("2026-04-01T06:45:00"); without the T the time was silently dropped and
+    // every synced datetime collapsed to midnight.
+    private static final Pattern DT_RE =
+            Pattern.compile("(\\d{4}-\\d{2}-\\d{2})[\\sT]*(\\d{2}:\\d{2}(:\\d{2})?)?");
+
+    /**
+     * The hospital's time zone. Every datetime we store is hospital local time
+     * without a zone (the extract's own form), and the hospital API serves
+     * "+07:00" on everything it sends; Bangkok has no daylight saving, so this
+     * is a fixed +07:00.
+     */
+    public static final ZoneId HOSPITAL_ZONE = ZoneId.of("Asia/Bangkok");
+
+    private static final ZoneOffset HOSPITAL_OFFSET = ZoneOffset.ofHours(7);
+
+    /** What may follow the matched HH:MM[:SS]: a fraction, then an offset. */
+    private static final Pattern OFFSET_TAIL =
+            Pattern.compile("^(?:\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})$");
+
+    private static final DateTimeFormatter STORED =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * sync.py:38 parse_dt() — normalize a hospital datetime to "YYYY-MM-DD
+     * HH:MM:SS" hospital local time, or null. The hospital API sends ISO 8601
+     * with an offset ("2026-08-09T08:00:00+07:00"): the hospital's own offset is
+     * simply dropped, any OTHER offset (say "Z") is converted to hospital time
+     * first — storing a UTC clock reading as local would shift it by 7 hours.
+     */
+    public static String parseDt(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        String s = raw.strip();
+        Matcher m = DT_RE.matcher(s);
+        if (!m.lookingAt()) { // Python re.match anchors at start only
+            return null;
+        }
+        String d = m.group(1);
+        String t = m.group(2) != null ? m.group(2) : "00:00:00";
+        if (t.length() == 5) { // HH:MM → HH:MM:00
+            t += ":00";
+        }
+        if (m.group(2) != null) {
+            Matcher tail = OFFSET_TAIL.matcher(s.substring(m.end()));
+            if (tail.matches()) {
+                String o = tail.group(1);
+                try {
+                    ZoneOffset offset = "Z".equals(o) ? ZoneOffset.UTC
+                            : ZoneOffset.of(o.length() == 5 ? o.substring(0, 3) + ":" + o.substring(3) : o);
+                    if (!offset.equals(HOSPITAL_OFFSET)) {
+                        return LocalDateTime.parse(d + "T" + t).atOffset(offset)
+                                .atZoneSameInstant(HOSPITAL_ZONE).toLocalDateTime().format(STORED);
+                    }
+                } catch (DateTimeException e) {
+                    // not a real date/offset: keep the old lenient behaviour (text as matched)
+                }
+            }
+        }
+        return d + " " + t;
+    }
+
+    /**
+     * Patient sex in our one vocabulary. The hospital API sends "F" / "M"; the
+     * extract (and every case synced before 2026-11-09) says "female" / "male".
+     * Storing both would split every sex breakdown in analytics in two, so the
+     * letter codes are spelled out. Anything else is kept as sent; blank → null.
+     */
+    public static String sexWord(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String s = raw.strip();
+        return switch (s.toLowerCase()) {
+            case "f", "female" -> "female";
+            case "m", "male" -> "male";
+            default -> s;
+        };
+    }
+
+    /** sync.py:47 chunk() — split section text into fixed-size pieces (F11); [] when empty. */
+    public static List<String> chunk(String text, int size) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return out;
+        }
+        for (int i = 0; i < text.length(); i += size) {
+            out.add(text.substring(i, Math.min(i + size, text.length())));
+        }
+        return out;
+    }
+
+    public static List<String> chunk(String text) {
+        return chunk(text, 500);
+    }
+
+    /** sync.py:104 coverage_family() — OFC_O3 → OFC, UCS_89_I → UCS, Cashonly → SELF_PAY. */
+    public static String coverageFamily(String code) {
+        if (COVERAGE_FAMILY_SPECIAL.containsKey(code)) {
+            return COVERAGE_FAMILY_SPECIAL.get(code);
+        }
+        int us = code.indexOf('_');
+        return us >= 0 ? code.substring(0, us) : "OTHER";
+    }
+
+    /** Payer for a coverage family, or null when unknown. */
+    public static String familyPayer(String family) {
+        return FAMILY_PAYER.get(family);
+    }
+
+    /** sync.py:159 — IPD admission (admissionnumber present) → "1", else OPD → "0". */
+    public static String encounterType(String admissionNumber) {
+        return admissionNumber != null && !admissionNumber.strip().isEmpty() ? "1" : "0";
+    }
+
+    /**
+     * Completeness (F03) [POC]. Returns the missing[] labels; empty means
+     * complete. Rule changed 2026-08-05: a case is complete when the hospital
+     * data ALREADY CARRIED both code systems at sync time — at least one ICD-10
+     * diagnosis and at least one ICD-9 procedure. The old documentation-section
+     * rule (chief/exam/assessment, admission note/clinical summary) is gone;
+     * completeness now means "arrived already coded", and everything else is
+     * the coding work this product queues up. Same rule for OPD and IPD.
+     */
+    public static List<String> missingCodes(boolean hasIcd10, boolean hasIcd9) {
+        java.util.ArrayList<String> missing = new java.util.ArrayList<>();
+        if (!hasIcd10) {
+            missing.add("icd10");
+        }
+        if (!hasIcd9) {
+            missing.add("icd9");
+        }
+        return missing;
+    }
+
+    /**
+     * The visit datetime encoded in a transaction number, or null.
+     *
+     * <p>The hospital writes YYMMDDHHMMSS at positions 4-15 of every TN, and on
+     * OPD visits that is the ONLY date we get: the extract leaves
+     * admissiondatetime null on every outpatient row (it fills it just for the
+     * handful that are admissions). imed-mock-api's visit-date window and our
+     * own analytics roll-ups already decode it, so the case list has to decode
+     * it identically or one visit carries two different dates on two screens.
+     *
+     * <p>Returns "YYYY-MM-DD HH:MM:SS" — the shape {@link #parseDt} produces,
+     * so callers can use it interchangeably with a real admissiondatetime.
+     * Null when the TN is too short, is not all digits there, or those twelve
+     * characters are not a real date. A two-digit year maps into 2000-2099,
+     * matching the {@code to_timestamp(…, 'YY…')} the SQL side uses.
+     */
+    public static String visitDateFromCaseId(String caseId) {
+        if (caseId == null || caseId.length() < 15) {
+            return null;
+        }
+        String raw = caseId.substring(3, 15);
+        for (int i = 0; i < raw.length(); i++) {
+            if (!Character.isDigit(raw.charAt(i))) {
+                return null;
+            }
+        }
+        try {
+            java.time.LocalDateTime dt = java.time.LocalDateTime.of(
+                    2000 + Integer.parseInt(raw.substring(0, 2)),
+                    Integer.parseInt(raw.substring(2, 4)),
+                    Integer.parseInt(raw.substring(4, 6)),
+                    Integer.parseInt(raw.substring(6, 8)),
+                    Integer.parseInt(raw.substring(8, 10)),
+                    Integer.parseInt(raw.substring(10, 12)));
+            return dt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (java.time.DateTimeException e) {
+            return null; // all digits, but not a real date (month 13, day 99…)
+        }
+    }
+
+    /** sync.py:174 disease group (F04) [POC] — ICD-10 chapter of the primary dx. */
+    public static String diseaseGroup(String primaryIcd) {
+        if (primaryIcd == null || primaryIcd.isEmpty()) {
+            return "Ungrouped";
+        }
+        return ICD10_GROUP.getOrDefault(primaryIcd.charAt(0), "Ungrouped");
+    }
+
+    /** sync.py:177 severity (F06) [POC] — comorbidity count buckets. */
+    public static String severity(int comorbidityCount) {
+        if (comorbidityCount >= 3) {
+            return "high";
+        }
+        return comorbidityCount >= 1 ? "medium" : "low";
+    }
+}

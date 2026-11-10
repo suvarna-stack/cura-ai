@@ -1,0 +1,1005 @@
+# CLAUDE.md — session orientation for medcode-api
+
+## What this is
+
+Spring Boot 4.1 / Java 21 backend for MedCode AI (medical-coding audit
+dashboard). Originally a query-for-query clone of the Flask POC at
+`../audit_chart/audit-chart_doc/integration-poc/server/` — that POC (and the
+whole audit_chart repo) is now **historical reference only**, never edited,
+never needed at runtime or setup time. Owns the `medcode` Postgres database;
+sends approval results to the hospital's iMed API — locally the sibling repo
+`../imed-mock-api`, a fake hospital server owning the separate `imed`
+database. Build/run/test commands: see `README.md`.
+
+**Domain vocabulary: `docs/medical-glossary.md`.** Plain-language meanings of
+every medical term this project touches — visit/OPD/IPD/HN, ICD-10 vs ICD-9 and
+the code roles, the note sections, lab/drug/imaging order names, the Thai
+coverage schemes and departments, the clinical shorthand inside note text, and
+(important) which "clinical-looking" fields are really our own [POC] rules
+(disease group, severity, completeness). It also carries the **ICD-10-TM
+Standard Coding Guidelines** our coders are judged against — one principal
+diagnosis only, comorbidity vs complication, "a lab result is never a
+diagnosis", TTM U50–U77 and the 7-digit Thai procedure codes — with sources.
+Read it before reasoning about hospital data or writing anything user-facing
+about the domain; extend it when new terms appear in the data.
+
+## The golden rule (rewritten 2026-07-22 — the Flask-clone era is over)
+
+**This backend owns the API contract.** The old React frontend is retired; its
+replacement — the sibling repo `../audit-chart-frontend` — is built against
+`docs/api-contract.md` + `docs/types.ts` and is now LIVE against this backend
+(see the 2026-07-27 entry in Progress). Consequences:
+
+- Key order, absent-vs-null choices, and error text are OUR decisions now —
+  deliberate and documented, not cloned. When changing any response shape,
+  update `docs/api-contract.md` + `docs/types.ts` + `CasesApiIntegrationTest`
+  in the same commit.
+- Every field serves a REAL DB value; where no real source exists the field
+  is null (`confidence`, `patient`, `revenue_impact`) or a documented static
+  placeholder (`drg: "—"`). Never reintroduce synthesized per-case fake data.
+- The correctness gate is `./mvnw test` (requires imed-mock-api on :8003).
+- **Swagger is NOT a fourth mirror.** The `@Operation`/`@ExampleObject`
+  annotations on the controllers feed a local-dev try-it-out console; they are
+  descriptive, hand-trimmed, and nothing asserts them. The same-commit sync
+  obligation stays `docs/api-contract.md` + `docs/types.ts` +
+  `CasesApiIntegrationTest`. Only **adding or removing an endpoint** obliges
+  you to touch the annotations — `OpenApiDocsTest` enforces that much.
+
+## Layout conventions
+
+- Layers: `web/` (controllers) → `service/` (logic) → `repo/` (ALL SQL), plus
+  `client/` (HTTP to the hospital iMed API — `ImedApiClient`: write-back on
+  approve/reopen, and the read/sync GETs the `SyncService` pulls case data with).
+- Many repo/service methods still carry comments naming their Python source
+  line (`// views.py:117`) — provenance for archaeology, not a constraint.
+- Responses are `LinkedHashMap<String,Object>` — stable key order and
+  absent-vs-null stay one-line decisions per field. `service/Py.java` keeps
+  the ported or-falsiness/slice helpers.
+- Single-instance concurrency: one write `ReentrantLock` (`WriteGate`) + an
+  in-process cases cache (`CasesCache`), invalidated after approve/reopen/
+  reset — NOT after codes/draft saves. Never scale past one instance.
+- **Writes are two-phase**: our DB transaction commits first, then the queued
+  hospital calls run (`ApprovalService` → `ImedApiClient`), still inside the
+  write lock — the Flask reference's two-commit order. A hospital-call
+  failure 500s with our side committed; approve/reopen are idempotent on both
+  sides, so re-doing the action heals.
+
+## Progress
+
+Milestones (git log --oneline reads as this sequence):
+
+- ✅ **M0** skeleton, health endpoints, local PG seeding
+- ✅ **M1** DeterministicFakes port + golden parity test
+- ✅ **M2** read endpoints, full parity with Flask
+- ✅ **M3** working-state writes (PUT codes/draft)
+- ✅ **M4** approve + reopen, full write parity
+- ✅ **M5** demo reset
+- ✅ **M6** CORS, Dockerfile, deploy docs — all parity gates green
+- ✅ **Fake-data removal (2026-07-22):** dropped `DeterministicFakes`;
+  `confidence`/`patient`/`hn`/`created_at`/`updated_at`/`revenue_impact`/
+  `coder` serve real DB values (null where none exists). Python parity
+  scripts deleted; `CasesApiIntegrationTest` is the gate.
+- ✅ **iMed split + contract ownership + Python removal (2026-07-22):**
+  hospital side extracted to sibling repo `../imed-mock-api` (own `imed`
+  database; the medcode DB has no imed schema anymore). Approval results go
+  over HTTP (`client/ImedApiClient`, `IMED_API_BASE`). Seeding is committed
+  `db/seed.sql.gz` dumps restored with plain psql — Python and `.venv` fully
+  gone from both repos. URLs cleaned (`GET /api/cases`, `GET
+  /api/cases/{id}` — no `.json` suffix). Backend now owns the API contract:
+  `docs/api-contract.md` + `docs/types.ts`.
+- ✅ **Swagger UI (2026-07-22):** springdoc 3.0.3 (the Boot 4 line; Boot's BOM
+  doesn't manage it, so the version is pinned in `pom.xml`). Scope was chosen
+  deliberately: a **try-it-out console for manual poking, local dev only** —
+  not a codegen-grade spec. `SWAGGER_ENABLED` defaults true in
+  `application.yml` and is forced `false` by `ENV` in the `Dockerfile`, so
+  containers are off by construction (the API has no auth and
+  `POST /api/demo/reset` is a bulk write). Metadata in `config/OpenApiConfig`.
+- ✅ **Sync — inbound hospital pull (2026-07-23):** the read direction of the
+  iMed integration. `POST /api/sync` (bulk) + `POST /api/cases/{id}/sync`
+  (one) fetch case data from the hospital and load it into medcode. Ported
+  from the retired `sync/sync.py`, but reshaped **non-destructive**: new case →
+  import, existing OPEN case → refresh hospital-sourced rows only, finalized
+  case → **skipped** (coder work — `coder_assigned` codes, edits/drafts,
+  `case_status`, history — is never clobbered; a `case_synced` row is only
+  appended). Idempotent, so re-running is safe. New code: `client/ImedApiClient`
+  GET methods, `service/SyncService` + `service/SyncRules` (pure [POC] derive
+  rules), `repo/SyncRepository`, `web/SyncController`. Reads the hospital only
+  (no write-back). Runs under the `WriteGate` lock; invalidates `CasesCache`.
+  Limitation: the hospital list has no "changed since" filter, so the fetch
+  pulls the full list (writes are selective) — a future hospital-side add.
+- ✅ **Admin auth + account management (2026-07-24):** login wall around the
+  **admin surface only** — the case/approve/sync endpoints stay public
+  (unchanged, tests untouched). Per-account BCrypt passwords (new `password_hash`
+  column), roles just `coder`/`admin` (the frontend's "Senior Coder" was a
+  mistake; "SuperAdmin" = the `admin` role), opaque **Bearer tokens** stored
+  server-side in the existing `auth_sessions` table (`session_id` = sha256 of the
+  token; `SESSION_TTL_DAYS` default 7). New endpoints: `POST /api/auth/login`,
+  `POST /api/auth/logout`, `GET /api/auth/me`, and admin-guarded
+  `GET/POST /api/admin/accounts`, `PUT /api/admin/accounts/{id}`,
+  `PUT …/{id}/status`, `DELETE …/{id}`, `GET /api/admin/dashboard`. Key
+  choices: **`spring-security-crypto` only** (BCrypt), NOT
+  `spring-boot-starter-security` — the starter would auto-lock every endpoint;
+  enforcement is a hand-written `AuthInterceptor` scoped to `/api/admin/**` +
+  `/api/auth/{me,logout}`. No migration tool exists, so a startup
+  `ApplicationRunner` (`config/SchemaBootstrap`) idempotently adds `password_hash`
+  and seeds a bootstrap admin from `ADMIN_BOOTSTRAP_EMAIL`/`_PASSWORD` (default
+  `admin@medcodeai.demo` / `admin1234` — WARNs on the default). Delete is
+  audit-safe: an account referenced by coding history → `409` (deactivate
+  instead). New code: `web/{AuthController,AdminController,AuthInterceptor}`,
+  `service/{AuthService,AccountService}`, `repo/{UsersRepository,
+  AuthSessionRepository}`, `config/{AuthConfig,WebConfig,SchemaBootstrap}`. Test:
+  `web/AdminApiIntegrationTest`. This **supersedes** the old
+  shared-coder-password idea (per-account passwords won).
+  **Prod-hardening added same day:** `POST /api/demo/reset` is now gated by
+  `DEMO_TOOLS_ENABLED` (default true locally, forced `false` in the Dockerfile
+  like `SWAGGER_ENABLED` — returns `404` when off); and login has an in-memory
+  brute-force lockout (`service/LoginRateLimiter`, `LOGIN_MAX_ATTEMPTS`/
+  `LOGIN_LOCKOUT_SECONDS`, keyed by email, single-instance) that 429s past the
+  limit. Deferred still: coder-facing login + stamping the authenticated coder
+  into approvals (wait for the coder frontend); the broader prod checklist
+  (gate case reads, HTTPS/SSO/private network) is discussed but not built.
+
+- ✅ **Real iMed write contract — diff-based write-back (2026-07-24):** the
+  hospital delivered its real API spec ("iMed Diagnosis and Medical Discharge
+  API" PDF: `POST /api/v1/diagnosis`, `PUT /api/v1/diagnosis/{visit_id}`,
+  `DELETE …/icd10|icd9/{object_id}`, Bearer auth, request_id dedup,
+  STATUS_SUCCESS/BUSINESS_ERROR envelopes, 409 duplicate rule). Supersedes
+  the invented coding-result contract — which was DELETED on both sides, not
+  kept in parallel (decision). imed-mock-api now mocks the real contract
+  field-for-field (+ our proposed `PUT/DELETE /api/v1/coding-status/{visit_id}`
+  extension, backed by the coding-status table the hospital agreed to add;
+  DELETE = cancel flow via `is_cancelled`, reads filter cancelled rows). This
+  side: `client/ImedApiClient` reworked (Bearer `IMED_API_TOKEN`, /api/v1
+  calls), new `service/ImedWritebackService` implements the decided **diff
+  strategy** — finalized codes vs live hospital rows → cancel removed / PUT
+  changed / POST new (order matters: cancel→update→create avoids the 409),
+  journaled with before-images in `imed_write_ops` (SchemaBootstrap +
+  `db/migrations/0002_imed_write_ops.sql`); reopen replays the journal in
+  reverse against live state (created→cancel, updated→restore,
+  cancelled→re-create with new ids — iMed has no un-cancel) and clears it.
+  Hospital writes still ONLY at approve/reopen (decision), still two-phase
+  after our commit; healing = re-diff against live state, not request replay.
+  `stats.mcai_code_rows` now counts diff writes (key kept for compat).
+  Placeholders pending hospital master data: `fix_operation_type_id`
+  GENERAL_OPERATION, discharge-object ids (open question 3 — the discharge
+  coupling — is the big unknown). Field mapping + 10 open hospital questions:
+  `docs/imed-integration.md`. Known gap: a crash between POST and journaling
+  its created ids leaves rows reopen can't attribute (approve re-diff heals).
+- ✅ **Case-surface auth + token actor stamping (2026-07-25, Phase 3):** the
+  AuthInterceptor now also guards /api/cases/**, /api/sync and
+  /api/demo/reset — any valid token (either role); 401 otherwise. Approve and
+  reopen take their acting coder from the authenticated principal's email
+  (`ApprovalService.approve(ids, userId, coder)`; body `coder` accepted but
+  IGNORED). Public remains: login, /api/health(z), Swagger. This supersedes
+  the earlier "auth is admin-only, never gate case routes" gotcha — reversed
+  deliberately now that the coder frontend logs in. Contract docs + both
+  integration tests updated (tests authenticate as the bootstrap admin; the
+  history-guard test now creates a real coder account since body-coder
+  auto-creation is gone).
+- ✅ **New frontend wired to this backend (2026-07-27):** the replacement UI
+  lives in the sibling repo `../audit-chart-frontend` (React + Vite + axios,
+  `VITE_API_BASE_URL=http://localhost:8001/api` — the base URL already
+  includes `/api`). It calls nearly the whole surface for real: auth
+  (login/logout/me), both case reads, all four case writes (approve, reopen,
+  PUT codes, PUT draft), the whole admin surface (accounts CRUD + status +
+  dashboard), and demo reset. Its `lib/axios.ts` attaches
+  `Authorization: Bearer <token>` from `localStorage` on every request and, on
+  any 401 outside the login form, clears the token and redirects to `/login` —
+  matching the Phase 3 auth model. It sends no `coder` name on approve/reopen
+  and relies on our token stamping.
+  **Wiring status (re-checked 2026-07-29 — the earlier "18 of 20 / Sync is a
+  fake timer" note was already stale when written down):** bulk sync IS wired
+  (`SyncProvider.runSync` → `syncFromHospital()` → `POST /api/sync`, triggered
+  from `CasesLayout.tsx`, with `CasesPage` refetching on `syncVersion`); the
+  **Training page is LIVE** against all seven `/api/admin/knowledge/**` routes
+  (`trainingService.ts`, `sync-codes` included); and `suggest-codes` +
+  `icd-codes` are called from the case detail pages and the Add-code modal.
+  Still NOT wired: **`POST /api/cases/{id}/sync`** (per-case) has no caller.
+  (**Superseded 2026-08-07:** the old "Analytics + Agent-chat remain
+  `USE_MOCK = true`, no endpoints behind them and none planned" note is DEAD —
+  both pages are live now. `/api/agent/chat` landed with the RAG work, and
+  `GET /api/analytics` landed 2026-08-07; `USE_MOCK` is gone from
+  `analyticsService.ts` and `agentService.ts`.)
+  Behavior worth knowing: their code/draft/approve writes are best-effort —
+  failures are swallowed and the browser keeps its own `localStorage` copy, so
+  a rejected write still looks saved on screen.
+- ✅ **ICD catalog split into two tables (2026-07-28):** the single `icd_codes`
+  table (discriminated by the `code_system_t` enum) became **`icd_10` + `icd_9`**,
+  because the two systems are expected to DIVERGE — ICD-9-CM procedure codes and
+  ICD-10 diagnosis codes want different columns, and one shared table can only
+  grow columns that are null for half its rows. Consequences: `case_codes` now
+  carries **two nullable FK columns** (`icd_10_id`, `icd_9_id`) with
+  `case_codes_one_catalog_ck` pinning exactly one per row — so a catalog id is
+  meaningless without its system, and the two always travel together
+  (`CodingRepository.insertCaseCode(caseId, codeSystem, id, …)`,
+  `SyncRepository.insertImportedCode(caseId, codeSystem, id, …)`). The old
+  `icd_code_id` values were PRESERVED as the new primary keys (both systems drew
+  from one sequence → disjoint id spaces → unambiguous backfill, and the split
+  is reversible). Reads use `LEFT JOIN` to both tables + `COALESCE`, with a
+  `WHERE … IS NOT NULL` guard preserving the old INNER JOIN semantics. New
+  `repo/IcdSystem` enum is the one place that maps a system label to a table and
+  is deliberately **strict** — an unknown label throws, matching the enum column's
+  old type-cast rejection. **The API contract did NOT change** (`code` + `system`
+  chips are byte-identical; verified by checksumming every case's resolved
+  code/system/description before and after), so `docs/api-contract.md` and
+  `docs/types.ts` were untouched. `code_system_t` is left defined but unused —
+  the discriminator is now which column is populated.
+- ✅ **Catalog-search repair + contract drift closed (2026-07-29):** merging
+  `origin/main` after the ICD split was textually clean but semantically broken.
+  The incoming `GET /api/icd-codes` typeahead (and its frontend client, the
+  Add-code modal's `CodeSearchField`) queried `FROM icd_codes` — the table
+  `SchemaBootstrap` now DROPS. Nothing caught it: no test covered the endpoint,
+  and it compiled fine because the table name lives in a SQL string.
+  `IcdCatalogRepository.search()` now reads both tables — one table when
+  `system` is given, `UNION ALL` inside a subquery when it isn't (so ranking and
+  `LIMIT` apply across the combined set), via a private `matchingRows(IcdSystem)`
+  fragment builder. The controller already 400s a blank `q` or an unknown
+  `system`, so `IcdSystem.of()` can't throw there.
+  Then the wider problem behind it: **`OpenApiDocsTest` only checked one direction**
+  — that its hand-kept `EXPECTED_PATHS` were present — so any endpoint added
+  without touching the list shipped undocumented. `icd-codes`,
+  `cases/{id}/suggest-codes` and `admin/knowledge/sync-codes` had all drifted
+  that way. The test now asserts **both** directions and all three are
+  documented in `docs/api-contract.md` + `docs/types.ts`.
+- ✅ **ICD-9 operation time window, end-to-end (2026-07-30):** an ICD-9 code is
+  a procedure, and a procedure happens over a time window — the hospital records
+  it on BOTH surfaces (extract `startdatetime`/`enddatetime`; write API
+  `date_in`/`time_in`/`date_out`/`time_out`, real PDF fields) and we were the
+  only link dropping it. Now: `case_codes.operation_start/_end` (text, nullable,
+  ICD-9 rows only — guarded in both insert paths; SchemaBootstrap +
+  `db/migrations/0004`), sync imports the extract times (normalized via
+  `SyncRules.parseDt`), detail `codes[]` serves them (`operation_start/_end`,
+  null on ICD-10), CodeEdit rows carry them into approve (datetime-local
+  `YYYY-MM-DDTHH:MM` accepted, garbage → null), and the write-back diff sends
+  them split into the four iMed fields — same never-blank rule as names, window
+  change = PUT, reopen restores from the journal before-image. Frontend
+  (`../audit-chart-frontend`): Add-code ICD-9 box + both Edit modals get
+  datetime-local inputs **pre-filled with "now"** (decision: a procedure must
+  have times; default-now + coder edits, not a hard 400 — hospital rows with
+  blank times stay valid), cards show a Clock line, detail seeding keeps the
+  hospital times. Two adjacent bugs found and fixed: (1) sync 500'd on any
+  case whose hospital diagnosis has a null `diagnosistype` (Java `Map.of` NPEs
+  on null keys where Python's `.get(None)` didn't — KNOWN_CASE_ID could never
+  sync); (2) approve 500'd on the UI's verbose `type` labels ("ICD-9 Primary
+  Diagnosis", "Comorbidities") via strict `IcdSystem.of` — materialize now
+  mirrors the frontend's own `/icd[- ]?9|pcs/i` rule ("…comorbid…" → secondary),
+  and the frontend's ICD-9 comorbidity label became "ICD-9 Comorbidity" (the
+  bare legacy "Comorbidities" reads as ICD-10 on both sides — old saved rows
+  keep that consistently). Hospital data itself can be dirty (a seeded overnight
+  surgery ends "before" it starts) — we store/display verbatim, no end>start
+  validation. imed-mock-api needed NO change (it already persisted the four
+  fields). Tests: sync-import + edit→approve→reopen round trips in
+  `CasesApiIntegrationTest` (the second also covers the verbose-label fix).
+- ✅ **Hospital-UI elements: operation type + vital signs (2026-07-30):** the
+  hospital wants our app to show the same fields as its own coder UI (screenshots
+  in the 2026-07-30 session; gap analysis → memory + open question 11). The two
+  gaps closeable without hospital help, both end-to-end: (1) **operation type**
+  — the extract's `operationtype` on ICD-9 procedures ("OR Procedure" / "NON OR
+  Procedure" / "OTH" / "GENERAL_OPERATION"), previously read by sync only as a
+  surgery-order filter and discarded. Now: `case_codes.operation_type` (text,
+  ICD-9 only, guarded in both insert paths; SchemaBootstrap + migration 0005),
+  sync imports it, detail `codes[]` serves it, CodeEdit `operation_type` carries
+  it through approve, and the write-back POST sends it as
+  `fix_operation_type_id` when present (else the GENERAL_OPERATION placeholder,
+  unchanged; PUT/diff still ignore it — settable on create only). Reopen
+  re-creates carry the hospital's original value via the journal before-image.
+  (2) **vital signs** — `medhack_vitalsign` existed in the imed DB and the mock
+  already served `GET /api/cases/{tn}/vital-signs`; nothing on our side read it.
+  Now: `case_vitals` table (hospital-sourced, refresh = delete+reinsert, blanks
+  → null), synced per case, served as detail `vitals[]` (chronological), sync
+  stats gains `vitals`. Frontend (`../audit-chart-frontend`): ICD-9 cards show
+  an operation-type chip, Add-code ICD-9 box + both Edit modals get a Type
+  dropdown (`OPERATION_TYPES` in `utils/operationTime.ts`, default "OR
+  Procedure", unknown hospital values still render + round-trip), and a
+  `VitalsStrip` table (Time | BT | BP | PR | O2Sat | Wt | Ht, hospital-style)
+  sits above the report text on all three detail pages. **Round 2 (same
+  day):** the ICD-10 type dropdown grew the hospital's other two diagnosis
+  kinds — "ICD-10 Other" / "ICD-10 External Cause" labels; materialize now
+  reads "…external…" → `external_cause` and "…other…" → `other` (both roles,
+  sync mapping and write-back diagnosis types existed all along), and detail
+  seeding became role-aware (`codeTypeFromRole`) so an imported external-cause
+  diagnosis opens the Edit dialog on the right type instead of collapsing to
+  first-ICD-10-= principal. Plus a per-code **Note** (the hospital UI's Note
+  column) — deliberately INTERNAL-ONLY: a `note` field riding the CodeEdit
+  verbatim round-trip (stored + echoed, never materialized, never sent to
+  iMed — its write API has no note field; labeled "(internal)" in the UI).
+  **Round 3 (same day):** labs render as the hospital-style results table
+  (`global/LabResults.tsx` — grouped by panel, `item : value unit`, report
+  datetime in the header), fed by the lab order rows' detail JSON
+  (panelname/itemname/itemvalue/itemuom) that sync always stored;
+  `ReportOrders` dropped its generic "Lab" category (and filters lab rows
+  from its empty-guard). NO abnormal-value highlighting on purpose — the
+  extract has no reference ranges (open question 14). The rest of the
+  hospital's UI fields (doctor, clinic, chronic flag, recorder, WHO/TM/CM
+  edition, Extension Code, lab ranges) are NOT in the extract — blocked on
+  the hospital, tracked as `docs/imed-integration.md` open questions 11–14;
+  the user chose NOT to contact the hospital for now, so don't draft
+  outreach unprompted.
+- ✅ **Hospital-style panel view of the case detail (2026-07-31):** the case
+  detail's report side can now render as the SAME six-panel layout the
+  hospital's own coder screen shows — CC,PI,PE (vitals table + note text) ·
+  Past history (allergies in red) · Lab/X-ray · Diagnosis/Procedure (codes
+  with roles, หัตถการ list with op type/window, Assessment text) · Order
+  Entry (CPOE, name + qty) · Investigations finding · Management/Suggestion —
+  with a persisted toggle back to the chronological document view (which
+  keeps day-by-day order; unmapped fieldnames land in a "Progress / other
+  notes" panel so nothing is dropped). Frontend: `global/HospitalPanels.tsx`
+  + wiring in all three detail pages (`../audit-chart-frontend`). Backend
+  enabler — and a latent-bug fix: detail `orders[]` never served the stored
+  `order_detail` JSONB, though the frontend's lab table and order chips had
+  read `o.detail.*` all along (they silently degraded to name-only rows with
+  "—" values). Now each order row carries `detail` (raw hospital row, parsed
+  from JSONB text in the service) + a new `orderCounts` map (true per-category
+  totals), and the orders cap became **50 rows per category** (old global
+  LIMIT 150 let 400-lab IPD cases starve medicine rows out entirely — the
+  CPOE/med panels would have been empty exactly on the big cases). Contract +
+  docs/types.ts updated; `caseDetailOrdersCarryDetailJsonAndTrueCounts` is
+  the test (fun fact it caught: medicine quantity can be negative — we read
+  that as a return/credit row and display it verbatim; recorded as open
+  question 15 in `docs/imed-integration.md`). Still blocked on hospital
+  data, unchanged: lab normal ranges (no abnormal-value highlighting, Q14)
+  and doctor/recorder names (MD field shows "—", Q11).
+- ✅ **Frontend WCAG 2.2 AA pass (2026-07-31):** three commits in
+  `../audit-chart-frontend` (67ab714 / ac8e9da / fb4b76d+69a496d) after a full
+  audit found ~20+ AA failures. Phase 1: shared `useModalA11y` (Escape, focus
+  trap, focus restore) + `ModalShell` behind all 8 hand-rolled overlays, label
+  wiring via a `Field` render-prop in the three code modals, aria-labels on
+  every icon button/input, live-region toasts + alert banners, global
+  `:focus-visible` ring, **inert hidden tab panels** (keyboard users could
+  approve invisible cases), keyboard-reachable PDF dropzone. Phase 2: the ICD
+  typeahead is a real ARIA combobox (arrows/Enter/double-Escape), case tabs are
+  a real tablist, per-route `document.title`, `<html lang>` follows the EN/TH
+  toggle, skip links, table scope/captions; `eslint-plugin-jsx-a11y` enforced
+  as **errors** (deliberate mouse-only conveniences carry inline disables
+  naming the accessible path). Phase 3 (user pre-approved look changes):
+  contrast tokens fixed — light-rose muted 0.50→0.70 and accent `#C9748A`→
+  `#A34D66` (accentRgb follows), dark-rose muted →0.70, mono muted →0.60;
+  all ≤11px text bumped to 12px (isolated commit 69a496d, revert if something
+  wraps); 24px touch targets; `prefers-reduced-motion`; real `<title>`.
+  Still manual-only: VoiceOver/keyboard walkthrough scripts + a visual pass of
+  the 4 themes (in the plan file `~/.claude/plans/glittery-forging-waffle.md`);
+  keyboard drag-reorder of code priority is the one tracked follow-up. Lint's
+  7 remaining errors are PRE-EXISTING react-hooks/react-refresh findings,
+  untouched deliberately.
+- ✅ **Completeness rule = "arrived already coded" (2026-08-05):** the third
+  incarnation of the [POC] completeness rule. A case is now **complete** when
+  the hospital data at sync time already carried BOTH code systems — ≥1 ICD-10
+  diagnosis and ≥1 ICD-9 procedure; anything less is **incomplete** (missing
+  labels `icd10` / `icd9`). Replaces the documentation-sections rule
+  (chief/exam/assessment, admission note/clinical summary) entirely — same
+  rule for OPD and IPD. `SyncRules.missingCodes(hasIcd10, hasIcd9)` replaced
+  `missingSections`; `SyncService.writeCase` derives the booleans from the
+  hospital diagnosis/procedure rows (truthy `icd` only — same filter as code
+  import); `CasesViewService.MISSING_LABEL` gained the two new keys and KEEPS
+  the legacy ones, because stored `missing_detail` values only recompute on
+  the next sync (finalized cases are skipped by sync, so theirs stay frozen
+  under the old rule until reset/re-import). API shape unchanged
+  (`completeness_status`, `missing_detail`, `missing` all as before) — only
+  the semantics moved; glossary §11 updated, contract/types untouched.
+- ✅ **Demo reset keeps accounts (2026-08-05):** `POST /api/demo/reset` no
+  longer prunes accounts created after the snapshot, and no longer reverts
+  baseline accounts to their snapshotted row — the users table is left as-is
+  (everyone stays logged in). The one exception: a baseline account deleted
+  since the snapshot is re-inserted (`ON CONFLICT DO NOTHING`), because
+  restored audit rows FK to it (`coding_history.user_id`,
+  `case_codes.assigned_by`, `knowledge_base.taught_by`).
+  `DemoBaselineService.reset()` + contract updated.
+- ✅ **Time-windowed sync (2026-08-05):** coders pick a visit-date period and
+  pull only those cases, instead of always fetching the hospital's full list.
+  `POST /api/sync` takes an optional `{from, to}` body (`YYYY-MM-DD` or
+  datetime, inclusive, either side optional; malformed → 400; response echoes
+  a `window` key only when windowed). The filter runs HOSPITAL-side:
+  imed-mock's `GET /api/cases` gained `from`/`to` on the **visit datetime** —
+  `admissiondatetime` when filled, else the **YYMMDDHHMMSS encoded at
+  positions 4–15 of the transaction number** (verified identical to the
+  notes' recorddatetime on all 21 seed visits; `admissiondatetime` is blank
+  throughout the seed) — plus a `changed_since` filter backed by a new
+  `updated_at` text column on the two code tables (stamped by every /api/v1
+  create/update/cancel; visit-level max, floored at the visit datetime; seed
+  rows stay NULL; mock migration 0003 + baseline-schema ALTER so demo reset's
+  positional INSERT…SELECT * survives). medcode does NOT expose
+  `changed_since` yet — it's reserved for the deferred auto-sync; both
+  filters together are hospital open question 16 in `docs/imed-integration.md`.
+  Frontend: the header Sync button now opens `SyncDialog` (Today / Last 7
+  days / All presets + date inputs, defaults to today) → `runSync({from,to})`.
+  Tests: mock list-filter + changed_since tests (16/16 green);
+  `bulkSyncAcceptsAVisitDatetimeWindow` in `CasesApiIntegrationTest`.
+  **Found while testing, NOT fixed here: 13 pre-existing
+  CasesApiIntegrationTest failures** — the suite's KNOWN_CASE_ID/
+  APPROVABLE_CASE_ID are April-2026 TNs from the retired dataset, but the DB
+  now holds the curated July demo dataset (empty-start-state era), so every
+  test needing an approved/known case fails regardless of this change
+  (verified identical red set on a clean checkout). The suite needs re-basing
+  onto the new demo data. **(DONE 2026-08-19 — see the re-basing entry below;
+  the suite is 46/46 green.)**
+- ✅ **Analytics live + local `dev_all.sh` gains RAG (2026-08-07):** two
+  things landed the same day. (1) **`GET /api/analytics`** arrived from remote
+  (`AnalyticsController` / `AnalyticsService` / `AnalyticsRepository`, plus a
+  real discharge status on approve) and the frontend's Analytics page dropped
+  its mock fallback — so **Analytics and Agent chat are both LIVE now**, killing
+  the old "no endpoints behind those two and none planned" note in two places
+  above. That commit **forgot `OpenApiDocsTest.EXPECTED_PATHS`** and so shipped
+  the build red on the reverse assertion (`docs/api-contract.md` + `docs/types.ts`
+  were done); adding `/api/analytics` to the list was the whole fix — exactly the
+  drift that assertion exists to catch, working as designed. (2) **`scripts/
+  dev_all.sh` now starts RAG too** (`:8000`, via `RAG/.venv/bin/python run.py`,
+  `RAG_DIR` overridable), so one command brings up all four repos. RAG is treated
+  as **optional-by-design** — a missing `.venv` or a failed start only WARNs and
+  the stack continues, because everything except AI suggestions / Agent / Training
+  works without it; `--no-rag` skips it deliberately. Teardown sweeps `:8000`
+  because `uvicorn --reload` runs a child worker the parent PID doesn't cover.
+  **`dev_all.sh` is deliberately NOT in git** (`.git/info/exclude`) — the team
+  isn't all on macOS and `scripts/*.sh` is bash + `lsof` + `brew`, so the
+  four-terminal path in `RUN-ALL.md` §5 stays the one documented route. It was
+  briefly tracked on 2026-08-07 and untracked again the same day; don't re-add
+  it, and don't reference it from tracked docs. (The tracked `dev.sh` is just as
+  mac-bound — both are now labelled macOS/Linux-only, with Windows pointed at the
+  manual path.)
+- ✅ **Selection-first code review (2026-08-07):** the coder flow inverted. AI /
+  hospital suggestions used to arrive as "everything is in, delete what's
+  wrong"; now **nothing is pre-ticked** and the coder ticks the codes that
+  belong on the case, then approves. The pick rides in the codeEdits payload as
+  a `selected` boolean, so it is durable (server copy) and survives reload,
+  and `ApprovalService.materializeCodeEdits` skips rows with an explicit
+  `selected: false` — an ABSENT key still approves, so payloads saved before
+  this flow behave exactly as they did. Unticked codes are NOT deleted: they
+  stay in the working state, visible and re-tickable, and never reach iMed
+  (verified live: a 3-row payload with one unticked code wrote 2 coder rows and
+  the hospital got only those two). One guard: an all-unticked payload falls
+  back to re-confirming the imported principal, the same path as "no saved
+  edits", because that shape means nobody reviewed the case (the UI saves RAG
+  suggestions as soon as a case is opened, and the list page can bulk-approve).
+  Frontend (`../audit-chart-frontend`): checkbox per code card (the diagnosis
+  title is its label, so the whole title is a target), ticked = accent fill +
+  ring / unticked recedes at 0.78 opacity, per-column tri-state "Select all"
+  + Clear (indeterminate = "mixed", same control the case list already uses),
+  the column badge counts `picked/total`, and Approve says "Approve (n)" and is
+  DISABLED at zero with the reason in its tooltip. Manual codes stay pre-ticked
+  (typing a code is picking it), "???" placeholders can't be ticked until
+  resolved, and delete/edit/drag are unchanged. New `utils/codeSelection.ts`
+  holds the rules incl. the legacy-payload migration (no `selected` key
+  anywhere → keep the coder's own codes ticked, everything else waits).
+  Contract + `docs/types.ts` + Swagger text updated; the new
+  `unselectedCodeEditsAreKeptButNotApproved` test sits in
+  `CasesApiIntegrationTest` but CANNOT pass until the suite is re-based onto
+  the July demo dataset (its APPROVABLE_CASE_ID is a retired April TN — the
+  known 13-failure problem, unrelated to this change). **(Re-based and passing
+  since 2026-08-19.)**
+- ✅ **Coding status on the hospital visit row (2026-08-07):** the hospital now
+  has an "approved" flag of its own — `imed.medhack_patient.coding_status`
+  (`'approved'` / NULL), the twin of our `cases.case_status`. It replaces the
+  old marker, which **overwrote `medhack_patient.dischargestatus`** — the
+  DOCTOR's clinical outcome ("Improved", …), never ours to write; the mock's
+  /api/v1 writes no longer touch that column, and the discharge status id we
+  send (`"Coding Approved"`, still open question 3) now stays inside
+  `doctor_discharge_opd/_ipd`. Set through a new optional **`coding_status`
+  field on the EXISTING `POST`/`PUT /api/v1/diagnosis` envelope** — no new
+  endpoint, and the status commits in the same hospital transaction as the
+  codes. `"approved"` on approve, the reserved `"open"` on reopen (clears to
+  NULL), absent = no change. `ImedWritebackService` puts it on the diff bodies
+  it already sends and falls back to ONE body-less PUT when the diff had
+  nothing to say (nothing changed, or only cancels — a DELETE carries no
+  body); `DiffResult` is what carries "did a body go out" back from
+  `diffKind`. Mock side: `SchemaBootstrap` + `db/migrations/0005` (with the
+  `imed_baseline` mirror, or positional demo reset breaks), `updateCodingStatus`
+  replacing `updatePatientDischargeStatus`, unknown status words → 400. Reads
+  needed no change — `GET /api/cases` serves `p.*`. This **revives** the
+  coding-status idea withdrawn 2026-08-02, but as a field on an existing route
+  instead of a table + dedicated endpoint (a smaller ask of the hospital).
+  Still OUR invention: hospital open question 17 in `docs/imed-integration.md`.
+  Verified live end-to-end (approve → `approved`, reopen → NULL, and the
+  no-diff approve still marks the visit with `mcai_code_rows: 0`); mock suite
+  16/16 green. Our own API shape is unchanged, so `docs/api-contract.md` +
+  `docs/types.ts` were untouched.
+- ✅ **Codes grouped by ORIGIN; no % on hospital codes (2026-08-07):** a code
+  column used to be one undifferentiated list, so a hospital-imported fact, a
+  RAG guess and the coder's own typing looked identical — and every one of
+  them wore a confidence %, because hospital rows were seeded `confidence:
+  100` and the AI's real score sat in the same slot. Now each ICD column
+  renders **labelled groups in a fixed order: Added by coder → From hospital
+  record → Suggested by AI → Not documented** (the 4th holds the "???"
+  placeholders, which are nobody's suggestion). The **% shows on AI rows
+  ONLY** — a hospital code is already in the hospital's record and a typed
+  code is the coder's own call, so neither has anything to be confident
+  about — and the column header's average plus the case-list AI Confidence
+  pill now average **AI rows only** (`avgAiConfidence`), so a case with no AI
+  opinion shows no number instead of a meaningless 100%. Carried by a new
+  `origin: "manual" | "hospital" | "ai"` field on **CodeEdit**, which needs
+  ZERO backend code: `PUT /codes` reparses and re-serializes the whole body
+  into JSONB with no field whitelist, so unknown keys round-trip verbatim
+  (same free ride as `note`) — only `docs/api-contract.md` + `docs/types.ts`
+  were touched here. Frontend (`../audit-chart-frontend`): new
+  `utils/codeOrigin.ts` owns the vocabulary, the order and `originOf()`,
+  whose **legacy fallback** reads pre-2026-08-07 payloads (no `origin`
+  anywhere) as manual-flag → manual, `confidence === 100` → hospital, else
+  AI; the three detail pages seed `origin` from the detail row's `source`
+  (`imported_from_imed` → hospital, else manual), `suggestedToStored` stamps
+  `ai`, and both Add-code paths stamp `manual`. Grouping replaces the old
+  two-way manual/auto split in `CodesColumn`; drag-reorder still snaps back
+  across a group line (grouping wins over free ordering), which is safe for
+  approve because manual and hospital rows carry role-bearing type labels and
+  so never steal the positional principal-diagnosis pick from a bare-labelled
+  AI row. Also confirmed while doing this: the completeness rule the coders
+  see IS "the hospital's own data arrived with both systems" — unchanged.
+- ✅ **Agent chat streams + grounded code lookup (2026-08-15):** prep for the
+  GPU-less prod host (decided: no API, no GPU, 15-30s answer budget — accuracy
+  comes from retrieval, not model size). New `POST /api/agent/chat/stream` —
+  same body as /chat, SSE passthrough of the RAG side's new `/chat/stream`
+  (`meta` with contexts first, `delta` pieces, terminal `done`/`error`;
+  mid-stream failures are events because headers are already out).
+  `RagApiClient.streamChat` pipes bytes with per-chunk flush over a shared JDK
+  HttpClient (HTTP/1.1 — same uvicorn h2c gotcha). RAG side (`../RAG`) also
+  gained: exact-substring code lookup (codes named in the question fetch their
+  literal chunks via Chroma `$contains`, ranked ahead of semantic hits, capped
+  union of 8), `unverified_codes` on /chat responses (codes the answer cites
+  that no retrieved chunk contains — the medical grounding guard), and
+  `display_name` on every context (rename-following citation labels).
+  Frontend streams with a blocking-endpoint fallback and renders the
+  unverified-codes warning; dict mode caps answers at 224 tokens.
+  Contract + types.ts + OpenApiDocsTest updated (test green). Deferred by
+  choice: bge reranker (needs a ~1GB model download; flag off until wanted)
+  and the prod model swap (host .env: 3B-class `OLLAMA_MODEL`, 8+ cores,
+  32GB RAM — dev keeps Eir-8B unchanged).
+- ✅ **All four repos dockerized + a compose stack (2026-08-17):** the whole
+  system now runs as five containers. Shape decided deliberately: **four
+  separate images, each built from its own repo's own Dockerfile**, plus ONE
+  compose file that owns only the seam between them — it lives in a new fifth
+  sibling folder `../medcode-stack/` (compose + Postgres init scripts +
+  `.env.example` + README, no application code), so no repo becomes the hidden
+  owner of the other three. One image per service, never a bundle: three
+  runtimes, RAG must stay independently killable (it is optional-by-design), and
+  Cloud Run wants one image per service anyway. New files: `Dockerfile` +
+  `nginx.conf` in `../audit-chart-frontend`, `Dockerfile` in `../RAG`, a
+  `.dockerignore` in all four repos (RAG's `.venv` alone is 1.3GB of build
+  context). Key decisions and the traps they avoid:
+  - **The frontend is nginx + the built SPA with `/api` proxied to
+    `medcode-api`.** Vite inlines `VITE_API_BASE_URL` at BUILD time, so a baked
+    hostname would mean one image per environment; building with the relative
+    `/api` gives one image everywhere and same-origin requests, so CORS stops
+    mattering. Two nginx defaults are load-bearing overrides:
+    `proxy_read_timeout 600s` (AI suggestions/training legitimately run for
+    minutes — the 60s default 504s them) and `client_max_body_size 50m`
+    (training PDF uploads; the 1m default 413s them).
+  - **ONE Postgres container, both databases**, seeded from the two committed
+    dumps by `db/initdb/*.sh` — which run only once, on an empty volume, so
+    re-seeding is `docker compose down -v`. `postgres:18` moved its data
+    directory: the volume must mount at **`/var/lib/postgresql`**, NOT
+    `.../data` (the old path makes the image refuse to boot). The healthcheck
+    must be `pg_isready -h 127.0.0.1` — the socket form reports ready while the
+    entrypoint is still seeding on its temporary socket-only server.
+    `SchemaBootstrap` still supplies everything the dumps lack, unchanged.
+  - **RAG generation stays on the HOST's Ollama** (`OLLAMA_BASE` →
+    `host.docker.internal`, `extra_hosts: host-gateway`): Docker on macOS has no
+    GPU passthrough, so an in-container Ollama is CPU-only and far slower. torch
+    installs from PyTorch's **CPU index** (the PyPI wheel drags in all of CUDA)
+    with a plain-PyPI fallback for arm64. `data/` (chroma + graph + uploads) is a
+    named volume seeded from the image's committed baseline; the bge-m3 download
+    lands in a second volume, and `PREFETCH_EMBED_MODEL=1` bakes it into the
+    image instead (~3GB bigger, offline-capable — right for CI/prod, wrong for
+    an 8GB laptop). `run.py`'s `--reload` is bypassed; uvicorn runs directly,
+    one worker.
+  - Published ports dodge the two permanently-busy host ports so the stack can
+    run **alongside** the native four-terminal setup: web on **8080** (5173 is
+    vite), Postgres on **5433** (5432 is Homebrew PG). All overridable in `.env`.
+  - The two Java images kept their `ENV SWAGGER_ENABLED=false` /
+    `DEMO_TOOLS_ENABLED=false` (off by construction stays); the demo compose
+    file opts back in explicitly and visibly. Both run as UID 1000 and both
+    now install `curl` — imed-mock's existing HEALTHCHECK had always been
+    silently failing, because the JRE image ships no HTTP client.
+  Verified live in containers: both DBs seeded, all four services healthy,
+  login + `GET /api/cases` through the nginx proxy, `POST /api/sync` pulling
+  from imed-mock over the compose network, and an approve writing 5 diff rows
+  with `coding_status='approved'` on the hospital visit row (`dischargestatus`
+  correctly untouched). Found in passing, NOT ours: `npm ci` fails in
+  `../audit-chart-frontend` on a pre-existing peer conflict
+  (`eslint-plugin-jsx-a11y@6.10.2` wants eslint ≤9, devDeps pin eslint 10) —
+  its Dockerfile uses `--legacy-peer-deps` and the repo is untouched.
+  This does NOT replace the native dev loop, and `RUN-ALL.md`'s manual path
+  stays the documented route for anyone not using Docker.
+- ✅ **New iMed read contract (R1–R6) mocked — hospital-independent (2026-08-19):**
+  MedCode AI wrote its own build contract for the hospital's read side
+  ("MedCode AI Case Data API", `docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`,
+  v1 11 Aug 2026) and SENT it — the hospital builds R1–R6 from that document.
+  Rather than wait, the fake side was built to the contract first, so
+  development runs at full speed and cutover is an `IMED_API_BASE` + token
+  swap. **Write side W1–W4 needed ZERO change** — the contract states outright
+  that the request bodies are what we already send, `coding_status` extension
+  included. Only the READ side is new, and it replaces the 12 per-table GETs
+  with a nested **case object**: one `visit` block + nine data blocks
+  (`documents`, `record_results`, `diagnoses`, `procedures`, `drug_orders`,
+  `lab_results`, `vitals`, `ward_movements`, `billing_items`), every key
+  renamed to the contract's snake_case (`transactionnumber` → `visit_id`,
+  `icd` → `icd10_code`, `startdatetime` → `operation_start`). Built in
+  `../imed-mock-api` (new `web/CaseSyncApiController` + `repo/ImedCaseSyncRepository`,
+  `ApiExceptionHandler` gained a 422 `ImedUnprocessableException`), on
+  `/api/v1` so the existing Bearer gate covers it. **Faithfulness over
+  convenience was the explicit rule** — R2 refuses >20 ids (`422
+  too_many_visit_ids`), R3 refuses >31 days (`422 period_too_long`), both in
+  the hospital's `STATUS_BUSINESS_ERROR` envelope; datetimes are normalized to
+  ISO 8601 (the extract stores `YYYY-MM-DD HH:MM:SS`), `birth_date` is a plain
+  date, `age_year` is a number (extract stores `"70,2,9"`), blanks collapse to
+  null, cancelled rows still never appear. **No schema change was needed after
+  all** (contradicting the first read of the contract): `last_changed_at` and
+  `encounter_type` are DERIVED — the change stamp reuses the tested
+  `LAST_CHANGED` SQL (visit datetime raised by code-row writes) and IPD is
+  "has an admission number", per the contract's own "the internal mechanism is
+  the hospital's choice". R6 answers from a static `SUPPORTED_FIELDS` list of
+  every `block.field` served — it correctly reports the contract's own
+  Priority-2 wishes (`lab_results.reference_range`, doctor names) as missing.
+  Verified live against the seeded demo data plus 8 new tests (mock suite
+  16 → **24/24 green**), including a create → read → cancel → read round trip.
+  Trap worth remembering: **Java text blocks strip trailing whitespace**, so
+  `"""… WHERE """ + FRAGMENT` concatenated to `WHEREGREATEST(` — the SQL
+  joins now add `+ " " +` explicitly. NOT done yet: medcode-api still calls the
+  12 legacy GETs; `ImedApiClient` + `SyncService` move over next, and the old
+  endpoints stay until then.
+- ✅ **medcode-api moved onto the R1–R6 contract (2026-08-19):** the second half
+  of the same day's work — this backend now READS the hospital through the new
+  contract instead of the 12 per-table GETs. `ImedApiClient`'s read half is
+  replaced (`checkChanges`/`syncCases`/`syncByPeriod`/`contractCheck` + the
+  `/api/v1/catalog/*` masters); `SyncService` consumes the nested case object,
+  and — since the contract has NO "download everything" endpoint by design —
+  the fetch strategy is now: **windowed sync → R3 in ≤31-day chunks** (long
+  windows are split client-side), **unwindowed → R1 from the epoch, then R2 in
+  ≤20-id batches**. Every run is preceded by the **R6 contract check** (a
+  `REQUIRED_FIELDS` list of the block.fields we actually depend on; failure is
+  a 500 naming the missing fields, before any fetch or write). Our own API
+  shape is UNCHANGED — `POST /api/sync`, its `{from,to}` body, the response and
+  the case detail all behave as before.
+  Three things this shook out, none obvious from the contract:
+  - **`SyncRules.parseDt` silently dropped the time** off an ISO datetime (its
+    regex expected `\s*` between date and time, so `…T09:14:23` matched only
+    the date). Every synced datetime would have collapsed to midnight. The
+    separator is now `[\sT]*`.
+  - **`ImedWritebackService` also read the hospital** (`liveRows` for the diff).
+    It now reads R2, but translates the rows BACK to the extract's key names
+    (`id`/`icd`/`name`/`startdatetime`…) at that one boundary — deliberately,
+    because those names are also the shape of the before-images in
+    `imed_write_ops`, and a journal written before today must stay replayable
+    by a reopen running after it.
+  - **`order_detail` JSONB now holds the contract's key names** (`panel_name`,
+    `item_name`, `value`, `unit`) because it stores the hospital row verbatim.
+    The frontend's lab table and order chips read those keys, so
+    `../audit-chart-frontend` (`LabResults.tsx`, `ReportOrders.tsx`) now reads
+    **new-or-old** — rows synced before today keep the old names until
+    re-synced. `HospitalPanels.tsx` needed nothing (`name`/`value`/`quantity`
+    survived the rename). Contract doc + `docs/types.ts` say so.
+  Section and order datetimes were raw pass-throughs; they now go through
+  `parseDt` like every other stored datetime, so the TEXT columns keep the
+  `YYYY-MM-DD HH:MM:SS` form the frontend renders.
+- ✅ **CasesApiIntegrationTest re-based onto the July demo data (2026-08-19):**
+  the long-standing "13 pre-existing failures" are GONE — the suite is **46/46
+  green**, verified stable over three consecutive runs with the dataset
+  unchanged after (4 complete / 17 incomplete, all open). The old
+  `KNOWN_CASE_ID`/`APPROVABLE_CASE_ID` were April TNs from the retired dataset,
+  present in NEITHER database. Fixtures are now explicitly split by role, which
+  is the part worth keeping: `APPROVABLE_CASE_ID` (87026072711124400801) is the
+  **sacrificial** visit the write tests approve/reopen — those churn the
+  hospital's own rows, so no test asserting exact hospital values may share it;
+  `KNOWN_CASE_ID` (…413210500101, the richest visit) and
+  `TIMED_PROCEDURE_CASE_ID` (…209142300201, the 49.46 window) are READ-ONLY.
+  Tests that wanted "an approved case from the seed" now approve one themselves
+  and reopen it in a `finally` (the July data is an empty start state), and
+  nothing hard-codes `complete[0]` any more — **an approved-then-reopened case
+  moves to the `reopened` queue permanently**, so `complete` drains as the suite
+  runs. Two expectations changed on real grounds, not to go green: the lab
+  50-row cap can only be an upper bound (no July case has >50 labs), and the
+  round-trip's `mcai_code_rows` is 2, not 0 — one PUT because our catalog's
+  L02.4 description differs from the hospital's, one CANCEL because "no saved
+  edits" re-confirms the imported PRINCIPAL only, so the visit's ICD-9 is not in
+  the coder's final list. Reopen re-creates it, which is what keeps that stable.
+  **Data hazard confirmed and repaired the same day:** running the write tests
+  against a shared fixture had cancelled real seed procedures at the hospital,
+  permanently marking cases incomplete. The `imed` database was restored from
+  `~/medcode-backups/imed_live_2026-08-19.dump` (see the memory note) — which is
+  exactly why that dump was taken before any of this started.
+- ✅ **Legacy per-table reads deleted (2026-08-19):** with medcode-api on the
+  contract and no caller left in any of the four repos, `imed-mock-api` dropped
+  `ImedCasesReadController` and its 12 GETs plus `/api/icd10-codes`/`icd9-codes`.
+  Only two pieces of `ImedReadRepository` survived — the VISIT_DT/LAST_CHANGED
+  SQL and `caseExists` (the write API's validation) — so they moved into
+  `ImedCaseSyncRepository` and the old class went too. Coverage was ported, not
+  dropped: the change-stamp test is now an R1 test, and the write round-trips
+  read their results back through R2. `openApiDocumentCoversEveryEndpoint`
+  asserts the removed paths are **absent**, so the old surface can't creep back.
+  Mock suite 24 → **19 green**. Two order-dependent failures surfaced and were
+  fixed on the medcode side: `AdminApiIntegrationTest` was picking whichever
+  open case came first (landing on the cases suite's fixture and stamping it
+  with its throwaway "History Guard" account) and now uses a dedicated case;
+  and the coder assertion now asks whether an account actually goes by that
+  name instead of hard-coding one — the rotated per-case fakes it guards
+  against would match no account at all. A full run now leaves the dataset
+  exactly as it found it.
+- ✅ **Flyway — one source of truth for the schema (2026-08-20):** every DDL
+  statement added after the frozen dump existed TWICE — as Java in
+  `config/SchemaBootstrap` (which ran) and as `db/migrations/000N.sql` (which
+  **nothing ever ran**; grep found it referenced only from Java comments). Nothing
+  compared the copies and they had drifted: `case_vitals` and `imed_write_ops`
+  were created by hand-written Java **without the `cases` foreign key** that all
+  six other case-keyed child tables carry, so deleting a case orphaned its vitals
+  and its write-back journal forever. Nobody decided that; the convention was just
+  forgotten in a place no test could see. Now Flyway runs the SQL files and they
+  are the only definition. The files moved to `src/main/resources/db/migrations/`
+  and became `V1__`…`V6__` — **classpath, not the repo's `db/` folder**, because
+  the Dockerfile copies only `pom.xml` and `src/`, so a `filesystem:` location
+  would have found nothing in every container. `SchemaBootstrap` became
+  `AdminBootstrap`: 196 lines → 75, keeping only the bootstrap admin (it needs the
+  `PasswordEncoder`, so it cannot be a `.sql` file). New `V6` adds the two missing
+  keys, deleting any orphans first so it can't fail on a database that
+  accumulated them. Three traps worth remembering:
+  - **Boot 4 split the autoconfigurations into per-technology modules**, so
+    `flyway-core` alone puts the library on the classpath and *nothing calls it* —
+    the app boots, migrates nothing, and only fails later on the first missing
+    column. `org.springframework.boot:spring-boot-flyway` is the piece that
+    actually wires it. (On Boot 3, `flyway-core` was enough.)
+  - **`V3` had explicit `BEGIN;`/`COMMIT;`** from its hand-apply days. Flyway
+    already wraps each migration in a transaction, and that `COMMIT` would end
+    *Flyway's* transaction mid-file, before the history row is written. Removed.
+  - Demo reset refills tables in `DemoBaselineService.TABLES` order, so the new
+    keys make that order load-bearing — it was already parent-first (`cases`
+    before both), verified rather than assumed.
+  Verified on three databases before the suite: a **fresh seed** (6 migrations
+  from scratch), a **copy of the live dev database** (baselined at 0, migrated to
+  6, row counts identical across `cases`/`case_codes`/`case_vitals`/`users`/
+  `coding_history`), and a schema diff of Flyway's output against the real
+  database showing **no difference except `flyway_schema_history` itself**. Suite
+  46/46 green. `imed-mock-api` got the same treatment the same day, in its own
+  commit: there the runner was deleted **outright** rather than trimmed, because
+  nothing had to stay in Java — its five mirror files were already faithful (and
+  in two places better than the Java), and the ICD catalog seed became `V6`,
+  since a re-seed drops that reference data along with the schema history and so
+  replays it exactly as the old emptiness check did. It sets
+  `spring.flyway.schemas: imed` so the history table lands beside the tables it
+  describes. Mock 19/19, and our 46/46 re-verified against that build.
+- ✅ **Learned rules belong to the coder who taught them (2026-08-22):** the
+  Suggest & Learn panel let any coder delete, mute or **rewrite** any other
+  coder's rule. Reading everyone's rules is the point of a shared knowledge
+  layer; changing them is not. Now `DELETE /notes/{id}`, `PATCH /notes/{id}`
+  and a `POST /notes` carrying an existing `note.id` all 403 unless the caller
+  taught the rule — **listing is untouched**, every coder still reads every
+  rule. Three decisions worth keeping:
+  - **Edit is locked, not just delete.** Rewriting a rule to say the opposite
+    neuters it as thoroughly as removing it, and `POST /notes` with an id is
+    an in-place edit — locking only DELETE would have been a lock with the
+    door open beside it. Muting is in for the same reason.
+  - **Admin overrides.** A wrong rule taught by a coder who has since left the
+    hospital still has to be removable, and admin already owns the AI Training
+    surface these rules feed.
+  - **Ownership hangs on a new `created_by_id`** (the user id from the token),
+    not the `created_by` display name — a rename must not cost a coder their
+    rules, and two coders sharing a name must stay apart. RAG records it and
+    hands it back through a new `GET /learn/notes/{id}`; **the check lives
+    here** because this is the only tier holding a token. Rules taught before
+    the field fall back to matching the credited name; one crediting nobody
+    stays open. An edit never transfers authorship (RAG keeps the original),
+    so an admin fixing someone's rule doesn't quietly become its owner. An
+    unknown note id passes through unchecked, so this can't become a probe for
+    which rule ids exist.
+  Frontend (`../audit-chart-frontend`): the rules panel draws mute/delete only
+  on rules the signed-in coder may act on and a lock with a tooltip on the
+  rest (`utils/noteOwner.ts` mirrors the server rule, it does not replace it);
+  a refused change now says so in the chat instead of `console.warn`. The
+  decision itself is pure and unit-tested without a DB or a running RAG
+  (`AgentLearnOwnershipTest`, 8 cases incl. the shared-name and rename traps);
+  RAG's `test_learn.py` covers what it records. Verified live end-to-end:
+  coder B sees coder A's rule, is refused delete/mute/edit-in-place, A and the
+  admin both succeed.
+
+- ✅ **Shared case star (2026-08-25):** one "look at this one first" flag per
+  CASE, set by any coder and seen by every coder — deliberately not a private
+  favourites list, since the whole point is telling a colleague which case
+  matters. `POST` / `DELETE /api/cases/{id}/star` (the lock's two verbs),
+  persisted in `case_stars` (**V8**, FK to `cases` like every other case-keyed
+  table, and the migration also back-fills `demo_baseline.case_stars` so a
+  reset on an already-baselined database still works). Every card in
+  `GET /api/cases` now carries `starred` / `starredBy` / `starredAt` in all
+  four collections; a star toggle invalidates the cases cache like an approve
+  does. Deliberately **not** gated by the working lock or `WriteGate`: a star
+  annotates a case, it does not edit it, and the coder most likely to want to
+  flag one is the one locked out of it. Nothing reaches the hospital.
+  Frontend (`../audit-chart-frontend`): a star button on every row of all four
+  tabs, optimistic with rollback (`hooks/useCaseStars.ts`), starred rows
+  pinned to the top of their tab — keyed on the SERVER's flag, not the
+  optimistic one, so clicking a star never makes the row jump out from under
+  the cursor. Same commit removed the Finished detail page's DRG pill, which
+  could only ever render the `"—"` placeholder.
+
+- ✅ **The star gained an owner, and a home inside the case (2026-08-26):**
+  two follow-ups to the star above, both from the hospital.
+  (1) **Only its author may take a star down.** Everyone still SEES it — that
+  is the whole feature — but a message any reader can delete is not one the
+  writer can rely on. `CaseStarService.mayManage(owner, caller)` is the whole
+  rule, pure and unit-tested (`CaseStarOwnershipTest`, 7 cases), and it guards
+  BOTH verbs: star as well as unstar, because re-starting writes a new owner
+  and would otherwise hand the star over to be cleared on the next click.
+  Matched on `case_stars.starred_by` (the account stamp) case-insensitively,
+  never on the display name — the same reasoning `AgentLearnController
+  .mayManage` spells out for taught rules: two coders can share a name, and
+  renaming yourself must not cost you your stars. An unowned star stays free
+  to take, or pre-stamp rows would be unclearable forever. Refusal is `403
+  {"error": "starred by <name> — only they can remove it"}`. Cards, the case
+  detail payload and both star responses gained **`starredByStamp`** so the
+  frontend can grey the control out instead of offering a click that 403s
+  (`hooks/useCaseStars.ts` mirrors the rule; the server is what enforces it).
+  (2) **The badge inside the case is now the control.** It was read-only, so
+  the one place a coder could NOT set a star was while reading the case she
+  had just decided mattered. `StarredBadge` toggles, holds its own optimistic
+  override, and draws a quiet "Mark important" outline when unstarred instead
+  of rendering nothing; a colleague's star keeps the old read-only sentence.
+
+- ✅ **Filter-bar dropdowns stopped being glass (2026-08-26):** the hospital
+  reported the sort control looked "a little crash" — the Sort and Order Type
+  panels open straight over the tab strip and the case rows, and as glass
+  (`gl.card` + `backdrop-filter`) that text read right through the options.
+  `backdrop-filter` could not fix it either: the sticky filter bar the panels
+  live in already blurs, and the two do not compose. New **`gl.popover`** token
+  — one OPAQUE surface per theme — now backs `FacetDropdown`, the new
+  `SortMenu` and `IcdFilterDialog`. Sort also stopped being a centered MODAL:
+  a dim overlay covering the list was the wrong weight for a choice that only
+  reorders it, so it is an anchored dropdown like every other control on the
+  bar (`SortDialog.tsx` → `SortMenu.tsx`, outside-click/Escape shared via
+  `useMenuDismiss`). Same pass enlarged the bar per the same request: 12px →
+  13px labels, taller hit targets, 14px icons, wider panels, bigger tick boxes.
+
+- ✅ **Tuned to the hospital's own API guide (2026-11-09):** the hospital sent
+  "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026, HTML at
+  `../MedCode-API-Connection-Guide.html`, plus the central
+  `../third-party-integration-manual.html`). The user's call: **the guide
+  wins wherever it differs from the contract we proposed.** What moved:
+  - **Auth is client credentials, not a fixed token.** `ImedApiClient` trades
+    `IMED_CLIENT_ID`/`IMED_CLIENT_SECRET` for a Bearer token at
+    `POST {IMED_API_BASE}/auth/token` (Basic auth, form
+    `grant_type=client_credentials`), caches it, renews it 30 s before
+    `expires_in` (a tenth early for short tokens) and retries a call ONCE on a
+    `401`. The timing logic is the pure `client/ImedTokenProvider`
+    (`ImedTokenProviderTest`). `IMED_API_TOKEN` is gone everywhere.
+    `IMED_API_BASE` is the HOST (no `/api/v1`) because `/auth/token` sits at
+    the root. Read timeout 10 s → `IMED_READ_TIMEOUT_SECONDS` (60).
+  - **R1 `/cases/check` was never built** (parked by the hospital). Decided
+    with the user: an UNWINDOWED `POST /api/sync` now re-reads the OPEN cases
+    we already hold via `/cases/sync` (`SyncRepository.openCaseIds`), and
+    imports nothing new; new cases only arrive through a date window. The
+    frontend's "All time"/"Everything" choice became "Update cases already
+    here", and the empty-dashboard Sync button opens the date picker without
+    it. A `to` without a `from` is now `400` (an open start would mean one
+    hospital call per day back to 2000).
+  - **Windowed sync is one hospital call per DAY** (the guide's
+    recommendation; 31 days is only the hard cap), bounds sent with the
+    hospital's offset (`…T00:00:00+07:00`).
+  - **Wire values:** datetimes carry `+07:00` — `SyncRules.parseDt` drops the
+    hospital's own offset and CONVERTS any other one to Bangkok time;
+    `sex` arrives `F`/`M` and `SyncRules.sexWord` stores `female`/`male`
+    (mixing both would split analytics); catalogue rows lost `edition`.
+  - **Writes:** the hospital's side is a mock for now (`mock: true`, nothing
+    saved in HIS) — logged once as a WARN. Our bodies already met every 400
+    rule in the guide; only fix: a PUT no longer sends
+    `fix_diagnosis_type_id: null` (the hospital serves unmappable types as
+    null). `coding_status` is IN the guide now (accepted).
+  - `../imed-mock-api` was reworked to the guide in the same change (token
+    endpoint, R1 removed, `+07:00`/`F`/`M` on the wire, the guide's 400
+    rules on writes) but **its writes still persist** — the user's choice, so
+    approve/reopen stays testable end to end.
+  Verified: mock suite 24/24; this suite green except
+  `approveThenReopenRoundTripsAndInvalidatesCache`, which was ALREADY failing
+  before this change — it expects 2 hospital writes, but since 2026-08-25
+  (`confirmImportedCodes`) a list-approve confirms all hospital codes, so the
+  ICD-9 cancel it counts no longer happens (1 write). Live check in the
+  browser: header Sync → "Update cases already here" → confirm → refresh ran
+  against the token-gated mock with no errors.
+  Still open with the hospital (in `docs/imed-integration.md`): which field
+  `sync-by-period` filters on, whether `visit_id` keeps the transaction-number
+  shape (`SyncRules.visitDateFromCaseId` reads the visit date from it), the
+  max cases per period answer, rate limits.
+
+- ⬜ **M7 — cutover (NOT done, reshaped):** stand up prod (GCP, three
+  containers) and rerun both repos' test suites there. The frontend half of
+  this milestone is done (above); what remains is prod hosting plus pointing
+  the frontend's `VITE_API_BASE_URL` at it. The old frontend/Flask pair just
+  keeps running untouched until then.
+
+Deploy direction (decided 2026-07-21, updated 2026-07-22): **GCP, three
+containers** — medcode-api, imed-mock-api (until the hospital provides the
+real iMed API; swapping is an `IMED_API_BASE` change), and one stock
+`postgres:18` hosting both databases. Exact GCP service not chosen yet. Must
+run a single medcode-api instance (`max-instances=1` on Cloud Run).
+
+**Update this section when a milestone or significant decision lands.**
+
+## Gotchas still live
+
+- `./mvnw test` needs BOTH seeded databases AND imed-mock-api running on
+  :8003 (`IMED_API_BASE`) — approve/reopen make real hospital calls.
+- Timestamps/JSONB always come back as raw strings: `::text` casts +
+  `getString`; never let JDBC parse them into objects.
+- Never `ORDER BY` a PG ENUM column bare — the `CASE` expressions in the
+  repo SQL define the intended order.
+- JDBC URL needs `stringtype=unspecified` (writes into ENUM/JSONB columns)
+  and `binaryTransfer=false`.
+- Response-shape changes must update `docs/api-contract.md` + `docs/types.ts`
+  and pass `CasesApiIntegrationTest`.
+- **Adding an endpoint fails the build until you list it** in
+  `OpenApiDocsTest.EXPECTED_PATHS` (two-way since 2026-07-29). That assertion is
+  the ONLY mechanical force keeping the docs honest — springdoc generates the
+  spec from the controller annotations, so nothing else notices a new route.
+  When it fails, the fix is to document the endpoint in `docs/api-contract.md`
+  + `docs/types.ts` and *then* add the path, not to add the path alone.
+- **The seed dumps are the demo-start baseline, and they are NOT frozen**
+  (corrected 2026-08-21 — the old "regenerating needs the retired POC pipeline"
+  rule is what let them drift a month behind the working local databases, so
+  Docker booted 1150 stale April-2026 cases while the demo ran on 21 July-2026
+  visits). `db/seed.sql.gz` is data, not build output, but it is also the only
+  hospital/medcode data Docker ever sees — `medcode-stack` bind-mounts both
+  dumps into Postgres initdb. Change the demo data, regenerate the dump.
+  Ours holds schema + `coverage_types` + the `icd_10`/`icd_9` catalogs, with
+  every case table, `auth_sessions` AND `users` empty — that emptiness is what
+  makes the dashboard start empty, and an empty `users` is deliberate: it lets
+  `AdminBootstrap` create the admin from `ADMIN_BOOTSTRAP_EMAIL` /
+  `ADMIN_BOOTSTRAP_PASSWORD` at first boot. **Never ship an admin row in the
+  dump** — `AdminBootstrap` returns early once any admin exists, so a baked-in
+  hash would silently override the env password in prod. Take the dump from a
+  database already at demo start:
+
+  ```bash
+  psql -d medcode -c 'TRUNCATE cases, case_codes, case_code_edits, case_orders,
+      case_report_sections, case_vitals, coding_history, document_chunks,
+      imed_write_ops, knowledge_base, auth_sessions, users'
+  # then reset each serial with setval(..., 1, false)
+  pg_dump -d medcode -n public --no-owner --no-privileges \
+    -T public.flyway_schema_history | gzip -9 > db/seed.sql.gz
+  ```
+
+  Exclude `flyway_schema_history`, or `baseline-on-migrate` won't adopt the dump
+  as version 0 and replay V1–V7. `-n public` also leaves the `demo_baseline`
+  snapshot schema out. The hospital side has the same rule and its own recipe
+  in `../imed-mock-api/README.md` § *Regenerating the dump*.
+- The sibling `imed` database keeps every table in a schema named **`imed`**,
+  not `public` (a leftover from the pre-split single-database era; the dump is
+  taken with `pg_dump -n imed`, so it carries the schema along). Doesn't affect
+  us — we only reach it over HTTP — but two things follow for M7: the
+  hospital-side SQL must stay schema-qualified, and provisioning needs
+  `GRANT USAGE ON SCHEMA imed` for any non-owner app role, or it fails with
+  "permission denied for schema imed". Details in `../imed-mock-api/README.md`.
+- **Schema changes go in ONE place: a new `src/main/resources/db/migrations/
+  V<n>__<name>.sql` file** (Flyway, since 2026-08-20). Never also write the DDL
+  in Java — that duplication is exactly what drifted for a year. The seed dump is
+  version 0; `baseline-on-migrate` adopts any database that predates the history
+  table.
+- Everything after the dump is outside it, so **a fresh re-seed drops all of it**
+  — `icd_codes` comes back, `password_hash` and the admin vanish, and
+  `flyway_schema_history` goes too. The fix is always to boot the app (Flyway
+  replays from 0), never to edit the dump. `@SpringBootTest` boots it too, so the
+  test DB self-heals.
+- The **bootstrap admin is NOT a migration** — hashing `ADMIN_BOOTSTRAP_PASSWORD`
+  needs the `PasswordEncoder`, so it stays an `ApplicationRunner`
+  (`config/AdminBootstrap`, renamed from `SchemaBootstrap` when its DDL left).
+  It runs after Flyway and does nothing once any admin exists.
+- Auth covers the WHOLE case surface since 2026-07-25 (Phase 3 — the earlier
+  "admin-only, never gate case routes" scope is OVER): the interceptor guards
+  /api/cases/**, /api/sync and /api/demo/reset (any valid token), and
+  approve/reopen stamp the logged-in account (body `coder` ignored). Only
+  login, health, and Swagger stay public. Adding
+  `spring-boot-starter-security` is still the trap the memory warns about — we
+  use `spring-security-crypto` (BCrypt) + a `HandlerInterceptor` instead.
+
+## Open tasks
+
+- **Frontend** (`../audit-chart-frontend`) — built and live against this
+  backend; the repo itself stays out of scope here. One loose end on OUR side
+  of the seam, re-checked 2026-08-07: `POST /api/cases/{id}/sync` (per-case)
+  still has no caller — bulk `/api/sync` and the whole Training/knowledge
+  surface ARE wired. Not a promise we've made. (Analytics and Agent used to sit
+  in this list as permanently-mocked pages; both are live now — see the
+  2026-08-07 Progress entry.)
+- **`GET /api/icd-codes` has no automated test.** It is documented and
+  hand-verified, but nothing asserts its behavior — which is precisely how the
+  2026-07-29 break shipped green. Covering the UNION path, the `system` filter,
+  the limit cap and the two 400s in `CasesApiIntegrationTest` is the natural
+  next step.
+- **M7 cutover** (above).
+
+## Full history
+
+- Complete migration plan (context, file mapping, gotchas):
+  `~/.claude-work/plans/what-is-current-backend-refactored-gosling.md`
+- iMed split + contract-ownership plan:
+  `~/.claude/plans/lets-split-repo-first-shimmying-ripple.md`
