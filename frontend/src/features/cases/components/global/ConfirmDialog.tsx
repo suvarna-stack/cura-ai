@@ -1,0 +1,70 @@
+// ============================================================
+// Generic confirmation dialog — same glassmorphism pattern as the
+// Dashboard approval dialog (fixed overlay + centered card + gl.*).
+// The single gate in front of every consequential coder action:
+// approve, reopen/unapprove, delete code, iMed sync, reset demo,
+// forget a learned rule, undo, logout. Admin pages (no theme /
+// language context) use ConfirmModal from components/ui/Modal.
+// ============================================================
+import type { LucideIcon } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
+import { useLang } from "../../context/LanguageContext";
+import { ModalShell } from "../../../../components/ui/Modal";
+import { CuraSpinner } from "../../../../components/brand/CuraSpinner";
+
+export function ConfirmDialog({
+  icon: Icon, title, body, confirmLabel, danger = false, busy = false,
+  onConfirm, onClose,
+}: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  /** true → red confirm button (destructive actions like delete) */
+  danger?: boolean;
+  /** request in flight — locks both buttons so it can't be fired twice */
+  busy?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const { gl } = useTheme();
+  const { t } = useLang();
+  const tint = danger ? "239,68,68" : gl.accentRgb; // #ef4444 for destructive
+  const tintColor = danger ? "#ef4444" : gl.accent;
+  const close = () => { if (!busy) onClose(); };
+  return (
+    <ModalShell onClose={close} ariaLabel={title}
+      overlayStyle={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
+      className="w-full max-w-sm rounded-2xl p-5"
+      style={{
+        background: gl.card, backdropFilter: gl.blur20, WebkitBackdropFilter: gl.blur20,
+        border: `1px solid rgba(${tint},0.25)`, boxShadow: gl.shadow,
+      }}>
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
+            style={{ background: `rgba(${tint},0.15)`, color: tintColor }}>
+            <Icon size={18} />
+          </div>
+          <h3 className="text-[15px] font-bold" style={{ color: gl.text }}>{title}</h3>
+        </div>
+        <p className="text-[12px] font-normal leading-relaxed mb-4" style={{ color: gl.muted }}>{body}</p>
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={close} disabled={busy}
+            className="hover-glow text-[12px] font-semibold px-4 py-2 rounded-lg transition-all disabled:opacity-40"
+            style={{ border: gl.border, color: gl.text, background: gl.inputBg }}>
+            {t("confirm.cancel")}
+          </button>
+          <button onClick={onConfirm} disabled={busy}
+            className="hover-glow flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg transition-all disabled:opacity-60"
+            style={danger
+              ? { background: "#ef4444", color: "#fff" }
+              : { background: gl.accentGrad, color: gl.isDark ? "#1a0a00" : "#fff" }}>
+            {busy
+              ? <CuraSpinner variant="button" size={13} label={t("confirm.working")} />
+              : <Icon size={12} />}
+            {busy ? t("confirm.working") : confirmLabel}
+          </button>
+        </div>
+    </ModalShell>
+  );
+}
