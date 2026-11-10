@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Java formatting profile — the SAME engine VSCode's Java extension runs on
+  format-on-save (Eclipse JDT), so `./mvnw spotless:apply` and saving a file in
+  the editor produce identical output. Unspecified settings fall back to the
+  Eclipse defaults.
+
+  Comment formatting is off on purpose: the prose in this repo is hand-wrapped
+  to sit at a readable width, and letting the formatter re-flow it would churn
+  every file for no gain.
+-->
+<profiles version="23">
+  <profile kind="CodeFormatterProfile" name="imed-mock-api" version="23">
+    <setting id="org.eclipse.jdt.core.formatter.tabulation.char" value="space"/>
+    <setting id="org.eclipse.jdt.core.formatter.tabulation.size" value="4"/>
+    <setting id="org.eclipse.jdt.core.formatter.indentation.size" value="4"/>
+    <setting id="org.eclipse.jdt.core.formatter.lineSplit" value="120"/>
+    <!-- Keep hand-placed line breaks instead of re-flowing them. -->
+    <setting id="org.eclipse.jdt.core.formatter.join_wrapped_lines" value="false"/>
+    <!-- Eclipse defaults annotation arguments to "never wrap", which drags long
+         @Operation/@Schema descriptions onto 200-char lines and overrides
+         join_wrapped_lines. 16 = wrap only where necessary. -->
+    <setting id="org.eclipse.jdt.core.formatter.alignment_for_arguments_in_annotation" value="16"/>
+    <setting id="org.eclipse.jdt.core.formatter.comment.format_block_comments" value="false"/>
+    <setting id="org.eclipse.jdt.core.formatter.comment.format_javadoc_comments" value="false"/>
+    <setting id="org.eclipse.jdt.core.formatter.comment.format_line_comments" value="false"/>
+    <setting id="org.eclipse.jdt.core.formatter.comment.format_header" value="false"/>
+  </profile>
+</profiles>

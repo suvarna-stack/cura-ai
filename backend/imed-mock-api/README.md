@@ -1,0 +1,496 @@
+# imed-mock-api
+
+A **mock of the iMed hospital API**: the HTTP surface between MedCode AI and
+the hospital, implemented as a live, runnable example over the real sample
+extract data. Two audiences:
+
+1. **Hospital clients** — the READ endpoints are the integration spec for the
+   extract data ("give us APIs like this"); the WRITE endpoints under
+   `/api/v1` mock the hospital's OWN contract back at them — the "iMed
+   Diagnosis and Medical Discharge API" PDF (rev 1, 24 Jul 2026). (The
+   invented coding-status extension was withdrawn 2026-08-02 — the mock now
+   mirrors the PDF exactly.)
+2. **medcode-api** — calls these endpoints exactly as it will call the
+   hospital's real API later. Swapping this mock for the real thing is a
+   base-URL + credentials change (`IMED_API_BASE`, `IMED_CLIENT_ID`,
+   `IMED_CLIENT_SECRET` in medcode-api).
+
+> **Since 2026-11-09 the spec this mock follows is the hospital's own guide**,
+> "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026,
+> `../MedCode-API-Connection-Guide.html`). It wins wherever it differs from
+> the contract MedCode AI first proposed. One deliberate difference remains:
+> the hospital's write routes are a mock that answers `mock: true` and saves
+> nothing, while **this mock's writes really persist**, so approve/reopen can
+> be tested end to end.
+
+Spring Boot 4.1 / Java 21, Maven (`./mvnw`), plain SQL — no JPA, no Python.
+Owns the `imed` PostgreSQL database exclusively; no other app touches it.
+
+## The spec, generated
+
+Because this app IS the integration spec, the spec is generated from the
+running code rather than maintained by hand — the tables below can drift, the
+generated document cannot.
+
+| URL | What |
+|---|---|
+| `/console.html` | Minimal try-it-out console (single static page, reads `/v3/api-docs` live) |
+| `/swagger-ui.html` | Browsable API, try-it-out against the seeded data |
+| `/v3/api-docs` | OpenAPI 3.1 JSON |
+| `/v3/api-docs.yaml` | OpenAPI 3.1 YAML — **the file to hand the hospital's integrators** |
+
+The `/api/v1` write bodies are typed records with the hospital PDF's exact
+snake_case field names (`DiagnosisRequest`), so the published schema mirrors
+their contract field-for-field.
+
+## The API
+
+### AUTH — `POST /auth/token`
+
+Client credentials, as the guide shows: `Authorization: Basic
+base64(client_id:client_secret)`, form body `grant_type=client_credentials` →
+`{"access_token", "token_type": "Bearer", "expires_in": 300}`. Every
+`/api/v1` route needs `Authorization: Bearer <access_token>`; an expired or
+unknown token is `401 {"message":"unauthorized","message_th":"ไม่มีสิทธิเข้าถึง"}`
+(no `status` key). Wrong client credentials → the same `401`; a
+`grant_type` other than `client_credentials` → `400`. Tokens are random
+strings held in memory (the real API issues JWTs; a client never looks
+inside), so a restart forgets them — a client just asks again. The console
+page at `/` has a **Get token** button.
+
+### READ — `/api/v1`, the five routes the hospital built
+
+MedCode AI first proposed six read routes (R1–R6,
+`../medcode-api/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`). The
+hospital built five; **R1 `/cases/check` was parked**, so the mock no longer
+serves it (`404`).
+
+| # | Endpoint | Purpose |
+|---|---|---|
+| R2 | `POST /api/v1/cases/sync` | Full case data for up to **20** `visit_ids` → `{cases, not_found}` |
+| R3 | `POST /api/v1/cases/sync-by-period` | Same data for a visit-date window (`from`/`to`, both ends included, max **31 days**) → `{cases}` |
+| R4 | `GET /api/v1/catalog/icd10` | ICD-10 code master → `[{code, description}]` (no `edition`, as in the guide) |
+| R5 | `GET /api/v1/catalog/icd9` | ICD-9 code master, same shape |
+| R6 | `POST /api/v1/contract/check` | Schema gate: send `required_fields` as `block.field` names → `{valid}` or `{valid:false, missing:[…]}` |
+
+R2/R3 answer with the contract's nested **case object** — one `visit` block
+plus nine data blocks (`documents`, `record_results`, `diagnoses`,
+`procedures`, `drug_orders`, `lab_results`, `vitals`, `ward_movements`,
+`billing_items`). Blocks with no rows are `[]`, never absent.
+
+Three transport rules are enforced here because on the real API they are the
+hospital's job:
+
+- **Date-times are ISO 8601 with the hospital's offset**
+  (`2026-04-01T06:45:00+07:00`). The extract stores `2026-04-01 06:45:00`
+  (Bangkok local time), so every datetime is normalized on the way out;
+  `birth_date` is served as a plain date. `sex` is the guide's `F`/`M` (the
+  extract says `female`/`male`).
+- **Missing values are `null`** — never `""`, never an absent key. The
+  extract uses both `NULL` and `''` for "nothing", so blanks collapse.
+- **Cancelled code rows never appear**, same rule as the older reads.
+
+Two visit fields are DERIVED, not stored: `encounter_type` (IPD when the
+visit has an admission number, else OPD) and `last_changed_at` (the visit
+datetime, raised by any later write to its code rows). The contract leaves
+the change-timestamp mechanism to the hospital, so no column was added.
+
+The limits are real, not decorative: 21 ids → `422 too_many_visit_ids`, a
+32-day window → `422 period_too_long`, both in the hospital's
+`STATUS_BUSINESS_ERROR` envelope; an empty id or field list, or a window
+whose `from` is after its `to`, is a `400`. Period bounds may carry an offset
+(`+07:00`, `Z`) and are converted to hospital time; a bound without one is
+already hospital time. A convenient shortcut here would only surface on
+cutover day.
+
+### Demo tooling (mock-only)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/demo/snapshot` | freeze every `imed.*` table into the `imed_baseline` schema |
+| `POST /api/demo/reset` | truncate + restore every `imed.*` table from `imed_baseline` (undoes all write-backs; 400 before the first snapshot). Called by medcode-api's `POST /api/demo/reset` so one button resets both sides |
+
+Not part of the hospital contract — the real iMed API has nothing like this,
+so never ask the hospital for it.
+
+### WRITE — `/api/v1`, the hospital's real contract (mocked)
+
+Validated to the guide's rules, on top of the field names from the earlier
+"iMed Diagnosis and Medical Discharge API" PDF: Bearer token from
+`/auth/token`, snake_case bodies, `{request_id, status, result}` envelopes.
+What the guide requires and the mock enforces (each break is a `400`):
+
+- `request_id` is `MCAI-<visit_id>-<UUID v4>` naming the body's visit.
+- Only the guide's fields — anything else (the PDF's `doctor_eid`,
+  `comments`, IPD clinical texts, …) is refused.
+- POST: `diagnosis_icd10` and `diagnosis_icd9` both present, exactly one with
+  rows; ICD-10 rows need `fix_dx_source: "MED_DC"` and `coder_eid`; ICD-9
+  rows need `is_from: "MED_DC"` and one of the four operation types; a time
+  needs its date.
+- PUT: only the array being changed (never `[]` for the other), each row
+  `object_id` + at least one change, no discharge object, no
+  `fix_operation_type_id`; a body without rows must carry `coding_status`.
+  `time_in`/`time_out` may come without the date (it lands on the stored
+  date) or as `null`.
+- Descriptions go as a matching pair (`icd10_description` +
+  `beginning_diagnosis`); never an empty string instead of leaving a key out.
+
+Kept from the PDF because the real HIS will do them (the hospital's mock
+does not yet): `request_id` replay returns the stored response, and a
+duplicate live ICD-10 code is `409`.
+
+| Endpoint | What |
+|---|---|
+| `POST /api/v1/diagnosis` | Create ICD-10 dx **or** ICD-9 procedures + the discharge object in ONE transaction. New rows carry NO `object_id`; generated ids come back in `result` — keep them for PUT/DELETE |
+| `PUT /api/v1/diagnosis/{visit_id}` | Edit existing rows by their `object_id`, or only the coding status; only provided fields change |
+
+POST and PUT carry the optional `coding_status` — medcode's proposal, now in
+the hospital's guide. `"approved"` marks the visit's own
+`medhack_patient.coding_status`, the reserved word `"open"` clears it again on
+reopen, and absent/blank changes nothing — so a caller speaking the exact
+hospital contract is unaffected. It sets the visit in the SAME transaction as
+the codes; a body carrying only `coding_status` marks the visit without
+touching a code row. Any other word is a 400 (mock-only strictness).
+
+The discharge status the caller sends (`fix_opd_discharge_status_id` /
+`fix_ipd_discharge_status_id`) stays inside `doctor_discharge_opd` / `_ipd`.
+Until 2026-08-07 it was also written onto `medhack_patient.dischargestatus` —
+that column is the DOCTOR's clinical outcome, so the write API no longer
+touches it.
+
+| `DELETE /api/v1/diagnosis/{visit_id}/icd10/{id}` | Cancel one diagnosis — iMed's cancel flow: flagged `is_cancelled`, never hard-deleted, gone from reads. Idempotent |
+| `DELETE /api/v1/diagnosis/{visit_id}/icd9/{id}` | Same for one procedure |
+
+Errors, verbatim from the PDF: `400 {"status":"STATUS_BUSINESS_ERROR",
+"message":"invalid_request","message_th":…}` (the mock adds a `detail` key as
+a debugging aid — the real API does not), `401 {"message":"unauthorized",…}`,
+`409 {"message":"DIAGNOSIS_CODE_ALREADY_EXIST",…}` on a duplicate live ICD-10
+code for the visit.
+
+Mock master data (real IDs arrive with the hospital's master-data list and
+slot into the same fields): `fix_visit_type_id` = `OPD` | `IPD`,
+`fix_diagnosis_type_id` = `PRIMARY_DIAGNOSIS` / `COMORBIDITY` / `OTHERS` /
+`EXTERNAL_CAUSE_OF_INJURY`, `fix_operation_type_id` = any non-blank string.
+
+The invented `PUT/DELETE /api/cases/{tn}/coding-result` contract from the
+first mock iteration is **gone** — superseded by the endpoints above.
+
+### Health
+
+`GET /api/health` (no DB) · `GET /api/healthz` (real `COUNT(*)`). Both stay in
+the published contract for existing callers.
+
+For container probes prefer Actuator, which checks the connection pool itself:
+`GET /actuator/health/liveness` · `GET /actuator/health/readiness` (the
+readiness group includes the `db` check, so an unreachable Postgres reports
+DOWN rather than merely failing every request). The Dockerfile HEALTHCHECK
+uses readiness.
+
+**Auth:** every `/api/v1` route requires a Bearer token from
+`POST /auth/token` (see *AUTH* above). Health, actuator, Swagger and the demo
+tooling stay open.
+
+## Local dev — first-time setup included
+
+**Just cloned this (or got it from a teammate)?** The `imed` database is NOT
+shipped pre-built — you create it from the committed seed file:
+
+```bash
+brew install postgresql@18 && brew services start postgresql@18   # once per machine
+scripts/seed_local_imed_pg.sh     # creates + seeds db "imed" from db/seed.sql.gz
+./mvnw spring-boot:run            # :8003 — browse http://localhost:8003/console.html
+```
+
+Good to know:
+
+- `db/seed.sql.gz` is the demo-start baseline — **110 visits across the 10
+  `imed.medhack_*` tables**: 100 OPD (what the dashboard shows) and 10 IPD
+  admissions. 21 of them are the original hand-written sample extracts; the
+  rest are generated by `scripts/generate_demo_data.py` (see *The demo
+  dataset* below). Restoring is plain
+  `psql`; no Python anywhere. It is data, but it is **not frozen**: regenerate
+  it with `pg_dump` from a local `imed` that is already at demo start (see
+  *Regenerating the dump* below). The catalogs (`icd_10`, `icd_9`) and the
+  write-surface tables (`imed_request_log`, `doctor_discharge_*`) are NOT in
+  the dump — the Flyway migrations own those.
+- **Re-running the seed script wipes the database back to the baseline**
+  (any coding results written by medcode-api are discarded).
+- The full stack needs the sibling repo `../medcode-api` too — see its README
+  for the two-repo setup.
+- Java 21 required; `./mvnw` fetches Maven itself. Postgres not from
+  Homebrew? Point `PGBIN` at your Postgres `bin` directory.
+
+## The `imed` schema — tables are NOT in `public`
+
+Every table lives in a schema named **`imed`**, inside a database also named
+`imed`. Nothing is in `public` — it exists but is empty.
+
+That is history, not design: the hospital extracts and medcode's own tables
+once shared a single database, where the `imed` schema kept the two apart.
+The 2026-07-22 repo split gave this side its own database, but the dump is
+still taken with `pg_dump -n imed`, so its `CREATE SCHEMA imed` comes along
+unchanged — and renaming the schema now would be a migration across every
+statement in `repo/` for no gain.
+
+Consequences, all of them ordinary once you know:
+
+- **Always qualify the schema in SQL** — `FROM imed.medhack_patient`, never
+  `FROM medhack_patient`. Every statement in `repo/` already does. A missing
+  prefix compiles fine and fails at *runtime* with "relation does not exist",
+  possibly only on a rarely-hit endpoint — the one real trap here. Deliberately
+  no `currentSchema=imed` in the JDBC URL: it would paper over a missing
+  prefix instead of surfacing it.
+- **Database clients hide it.** DataGrip/DBeaver/pgAdmin show only `public` by
+  default, so the database looks empty. Tick the `imed` schema in the client's
+  schema chooser (the "1 of 4" style badge on the database node). For ad-hoc
+  psql, `SET search_path TO imed;` once per session.
+- **Deploying needs an explicit grant.** Locally you own the schema so this
+  never shows up; with a separate application role it fails as "permission
+  denied for schema imed". Grant it when provisioning:
+
+  ```sql
+  GRANT USAGE ON SCHEMA imed TO <app_role>;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA imed TO <app_role>;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA imed
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <app_role>;
+  ```
+
+  (The last line covers tables the Flyway migrations create at startup. The
+  role also needs `CREATE` on the schema, since Flyway writes its own
+  `imed.flyway_schema_history` table there.)
+
+## Schema changes
+
+Everything the `/api/v1` write surface needs on top of the extract dump lives in
+`src/main/resources/db/migrations/V*.sql` and is applied by **Flyway** at
+startup, into the `imed` schema. Pull and boot:
+
+```bash
+git pull
+./mvnw spring-boot:run     # Flyway applies anything missing
+```
+
+The dump is version 0; a database that already has content but no history table
+is adopted automatically (`baseline-on-migrate`). Every migration is guarded
+(`IF NOT EXISTS` / `ON CONFLICT DO NOTHING` / `WHERE NOT EXISTS`), so one that
+already had these applied by the old startup runner takes them as no-ops.
+
+| Version | Change |
+|---|---|
+| `V1` | `is_cancelled`, `imed_request_log`, `doctor_discharge_opd` / `_ipd` |
+| `V2` | `icd_10` / `icd_9` catalog tables |
+| `V3` | `updated_at` on the code rows, behind `visit.last_changed_at` (it once also backed R1's `changed_since`, parked by the hospital) |
+| `V4` | the five pre-coded demo visits |
+| `V5` | `coding_status` on the visit row |
+| `V6` | the ~1000 ICD catalog rows |
+
+```bash
+psql -d imed -c "SELECT version, description, success FROM imed.flyway_schema_history ORDER BY installed_rank"
+```
+
+A re-seed drops all of it — the dump predates every migration — along with the
+history table, so booting the app replays the lot from version 0.
+
+**Adding a change:** add one `V<n>__<name>.sql` file, and do NOT also write the
+DDL in Java. Until 2026-08-20 every statement lived in `config/SchemaBootstrap`
+AND in a `db/migrations` file that nothing ran; on the medcode side the same
+duplication silently cost two tables their foreign keys.
+
+## The demo dataset
+
+`db/seed.sql.gz` holds **110 visits**. The shape matters, because each part of
+it exists to make a different thing visible in the product:
+
+| | Count | What it is for |
+|---|---|---|
+| OPD visits | 100 | The dashboard. `medcode-api` serves only `encountertype='0'` there (`CasesRepository`), so these are the cases a coder actually works. |
+| IPD admissions | 10 | The only rows carrying `admissionnumber`, admission/discharge datetimes, `ward` and `bednumber`. They appear in case detail, the R1–R6 read contract and analytics — **not** on the dashboard. |
+
+The 100 OPD visits split by what the hospital had already coded when the extract
+was taken — which is exactly `medcode-api`'s completeness rule ("arrived already
+carrying both an ICD-10 diagnosis and an ICD-9 procedure", `SyncRules`):
+
+| After a Sync | Count | In the extract |
+|---|---|---|
+| incomplete | 50 | missing ICD-10, ICD-9, or both — the coding backlog |
+| complete | 50 | both code systems present |
+
+Clinical shape, all sourced rather than invented (see the generator's
+*DOMAIN SOURCES* docstring): exactly **one `PRIMARY_DIAGNOSIS` per visit**, as
+ICD-10-TM Volume 5 requires, plus `COMORBIDITY` rows on a slice of cases so
+`severity_level` actually varies (low 96 / medium 7 / high 7 rather than low on
+every row). Document types come from the defined set — OPD visits are one `OPD
+Record`, admissions are an `Admission Note` + `Progress Note` + `Clinical
+Summary`, the last because Volume 5 makes the discharge summary the primary
+source for choosing the principal diagnosis. Lab values are keyed to the
+diagnosis, so a pneumonia chart reads with a raised white count. No procedure
+code is one Volume 5 classes as routine and therefore uncodable — that rules out
+`57.94` (urinary catheterisation) and `99.29` (injection), both of which exist
+in the catalog and are easy to reach for by mistake.
+
+20 of those 50 complete visits additionally carry `coding_status='approved'` on
+`medhack_patient` — the hospital's own marker that its coding was already signed
+off. Note what this does **not** do: `medcode-api` seeds every synced case as
+`case_status='open'` on purpose (`SyncRepository.insertCase` — workflow state is
+coder-owned), so these land in the dashboard's *complete* queue, not its
+*finished* one. The dashboard's `finished` bucket fills when a coder approves in
+the app. Reflecting `coding_status` there would be a `medcode-api` decision, not
+ours.
+
+### The rows a coder opens first
+
+A demo is only as good as the first rows of each tab, and those were the
+*thinnest* charts in the set — two of them carried no labs, no imaging and no
+past history at all. `ENRICH_VISITS` in the generator fills eight of them out:
+the panels the presentation would really have ordered, the film it would really
+have taken, the past-history section, and whichever standard `OPD Record` fields
+the extract simply lacked (copied verbatim from the matching scenario in `S`).
+
+It **adds rows only**. No visit is created or removed, no id changes, no
+diagnosis or procedure row is ever written, and no hand-written Thai narrative
+is rewritten — so the dataset stays the same 150 visits it was.
+
+The eight are chosen by where each tab's own ordering puts them:
+
+| Tab | Ordered by | So the top rows are |
+|---|---|---|
+| Complete | principal ICD-10, A–Z (`useCaseFilters` default `code-asc`) | the lowest codes |
+| Incomplete | grouped by order type, **Surgery first** (`ORDER_PRIORITY`), then A–Z — which for a case with no diagnosis is its ICD-9 | the Surgery group, then CT / X-ray |
+| Finished | *nothing* — it is empty at demo start (see above) and fills only when a coder approves | — |
+
+If the generated data ever moves, re-derive the list: `main()` asserts every id
+in `ENRICH_VISITS` still exists, so a change that displaces them fails the run
+rather than silently enriching nothing.
+
+### Regenerating it
+
+```bash
+python3 scripts/generate_demo_data.py     # rebuilds, then apply the dump step below
+```
+
+The script is deterministic (fixed RNG seed) and idempotent: it deletes what it
+previously generated, clears write-backs left by demo *and test* runs, and
+rebuilds. The 21 original hand-written visits are preserved by id — four of them
+are named in test suites, and `V4__precoded_demo_visits.sql` depends on five.
+Read its docstring before changing it; it explains which columns are left NULL
+on purpose and why filling them would break the dashboard.
+
+## Regenerating the dump
+
+`db/seed.sql.gz` is the **only** source of hospital data Docker boots from
+(`medcode-stack/docker-compose.yml` bind-mounts it into the Postgres container's
+initdb), and `scripts/seed_local_imed_pg.sh` restores the same file locally. So
+when the demo data changes, it changes *here* — a database edited only in place
+reaches nobody else. That is exactly how the dump drifted a month behind the
+working local database before 2026-08-21.
+
+Regenerate from a local `imed` that is already at **demo start** — 110 visits, no
+approvals written back. `scripts/generate_demo_data.py` puts the database in
+exactly that state (it clears write-backs before rebuilding), so the reliable
+sequence is *run the generator, then dump*:
+
+```bash
+pg_dump -d imed -n imed --no-owner --no-privileges \
+  -T imed.flyway_schema_history \
+  -T imed.icd_10 -T imed.icd_9 \
+  -T imed.imed_request_log \
+  -T imed.doctor_discharge_opd -T imed.doctor_discharge_ipd \
+  | gzip -9 > db/seed.sql.gz
+```
+
+Why each exclusion:
+
+- **`flyway_schema_history`** — the dump must stay version 0 so
+  `baseline-on-migrate` adopts it and replays V1–V6. Ship the history table and
+  Flyway thinks the work is already done.
+- **`icd_10` / `icd_9` / `imed_request_log` / `doctor_discharge_*`** — created by
+  V1/V2 and filled by V6. The dump is the frozen hospital *extract*; everything
+  we added since belongs to the migrations.
+- **the `imed_baseline` schema** — a runtime snapshot taken by
+  `POST /api/demo/snapshot`, not seed data. `-n imed` already leaves it out.
+
+If the source database has served a demo, strip the write-back rows first — our
+own mock generates them, and they are not hospital data — and un-cancel any SEED
+row an approve/reopen cycle knocked out:
+
+```sql
+DELETE FROM imed.medhack_diagnosis_icd10 WHERE id !~ '^[0-9]+$';  -- DX10-*
+DELETE FROM imed.medhack_procedure_icd9  WHERE id !~ '^[0-9]+$';  -- PX9-*
+UPDATE imed.medhack_patient       SET coding_status = NULL;
+UPDATE imed.medhack_procedure_icd9  SET is_cancelled = NULL WHERE id ~ '^[0-9]+$';
+UPDATE imed.medhack_diagnosis_icd10 SET is_cancelled = NULL WHERE id ~ '^[0-9]+$';
+```
+
+The numeric-id rows are the hospital's own extract; only `DX10-*`/`PX9-*` are
+ours. That last pair matters: a cancelled seed procedure silently costs the demo
+a complete case, which is exactly what happened to `86.3` on visit
+`…813401900901` before 2026-08-21.
+
+Then verify a clean boot before committing: restore into a scratch database, run
+the migrations, and check the counts — **110 patients (100 OPD + 10 IPD), 102
+active ICD-10 (69 principal + 33 comorbidity), 66 active ICD-9, 1091 medical
+records, catalogs 650/332**, and
+**50 OPD visits carrying both code systems** (those become the 50 complete cases
+after a Sync).
+
+## Environment variables
+
+| Var | Meaning |
+|---|---|
+| `DATABASE_URL` | libpq-form DSN (`postgresql://user:pass@host:port/db`). Unset = `localhost:5432/imed`. |
+| `JDBC_DATABASE_URL` | Already-JDBC URL; wins over `DATABASE_URL`. |
+| `PORT` | HTTP port (default 8003). |
+| `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` | The client credentials `/auth/token` accepts (default `medcode-mock-client` / `medcode-mock-secret`). |
+| `IMED_TOKEN_TTL_SECONDS` | Token lifetime, reported as `expires_in` (default `300`). |
+
+## Testing
+
+```bash
+./mvnw test
+```
+
+`ImedMockApiIntegrationTest` runs against the local seeded `imed` Postgres
+(`@SpringBootTest` + MockMvc, no test containers, no mocks): read endpoints,
+Bearer auth (401s), the full `/api/v1/diagnosis` life cycle (POST → visible in
+reads → PUT edit → DELETE cancel → gone from reads, idempotent), the 409
+duplicate rule, `request_id` replay semantics, the demo snapshot/reset round
+trip, and the published contract itself — that `/v3/api-docs` covers every endpoint
+with the PDF's exact field names, so the spec cannot silently drift from the
+code. The write tests self-reset via the cancel flow, so re-runs are stable.
+
+## Formatting
+
+```bash
+./mvnw spotless:apply     # reformat every Java file
+./mvnw spotless:check     # fail if anything is unformatted
+```
+
+Spotless runs the Eclipse JDT formatter — the same engine VSCode's Java
+extension uses on format-on-save — against `config/eclipse-formatter.xml`, so
+saving in the editor and running the command produce identical output and
+nobody's editor settings can start a whitespace war.
+
+Two deliberate deviations from the Eclipse defaults: comment re-flow is off
+(the prose here is hand-wrapped), and annotation arguments wrap at 120 instead
+of never (the default drags long `@Operation`/`@Schema` descriptions onto
+200-character lines).
+
+## Docker
+
+**The whole system in one command** — the sibling repo
+[`medcode-stack`](https://github.com/Occamy-medihack/medcode-stack) runs this
+mock, medcode-api, the web UI, RAG and one Postgres (holding both the `imed` and
+`medcode` databases, each seeded from its repo's committed dump) as five
+containers. Clone the five repos as siblings, then:
+
+```bash
+cd ../medcode-stack && cp .env.example .env && docker compose up -d --build
+```
+
+This service alone, against a database you already run:
+
+```bash
+docker build -t imed-mock-api .
+docker run -p 8003:8003 \
+  -e DATABASE_URL="postgresql://$USER@host.docker.internal:5432/imed" imed-mock-api
+```
