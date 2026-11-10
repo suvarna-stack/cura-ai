@@ -117,12 +117,23 @@ public class AgentLearnController {
         AuthService.Principal me = principal(request);
         // An id in the body means "edit that rule in place" — the same act as
         // deleting it and teaching a new one, so it needs the same permission.
-        String editing = map.get("id") instanceof String id ? id.strip() : "";
-        if (!editing.isEmpty()) {
+        // Fail closed: an id that is present must be a string, and RAG gets
+        // exactly the id that was checked (a copy of the note carries it).
+        Map<String, Object> forwarded = new LinkedHashMap<>();
+        map.forEach((k, v) -> forwarded.put(String.valueOf(k), v));
+        Object rawId = forwarded.get("id");
+        if (rawId != null && !(rawId instanceof String)) {
+            throw new ApiExceptionHandler.BadRequestException("note.id must be a string");
+        }
+        String editing = rawId == null ? "" : ((String) rawId).strip();
+        if (editing.isEmpty()) {
+            forwarded.remove("id");          // blank = a new rule
+        } else {
             requireAuthor(me, editing);
+            forwarded.put("id", editing);
         }
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("note", map);
+        payload.put("note", forwarded);
         payload.put("created_by", displayName(me));
         payload.put("created_by_id", me.userId());
         return forward(() -> rag.saveNote(payload));

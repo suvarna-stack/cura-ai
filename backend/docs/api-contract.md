@@ -972,6 +972,8 @@ POST /api/agent/learn/notes      { "note": { ...the confirmed draft... } }
   -> the stored note (`id`, `created_by`, `created_by_id`, `created_at`,
                       `hits`)
      403 when `note.id` names a rule taught by someone else
+     400 when `note.id` is present but not a string; a blank one means
+         a new rule, and a padded one is trimmed before the check
 GET  /api/agent/learn/notes      -> { "notes": [ ... ] }   // incl. muted,
                                                            // and every coder's
 PATCH  /api/agent/learn/notes/{id}?active=false            // mute, keep

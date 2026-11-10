@@ -12,8 +12,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * the whole case surface (/api/cases/**, /api/sync, /api/demo/reset). Only
  * /api/auth/login, the health probes, and Swagger stay public.
  *
- * It validates the Bearer token, and for /api/admin/** additionally requires
- * the admin role. On success the resolved Principal is stashed as a request
+ * It validates the Bearer token; the admin role for /api/admin/** is then
+ * required by AdminRoleInterceptor. On success the resolved Principal is stashed as a request
  * attribute — approve/reopen stamp their audit trail from it (the
  * body-supplied `coder` field is ignored now). Failures throw the
  * ApiExceptionHandler exceptions, so the 401/403 bodies stay the contract's
@@ -45,9 +45,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (principal == null) {
             throw new ApiExceptionHandler.UnauthorizedException("unauthorized");
         }
-        if (request.getRequestURI().startsWith("/api/admin/") && !"admin".equals(principal.role())) {
-            throw new ApiExceptionHandler.ForbiddenException("forbidden");
-        }
+        // The admin-role check for /api/admin/** is AdminRoleInterceptor's job.
         request.setAttribute(PRINCIPAL, principal);
         return true;
     }
