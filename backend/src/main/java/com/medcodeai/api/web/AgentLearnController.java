@@ -126,10 +126,18 @@ public class AgentLearnController {
             throw new ApiExceptionHandler.BadRequestException("note.id must be a string");
         }
         String editing = rawId == null ? "" : ((String) rawId).strip();
-        if (editing.isEmpty()) {
-            forwarded.remove("id");          // blank = a new rule
+        Map<String, Object> existing = editing.isEmpty() ? null : forward(() -> rag.note(editing));
+        if (existing == null || !editing.equals(existing.get("id"))) {
+            // Blank or unknown id = a new rule. Only an id RAG hands back
+            // verbatim is an edit, and an unknown one is never forwarded: RAG
+            // normalizes ids with Python's whitespace rules (U+00A0 and
+            // friends), so "x " — unknown here — could land on rule "x"
+            // there, skipping the author check.
+            forwarded.remove("id");
         } else {
-            requireAuthor(me, editing);
+            if (!mayManage(existing, me)) {
+                throw refusal(existing);
+            }
             forwarded.put("id", editing);
         }
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -210,9 +218,13 @@ public class AgentLearnController {
         if (note == null || mayManage(note, me)) {
             return;
         }
+        throw refusal(note);
+    }
+
+    private static ApiExceptionHandler.ForbiddenException refusal(Map<String, Object> note) {
         Object owner = note.get("created_by");
         String who = owner instanceof String s && !s.isBlank() ? s : "another coder";
-        throw new ApiExceptionHandler.ForbiddenException(
+        return new ApiExceptionHandler.ForbiddenException(
                 "This rule was taught by " + who
                         + ". Only its author can change or delete it.");
     }

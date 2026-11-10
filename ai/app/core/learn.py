@@ -154,8 +154,15 @@ def save_note(draft: dict[str, Any], created_by: str = "",
     an edit the original author is kept: editing does not transfer ownership.
     """
     note = _normalize(draft)
-    note_id = note.get("id") or _new_id()
-    existing = get_note(note_id) or {}
+    # An id is an edit only when it names a stored rule EXACTLY as sent —
+    # never after normalizing. medcode-api checks the author of the exact id
+    # it forwards; stripping here (Python also eats U+00A0) could turn an id
+    # unknown to that check into someone else's rule. Anything else is a new
+    # rule with a fresh id: callers never choose ids.
+    requested = draft.get("id")
+    found = get_note(requested) if isinstance(requested, str) and requested else None
+    note_id = requested if found is not None else _new_id()
+    existing = found or {}
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     note.update({

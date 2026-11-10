@@ -83,6 +83,22 @@ class AgentLearnSaveIdTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void anUnknownIdIsNeverAnEdit() throws Exception {
+        // RAG strips with Python's whitespace rules, which include U+00A0 —
+        // Java's strip() does not. "theirs\u00A0" is unknown to the lookup but
+        // would land on "theirs" in RAG, so an unknown id must not be forwarded.
+        save("{\"id\": \"theirs\u00A0\", \"rule\": \"x\"}").andExpect(status().isOk());
+        save("{\"id\": \"no-such-rule\", \"rule\": \"x\"}").andExpect(status().isOk());
+        ArgumentCaptor<Map<String, Object>> sent = ArgumentCaptor.forClass(Map.class);
+        verify(rag, org.mockito.Mockito.times(2)).saveNote(sent.capture());
+        for (Map<String, Object> payload : sent.getAllValues()) {
+            Map<String, Object> note = (Map<String, Object>) payload.get("note");
+            assertEquals(null, note.get("id"));
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void noIdOrABlankIdIsANewRule() throws Exception {
         save("{\"rule\": \"x\"}").andExpect(status().isOk());
         save("{\"id\": null, \"rule\": \"x\"}").andExpect(status().isOk());

@@ -248,6 +248,24 @@ def test_save_indexes_the_note_and_survives_reload(store, tmp_path):
     assert list(stored) == [note["id"]]
 
 
+def test_an_id_is_an_edit_only_when_it_names_a_stored_rule_exactly(store):
+    """RAG holds no identity: medcode-api checks the author of the exact id it
+    sends. Normalizing the id here (Python's strip() also eats U+00A0, Java's
+    does not) would let "x\u00a0" — unknown to that check — overwrite rule x."""
+    victim = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."),
+                             created_by="Frank", created_by_id=7)
+
+    sneaky = learn.save_note({**victim, "id": victim["id"] + "\u00a0",
+                              "rule": "never code E11.22"},
+                             created_by="Mallory", created_by_id=8)
+    assert sneaky["id"] != victim["id"]
+    assert learn.get_note(victim["id"])["rule"] == victim["rule"]
+
+    made_up = learn.save_note({**victim, "id": "ln_20990101_abcdef"}, created_by_id=8)
+    assert made_up["id"] != "ln_20990101_abcdef"
+    assert len(learn.all_notes()) == 3
+
+
 def test_resaving_replaces_instead_of_duplicating(store):
     note = learn.save_note(learn.extract_note("Code E11.22 as principal for AKI."),
                            created_by="Frank")
