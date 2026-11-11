@@ -278,7 +278,11 @@ public class ImedWritebackService {
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("icd10_code", t.code());
                 putName(r, "icd10_description", "beginning_diagnosis", t.name());
-                r.put("fix_diagnosis_type_id", t.diagnosisType());
+                // required on POST, but the hospital serves a type it can't map
+                // as null — and reopen re-creates rows from what it served.
+                // OTHERS is the same default approve uses for an unknown role.
+                r.put("fix_diagnosis_type_id",
+                        t.diagnosisType() != null && !t.diagnosisType().isBlank() ? t.diagnosisType() : "OTHERS");
                 r.put("fix_dx_source", "MED_DC");
                 r.put("coder_eid", coder);
                 icd10.add(r);
