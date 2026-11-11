@@ -1,0 +1,719 @@
+{
+ "summary": {
+  "gold": "gold_synthetic_42.jsonl",
+  "view": "complaint-only",
+  "memory": "none",
+  "rag_fallback": false,
+  "cases": 42,
+  "icd10": {
+   "top1": 2,
+   "top3": 4,
+   "top8": 4
+  },
+  "icd10_cases": 42,
+  "icd9": {
+   "top1": 0,
+   "top3": 0,
+   "top8": 0
+  },
+  "icd9_cases": 23,
+  "icd9_codes_offered_when_none_done": 0.0,
+  "seconds": 0.9
+ },
+ "cases": [
+  {
+   "id": "syn-01",
+   "gold_icd10": [
+    "J00"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R07.0",
+    "R50.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ไข้ต่ำๆ น้ำมูกไหล เจ็บคอ 3 วัน\" ~ เจ็บคอ"
+  },
+  {
+   "id": "syn-02",
+   "gold_icd10": [
+    "J02.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R07.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"เจ็บคอมาก กลืนลำบาก 2 วัน\" ~ เจ็บคอ"
+  },
+  {
+   "id": "syn-03",
+   "gold_icd10": [
+    "J20.9"
+   ],
+   "gold_icd9": [
+    "93.94"
+   ],
+   "icd10_suggested": [
+    "Y55.4",
+    "R07.4"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ไอมีเสมหะ 5 วัน เหนื่อยเวลาไอ\" ~ ยาขับเสมหะ"
+  },
+  {
+   "id": "syn-04",
+   "gold_icd10": [
+    "J18.9"
+   ],
+   "gold_icd9": [
+    "87.44"
+   ],
+   "icd10_suggested": [
+    "R53",
+    "R63.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"4 วันก่อนมา ไข้สูงหนาวสั่น ไอมีเสมหะสีเขียว เหนื่อยหอบมากขึ้น เบื่ออาหาร อ่อน...\" ~ หนื่อยอ่อนเพลีย"
+  },
+  {
+   "id": "syn-05",
+   "gold_icd10": [
+    "E11.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "I73.8"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"เป็นเบาหวานมา 6 ปี รับประทานยาสม่ำเสมอ ไม่มีอาการชาปลายมือปลายเท้า ไม่มีแผลที...\" ~ ชาปลายมือปลายเท้า"
+  },
+  {
+   "id": "syn-06",
+   "gold_icd10": [
+    "I10"
+   ],
+   "gold_icd9": [
+    "89.52"
+   ],
+   "icd10_suggested": [
+    "R03.0",
+    "I10",
+    "R07.4"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 2,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · complaint: \"เป็นความดันโลหิตสูงมา 4 ปี รับประทานยาสม่ำเสมอ บางครั้งปวดศีรษะท้ายทอยตอนเช้า...\" ~ พบความดันโลหิตสูง"
+  },
+  {
+   "id": "syn-07",
+   "gold_icd10": [
+    "E78.5"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "M79.14",
+    "Y52.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ตรวจพบไขมันในเลือดสูงเมื่อ 1 ปีก่อน รับประทานยาลดไขมันสม่ำเสมอ ไม่มีอาการปวดก...\" ~ ปวดกล้ามเนื้อ มือ"
+  },
+  {
+   "id": "syn-08",
+   "gold_icd10": [
+    "K29.1"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "K92.0",
+    "R11",
+    "R04.2"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"3 วันก่อนมา ปวดแสบบริเวณลิ้นปี่ เป็นมากตอนท้องว่าง มีคลื่นไส้ ไม่มีอาเจียนเป็...\" ~ อาเจียนเป็นเลือด"
+  },
+  {
+   "id": "syn-09",
+   "gold_icd10": [
+    "K21.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R12"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"แสบร้อนกลางอก เรอเปรี้ยว 2 สัปดาห์\" ~ แสบร้อนหน้าอก"
+  },
+  {
+   "id": "syn-10",
+   "gold_icd10": [
+    "A09.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "Y53.7",
+    "K92.0",
+    "R11"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ถ่ายเหลว 6 ครั้ง อาเจียน 1 วัน\" ~ ยาทําใหอาเจียน"
+  },
+  {
+   "id": "syn-11",
+   "gold_icd10": [
+    "D50.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R53",
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"อ่อนเพลีย เหนื่อยง่าย 1 เดือน\" ~ หนื่อยอ่อนเพลีย"
+  },
+  {
+   "id": "syn-12",
+   "gold_icd10": [
+    "N39.0"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R30.0",
+    "R33",
+    "R31"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปัสสาวะแสบขัด 3 วัน\" ~ ปัสสาวะขัด"
+  },
+  {
+   "id": "syn-13",
+   "gold_icd10": [
+    "J45.9"
+   ],
+   "gold_icd9": [
+    "93.94"
+   ],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-14",
+   "gold_icd10": [
+    "K64.2"
+   ],
+   "gold_icd9": [
+    "49.46"
+   ],
+   "icd10_suggested": [
+    "R04.2",
+    "K92.1",
+    "L29.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ถ่ายเป็นเลือดสด มีก้อนยื่นที่ทวารหนัก 3 สัปดาห์\" ~ ไอเป็นเลือด"
+  },
+  {
+   "id": "syn-15",
+   "gold_icd10": [
+    "K35.8"
+   ],
+   "gold_icd9": [
+    "47.09"
+   ],
+   "icd10_suggested": [
+    "R63.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"1 วันก่อนมา ปวดรอบสะดือแล้วย้ายมาปวดท้องน้อยขวา ปวดมากขึ้นเรื่อยๆ มีไข้ต่ำๆ เ...\" ~ เบื่ออาหาร"
+  },
+  {
+   "id": "syn-16",
+   "gold_icd10": [
+    "L02.4"
+   ],
+   "gold_icd9": [
+    "86.04"
+   ],
+   "icd10_suggested": [
+    "S71.0",
+    "T24.1",
+    "T24.3"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ก้อนบวมแดงที่สะโพกขวา ปวดมาก 5 วัน\" ~ แผลเปิดที่สะโพก"
+  },
+  {
+   "id": "syn-17",
+   "gold_icd10": [
+    "D17.1"
+   ],
+   "gold_icd9": [
+    "86.11"
+   ],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-18",
+   "gold_icd10": [
+    "N20.0"
+   ],
+   "gold_icd9": [
+    "88.75"
+   ],
+   "icd10_suggested": [
+    "R11",
+    "K92.0",
+    "R31"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"1 วันก่อนมา ปวดบิดเอวขวาเป็นพักๆ ร้าวลงขาหนีบ ปัสสาวะมีเลือดปน คลื่นไส้อาเจียน\" ~ คลื่นไส้อาเจียน"
+  },
+  {
+   "id": "syn-19",
+   "gold_icd10": [
+    "M54.5"
+   ],
+   "gold_icd9": [
+    "93.35"
+   ],
+   "icd10_suggested": [
+    "M54.5",
+    "M54.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · complaint: \"ปวดหลังส่วนล่าง 2 สัปดาห์\" ~ ปวดหลังส่วนล่าง"
+  },
+  {
+   "id": "syn-20",
+   "gold_icd10": [
+    "M17.1"
+   ],
+   "gold_icd9": [
+    "81.92"
+   ],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปวดเข่าซ้าย เดินลำบาก 6 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-21",
+   "gold_icd10": [
+    "M75.1"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปวดไหล่ซ้าย ยกแขนไม่ขึ้น 2 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-22",
+   "gold_icd10": [
+    "J03.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R07.0",
+    "R56.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"เจ็บคอ กลืนลำบาก ไข้สูง 3 วัน\" ~ เจ็บคอ"
+  },
+  {
+   "id": "syn-23",
+   "gold_icd10": [
+    "J32.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"คัดจมูก น้ำมูกข้น ปวดโหนกแก้ม 2 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-24",
+   "gold_icd10": [
+    "H61.2"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "H92.1"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"1 สัปดาห์ก่อนมา หูอื้อข้างขวา ได้ยินลดลง ไม่มีปวดหู ไม่มีน้ำหนวก ไม่มีเวียนศีรษะ\" ~ มีน้ าหนวก"
+  },
+  {
+   "id": "syn-25",
+   "gold_icd10": [
+    "J30.4"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-26",
+   "gold_icd10": [
+    "R51"
+   ],
+   "gold_icd9": [
+    "87.03"
+   ],
+   "icd10_suggested": [
+    "Y91.2",
+    "R51",
+    "Y91.3"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 2,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · complaint: \"ปวดศีรษะรุนแรง 3 วัน\" ~ เปนพิษรุนแรงจากแอลกอฮอล พฤติกรรมเปลี่ยนแปลงรุนแรงในการทํางาน และการตอบสนอง หรือมีความลําบากอยาง รุนแรงในการประสานงานของอวัยวะตางๆ หรือเสียความสามารถในการประสานงานกัน"
+  },
+  {
+   "id": "syn-27",
+   "gold_icd10": [
+    "G43.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปวดศีรษะข้างเดียว เป็นๆ หายๆ 6 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-28",
+   "gold_icd10": [
+    "L23.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-29",
+   "gold_icd10": [
+    "B35.4"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "R21"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ผื่นวงแหวนคันที่ลำตัว 3 สัปดาห์\" ~ ผื่น"
+  },
+  {
+   "id": "syn-30",
+   "gold_icd10": [
+    "Z00.0"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "Z01.2"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"มาตรวจสุขภาพประจำปี\" ~ ตรวจฟัน"
+  },
+  {
+   "id": "syn-31",
+   "gold_icd10": [
+    "S61.0"
+   ],
+   "gold_icd9": [
+    "86.59"
+   ],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-32",
+   "gold_icd10": [
+    "S01.8"
+   ],
+   "gold_icd9": [
+    "86.59"
+   ],
+   "icd10_suggested": [
+    "S01.8",
+    "S00.8"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · complaint: \"ล้มศีรษะกระแทกพื้น มีแผลที่หน้าผาก 2 ชั่วโมง\" ~ แผลเปิดที่หน้า"
+  },
+  {
+   "id": "syn-33",
+   "gold_icd10": [
+    "L50.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": ""
+  },
+  {
+   "id": "syn-34",
+   "gold_icd10": [
+    "R10.4"
+   ],
+   "gold_icd9": [
+    "88.79"
+   ],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปวดท้องน้อยเป็นๆ หายๆ 1 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-35",
+   "gold_icd10": [
+    "C50.9"
+   ],
+   "gold_icd9": [
+    "85.21"
+   ],
+   "icd10_suggested": [
+    "S21.0",
+    "S20.1",
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"คลำได้ก้อนที่เต้านมขวา 2 เดือน\" ~ แผลเปิดที่เต้านม"
+  },
+  {
+   "id": "syn-36",
+   "gold_icd10": [
+    "E04.1"
+   ],
+   "gold_icd9": [
+    "06.2"
+   ],
+   "icd10_suggested": [
+    "R00.2"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"6 เดือนก่อนมา คลำได้ก้อนที่คอด้านหน้าข้างขวา โตขึ้นช้าๆ ไม่เจ็บ กลืนอาหารได้ป...\" ~ ใจสั่น"
+  },
+  {
+   "id": "syn-37",
+   "gold_icd10": [
+    "E11.5"
+   ],
+   "gold_icd9": [
+    "86.22"
+   ],
+   "icd10_suggested": [
+    "M77.1"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"แผลที่ฝ่าเท้าขวาไม่หาย 3 สัปดาห์\" ~ ปวดฝ่าเท้า"
+  },
+  {
+   "id": "syn-38",
+   "gold_icd10": [
+    "E14.3"
+   ],
+   "gold_icd9": [
+    "13.41"
+   ],
+   "icd10_suggested": [
+    "N94.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ตาขวามัวลงเรื่อยๆ 6 เดือน\" ~ ปวดประจ าเดือน"
+  },
+  {
+   "id": "syn-39",
+   "gold_icd10": [
+    "G56.0"
+   ],
+   "gold_icd9": [
+    "04.43"
+   ],
+   "icd10_suggested": [
+    "I73.8"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ชาปลายนิ้วมือขวา ตื่นกลางดึก 4 เดือน\" ~ ชาปลายมือปลายเท้า"
+  },
+  {
+   "id": "syn-40",
+   "gold_icd10": [
+    "K80.2"
+   ],
+   "gold_icd9": [
+    "51.23"
+   ],
+   "icd10_suggested": [
+    "M79.18",
+    "R11"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปวดจุกแน่นใต้ชายโครงขวาหลังกินอาหารมัน 1 เดือน\" ~ ปวดกล้ามเนื้อ คอ ล าตัว ชายโครง"
+  },
+  {
+   "id": "syn-41",
+   "gold_icd10": [
+    "N40"
+   ],
+   "gold_icd9": [
+    "57.32"
+   ],
+   "icd10_suggested": [
+    "R30.0",
+    "R33",
+    "R31"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"ปัสสาวะลำบาก ต้องเบ่ง ปัสสาวะบ่อยตอนกลางคืน 6 เดือน\" ~ ปัสสาวะขัด"
+  },
+  {
+   "id": "syn-42",
+   "gold_icd10": [
+    "R42"
+   ],
+   "gold_icd9": [
+    "88.72"
+   ],
+   "icd10_suggested": [
+    "H81.3",
+    "R11"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · complaint: \"เวียนศีรษะ บ้านหมุน 3 วัน\" ~ vertigo (บ้านหมุน)"
+  }
+ ]
+}

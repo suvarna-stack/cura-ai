@@ -23,3 +23,6 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Approved hospital cases (patient charts) — stay on the hospital server
+data/cases/
