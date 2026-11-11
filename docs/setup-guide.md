@@ -220,9 +220,11 @@ rebuilt from the committed files.
 | Symptom | Cause and fix |
 |---|---|
 | `Cannot connect to the Docker daemon` (Colima) | Colima's socket is not the default. Run `colima start`, then `export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"`. |
+| `medcode-api` keeps restarting; its log says `database "medcode" does not exist` (Colima) | The repo is outside your home folder. Colima shares only your home folder with containers by default, so `db` started with empty init scripts. Move the clone under `~`, then `docker compose down -v` and up again. |
 | `port is already allocated` | Something else holds 8080/8001/8000/5433. Change that port in `.env`. |
-| Sync, Approve or Reopen fails with "iMed API not reachable" | The hospital's API is down or `IMED_API_BASE` is wrong. Check `.env`, then `docker compose up -d medcode-api`. |
-| Sync fails with `401` | `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` are wrong. Ask the hospital's admin for the pair. |
+| Sync, Approve or Reopen just says it failed | The screen shows no reason; `docker compose logs medcode-api` does. **"iMed API not reachable"**: the hospital's API is down or `IMED_API_BASE` is wrong. Check `.env`, then `docker compose up -d medcode-api`. |
+| The log says "refused our client credentials" | `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` are wrong. Ask the hospital's admin for the pair. |
+| The log says "hospital contract check failed" | The hospital's API no longer serves a field our code needs (R6). The message lists the missing fields; nothing was imported. |
 | After a pull the demo data looks old | Postgres ignored the new dumps because the volume already existed. `docker compose down -v`, then up again. |
 | "password_hash does not exist", or no admin can sign in | The database was restored but the app has not booted yet. Start `medcode-api`. Flyway adds the columns and the bootstrap admin at startup. Never edit a dump to fix this. |
 | Admin signs in but never sees cases | Working as designed. Cases are a coder-role screen. Create a coder under **Accounts**. |
