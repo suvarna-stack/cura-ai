@@ -8,6 +8,23 @@ the services at each other, the database, and the volumes.
 The hospital's iMed API is **not** in this repo: the hospital builds and runs
 it, and our backend reaches it through `IMED_API_BASE`.
 
+## System and AI model
+
+| Part | Folder | Docker service | What it does |
+|---|---|---|---|
+| **System** | `frontend/` | `web` | The web app that coders and admins use |
+| **System** | `backend/` | `medcode-api` | Accounts, cases, Sync from iMed, and writing approved codes back to iMed |
+| **System** | `db/` | `db` | Postgres, our own database (`medcode`) |
+| **AI model** | `ai/` | `rag` | Suggests ICD-10 / ICD-9 codes and answers Agent chat, from the ICD manuals |
+
+The model files are not in the repo. They download when first needed:
+
+- **`BAAI/bge-m3`** (embedding model, about 2.3 GB): `rag` downloads it into
+  the `hfcache` volume. It searches the manuals. Case code suggestions use only
+  this model.
+- **`Llama-3.1-EIRAI-8B`** (Q4_K_M, the language model for Agent chat): run
+  by Ollama on the host, not in Docker. See **AI (the RAG service)** below.
+
 ## Layout
 
 ```

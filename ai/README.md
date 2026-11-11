@@ -7,7 +7,7 @@ A small, fully-local **Retrieval-Augmented Generation** API built with FastAPI.
 | Web framework | FastAPI + Uvicorn |
 | Embeddings | `BAAI/bge-m3` (multilingual, 1024-dim) via `sentence-transformers` |
 | Vector store | Chroma (persistent, on-disk) |
-| Generation | `Qwen/Qwen2.5-0.5B-Instruct` (tiny local LLM) via `transformers` |
+| Generation (Agent chat) | In Docker: `Llama-3.1-EIRAI-8B` (Q4_K_M) via Ollama on the host. Run natively, the default is `Qwen/Qwen2.5-0.5B-Instruct` (tiny local LLM) via `transformers` |
 
 Everything runs **offline on CPU**. Models are downloaded from Hugging Face on
 first use (~3 GB total) and cached; the API process itself starts instantly
@@ -45,7 +45,7 @@ RAG/
 ## Setup
 
 > **Prefer Docker?** The root [`docker-compose.yml`](../docker-compose.yml) runs this
-> service together with the rest of MedCode AI (five containers, one command) —
+> service together with the rest of MedCode AI (four containers, one command) —
 > no Python install, no venv. Retrieval runs in the container; generation talks
 > to **Ollama on your host**, because Docker on macOS has no GPU passthrough.
 > The steps below are for running it natively instead.
