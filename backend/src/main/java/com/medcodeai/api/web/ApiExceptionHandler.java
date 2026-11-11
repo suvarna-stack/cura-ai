@@ -102,14 +102,15 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * 502 — the hospital's API failed us. The message is meant for the coder's
-     * screen; the log keeps the full cause (including the hospital's error
-     * body), which is where the hospital's developers look.
+     * 502 — the hospital's API failed us. The screen gets the public message
+     * (no host address, no setting names); the log keeps the full message and
+     * cause, including the hospital's error body — where IT and the hospital's
+     * developers look.
      */
     @ExceptionHandler(HospitalApiException.class)
     public ResponseEntity<Map<String, Object>> hospital(HospitalApiException e) {
         log.warn("hospital API call failed: {}", e.getMessage(), e);
-        return body(HttpStatus.BAD_GATEWAY, e.getMessage());
+        return body(HttpStatus.BAD_GATEWAY, e.publicMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error) {

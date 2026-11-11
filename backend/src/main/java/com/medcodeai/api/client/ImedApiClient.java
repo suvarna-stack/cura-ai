@@ -122,8 +122,8 @@ public class ImedApiClient {
                     .body(form)
                     .retrieve().body(ENVELOPE);
         } catch (HttpClientErrorException.Unauthorized e) {
-            throw new HospitalApiException("the hospital API refused our client credentials at "
-                    + base + "/auth/token — check IMED_CLIENT_ID / IMED_CLIENT_SECRET", e);
+            throw new HospitalApiException("the hospital API refused our client credentials",
+                    "at " + base + "/auth/token — check IMED_CLIENT_ID / IMED_CLIENT_SECRET", e);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
         } catch (RestClientResponseException e) {
@@ -291,7 +291,7 @@ public class ImedApiClient {
     }
 
     private HospitalApiException unreachable(Exception e) {
-        return new HospitalApiException("iMed API not reachable at " + base
+        return new HospitalApiException("iMed API not reachable", "at " + base
                 + " — is the hospital's API running, and is IMED_API_BASE set to it?", e);
     }
 

@@ -72,7 +72,9 @@ class HospitalApiErrorsTest {
         String nowhere = "http://127.0.0.1:" + closed;
         HospitalApiException e = assertThrows(HospitalApiException.class,
                 () -> client(nowhere).contractCheck(List.of("visit.visit_id")));
-        assertTrue(e.getMessage().contains("not reachable at " + nowhere), e.getMessage());
+        // the log names the address; the screen must not
+        assertTrue(e.getMessage().contains("not reachable — at " + nowhere), e.getMessage());
+        assertEquals("iMed API not reachable", e.publicMessage());
     }
 
     @Test
@@ -80,7 +82,8 @@ class HospitalApiErrorsTest {
         answer("/auth/token", 401, "{\"error\":\"invalid_client\"}");
         HospitalApiException e = assertThrows(HospitalApiException.class,
                 () -> client(base).contractCheck(List.of("visit.visit_id")));
-        assertTrue(e.getMessage().contains("refused our client credentials"), e.getMessage());
+        assertTrue(e.getMessage().contains("IMED_CLIENT_ID"), e.getMessage());
+        assertEquals("the hospital API refused our client credentials", e.publicMessage());
     }
 
     @Test
@@ -113,10 +116,12 @@ class HospitalApiErrorsTest {
     }
 
     @Test
-    void theApiAnswersAHospitalFailureAs502WithTheReason() {
+    void theApiAnswersAHospitalFailureAs502WithOnlyThePublicReason() {
+        // an IMED_API_BASE with userinfo must never reach a coder's screen
         ResponseEntity<Map<String, Object>> r = new ApiExceptionHandler()
-                .hospital(new HospitalApiException("iMed API not reachable at x"));
+                .hospital(new HospitalApiException("iMed API not reachable",
+                        "at http://user:pass@his.internal:8003 — is IMED_API_BASE set to it?", null));
         assertEquals(502, r.getStatusCode().value());
-        assertEquals("iMed API not reachable at x", r.getBody().get("error"));
+        assertEquals(Map.of("error", "iMed API not reachable"), r.getBody());
     }
 }

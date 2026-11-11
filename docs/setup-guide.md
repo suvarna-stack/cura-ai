@@ -222,7 +222,7 @@ rebuilt from the committed files.
 | `Cannot connect to the Docker daemon` (Colima) | Colima's socket is not the default. Run `colima start`, then `export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"`. |
 | `medcode-api` keeps restarting; its log says `database "medcode" does not exist` (Colima) | The repo is outside your home folder. Colima shares only your home folder with containers by default, so `db` started with empty init scripts. Move the clone under `~`, then `docker compose down -v` and up again. |
 | `port is already allocated` | Something else holds 8080/8001/8000/5433. Change that port in `.env`. |
-| Sync, Approve or Reopen fails with "iMed API not reachable" | The hospital's API is down or `IMED_API_BASE` is wrong. Check `.env`, then `docker compose up -d medcode-api`. |
+| Sync, Approve or Reopen fails with "iMed API not reachable" | The hospital's API is down or `IMED_API_BASE` is wrong. The address it tried is in `docker compose logs medcode-api` (the screen never shows it). Check `.env`, then `docker compose up -d medcode-api`. |
 | … fails with "refused our client credentials" | `IMED_CLIENT_ID` / `IMED_CLIENT_SECRET` are wrong. Ask the hospital's admin for the pair. |
 | … fails with "hospital contract check failed" | The hospital's API no longer serves a field our code needs (R6). The message lists the missing fields; nothing was imported. |
 | … fails with "the hospital API answered 4xx/5xx on …" | The hospital refused that call. Its own error body is in `docker compose logs medcode-api`. |
