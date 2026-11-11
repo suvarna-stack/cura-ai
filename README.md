@@ -24,16 +24,28 @@ built on its own: `docker build ./frontend`, `docker build ./ai`, and so on.
 
 ### For hospital developers building the iMed API
 
-What our backend calls, and expects back, is written down in
-`backend/docs/imed-integration.md` and
-`backend/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`. The
-code that calls it is `backend/` (start at
-`src/main/java/com/medcodeai/api/client/ImedApiClient.java`). Pointing our
-backend at your API is three settings in `.env`: `IMED_API_BASE`,
+Every hospital route lives on the hospital's server, and only our backend calls
+them — the hospital never calls us:
+
+- **Read, R1–R6** (case data, ICD code lists, a field check before each sync):
+  we designed these, in
+  `backend/docs/MedCode-AI-iMed-Integration-API-Contract-v1.pdf`.
+- **Write, W1–W4** (add, change and cancel codes on approve/reopen): the
+  hospital's own existing spec. We only asked for one extra field,
+  `coding_status`.
+
+The hospital's own guide for MedCode (4 Nov 2026) wins wherever it differs from
+our PDF — R1 was not built, and login is client credentials at `/auth/token`.
+The differences are listed at the top of `backend/docs/imed-integration.md`, and
+every route is summed up in `docs/api-reference.md`. The code that calls them is
+`backend/src/main/java/com/medcodeai/api/client/ImedApiClient.java`. Pointing
+our backend at your API is three settings in `.env`: `IMED_API_BASE`,
 `IMED_CLIENT_ID` and `IMED_CLIENT_SECRET`.
 
 These folders were separate repos until 2026-11-10 (`audit-chart-frontend`,
 `medcode-api`, `RAG`, `medcode-stack`); their full git history is kept here.
+`imed-mock-api`, our stand-in for the hospital, was merged too and removed the
+same day.
 
 ## Documentation
 
@@ -71,13 +83,24 @@ cp .env.example .env      # set IMED_API_BASE + client id/secret; edit ports/pas
 docker compose up -d --build
 ```
 
-Then open **http://localhost:8080** and log in with the bootstrap admin from
-`.env` (`admin@medcodeai.demo` / `admin1234` by default).
+Then open **http://localhost:8080** and log in as `admin@medcodeai.demo` /
+`admin1234`.
+
+> **That password comes from the seed dump, not from `.env`.** The committed
+> dump already holds this admin (plus two demo coder accounts), and the backend
+> only creates an admin from `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`
+> when none exists — so changing those two settings does nothing on a fresh
+> database. Change the password after the first login: **Accounts → edit the
+> admin → new password**.
 
 The dashboard starts empty: every case arrives by **Sync** from the hospital's
 iMed API. Without that API the app still starts and you can log in, but Sync,
 Approve and Reopen fail. If `IMED_API_BASE` is left blank, the backend looks for
 it on port 8003 of this machine.
+
+**Reset demo** resets our side, then asks the hospital to reset too. Only the
+old mock could do that, so against the real hospital API it answers an error —
+our side has still been reset.
 
 First run takes a while: a Maven build, an npm build, and a PyTorch install.
 Later runs are cached.
@@ -86,7 +109,7 @@ Later runs are cached.
 docker compose ps                 # health of all four services
 docker compose logs -f medcode-api
 docker compose down               # stop, keep data
-docker compose down -v            # stop and WIPE the databases + RAG index
+docker compose down -v            # stop and WIPE the database + RAG index
 ```
 
 ## What runs where
@@ -128,7 +151,7 @@ Compose bind-mounts the seed dump `backend/db/seed.sql.gz` at
 `/seed/medcode.sql.gz`.
 
 One `git pull` gets you a new dump, but **`docker compose up -d` will silently
-ignore them.** The scripts in `db/initdb/` are run by the postgres image only on
+ignore it.** The scripts in `db/initdb/` are run by the postgres image only on
 an *empty* `pgdata` volume. If you have ever started this stack, that volume is
 populated, the new dump is mounted at `/seed/` and never read, and nothing
 errors — you just quietly keep the old data.
@@ -146,11 +169,12 @@ rebuilt from committed files — but it also destroys **any approvals made in
 this stack**, since they live only in the `pgdata` volume. (Codes already written
 back to the hospital stay there.)
 
-Not in the dumps, and restored a different way: the auth columns, the bootstrap
-admin and the `icd_10`/`icd_9` catalog split are applied by `medcode-api`'s
-Flyway migrations (`V1__add_password_hash.sql`, `V3__split_icd_codes.sql`) at
-every startup, and the bootstrap admin by `AdminBootstrap`. That is by design —
-don't try to fix a "missing" `password_hash` by editing a dump; start the app.
+The schema is owned by `medcode-api`'s Flyway migrations
+(`backend/src/main/resources/db/migrations/V1…V9`), which run at every startup
+and add whatever a database is missing. So a schema problem is never fixed by
+editing the dump — start the app. The bootstrap admin is not a migration:
+`AdminBootstrap` creates it only when no admin exists (see the note under
+**Run it**).
 
 Reach it from the host with:
 
@@ -207,11 +231,16 @@ IMED_API_BASE=https://<hospital-test-server> ./mvnw test
 hospital API**. Run it only against a hospital test server. Its fixed case IDs
 come from the old mock's demo data, so expect failures against other data.
 
+Tests that need neither the database nor the hospital run anywhere — for
+example `./mvnw test -Dtest='ImedWritebackGuideTest,SyncRulesTest'`, the first
+of which checks our write requests against the hospital's guide. The AI service
+has its own suite: `cd ai && pytest -q` (see `ai/README.md`).
+
 ## Production is not this file
 
 Compose is for local dev, demos and onboarding. For the M7 GCP cutover, each folder
 builds and pushes its **own** image and Cloud Run wires them with the same env
-vars used here. Three things to carry over:
+vars used here. Four things to carry over:
 
 - `medcode-api` must stay at **one instance** (`max-instances=1`) — its write
   lock and cases cache are in-process.
