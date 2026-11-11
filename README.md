@@ -83,15 +83,17 @@ cp .env.example .env      # set IMED_API_BASE + client id/secret; edit ports/pas
 docker compose up -d --build
 ```
 
-Then open **http://localhost:8080** and log in as `admin@medcodeai.demo` /
-`admin1234`.
+Then open **http://localhost:8080** and log in with the admin from `.env`
+(`ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`, default
+`admin@medcodeai.demo` / `admin1234`).
 
-> **That password comes from the seed dump, not from `.env`.** The committed
-> dump already holds this admin (plus two demo coder accounts), and the backend
-> only creates an admin from `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`
-> when none exists — so changing those two settings does nothing on a fresh
-> database. Change the password after the first login: **Accounts → edit the
-> admin → new password**.
+> The backend creates that admin **once**, on the first start with an empty
+> accounts table. Editing `.env` afterwards changes nothing — change the
+> password in the app instead: **Accounts → edit the admin → new password**.
+> Set a real password in `.env` *before* the first start of any deployment.
+> (Seed dumps before 2026-11-11 shipped demo accounts, including an admin with
+> `admin1234`; if your `pgdata` volume is older than that, run
+> `docker compose down -v` once to start clean.)
 
 The dashboard starts empty: every case arrives by **Sync** from the hospital's
 iMed API. Without that API the app still starts and you can log in, but Sync,
