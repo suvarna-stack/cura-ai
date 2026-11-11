@@ -24,6 +24,9 @@ built on its own: `docker build ./frontend`, `docker build ./ai`, and so on.
 
 ### For hospital developers building the iMed API
 
+**Start with [`docs/for-hospital-developers.md`](docs/for-hospital-developers.md)**
+— when we call each route, and what our code relies on from the real write-back.
+
 Every hospital route lives on the hospital's server, and only our backend calls
 them — the hospital never calls us:
 
