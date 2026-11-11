@@ -843,9 +843,10 @@ Milestones (git log --oneline reads as this sequence):
   13px labels, taller hit targets, 14px icons, wider panels, bigger tick boxes.
 
 - ✅ **Tuned to the hospital's own API guide (2026-11-09):** the hospital sent
-  "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026, HTML at
-  `../MedCode-API-Connection-Guide.html`, plus the central
-  `../third-party-integration-manual.html`). The user's call: **the guide
+  "คู่มือเชื่อมต่อ MedCode กับ Medihack API" (4 Nov 2026, HTML
+  `MedCode-API-Connection-Guide.html`, plus the central
+  `third-party-integration-manual.html` — both kept OUTSIDE this repo, in the
+  parent folder that holds the monorepo; not in Git). The user's call: **the guide
   wins wherever it differs from the contract we proposed.** What moved:
   - **Auth is client credentials, not a fixed token.** `ImedApiClient` trades
     `IMED_CLIENT_ID`/`IMED_CLIENT_SECRET` for a Bearer token at

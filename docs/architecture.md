@@ -98,7 +98,7 @@ sequenceDiagram
 
   C->>A: POST /api/sync {from, to}
   A->>H: R6 contract check (required fields)
-  A->>H: R3 by period (≤31 days) or R1 → R2 (≤20 ids)
+  A->>H: R3 by period (one day per call) or R2 for open cases held (≤20 ids)
   H-->>A: nested case objects
   A->>DB: import new · refresh open · SKIP approved
   C->>A: open case → POST /cases/{id}/lock (every 30 s)

@@ -24,7 +24,12 @@ export const FIELD_LABEL: Record<string, string> = {
   recorded_at: "Recorded", operation_type: "Type",
   operation_start: "Start", operation_end: "End",
   icd10_code: "ICD-10", icd9_code: "ICD-9", description: "Description",
-  tmt_code: "TMT", panel_tmlt: "TMT", item_tmlt: "TMT", fee_schedule: "Fee",
+  // TMT = Thai Medicines Terminology (drugs); TMLT = Thai Medical Laboratory
+  // Terminology (lab tests and billed services) — two different code sets.
+  tmt_code: "TMT", panel_tmlt: "TMLT", item_tmlt: "TMLT", fee_schedule: "Fee",
+  // the rest of the hospital guide's field names (4 Nov 2026)
+  object_id: "Row ID", item_id: "Item ID", field_id: "Field ID",
+  panel_cgd: "CGD", item_cgd: "CGD", verified_at: "Verified",
   dosagesignature: "Dosage", dosageinstruction: "Instruction", quantity: "Qty",
   remark: "Remark", receiveddatetime: "Received",
   panelname: "Panel", itemname: "Item", itemvalue: "Result", itemuom: "Unit",
@@ -32,7 +37,7 @@ export const FIELD_LABEL: Record<string, string> = {
   value: "Value", uom: "Unit", documenttype: "Document",
   fieldname: "Field", subfieldname: "Section", recorddatetime: "Recorded",
   icd: "ICD-9", operationtype: "Type", startdatetime: "Start", enddatetime: "End",
-  tmt: "TMT", tmlt: "TMT", paneltmlt: "TMT", itemtmlt: "TMT",
+  tmt: "TMT", tmlt: "TMLT", paneltmlt: "TMLT", itemtmlt: "TMLT",
   cgd: "CGD", panelcgd: "CGD", itemcgd: "CGD",
 };
 
