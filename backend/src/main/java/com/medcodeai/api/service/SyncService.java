@@ -1,6 +1,7 @@
 package com.medcodeai.api.service;
 
 import com.medcodeai.api.client.ImedApiClient;
+import com.medcodeai.api.client.HospitalApiException;
 import com.medcodeai.api.repo.CodingRepository;
 import com.medcodeai.api.repo.IcdCatalogRepository;
 import com.medcodeai.api.repo.SyncRepository;
@@ -148,7 +149,7 @@ public class SyncService {
      * R6 — refuse to start if the hospital no longer serves a field we depend
      * on. This runs BEFORE any fetch or write, which is the whole point: a
      * schema change should stop the sync cleanly, not surface as half-imported
-     * cases with silently-nulled columns. Failure is a 500 (a hospital-side
+     * cases with silently-nulled columns. Failure is a 502 (a hospital-side
      * dependency problem, like an unreachable API), naming the missing fields.
      */
     private void preflight() {
@@ -157,7 +158,7 @@ public class SyncService {
             return;
         }
         Object missing = answer.get("missing");
-        throw new IllegalStateException("hospital contract check failed — the iMed API no longer "
+        throw new HospitalApiException("hospital contract check failed — the iMed API no longer "
                 + "serves: " + (missing == null ? "(unspecified)" : missing)
                 + ". Sync stopped before touching any data.");
     }

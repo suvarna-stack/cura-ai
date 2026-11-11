@@ -201,6 +201,12 @@ export const dict: Record<string, { en: string; th: string }> = {
                             th: "{n} เคสยังต้องมีรหัสทั้งสองคอลัมน์ — เปิดเคสเพื่อดำเนินการต่อ" },
   "toast.writeFailed": { en: "Couldn't confirm {n} case(s) reached the hospital record — try again",
                          th: "ไม่สามารถยืนยันได้ว่าส่งเคส {n} รายการถึงโรงพยาบาลแล้ว — กรุณาลองใหม่อีกครั้ง" },
+  // {reason} is the server's own message (English) — shown as-is so a coder can
+  // pass it to IT / the hospital's developers word for word
+  "toast.writeFailedReason": { en: "Couldn't confirm {n} case(s) reached the hospital record: {reason}",
+                               th: "ไม่สามารถยืนยันได้ว่าส่งเคส {n} รายการถึงโรงพยาบาลแล้ว: {reason}" },
+  "toast.syncFailed":       { en: "Sync failed — try again", th: "ซิงค์ไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง" },
+  "toast.syncFailedReason": { en: "Sync failed: {reason}", th: "ซิงค์ไม่สำเร็จ: {reason}" },
   "code.noProc":      { en: "No procedure was performed on this visit",
                         th: "การมารับบริการครั้งนี้ไม่มีหัตถการ" },
   "code.pickNo10":    { en: "Tick an ICD-10 diagnosis code before approving",

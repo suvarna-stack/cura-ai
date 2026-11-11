@@ -541,7 +541,12 @@ export function CasesPage({
   useEffect(() => {
     const onWriteFailed = (e: Event) => {
       const ids: string[] = (e as CustomEvent).detail?.caseIds ?? [];
-      if (ids.length > 0) showToast(t("toast.writeFailed", { n: ids.length }));
+      const reason: string | undefined = (e as CustomEvent).detail?.reason;
+      if (ids.length > 0) {
+        showToast(reason
+          ? t("toast.writeFailedReason", { n: ids.length, reason })
+          : t("toast.writeFailed", { n: ids.length }));
+      }
     };
     window.addEventListener("approvals:writeFailed", onWriteFailed);
     return () => window.removeEventListener("approvals:writeFailed", onWriteFailed);

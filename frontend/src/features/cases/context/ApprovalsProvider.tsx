@@ -45,7 +45,7 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     // column, so anything it reports as blocked is rolled back out of the
     // optimistic set and announced (CasesPage turns this into a toast — this
     // provider sits ABOVE ToastProvider and cannot raise one itself).
-    void approveCases(ids).then(({ ok, blocked }) => {
+    void approveCases(ids).then(({ ok, blocked, error }) => {
       if (!ok) {
         // The whole request failed — most likely the hospital write-back
         // 500'd after our side already committed, or a network error. Don't
@@ -55,7 +55,7 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
           const n = new Set(prev); ids.forEach(id => n.delete(id)); return n;
         });
         window.dispatchEvent(new CustomEvent("approvals:writeFailed", {
-          detail: { caseIds: ids },
+          detail: { caseIds: ids, reason: error },
         }));
         return;
       }
@@ -73,7 +73,7 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
     setApprovedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     setReopenedIds(prev => new Set(prev).add(id)); // optimistic: into the Reopen tab now
     inFlight.current.add(id);
-    reopenCase(id).then(ok => {
+    reopenCase(id).then(({ ok, error }) => {
       inFlight.current.delete(id);
       if (ok) {
         setCasesVersion(v => v + 1); // server moved it → silent refetch
@@ -87,7 +87,7 @@ export function ApprovalsProvider({ children }: { children: React.ReactNode }) {
       }
       setReopenedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
       window.dispatchEvent(new CustomEvent("approvals:writeFailed", {
-        detail: { caseIds: [id] },
+        detail: { caseIds: [id], reason: error },
       }));
     });
   };

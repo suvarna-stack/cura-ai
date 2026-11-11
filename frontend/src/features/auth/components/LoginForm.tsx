@@ -110,24 +110,28 @@ export function LoginForm() {
           </Button>
         </form>
 
-        {/* demo credentials — click to pre-fill (local/demo only) */}
-        <button
-          type="button"
-          onClick={fillDemoCredentials}
-          className="mt-6 w-full rounded-lg border border-dashed border-border bg-bg p-3 text-left transition-colors hover:border-primary"
-        >
-          <p className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-muted">
-            Demo admin — click to fill
-          </p>
-          <p className="text-[12px] text-text">
-            Email:{' '}
-            <span className="font-semibold text-primary">{DEMO_EMAIL}</span>
-          </p>
-          <p className="text-[12px] text-text">
-            Password:{' '}
-            <span className="font-semibold text-primary">{DEMO_PASSWORD}</span>
-          </p>
-        </button>
+        {/* demo credentials — click to pre-fill. Dev server only: a built image
+            can't know the admin password set in .env, so there it would show
+            a wrong one, or advertise the default on a real install. */}
+        {import.meta.env.DEV && (
+          <button
+            type="button"
+            onClick={fillDemoCredentials}
+            className="mt-6 w-full rounded-lg border border-dashed border-border bg-bg p-3 text-left transition-colors hover:border-primary"
+          >
+            <p className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-muted">
+              Demo admin — click to fill
+            </p>
+            <p className="text-[12px] text-text">
+              Email:{' '}
+              <span className="font-semibold text-primary">{DEMO_EMAIL}</span>
+            </p>
+            <p className="text-[12px] text-text">
+              Password:{' '}
+              <span className="font-semibold text-primary">{DEMO_PASSWORD}</span>
+            </p>
+          </button>
+        )}
       </Card>
     </main>
   )

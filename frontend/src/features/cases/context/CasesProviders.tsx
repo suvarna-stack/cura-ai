@@ -25,9 +25,11 @@ function ToastProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (toasts.length === 0) return
+    // long enough to read: a hospital error can be a sentence, not two words
+    const ms = Math.min(10000, Math.max(2800, toasts[0].message.length * 60))
     const timer = window.setTimeout(() => {
       setToasts((prev) => prev.slice(1))
-    }, 2800)
+    }, ms)
     return () => window.clearTimeout(timer)
   }, [toasts])
 
@@ -78,20 +80,21 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** Feature-scoped providers for the coder cases UI. */
+/** Feature-scoped providers for the coder cases UI. Toasts sit right under
+ *  the language so the providers below (sync) can raise one themselves. */
 export function CasesProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       <LanguageProvider>
-        <SyncProvider>
-          <CaseFieldsProvider>
-            <ApprovalsProvider>
-              <ActivityLogProvider>
-                <ToastProvider>{children}</ToastProvider>
-              </ActivityLogProvider>
-            </ApprovalsProvider>
-          </CaseFieldsProvider>
-        </SyncProvider>
+        <ToastProvider>
+          <SyncProvider>
+            <CaseFieldsProvider>
+              <ApprovalsProvider>
+                <ActivityLogProvider>{children}</ActivityLogProvider>
+              </ApprovalsProvider>
+            </CaseFieldsProvider>
+          </SyncProvider>
+        </ToastProvider>
       </LanguageProvider>
     </ThemeProvider>
   )

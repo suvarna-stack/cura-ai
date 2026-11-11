@@ -27,9 +27,10 @@ convenience — when the two disagree, **this document wins**.
   backend (`codedDate`, `fetched_at`, working-state timestamps) use
   `YYYY-MM-DD HH:MM:SS` (or `YYYY-MM-DD` where sliced).
 - **Errors**: `400` / `404` / `401` / `403` / `409` / `429` return
-  `{"error": "<message>"}`. `500` (e.g. the hospital iMed call failed after our
-  commit) returns Spring's default error body; the triggering action is
-  idempotent — retry it.
+  `{"error": "<message>"}`. `502` means the hospital iMed call failed (after
+  our commit, for approve/reopen) and also returns `{"error": "<message>"}`,
+  naming the cause and the route; the triggering action is idempotent — retry
+  it. `500` returns Spring's default error body.
 - **Auth** guards the whole API except `POST /api/auth/login`, the health
   probes, and Swagger — every case / approve / sync / demo endpoint needs a
   Bearer token (any active account); `/api/admin/**` additionally requires the
@@ -283,7 +284,7 @@ live state). `stats.mcai_code_rows` = hospital code writes made by the diff
 No meaningful request body (a `coder` field is ignored; the actor is the
 logged-in account). Reverses an approve on both sides; the coder's saved
 edits are KEPT. Response `{"ok": true}` · `404` unknown case. Same
-500-then-retry semantics as approve.
+502-then-retry semantics as approve.
 
 ### POST /api/cases/{caseId}/lock — one coder per case
 
@@ -452,7 +453,7 @@ hard cap is 31 days), each bound carrying `+07:00`. An **unwindowed** one
 sends the saved ids of every open case to `/api/v1/cases/sync` in ≤20-id
 batches; ids the hospital no longer knows come back in `not_found` and are
 only logged. Both are preceded by the contract check
-(`/api/v1/contract/check`), which fails the run with a `500` naming any field
+(`/api/v1/contract/check`), which fails the run with a `502` naming any field
 the hospital has stopped serving — before anything is written. Every hospital
 call carries a Bearer token from `/auth/token` (see *Downstream* below).
 `document_chunks` is populated for future retrieval but has no reader today.

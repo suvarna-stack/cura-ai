@@ -155,13 +155,14 @@ flowchart TD
   post --> j
   j --> status["coding_status = approved<br/>on the hospital visit row"]
   status --> done(["200 · stats.mcai_code_rows"])
-  diff -.->|hospital call fails| err(["500 · our side already committed<br/>→ approve again: the diff heals"])
+  diff -.->|hospital call fails| err(["502 + reason · our side already committed<br/>→ approve again: the diff heals"])
 ```
 
 Four decisions are baked into this shape:
 
 1. **Our commit comes first, then the hospital calls.** If the hospital fails,
-   the request returns 500 with our side committed. Approving again is the fix.
+   the request returns 502 with the hospital's error as the message, and our
+   side committed. Approving again is the fix.
    The diff recomputes against the hospital's *live* state rather than
    replaying the failed request, so a retry can never double-write.
 2. **Cancel, then edit, then create.** Creating a code before its old row is

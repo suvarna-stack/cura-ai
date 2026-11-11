@@ -305,10 +305,11 @@ in the hospital's rev.-1 spec; an API that ignores unknown fields is unharmed.
 
 **On 409, on 500, on timeout** — the same thing: **no automatic retry.**
 
-- Timeouts are 2 s connect / 10 s read. Any failure (409, 5xx, timeout) throws;
-  our own database transaction has **already committed** (hospital calls run
-  after our commit, still under the write lock), and the coder's request ends
-  in a 500.
+- Timeouts are 5 s connect / 60 s read (`IMED_READ_TIMEOUT_SECONDS`). Any
+  failure (409, 5xx, timeout) throws; our own database transaction has
+  **already committed** (hospital calls run after our commit, still under the
+  write lock), and the coder's request ends in a 502 whose message names the
+  hospital's status and route.
 - Healing is by **re-running the action, not by replaying the request**: the
   next approve/reopen re-reads the visit's live rows and recomputes the diff,
   so an operation that half-landed converges instead of double-writing. This is

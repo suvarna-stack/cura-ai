@@ -98,10 +98,11 @@ can't hold, please tell us before you build — it changes our code, not yours.
    When an approve has no code changes, we send a PUT with only
    `coding_status`. Please also serve it back as `visit.coding_status` in R2
    (it is `null` there today).
-6. **Errors:** we treat any `2xx` as success and anything else as failure
-   (shown to the coder; we don't read the body). For the visit-lock `403` and
-   the duplicate `409` in your PDF, send us the exact bodies and we'll show the
-   coder a clear message instead of a generic error.
+6. **Errors:** we treat any `2xx` as success and anything else as failure.
+   The coder sees the status and the route ("the hospital API answered 409 on
+   DELETE /api/v1/diagnosis/…"); your response body goes only to our backend
+   log. For the visit-lock `403` and the duplicate `409` in your PDF, send us
+   the exact bodies and we'll show the coder a clearer message.
 
 **What reopen sends**, using the record we keep of each approve:
 rows the approve created → W3/W4 (only if R2 still shows them); rows it changed

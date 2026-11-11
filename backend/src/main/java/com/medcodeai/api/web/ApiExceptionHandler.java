@@ -1,5 +1,8 @@
 package com.medcodeai.api.web;
 
+import com.medcodeai.api.client.HospitalApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +19,8 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     public static class NotFoundException extends RuntimeException {
         private static final long serialVersionUID = 1L;
@@ -94,6 +99,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<Map<String, Object>> tooManyRequests(TooManyRequestsException e) {
         return body(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+    }
+
+    /**
+     * 502 — the hospital's API failed us. The message is meant for the coder's
+     * screen; the log keeps the full cause (including the hospital's error
+     * body), which is where the hospital's developers look.
+     */
+    @ExceptionHandler(HospitalApiException.class)
+    public ResponseEntity<Map<String, Object>> hospital(HospitalApiException e) {
+        log.warn("hospital API call failed: {}", e.getMessage(), e);
+        return body(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error) {

@@ -504,8 +504,8 @@ public class ApprovalService {
     }
 
     /** Run the queued hospital actions, in order, after our commit (still
-     *  inside the WriteGate lock). A failure here 500s the request with our
-     *  side committed — re-approve / re-reopen heals (the diff recomputes
+     *  inside the WriteGate lock). A failure here 502s the request, with the
+     *  hospital's error as the message and our side committed — re-approve / re-reopen heals (the diff recomputes
      *  against live hospital state). Returns total hospital code writes. */
     private int runImedOps(List<ImedOp> ops) {
         int writes = 0;

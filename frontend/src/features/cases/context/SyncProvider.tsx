@@ -10,14 +10,16 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { SyncCtx } from "./SyncContext";
 import { useLang } from "./LanguageContext";
+import { useToast } from "./ToastContext";
 import { ConfirmDialog } from "../components/global/ConfirmDialog";
 import { DateRangeDialog } from "../components/global/DateRangeDialog";
 import type { DateRange } from "../utils/dateRange";
-import { syncFromHospital, type SyncWindow } from "../api/casesService";
+import { serverError, syncFromHospital, type SyncWindow } from "../api/casesService";
 import { formatDate } from "../utils/formatDate";
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLang();
+  const { showToast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState("sync.ago2m");
   const [syncVersion, setSyncVersion] = useState(0);
@@ -35,8 +37,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await syncFromHospital(window);
         setLastSync("sync.justNow");
         setSyncVersion((v) => v + 1);
-      } catch {
+      } catch (err) {
         setLastSync("sync.failed");
+        // say why — the server names the hospital-side cause (unreachable,
+        // refused credentials, a missing R6 field…); a bare spinner stop
+        // left the coder guessing
+        const reason = serverError(err);
+        showToast(reason ? t("toast.syncFailedReason", { reason }) : t("toast.syncFailed"));
       } finally {
         setSyncing(false);
       }

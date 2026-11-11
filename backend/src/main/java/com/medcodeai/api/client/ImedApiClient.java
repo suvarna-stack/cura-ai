@@ -11,6 +11,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Clock;
@@ -50,7 +51,9 @@ import java.util.function.Function;
  * While the hospital's write side is a mock it answers {@code mock: true} and
  * saves nothing in HIS; that is logged (once) as a warning, not an error.
  *
- * Failures surface as exceptions → 500 to our caller. For writes our own DB
+ * Every failure surfaces as a {@link HospitalApiException} whose message
+ * names the cause and the route — our API answers it as a 502 and the
+ * coder's screen shows it. For writes our own DB
  * transaction has already committed by then (see ApprovalService); the
  * write-back diff recomputes against live hospital state, so re-approving or
  * re-reopening heals — no retry logic here beyond the single 401 retry.
@@ -78,18 +81,24 @@ public class ImedApiClient {
     private final AtomicBoolean mockModeLogged = new AtomicBoolean();
 
     public ImedApiClient() {
-        String b = envOr("IMED_API_BASE", "http://localhost:8003");
-        this.base = b.endsWith("/") ? b.substring(0, b.length() - 1) : b;
-        // the mock's defaults; the real pair comes from the hospital's admin
-        this.clientId = envOr("IMED_CLIENT_ID", "medcode-mock-client");
-        this.clientSecret = envOr("IMED_CLIENT_SECRET", "medcode-mock-secret");
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        // the mock's default credentials; the real pair comes from the hospital's admin
         // a day of full case objects from a real hospital is far bigger than the
         // mock's — 10s was only ever tuned against localhost
-        factory.setReadTimeout(Duration.ofSeconds(
-                Long.parseLong(envOr("IMED_READ_TIMEOUT_SECONDS", "60"))));
-        this.http = RestClient.builder().baseUrl(base).requestFactory(factory).build();
+        this(envOr("IMED_API_BASE", "http://localhost:8003"),
+                envOr("IMED_CLIENT_ID", "medcode-mock-client"),
+                envOr("IMED_CLIENT_SECRET", "medcode-mock-secret"),
+                Duration.ofSeconds(Long.parseLong(envOr("IMED_READ_TIMEOUT_SECONDS", "60"))));
+    }
+
+    /** What the environment would set, passed in — tests point this at a local server. */
+    ImedApiClient(String base, String clientId, String clientSecret, Duration readTimeout) {
+        this.base = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        factory.setReadTimeout(readTimeout);
+        this.http = RestClient.builder().baseUrl(this.base).requestFactory(factory).build();
         this.tokens = new ImedTokenProvider(this::fetchToken, Clock.systemUTC());
     }
 
@@ -113,14 +122,16 @@ public class ImedApiClient {
                     .body(form)
                     .retrieve().body(ENVELOPE);
         } catch (HttpClientErrorException.Unauthorized e) {
-            throw new IllegalStateException("the hospital API refused our client credentials at "
+            throw new HospitalApiException("the hospital API refused our client credentials at "
                     + base + "/auth/token — check IMED_CLIENT_ID / IMED_CLIENT_SECRET", e);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
+        } catch (RestClientResponseException e) {
+            throw answered("POST /auth/token", e);
         }
         Object value = body == null ? null : body.get("access_token");
         if (value == null || value.toString().isBlank()) {
-            throw new IllegalStateException("the hospital API's /auth/token answer had no access_token");
+            throw new HospitalApiException("the hospital API's /auth/token answer had no access_token");
         }
         long expiresIn = body.get("expires_in") instanceof Number n ? n.longValue() : 0;
         return new ImedTokenProvider.Token(value.toString(), expiresIn);
@@ -130,8 +141,9 @@ public class ImedApiClient {
      * Runs one call with the current token. A 401 means the token died early
      * (revoked, or the server restarted and forgot it): drop it and retry ONCE
      * with a fresh one. A second 401 is a real refusal and propagates.
+     * {@code route} ("POST /api/v1/…") only labels a failure for the coder.
      */
-    private <T> T authed(Function<String, T> call) {
+    private <T> T authed(String route, Function<String, T> call) {
         try {
             String token = tokens.current();
             try {
@@ -142,6 +154,8 @@ public class ImedApiClient {
             }
         } catch (ResourceAccessException e) {
             throw unreachable(e);
+        } catch (RestClientResponseException e) {
+            throw answered(route, e);
         }
     }
 
@@ -149,14 +163,15 @@ public class ImedApiClient {
 
     /** POST /api/v1/diagnosis — returns the envelope with generated object_ids. */
     public Map<String, Object> postDiagnosis(Map<String, Object> body) {
-        return noteMockMode(authed(t -> http.post().uri("/api/v1/diagnosis")
+        return noteMockMode(authed("POST /api/v1/diagnosis", t -> http.post().uri("/api/v1/diagnosis")
                 .headers(h -> h.setBearerAuth(t))
                 .contentType(MediaType.APPLICATION_JSON).body(body)
                 .retrieve().body(ENVELOPE)));
     }
 
     public void putDiagnosis(String visitId, Map<String, Object> body) {
-        noteMockMode(authed(t -> http.put().uri("/api/v1/diagnosis/{v}", visitId)
+        noteMockMode(authed("PUT /api/v1/diagnosis/" + visitId,
+                t -> http.put().uri("/api/v1/diagnosis/{v}", visitId)
                 .headers(h -> h.setBearerAuth(t))
                 .contentType(MediaType.APPLICATION_JSON).body(body)
                 .retrieve().body(ENVELOPE)));
@@ -164,7 +179,8 @@ public class ImedApiClient {
 
     /** DELETE …/icd10|icd9/{objectId} — the cancel flow; no body, idempotent. */
     public void cancelDiagnosis(String visitId, String kind, String objectId) {
-        noteMockMode(authed(t -> http.delete()
+        noteMockMode(authed("DELETE /api/v1/diagnosis/" + visitId + "/" + kind + "/" + objectId,
+                t -> http.delete()
                 .uri("/api/v1/diagnosis/{v}/{kind}/{id}", visitId, kind, objectId)
                 .headers(h -> h.setBearerAuth(t))
                 .retrieve().body(ENVELOPE)));
@@ -237,6 +253,8 @@ public class ImedApiClient {
             return http.post().uri("/api/demo/snapshot").retrieve().body(ENVELOPE);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
+        } catch (RestClientResponseException e) {
+            throw answered("POST /api/demo/snapshot", e);
         }
     }
 
@@ -246,6 +264,8 @@ public class ImedApiClient {
             return http.post().uri("/api/demo/reset").retrieve().body(ENVELOPE);
         } catch (ResourceAccessException e) {
             throw unreachable(e);
+        } catch (RestClientResponseException e) {
+            throw answered("POST /api/demo/reset", e);
         }
     }
 
@@ -255,7 +275,7 @@ public class ImedApiClient {
 
     /** POST a JSON body to a read endpoint; a null body degrades to {}. */
     private Map<String, Object> postEnvelope(String uri, Map<String, Object> body) {
-        Map<String, Object> out = authed(t -> http.post().uri(uri)
+        Map<String, Object> out = authed("POST " + uri, t -> http.post().uri(uri)
                 .headers(h -> h.setBearerAuth(t))
                 .contentType(MediaType.APPLICATION_JSON).body(body)
                 .retrieve().body(ENVELOPE));
@@ -264,14 +284,20 @@ public class ImedApiClient {
 
     /** GET a row-list endpoint; a null body degrades to an empty list. */
     private List<Map<String, Object>> getRows(String uri) {
-        List<Map<String, Object>> body = authed(t -> http.get().uri(uri)
+        List<Map<String, Object>> body = authed("GET " + uri, t -> http.get().uri(uri)
                 .headers(h -> h.setBearerAuth(t))
                 .retrieve().body(ROWS));
         return body == null ? List.of() : body;
     }
 
-    private IllegalStateException unreachable(Exception e) {
-        return new IllegalStateException("iMed API not reachable at " + base
+    private HospitalApiException unreachable(Exception e) {
+        return new HospitalApiException("iMed API not reachable at " + base
                 + " — is the hospital's API running, and is IMED_API_BASE set to it?", e);
+    }
+
+    /** The hospital answered, with an error status. Its body stays in the log (via the cause). */
+    private static HospitalApiException answered(String route, RestClientResponseException e) {
+        return new HospitalApiException("the hospital API answered "
+                + e.getStatusCode().value() + " on " + route, e);
     }
 }

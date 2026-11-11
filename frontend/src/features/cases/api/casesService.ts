@@ -32,6 +32,13 @@ export async function fetchCaseDetail(id: string): Promise<ApiCaseDetail> {
 /** True when the detail came from a live server (includes working-state keys). */
 export const isLiveDetail = (d: ApiCaseDetail) => 'codeEdits' in d
 
+/** The server's `{error}` text from a failed request, when it sent one —
+ *  e.g. why the hospital's API failed on a sync, approve or reopen (502). */
+export function serverError(err: unknown): string | undefined {
+  const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error
+  return typeof msg === 'string' && msg.trim() ? msg : undefined
+}
+
 /** Fire a write; resolves true on success, false on failure (callers treat
  *  writes as best-effort on top of their optimistic local state). */
 async function send(
@@ -115,20 +122,29 @@ export async function setCaseStar(
  * finalized, and approving from the list can only fill a column when the
  * choice is unambiguous. The caller un-approves those and says so.
  */
-export async function approveCases(ids: string[]): Promise<{ ok: boolean; blocked: string[] }> {
+export async function approveCases(
+  ids: string[],
+): Promise<{ ok: boolean; blocked: string[]; error?: string }> {
   try {
     const { data } = await apiClient.request<{ blocked?: string[] }>({
       url: '/cases/approve', method: 'POST', data: { ids },
     })
     return { ok: true, blocked: Array.isArray(data?.blocked) ? data.blocked : [] }
-  } catch {
-    return { ok: false, blocked: [] }
+  } catch (err) {
+    return { ok: false, blocked: [], error: serverError(err) }
   }
 }
 
-/** POST /api/cases/{id}/reopen — undo an approve (actor = logged-in coder). */
-export const reopenCase = (id: string) =>
-  send(`/cases/${encodeURIComponent(id)}/reopen`, 'POST', {})
+/** POST /api/cases/{id}/reopen — undo an approve (actor = logged-in coder).
+ *  `error` is the server's reason when it gave one. */
+export async function reopenCase(id: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await apiClient.post(`/cases/${encodeURIComponent(id)}/reopen`, {})
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: serverError(err) }
+  }
+}
 
 /** PUT /api/cases/{id}/codes — save working code edits (bare array). */
 export const saveCodesRemote = (id: string, codes: ApiStoredCode[]) =>

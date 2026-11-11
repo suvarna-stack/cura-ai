@@ -100,9 +100,10 @@ Errors are one JSON key:
 | `404` | Unknown case, account or conversation. Also every demo route when `DEMO_TOOLS_ENABLED` is off |
 | `409` | Another coder holds the case lock; the account email is taken; an account with coding history cannot be deleted; no demo snapshot exists |
 | `429` | Too many failed logins for this email |
-| `500` | Spring's default body. Usually a hospital or AI-service call failed |
+| `500` | Spring's default body. Usually an AI-service call failed |
+| `502` | The hospital's API failed: unreachable, refused our client credentials, answered an error status, or failed the R6 check. `{"error": "..."}` says which, and the screen shows it |
 
-> **A `500` from approve, reopen or demo reset means our side already
+> **A `502` from approve, reopen or demo reset means our side already
 > committed.** The hospital call runs after our transaction. All three
 > recompute against the hospital's live state, so **retrying heals**. It never
 > double-writes.
@@ -325,7 +326,7 @@ A case is a `visit` block plus nine data blocks (`documents`,
 absent. Datetimes are ISO 8601 with `+07:00`, `sex` is `F`/`M`, missing values
 are `null` (never `""`), and cancelled code rows never appear. **Every sync
 runs R6 first**. If the hospital has stopped serving a field we depend on, the
-sync fails with a `500` naming it, before anything is written. Bad bodies are
+sync fails with a `502` naming it, before anything is written. Bad bodies are
 `400`; an empty `visit_ids`/`required_fields` list or a backwards window is a
 `400` too.
 
