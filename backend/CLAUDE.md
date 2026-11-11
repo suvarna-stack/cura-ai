@@ -266,9 +266,9 @@ Milestones (git log --oneline reads as this sequence):
   mirrors the frontend's own `/icd[- ]?9|pcs/i` rule ("…comorbid…" → secondary),
   and the frontend's ICD-9 comorbidity label became "ICD-9 Comorbidity" (the
   bare legacy "Comorbidities" reads as ICD-10 on both sides — old saved rows
-  keep that consistently). Hospital data itself can be dirty (a seeded overnight
-  surgery ends "before" it starts) — we store/display verbatim, no end>start
-  validation. imed-mock-api needed NO change (it already persisted the four
+  keep that consistently). A hospital record can have an end time earlier than
+  its start (an overnight surgery in the demo data) — we store/display it as
+  sent, no end>start validation. imed-mock-api needed NO change (it already persisted the four
   fields). Tests: sync-import + edit→approve→reopen round trips in
   `CasesApiIntegrationTest` (the second also covers the verbose-label fix).
 - ✅ **Hospital-UI elements: operation type + vital signs (2026-07-30):** the
@@ -312,10 +312,9 @@ Milestones (git log --oneline reads as this sequence):
   from its empty-guard). NO abnormal-value highlighting on purpose — the
   extract has no reference ranges (open question 14). The rest of the
   hospital's UI fields (doctor, clinic, chronic flag, recorder, WHO/TM/CM
-  edition, Extension Code, lab ranges) are NOT in the extract — blocked on
-  the hospital, tracked as `docs/imed-integration.md` open questions 11–14;
-  the user chose NOT to contact the hospital for now, so don't draft
-  outreach unprompted.
+  edition, Extension Code, lab ranges) are NOT in the extract — they need
+  hospital data, tracked as `docs/imed-integration.md` open questions 11–14;
+  don't draft messages to the hospital about them unless asked.
 - ✅ **Hospital-style panel view of the case detail (2026-07-31):** the case
   detail's report side can now render as the SAME six-panel layout the
   hospital's own coder screen shows — CC,PI,PE (vitals table + note text) ·
