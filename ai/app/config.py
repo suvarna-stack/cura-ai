@@ -73,6 +73,20 @@ class Settings(BaseSettings):
     repetition_penalty: float = 1.1            # small models echo without it
     chat_history_turns: int = 8                # prior turns kept per /chat call
 
+    # --- Code suggestions (/suggest) ---
+    # "codebook": read the chart, look each diagnosis / procedure up in the
+    # one-entry-per-code index (data/codebook). "rag": the pre-2026-11 PDF
+    # chunk scraping only (kept to compare against).
+    suggest_engine: str = "codebook"
+    # Use the old PDF scraping for a column the chart gave no term for.
+    suggest_rag_fallback: bool = True
+    # Local LLM steps: "auto" = on when llm_backend is "ollama", "on", "off".
+    suggest_llm_extract: str = "auto"
+    suggest_llm_rerank: str = "auto"
+    suggest_min_score: float = 0.3       # codebook match needed to show a code
+    suggest_per_term: int = 3            # codes shown per diagnosis / procedure
+    suggest_case_min_score: float = 0.35 # how alike a past case must read
+
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.chroma_dir.mkdir(parents=True, exist_ok=True)

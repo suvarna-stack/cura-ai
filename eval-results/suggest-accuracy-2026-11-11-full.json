@@ -1,0 +1,837 @@
+{
+ "summary": {
+  "gold": "gold_synthetic_42.jsonl",
+  "view": "full",
+  "memory": "none",
+  "rag_fallback": false,
+  "cases": 42,
+  "icd10": {
+   "top1": 34,
+   "top3": 38,
+   "top8": 38
+  },
+  "icd10_cases": 42,
+  "icd9": {
+   "top1": 16,
+   "top3": 18,
+   "top8": 18
+  },
+  "icd9_cases": 23,
+  "icd9_codes_offered_when_none_done": 0.74,
+  "seconds": 1.7
+ },
+ "cases": [
+  {
+   "id": "syn-01",
+   "gold_icd10": [
+    "J00"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "J00",
+    "Y55.5"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Common cold\" ~ Common cold"
+  },
+  {
+   "id": "syn-02",
+   "gold_icd10": [
+    "J02.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "J02.9",
+    "J31.2"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute pharyngitis\" ~ Acute pharyngitis"
+  },
+  {
+   "id": "syn-03",
+   "gold_icd10": [
+    "J20.9"
+   ],
+   "gold_icd9": [
+    "93.94"
+   ],
+   "icd10_suggested": [
+    "J20.9",
+    "J40",
+    "J42"
+   ],
+   "icd9_suggested": [
+    "93.94"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute bronchitis\" ~ Acute bronchitis"
+  },
+  {
+   "id": "syn-04",
+   "gold_icd10": [
+    "J18.9"
+   ],
+   "gold_icd9": [
+    "87.44"
+   ],
+   "icd10_suggested": [
+    "J18.9",
+    "J15.9",
+    "J18.1"
+   ],
+   "icd9_suggested": [
+    "87.49",
+    "87.44",
+    "88.39"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 2,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Community acquired pneumonia, right lower lobe\" ~ Pneumonia"
+  },
+  {
+   "id": "syn-05",
+   "gold_icd10": [
+    "E11.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "E11.9",
+    "E14.9",
+    "E11.5"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Type 2 DM\" ~ DM Type 2 (Diabetes mellitus Type 2)"
+  },
+  {
+   "id": "syn-06",
+   "gold_icd10": [
+    "I10"
+   ],
+   "gold_icd9": [
+    "89.52"
+   ],
+   "icd10_suggested": [
+    "I10"
+   ],
+   "icd9_suggested": [
+    "89.52",
+    "75.32",
+    "89.51"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Essential hypertension\" ~ Essential HT"
+  },
+  {
+   "id": "syn-07",
+   "gold_icd10": [
+    "E78.5"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "E78.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · diagnosis: \"Dyslipidemia on statin\" ~ DLP (Dyslipidemia)"
+  },
+  {
+   "id": "syn-08",
+   "gold_icd10": [
+    "K29.1"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "K29.1",
+    "K29.7"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute gastritis\" ~ Acute gastritis"
+  },
+  {
+   "id": "syn-09",
+   "gold_icd10": [
+    "K21.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "K21.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Gastroesophageal reflux disease\" ~ GERD"
+  },
+  {
+   "id": "syn-10",
+   "gold_icd10": [
+    "A09.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "A09.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute gastroenteritis with mild dehydration\" ~ Acute gastroenteritis"
+  },
+  {
+   "id": "syn-11",
+   "gold_icd10": [
+    "D50.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "E61.1",
+    "D50.9",
+    "D64.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 2,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Iron deficiency anemia\" ~ Iron deficiency"
+  },
+  {
+   "id": "syn-12",
+   "gold_icd10": [
+    "N39.0"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "N39.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Uncomplicated urinary tract infection\" ~ Urinary tract infection"
+  },
+  {
+   "id": "syn-13",
+   "gold_icd10": [
+    "J45.9"
+   ],
+   "gold_icd9": [
+    "93.94"
+   ],
+   "icd10_suggested": [
+    "J45.9"
+   ],
+   "icd9_suggested": [
+    "93.94"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Asthma with acute exacerbation\" ~ Asthma, unspecified"
+  },
+  {
+   "id": "syn-14",
+   "gold_icd10": [
+    "K64.2"
+   ],
+   "gold_icd9": [
+    "49.46"
+   ],
+   "icd10_suggested": [
+    "K64.2",
+    "K64.8",
+    "K64.1"
+   ],
+   "icd9_suggested": [
+    "49.46"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Internal hemorrhoid grade III\" ~ Hemorrhoid Grade 3"
+  },
+  {
+   "id": "syn-15",
+   "gold_icd10": [
+    "K35.8"
+   ],
+   "gold_icd9": [
+    "47.09"
+   ],
+   "icd10_suggested": [
+    "K35.8"
+   ],
+   "icd9_suggested": [
+    "47.09",
+    "47.0",
+    "47.01"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute appendicitis\" ~ Acute appendicitis"
+  },
+  {
+   "id": "syn-16",
+   "gold_icd10": [
+    "L02.4"
+   ],
+   "gold_icd9": [
+    "86.04"
+   ],
+   "icd10_suggested": [
+    "H60.0",
+    "S71.0",
+    "L02.9"
+   ],
+   "icd9_suggested": [
+    "57.0",
+    "93.56",
+    "56.2",
+    "93.57",
+    "06.09"
+   ],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · diagnosis: \"Abscess at right hip\" ~ Abscess of external ear"
+  },
+  {
+   "id": "syn-17",
+   "gold_icd10": [
+    "D17.1"
+   ],
+   "gold_icd9": [
+    "86.11"
+   ],
+   "icd10_suggested": [
+    "D17.1"
+   ],
+   "icd9_suggested": [
+    "95.04",
+    "38.6",
+    "85.21",
+    "80.50",
+    "60.61",
+    "32.9"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Lipoma at back\" ~ lipoma at back"
+  },
+  {
+   "id": "syn-18",
+   "gold_icd10": [
+    "N20.0"
+   ],
+   "gold_icd9": [
+    "88.75"
+   ],
+   "icd10_suggested": [
+    "N20.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Right renal calculi with renal colic\" ~ Renal calculi"
+  },
+  {
+   "id": "syn-19",
+   "gold_icd10": [
+    "M54.5"
+   ],
+   "gold_icd9": [
+    "93.35"
+   ],
+   "icd10_suggested": [
+    "M54.5",
+    "M54.9"
+   ],
+   "icd9_suggested": [
+    "93.35"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Mechanical low back pain\" ~ Low back pain"
+  },
+  {
+   "id": "syn-20",
+   "gold_icd10": [
+    "M17.1"
+   ],
+   "gold_icd9": [
+    "81.92"
+   ],
+   "icd10_suggested": [
+    "M17.1",
+    "M17.0"
+   ],
+   "icd9_suggested": [
+    "81.92",
+    "75.0"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Osteoarthritis left knee\" ~ OA left knee"
+  },
+  {
+   "id": "syn-21",
+   "gold_icd10": [
+    "M75.1"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "S46.0",
+    "M75.1"
+   ],
+   "icd9_suggested": [
+    "00.94",
+    "88.91",
+    "88.97"
+   ],
+   "icd10_rank": 2,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Rotator cuff tear, left shoulder\" ~ Injury of tendon of the rotator cuff of shoulder"
+  },
+  {
+   "id": "syn-22",
+   "gold_icd10": [
+    "J03.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "J03.9"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute tonsillitis\" ~ Acute tonsillitis"
+  },
+  {
+   "id": "syn-23",
+   "gold_icd10": [
+    "J32.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "J32.0",
+    "J32.9"
+   ],
+   "icd9_suggested": [
+    "96.53",
+    "96.52",
+    "96.51"
+   ],
+   "icd10_rank": 2,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Chronic maxillary sinusitis\" ~ Chronic maxillary sinusitis"
+  },
+  {
+   "id": "syn-24",
+   "gold_icd10": [
+    "H61.2"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "H61.2"
+   ],
+   "icd9_suggested": [
+    "96.52",
+    "96.51",
+    "96.59"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Impacted cerumen, right ear\" ~ Impacted cerumen"
+  },
+  {
+   "id": "syn-25",
+   "gold_icd10": [
+    "J30.4"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "J30.4"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Allergic rhinitis\" ~ Allergic rhinitis"
+  },
+  {
+   "id": "syn-26",
+   "gold_icd10": [
+    "R51"
+   ],
+   "gold_icd9": [
+    "87.03"
+   ],
+   "icd10_suggested": [
+    "R51",
+    "G43.9",
+    "G44.2"
+   ],
+   "icd9_suggested": [
+    "87.03",
+    "87.71",
+    "87.41"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Headache\" ~ Headache"
+  },
+  {
+   "id": "syn-27",
+   "gold_icd10": [
+    "G43.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "G43.0",
+    "G43.1",
+    "G43.9"
+   ],
+   "icd9_suggested": [
+    "93.35",
+    "93.9"
+   ],
+   "icd10_rank": 3,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Migraine without aura\" ~ Migraine without aura [common migraine]"
+  },
+  {
+   "id": "syn-28",
+   "gold_icd10": [
+    "L23.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "L23.9",
+    "L23.0",
+    "L23.6"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Allergic contact dermatitis\" ~ Allergic contact dermatitis"
+  },
+  {
+   "id": "syn-29",
+   "gold_icd10": [
+    "B35.4"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "B35.4"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Tinea corporis\" ~ Tinea corporis"
+  },
+  {
+   "id": "syn-30",
+   "gold_icd10": [
+    "Z00.0"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "Z00.0"
+   ],
+   "icd9_suggested": [],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Annual health check up\" ~ Check up"
+  },
+  {
+   "id": "syn-31",
+   "gold_icd10": [
+    "S61.0"
+   ],
+   "gold_icd9": [
+    "86.59"
+   ],
+   "icd10_suggested": [
+    "S61.0",
+    "S01.8",
+    "S61.1"
+   ],
+   "icd9_suggested": [
+    "86.59",
+    "39.31",
+    "97.79"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Laceration wound right index finger\" ~ Open wound of finger(s)"
+  },
+  {
+   "id": "syn-32",
+   "gold_icd10": [
+    "S01.8"
+   ],
+   "gold_icd9": [
+    "86.59"
+   ],
+   "icd10_suggested": [
+    "S01.8"
+   ],
+   "icd9_suggested": [
+    "86.59",
+    "39.31",
+    "97.79"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Laceration wound at forehead\" ~ laceration wound at head"
+  },
+  {
+   "id": "syn-33",
+   "gold_icd10": [
+    "L50.9"
+   ],
+   "gold_icd9": [],
+   "icd10_suggested": [
+    "L50.9"
+   ],
+   "icd9_suggested": [
+    "81.92",
+    "99.21",
+    "31.0"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": null,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Acute urticaria from food allergy\" ~ Acute urticaria"
+  },
+  {
+   "id": "syn-34",
+   "gold_icd10": [
+    "R10.4"
+   ],
+   "gold_icd9": [
+    "88.79"
+   ],
+   "icd10_suggested": [
+    "R10.2"
+   ],
+   "icd9_suggested": [
+    "88.7",
+    "00.09",
+    "00.0"
+   ],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · diagnosis: \"Chronic pelvic pain\" ~ Pelvic pain"
+  },
+  {
+   "id": "syn-35",
+   "gold_icd10": [
+    "C50.9"
+   ],
+   "gold_icd9": [
+    "85.21"
+   ],
+   "icd10_suggested": [
+    "N63",
+    "C50.2"
+   ],
+   "icd9_suggested": [
+    "37.25",
+    "77.4",
+    "70.24"
+   ],
+   "icd10_rank": null,
+   "icd9_rank": null,
+   "icd10_all_found": 0,
+   "why_top": "codebook · diagnosis: \"Breast mass, right upper outer quadrant\" ~ Breast mass"
+  },
+  {
+   "id": "syn-36",
+   "gold_icd10": [
+    "E04.1"
+   ],
+   "gold_icd9": [
+    "06.2"
+   ],
+   "icd10_suggested": [
+    "E04.1",
+    "J98.4"
+   ],
+   "icd9_suggested": [
+    "06.2",
+    "50.3",
+    "01.53",
+    "32.49"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Solitary thyroid nodule, right lobe\" ~ Nontoxic single thyroid nodule"
+  },
+  {
+   "id": "syn-37",
+   "gold_icd10": [
+    "E11.5"
+   ],
+   "gold_icd9": [
+    "86.22"
+   ],
+   "icd10_suggested": [
+    "E11.5",
+    "L08.9",
+    "E14.3"
+   ],
+   "icd9_suggested": [
+    "86.28",
+    "86.22",
+    "83.45",
+    "01.59"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 2,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Infected diabetic foot ulcer\" ~ DM type 2 foot with Diabetic ulcer"
+  },
+  {
+   "id": "syn-38",
+   "gold_icd10": [
+    "E14.3"
+   ],
+   "gold_icd9": [
+    "13.41"
+   ],
+   "icd10_suggested": [
+    "E14.3"
+   ],
+   "icd9_suggested": [
+    "13.41",
+    "13.72",
+    "13.71",
+    "13.90"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Diabetic cataract, right eye\" ~ Diabetic cataract"
+  },
+  {
+   "id": "syn-39",
+   "gold_icd10": [
+    "G56.0"
+   ],
+   "gold_icd9": [
+    "04.43"
+   ],
+   "icd10_suggested": [
+    "G56.0",
+    "G57.5"
+   ],
+   "icd9_suggested": [
+    "04.43",
+    "04.44"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Carpal tunnel syndrome\" ~ Carpal tunnel syndrome"
+  },
+  {
+   "id": "syn-40",
+   "gold_icd10": [
+    "K80.2"
+   ],
+   "gold_icd9": [
+    "51.23"
+   ],
+   "icd10_suggested": [
+    "K80.2"
+   ],
+   "icd9_suggested": [
+    "51.23",
+    "51.24",
+    "51.22"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Symptomatic cholelithiasis\" ~ symptomatic gallstone"
+  },
+  {
+   "id": "syn-41",
+   "gold_icd10": [
+    "N40"
+   ],
+   "gold_icd9": [
+    "57.32"
+   ],
+   "icd10_suggested": [
+    "N40"
+   ],
+   "icd9_suggested": [
+    "57.32",
+    "57.31"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Benign prostatic hyperplasia with lower urinary tract symptoms\" ~ BPH"
+  },
+  {
+   "id": "syn-42",
+   "gold_icd10": [
+    "R42"
+   ],
+   "gold_icd9": [
+    "88.72"
+   ],
+   "icd10_suggested": [
+    "R42",
+    "H81.1"
+   ],
+   "icd9_suggested": [
+    "88.72",
+    "88.78"
+   ],
+   "icd10_rank": 1,
+   "icd9_rank": 1,
+   "icd10_all_found": 1,
+   "why_top": "codebook · diagnosis: \"Dizziness\" ~ Dizziness"
+  }
+ ]
+}

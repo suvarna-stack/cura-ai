@@ -200,3 +200,33 @@ pytest -q            # chunker unit tests + API smoke tests (no model download)
 - Consider adding a reranker (bge-reranker) and hybrid (BM25 + dense) retrieval
   for higher-precision medical coding lookups.
 ```
+
+## Code suggestions (`/suggest`) — how they are made (2026-11)
+
+The old `/suggest` searched 800-character PDF slices with the whole note and
+scraped every code-shaped token. It scored 0/42 top-1. It now works like a
+coder:
+
+1. **Codebook** (`app/core/codebook.py`, `data/codebook/codebook.json`): one
+   entry per ICD code, English + Thai names + search terms. Built by
+   `python -m scripts.build_codebook` from `data/codebook/*.csv` (the iMed
+   catalog; put the hospital's full ICD-10-TM / ICD-9-CM tables here),
+   the ICD-10-TM for PCU PDF (Thai names) and the ICD-9-CM PDF. Rebuild after
+   adding a table.
+2. **Read the chart** (`app/core/extract.py`): the written diagnoses
+   (principal first), procedures from the plan, and only if no diagnosis is
+   written, the complaint. Rules always; the local LLM too when
+   `SUGGEST_LLM_EXTRACT` is on (default `auto` = on with Ollama). Each term is
+   looked up in the codebook; the suggestion's `source` quotes the chart words.
+3. **Approved cases** (`app/core/case_memory.py`,
+   `data/cases/approved_cases.jsonl`, git-ignored): codes of similar past
+   cases are added or confirmed, and shown to the LLM as examples. Export with
+   `backend/scripts/export_approved_cases.sql`.
+4. **Order**: coder rules, then chart diagnoses in chart order, then past
+   cases / complaint guesses, then the old PDF search (only for a column the
+   chart gave nothing for). `SUGGEST_LLM_RERANK` lets the LLM reorder found
+   codes; it cannot add one.
+
+Measure with `python -m scripts.eval_suggest` (see
+`../eval-results/suggest-accuracy-2026-11-11.md`). `SUGGEST_ENGINE=rag`
+switches back to the old method for comparison.
