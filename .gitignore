@@ -1,3 +1,7 @@
 # Real secrets and local port overrides — .env.example is the tracked template.
 .env
 .DS_Store
+
+# Hospital-issued API credentials — never commit
+MedCode-token.txt
+*-token.txt
